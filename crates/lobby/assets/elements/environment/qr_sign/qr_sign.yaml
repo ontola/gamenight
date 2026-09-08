@@ -1,0 +1,6 @@
+# The lit face — the QR code itself. The slab around it (the platform players
+# land on) is this plus the shared screen frame on every side.
+#
+# Small, because it's a machine in a room people are also fighting in, and a
+# code only has to be big enough for a phone a couple of metres away.
+size: [48, 48]

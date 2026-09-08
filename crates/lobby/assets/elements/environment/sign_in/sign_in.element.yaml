@@ -1,0 +1,7 @@
+name: Sign-in Platform
+category: GameNight
+editor:
+  grab_size: [72, 32]
+  grab_offset: [0, 0]
+  show_name: true
+data: sign_in.yaml

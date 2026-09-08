@@ -1,0 +1,10 @@
+/target/
+/crates/lobby/target/
+/vendor/bones/target/
+.local/
+.env
+.env.*
+!.env.example
+.DS_Store
+.godot/
+*.import

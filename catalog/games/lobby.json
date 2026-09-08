@@ -1,0 +1,24 @@
+{
+  "$schema": "../schema.json",
+  "id": "lobby",
+  "title": "GameNight Lobby",
+  "tagline": "The couch you gather on before the game starts.",
+  "developer": "GameNight contributors",
+  "players": { "min": 1, "max": 4, "best": 4 },
+  "match_minutes": 1,
+  "price": "free",
+  "tags": ["lobby", "bundled", "open-source", "bevy", "rust"],
+  "emoji": "🛋️",
+  "color": "#6366f1",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "requirements": {
+    "disk_mb": 200,
+    "ram_mb": 2048,
+    "cpu": "any dual-core",
+    "gpu": "anything with Vulkan/Metal (integrated is fine)"
+  },
+  "bundled": "crates/lobby"
+}

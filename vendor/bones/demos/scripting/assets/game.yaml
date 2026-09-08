@@ -1,0 +1,3 @@
+plugins:
+  - plugin1.plugin.lua
+data: ./demo-data.yaml

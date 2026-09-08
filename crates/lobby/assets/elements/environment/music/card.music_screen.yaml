@@ -1,0 +1,11 @@
+# The lit face the track is written on: the front of the record cupboard, with
+# the deck and the amplifier standing on the lid above it.
+#
+# Sized to the cupboard rather than to the text. It used to be 172px wide across
+# a 96px piece of furniture, so the screen covered the entire jukebox — the
+# turntable, the amp and both speakers were behind it and the thing read as a
+# black rectangle on a plinth.
+screen_size: [132, 30]
+# Slab around it, per side. Wider than tall: this is a platform first, and a
+# wide landing is a forgiving one.
+frame: [6, 6]

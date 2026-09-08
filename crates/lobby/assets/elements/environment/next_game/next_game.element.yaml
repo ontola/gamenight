@@ -1,0 +1,7 @@
+name: Start Next Game
+category: Gameplay
+editor:
+  grab_size: [36, 31]
+  grab_offset: [0, 0]
+  show_name: true
+data: next_game_trigger.yaml

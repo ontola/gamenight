@@ -1,0 +1,36 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gamenight-protocol",
+    "crates/gamenight-core",
+    "crates/gamenight-daemon",
+    "crates/gamenight-sdk",
+    "crates/gamenight-certify",
+    "crates/gamenight-catalog",
+    "crates/gamenight-installer",
+    "crates/gamenight-mcp",
+    "crates/gamenight-local-web",
+    "examples/demo-game",
+]
+exclude = ["crates/lobby", "vendor/bones"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ontola/gamenight"
+
+[workspace.dependencies]
+gamenight-protocol = { path = "crates/gamenight-protocol" }
+gamenight-core = { path = "crates/gamenight-core" }
+gamenight-sdk = { path = "crates/gamenight-sdk" }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util", "signal"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

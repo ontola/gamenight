@@ -1,0 +1,7 @@
+name: Music — Screen
+category: GameNight
+editor:
+  grab_size: [172, 72]
+  grab_offset: [0, 0]
+  show_name: true
+data: card.music_screen.yaml

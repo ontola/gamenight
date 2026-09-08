@@ -1,0 +1,4 @@
+# The floor zone a player jumps into to point the wall's join QR at themselves.
+body_size: [64, 14]
+# One landing is one claim, however many frames the physics takes to settle it.
+cooldown_secs: 0.25

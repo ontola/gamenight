@@ -1,0 +1,36 @@
+[package]
+name                    = "bones_bevy_renderer"
+description             = "Bevy rendering implementation for the bones_framework."
+version.workspace       = true
+authors.workspace       = true
+edition.workspace       = true
+license.workspace       = true
+repository.workspace    = true
+documentation.workspace = true
+categories.workspace    = true
+keywords.workspace      = true
+
+[features]
+default = ["webgl2"]
+webgl2  = ["bevy/webgl2"]
+
+[dependencies]
+bones_framework = { version = "0.4.0", path = "../bones_framework" }
+
+bevy_egui           = "0.22"
+glam                = { version = "0.24", features = ["serde"] }
+bevy_prototype_lyon = "0.9"
+serde_yaml          = "0.9"
+serde               = "1.0.188"
+anyhow              = "1.0"
+
+[dependencies.bevy]
+default-features = false
+features         = ["bevy_render", "bevy_core_pipeline", "bevy_sprite", "x11"]
+version          = "0.11"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+directories = "5.0"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys = { version = "0.3", features = ["Window", "Storage", "Location"] }

@@ -1,0 +1,32 @@
+[package]
+name                    = "bones_utils"
+description             = "Utilites used throughout the bones_framework."
+version.workspace       = true
+authors.workspace       = true
+edition.workspace       = true
+license.workspace       = true
+repository.workspace    = true
+documentation.workspace = true
+categories.workspace    = true
+keywords.workspace      = true
+
+[features]
+default = ["ulid"]
+serde = ["dep:serde", "hashbrown/serde"]
+ulid = ["dep:ulid", "instant", "turborand"]
+
+[dependencies]
+bones_utils_macros = { version = "0.4", path = "./macros" }
+fxhash             = { workspace = true }
+hashbrown          = { workspace = true }
+
+# Optional
+instant   = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+serde     = { version = "1.0", optional = true }
+turborand = { version = "0.10", optional = true }
+ulid      = { version = "1.0", optional = true }
+
+# Make sure that the getrandom package, used in `ulid` works on web
+# when compiling for WASM.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }

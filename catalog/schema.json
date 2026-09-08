@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CatalogEntry",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "description": "Editor hint only; not validated. Points at `../schema.json`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bundled": {
+      "description": "Repo-relative path for games bundled with GameNight itself.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "color": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cover": {
+      "description": "Real cover art URL. `emoji` + `color` are the generated-poster fallback.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "developer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "downloads": {
+      "description": "Direct downloads keyed by platform (`linux` / `windows` / `mac`).",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/Download"
+      }
+    },
+    "emoji": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "id": {
+      "description": "Lowercase kebab-case; equals the filename and the wire game id.",
+      "type": "string"
+    },
+    "integration": {
+      "$ref": "#/$defs/Integration"
+    },
+    "links": {
+      "description": "Store / homepage / source links. Paid games are obtained here.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "match_minutes": {
+      "description": "Rough length of one match, for playlist pacing.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "players": {
+      "$ref": "#/$defs/Players"
+    },
+    "price": {
+      "$ref": "#/$defs/Price"
+    },
+    "requirements": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Requirements"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tagline": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "title": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "title",
+    "players",
+    "price",
+    "integration"
+  ],
+  "$defs": {
+    "Download": {
+      "type": "object",
+      "properties": {
+        "entrypoint": {
+          "description": "Path to the runnable executable, relative to the extracted archive's\nroot. Required when [`Self::is_archive`] — there's no way to guess\nwhat's inside a tarball. Omitted for a bare-binary download, where\nthe download itself (its URL's filename) is the executable.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sha256": {
+          "description": "Required — the daemon refuses unverifiable installs.",
+          "type": "string"
+        },
+        "size_mb": {
+          "description": "The download itself, not installed size.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "url",
+        "sha256"
+      ]
+    },
+    "Integration": {
+      "type": "object",
+      "properties": {
+        "certified_with": {
+          "description": "e.g. \"gamenight-certify 0.1.0\" (required for certified).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "level": {
+          "$ref": "#/$defs/IntegrationLevel"
+        },
+        "protocol": {
+          "description": "Protocol version spoken (required for integrated/certified).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "level"
+      ]
+    },
+    "IntegrationLevel": {
+      "description": "The integration ladder, honest by construction.",
+      "oneOf": [
+        {
+          "description": "Speaks the protocol and passes gamenight-certify.",
+          "type": "string",
+          "const": "certified"
+        },
+        {
+          "description": "Speaks the protocol; not (yet) certified.",
+          "type": "string",
+          "const": "integrated"
+        },
+        {
+          "description": "Launchable but silent: no protocol, transitions are kill-and-relaunch.",
+          "type": "string",
+          "const": "adapter"
+        },
+        {
+          "description": "Wishlist: metadata only.",
+          "type": "string",
+          "const": "planned"
+        }
+      ]
+    },
+    "Players": {
+      "type": "object",
+      "properties": {
+        "best": {
+          "description": "The count the game shines at.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "max": {
+          "description": "Couch seats, not online lobby size.",
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "min": {
+          "type": "integer",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "min",
+        "max"
+      ]
+    },
+    "Price": {
+      "type": "string",
+      "enum": [
+        "free",
+        "pay_what_you_want",
+        "paid"
+      ]
+    },
+    "Requirements": {
+      "description": "Approximate, honest hardware needs. Target: a living-room PC.",
+      "type": "object",
+      "properties": {
+        "cpu": {
+          "description": "Plain words: \"any dual-core\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disk_mb": {
+          "description": "Installed size.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "gpu": {
+          "description": "Plain words: \"integrated is fine\".",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ram_mb": {
+          "description": "Beyond the OS.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
