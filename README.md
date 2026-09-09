@@ -107,3 +107,11 @@ to adopt our engine or use our hosted services to contribute. Read
 GameNight's original code is MIT-licensed; see [LICENSE](LICENSE).
 The lobby and vendored Bones retain their own upstream notices. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for source revisions, modifications and media credits.
+
+### LÖVE party games
+
+The [LÖVE Party Pack](games/love-party/README.md) contains three original local
+multiplayer games for 2–4 players: Bumper Royale, Neon Trails and Meteor Dash.
+Run `love games/love-party` or build individual `.love` files with
+`scripts/package-love-party.py`. The pack shares one GameNight adapter and
+includes simulation tests plus native Windows protocol certification in CI.

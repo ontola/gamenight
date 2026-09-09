@@ -1,0 +1,66 @@
+name: LÖVE party pack
+on:
+  pull_request:
+    paths:
+      - 'games/love-party/**'
+      - 'scripts/*love-party.py'
+      - '.github/workflows/love-party.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'games/love-party/**'
+      - 'scripts/*love-party.py'
+      - '.github/workflows/love-party.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  games:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install verified LÖVE runtime
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'love.zip'
+          Invoke-WebRequest 'https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'BA6E56BE2685E53C817749C4A5007F51137136FE5A3AB64920508BABC2E74369') { throw 'LÖVE checksum mismatch' }
+          Expand-Archive $archive (Join-Path $env:RUNNER_TEMP 'love')
+      - name: Simulation and lifecycle tests
+        shell: pwsh
+        run: |
+          $env:GNLOVE_HEADLESS = '1'
+          $env:GNLOVE_TEST = '1'
+          & "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" games/love-party
+          if ($LASTEXITCODE -ne 0) { throw 'Game tests failed' }
+      - name: Package and verify deterministic output
+        shell: pwsh
+        run: |
+          python scripts/package-love-party.py --output dist/party
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          python scripts/package-love-party.py --output dist/repeated
+          if ($LASTEXITCODE -ne 0) { throw 'Repeat packaging failed' }
+          if ((Get-FileHash dist/party/gamenight-love-party.zip).Hash -ne (Get-FileHash dist/repeated/gamenight-love-party.zip).Hash) { throw 'Non-deterministic package' }
+      - name: Certify every packaged game against GameNight
+        shell: pwsh
+        run: |
+          cargo build --locked -p gamenight-certify
+          if ($LASTEXITCODE -ne 0) { throw 'Certifier build failed' }
+          $env:GNLOVE_HEADLESS = '1'
+          $env:GNLOVE_MATCH_SECONDS = '1'
+          foreach ($game in @('bumper-royale', 'neon-trails', 'meteor-dash')) {
+            & target/debug/gamenight-certify.exe $game -- "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" "$pwd/dist/party/$game.love"
+            if ($LASTEXITCODE -ne 0) { throw "Certification failed: $game" }
+          }
+      - name: Verify host disconnect cleanup
+        shell: pwsh
+        run: |
+          python scripts/test-love-party.py --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --pack dist/party
+          if ($LASTEXITCODE -ne 0) { throw 'Host disconnect test failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamenight-love-party
+          path: dist/party/*
