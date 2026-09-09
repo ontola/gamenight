@@ -32,6 +32,8 @@ impl Server {
             while !done.load(Ordering::SeqCst) {
                 match listener.accept() {
                     Ok((mut stream, _)) => {
+                        // Windows accepted sockets inherit the listener's nonblocking mode.
+                        stream.set_nonblocking(false).unwrap();
                         stream
                             .set_read_timeout(Some(std::time::Duration::from_secs(3)))
                             .unwrap();
@@ -70,7 +72,10 @@ impl Server {
 impl Drop for Server {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
-        self.thread.take().unwrap().join().unwrap();
+        let result = self.thread.take().unwrap().join();
+        if !std::thread::panicking() {
+            result.expect("test server failed");
+        }
     }
 }
 fn entry(server: &Server, game: &[u8], runtime: &[u8]) -> CatalogEntry {
