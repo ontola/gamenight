@@ -482,6 +482,8 @@ async fn a_game_that_quits_is_not_respawned() {
     std::fs::create_dir_all(&dir).unwrap();
     let tokens = dir.join("tokens");
     let _ = std::fs::remove_file(&tokens);
+    let quit = tokens.with_extension("quit");
+    let _ = std::fs::remove_file(&quit);
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
@@ -568,6 +570,7 @@ async fn a_game_that_quits_is_not_respawned() {
             }
         }
         drop(ws);
+        std::fs::write(&quit, "quit").unwrap();
     }
 
     // Let any further launch the daemon might attempt actually happen.
@@ -587,7 +590,11 @@ async fn a_game_that_quits_is_not_respawned() {
 async fn next_token(path: &std::path::Path, n: usize) -> Option<String> {
     for _ in 0..40 {
         if let Ok(contents) = std::fs::read_to_string(path) {
-            if let Some(line) = contents.lines().nth(n) {
+            if let Some(line) = contents
+                .split_inclusive('\n')
+                .filter(|line| line.ends_with('\n'))
+                .nth(n)
+            {
                 if !line.trim().is_empty() {
                     return Some(line.trim().to_string());
                 }
@@ -798,7 +805,15 @@ fn fake_game_process() {
     let mut file = std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(path)
+        .open(&path)
         .unwrap();
-    writeln!(file, "{token}").unwrap();
+    file.write_all(format!("{token}\n").as_bytes()).unwrap();
+    // Stay alive until the test has connected and dropped the game socket.
+    // Exiting before Hello lets another party command reap/relaunch this child
+    // and invalidate the token before the simulated game can use it.
+    let quit = std::path::Path::new(&path).with_extension("quit");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !quit.exists() && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
 }

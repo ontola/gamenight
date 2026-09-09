@@ -57,7 +57,7 @@ jobs:
           name: installer-smoke-diagnostics
           path: |
             ${{ runner.temp }}/installer-smoke/data
-            ${{ runner.temp }}/installer-smoke/installed/*.log
+            ${{ runner.temp }}/installer-smoke/*.log
           if-no-files-found: ignore
   lobby:
     timeout-minutes: 45

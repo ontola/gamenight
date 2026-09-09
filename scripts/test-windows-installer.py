@@ -2,6 +2,8 @@
 Uses a unique test app ID, private feed and disposable data, never GameNight's install.
 """
 import argparse
+import ctypes
+from ctypes import wintypes
 import json
 import os
 from pathlib import Path
@@ -27,6 +29,40 @@ def run(*args, **kwargs):
     return result
 
 
+class RunningApp:
+    """Track the app launched by the installed entry stub, which exits immediately."""
+    kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    kernel.GetExitCodeProcess.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+
+    def __init__(self, pid):
+        self.pid = pid
+        self.handle = self.kernel.OpenProcess(0x100000 | 0x1000, False, pid)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        self.returncode = None
+
+    def poll(self):
+        if self.kernel.WaitForSingleObject(self.handle, 0) == 0:
+            code = wintypes.DWORD()
+            if not self.kernel.GetExitCodeProcess(self.handle, ctypes.byref(code)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            self.returncode = code.value
+        return self.returncode
+
+    def wait(self, timeout):
+        if self.kernel.WaitForSingleObject(self.handle, int(timeout * 1000)) != 0:
+            raise RuntimeError('Installed app did not exit')
+        return self.poll()
+
+    def __del__(self):
+        if self.handle:
+            self.kernel.CloseHandle(self.handle)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--binary', type=Path, required=True)
@@ -49,19 +85,24 @@ def main():
             '--shortcuts', 'None', '--outputDir', str(root / version))
     setup = next((root / '1.0.0').glob('*Setup.exe'))
     run(str(setup), '--silent', '--installto', str(installed))
-    exe = installed / 'current/Smoke.exe'
+    exe = installed / 'Smoke.exe'
     wait_for(exe.is_file, 'Installation did not produce Smoke.exe')
     (data / 'settings.json').write_text('preserve this setting')
     env = dict(os.environ, GAMENIGHT_DATA_DIR=str(data))
+    session = 0
 
     def start(feed):
+        nonlocal session
+        session += 1
         for name in ['exit', 'running.json', 'children-closed', 'updater.log']:
             (data / name).unlink(missing_ok=True)
         env['GAMENIGHT_SMOKE_FEED'] = str(feed)
-        process = subprocess.Popen([str(exe)], env=env, creationflags=subprocess.CREATE_NO_WINDOW)
+        with (data / f'process-{session}.log').open('w') as log:
+            subprocess.run([str(exe)], env=env, stdout=log, stderr=log, check=True,
+                           timeout=10, creationflags=subprocess.CREATE_NO_WINDOW)
         wait_for(lambda: (data / 'running.json').is_file(), 'Installed app failed to start')
         report = json.loads((data / 'running.json').read_text())
-        return process, report
+        return RunningApp(report['pid']), report
 
     def log_contains(text):
         log = data / 'updater.log'
@@ -70,7 +111,7 @@ def main():
     def close(process, report):
         (data / 'exit').write_text('exit')
         process.wait(timeout=30)
-        assert (data / 'children-closed').is_file(), 'Update began before process cleanup'
+        assert (data / 'children-closed').is_file(), f'Process {process.pid} exited ({process.returncode}) before child cleanup; see process-{session}.log'
         # tasklist reports only the exact fixture child PID; unrelated processes are untouched.
         out = run('tasklist', '/FI', f"PID eq {report['child']}", '/FO', 'CSV', '/NH').stdout
         assert f'"{report["child"]}"' not in out, 'Hidden child survived shutdown'
@@ -96,6 +137,14 @@ def main():
         close(process, report)
         wait_for(lambda: (installed / 'current/version.txt').is_file() and
                  (installed / 'current/version.txt').read_text() == '2.0.0', 'Update was not applied on exit')
+        # The version directory is swapped before post-update hooks finish.
+        # Wait for this install's updater, not an arbitrary delay or an unrelated updater.
+        def update_finished():
+            command = "$wanted = Join-Path $env:GAMENIGHT_SMOKE_INSTALL 'Update.exe'; @(Get-CimInstance Win32_Process -Filter \"Name='Update.exe'\" | Where-Object { $_.ExecutablePath -eq $wanted }).Count"
+            check = run('powershell', '-NoProfile', '-Command', command,
+                        env=dict(os.environ, GAMENIGHT_SMOKE_INSTALL=str(installed)))
+            return check.stdout.strip() == '0'
+        wait_for(update_finished, 'Updater did not complete')
         process, report = start(root / '2.0.0')
         assert report['version'] == '2.0.0'
         assert (data / 'settings.json').read_text() == 'preserve this setting'
@@ -107,6 +156,8 @@ def main():
         if 'process' in locals() and process.poll() is None:
             (data / 'exit').write_text('exit')
             process.wait(timeout=30)
+        for log in installed.rglob('*.log'):
+            shutil.copy2(log, root / log.name)
         if (installed / 'Update.exe').exists():
             run(str(installed / 'Update.exe'), 'uninstall', '--silent')
 
