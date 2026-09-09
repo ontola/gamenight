@@ -37,6 +37,28 @@ jobs:
         run: |
           cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
           cargo run -p gamenight-certify -- c-game -- /tmp/c-game
+      - if: runner.os == 'Windows'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - if: runner.os == 'Windows'
+        name: Test real Windows install and update
+        shell: pwsh
+        run: |
+          dotnet tool install --global vpk --version 1.2.0
+          if ($LASTEXITCODE -ne 0) { throw 'Velopack installation failed' }
+          cargo build --locked -p gamenight-daemon --example installer-smoke
+          if ($LASTEXITCODE -ne 0) { throw 'Installer fixture build failed' }
+          python scripts/test-windows-installer.py --binary target/debug/examples/installer-smoke.exe --output "$env:RUNNER_TEMP/installer-smoke"
+          if ($LASTEXITCODE -ne 0) { throw 'Installer smoke test failed' }
+      - if: failure() && runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-smoke-diagnostics
+          path: |
+            ${{ runner.temp }}/installer-smoke/data
+            ${{ runner.temp }}/installer-smoke/installed/*.log
+          if-no-files-found: ignore
   lobby:
     timeout-minutes: 45
     strategy:

@@ -1,26 +1,106 @@
-name: Package Windows preview
-on: [workflow_dispatch]
+name: Windows installer
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/windows-preview.yml'
+      - 'scripts/*windows*'
+      - 'crates/gamenight-daemon/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Installer version (without v)'
+        required: true
+        default: '0.1.0-preview.2'
+      channel:
+        type: choice
+        options: [preview, stable]
+        default: preview
+      publish:
+        description: 'Create a draft GitHub release with the installer and update feed'
+        type: boolean
+        default: false
 permissions:
   contents: read
+concurrency:
+  group: windows-installer-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   package:
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
             . -> target
             crates/lobby -> target
-      - name: Build native preview with pinned Pinpals and LOVE
+          key: windows-installer
+      - name: Install pinned packaging tool
+        run: dotnet tool install --global vpk --version 1.2.0
+      - name: Authenticate for signing
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.WINDOWS_SIGNING_ENDPOINT != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Build installer and update feed
         shell: pwsh
-        run: ./scripts/build-windows-preview.ps1 -OutputDir "$env:RUNNER_TEMP/preview" -TargetDir "$env:GITHUB_WORKSPACE/target"
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+          SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
+        run: |
+          $version = if ($env:RELEASE_VERSION) { $env:RELEASE_VERSION } else { "0.0.0-ci.$env:GITHUB_RUN_NUMBER" }
+          $channel = if ($env:RELEASE_CHANNEL) { $env:RELEASE_CHANNEL } else { 'preview' }
+          $profile = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { 'release' } else { 'ci' }
+          $params = @{
+            Version = $version; Channel = $channel; Profile = $profile
+            OutputDir = "$env:RUNNER_TEMP/installer"; TargetDir = "$env:GITHUB_WORKSPACE/target"
+          }
+          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:SIGNING_ENDPOINT) {
+            if (!$env:SIGNING_ACCOUNT -or !$env:SIGNING_PROFILE) { throw 'Signing configuration is incomplete' }
+            $metadata = "$env:RUNNER_TEMP/signing.json"
+            @{ Endpoint=$env:SIGNING_ENDPOINT; CodeSigningAccountName=$env:SIGNING_ACCOUNT; CertificateProfileName=$env:SIGNING_PROFILE } |
+              ConvertTo-Json | Set-Content -LiteralPath $metadata -Encoding utf8NoBOM
+            $params.SigningMetadata = $metadata
+          }
+          ./scripts/build-windows-installer.ps1 @params
       - uses: actions/upload-artifact@v4
         with:
-          name: gamenight-windows-preview
-          path: |
-            ${{ runner.temp }}/preview/gamenight-windows-preview.zip
-            ${{ runner.temp }}/preview/SHA256SUMS.txt
+          name: gamenight-windows-installer
+          path: ${{ runner.temp }}/installer/releases/*
           if-no-files-found: error
+  release:
+    needs: package
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: gamenight-windows-installer
+          path: release
+      - name: Create reviewable release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_CHANNEL: ${{ inputs.channel }}
+        run: |
+          args=(--draft --title "GameNight $RELEASE_VERSION" --target "$GITHUB_SHA" --generate-notes)
+          if [ "$RELEASE_CHANNEL" = preview ]; then args+=(--prerelease); fi
+          gh release create "v$RELEASE_VERSION" release/* "${args[@]}"

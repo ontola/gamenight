@@ -1,15 +1,30 @@
 # GameNight Windows developer preview
 
-Experimental local multiplayer for Windows x64. No Rust, Python, account or
-cloud service is required. Extract the ZIP to a writable folder, then run
-**GameNight.exe**. Keep the console open; press Enter
-there to close the host and its games. Use a normal, non-administrator account.
-The launcher does not use PowerShell.
+Experimental local multiplayer for Windows x64. No Rust, Python, .NET, account
+or cloud service is required on the player's computer.
+
+For releases that include **Setup.exe**, run it once. It installs for the current
+user, adds a shortcut, and opens GameNight. No administrator account is required.
+The portable ZIP also works: extract it and run **GameNight.exe**. Close the lobby
+to close GameNight and all its games; there is no separate console to manage.
+The older `v0.1.0-preview.1` ZIP uses a console and Enter to exit instead.
 
 Connect two controllers and press a button on each to join the lobby. Pinpals
 is the first game. Walk onto Start and jump to play. Back/Select returns to
 the lobby. The game should remain hidden and silent while preparing.
-Logs are stored in `.local` inside the extracted folder.
+
+Installed builds check the public GitHub releases for updates in the background.
+A downloaded update is applied only after the lobby and all game processes have
+closed. Slow, offline or failed downloads do not hold up startup or shutdown.
+Preview builds stay on the preview channel; stable builds stay on stable.
+Portable builds are updated by downloading a new ZIP.
+
+Logs and versioned game content live under `%LOCALAPPDATA%\GameNight`, outside
+the replaceable application directory. Game saves remain in the game's own user
+save directory. `shelf.json` in this folder is generated, not a settings file.
+`GAMENIGHT_DATA_DIR` can override the GameNight data directory with an absolute
+path for testing. It does not relocate a game's own saves. Uninstalling GameNight
+does not intentionally delete its external user data or the game's saves.
 
 ## Included versions
 
@@ -23,7 +38,7 @@ Logs are stored in `.local` inside the extracted folder.
 
 This preview is intended for feedback. Controller mappings and focus should
 be checked on your hardware. Use Windows native, rather than Linux binaries
-through WSL. There is no automatic update or installation service.
+through WSL. Unsigned preview installers can trigger a Windows warning.
 
 ## Rebuild the preview
 
@@ -35,5 +50,5 @@ From a native Windows checkout with Rust/MSVC and Python 3 installed:
 
 Use a new output directory. The build fetches fixed Pinpals and LÖVE versions
 and validates their SHA-256 hashes. The package includes license notices.
-The **Package Windows preview** Actions workflow performs the same build.
+For the installer and release workflow, see [Windows distribution](windows-distribution.md).
 Controller gameplay should still be tested before promoting a preview to stable.

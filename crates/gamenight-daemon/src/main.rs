@@ -3,6 +3,16 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    // The desktop launcher attaches us to its Windows job before allowing any
+    // descendants to spawn. EOF means the launcher failed before ownership was set.
+    if std::env::var_os("GAMENIGHT_STARTUP_GATE").is_some() {
+        use std::io::Read;
+        let mut signal = [0];
+        std::io::stdin().read_exact(&mut signal)?;
+        if signal != [1] {
+            return Err(std::io::Error::other("Invalid startup signal"));
+        }
+    }
     tracing_subscriber::fmt()
         .with_env_filter(
             EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
@@ -102,6 +112,11 @@ async fn main() -> std::io::Result<()> {
     }
 
     let listener = TcpListener::bind(&addr).await?;
+    if std::env::var_os("GAMENIGHT_EXIT_WITH_LOBBY").is_some() {
+        let lobby =
+            lobby_game.ok_or_else(|| std::io::Error::other("Desktop mode requires a lobby"))?;
+        return gamenight_daemon::run_desktop(listener, library, lobby).await;
+    }
     gamenight_daemon::run_with_prewarm_progress(
         listener,
         library,

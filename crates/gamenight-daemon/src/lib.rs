@@ -87,6 +87,8 @@ struct Shared {
     /// The party size the prewarm queue was last ordered for, so a seat change
     /// that doesn't change the count doesn't re-sort the queue.
     prewarm_players: Option<u8>,
+    /// Packaged app lifetime: quitting the lobby also quits its host.
+    exit_with_lobby: bool,
 }
 
 impl Shared {
@@ -116,6 +118,7 @@ impl Shared {
             // A fresh night genuinely has nobody seated, so recording that up
             // front keeps the first real join the first signal ever sent.
             prewarm_players: Some(0),
+            exit_with_lobby: false,
         }
     }
 
@@ -680,7 +683,7 @@ pub async fn run_with_prewarm(
     lobby_game: Option<GameId>,
     prewarm: Option<gamenight_installer::PrewarmHandle>,
 ) -> std::io::Result<()> {
-    run_inner(listener, library, lobby_game, prewarm, None, false).await
+    run_inner(listener, library, lobby_game, prewarm, None, false, false).await
 }
 
 /// [`run_with_prewarm`], plus the background installer's progress stream and
@@ -700,8 +703,19 @@ pub async fn run_with_prewarm_progress(
         prewarm,
         install_progress,
         true,
+        false,
     )
     .await
+}
+
+/// Run a packaged desktop app. Closing the lobby ends the host and its games.
+/// Headless/resident callers should use [`run_with_lobby`] instead.
+pub async fn run_desktop(
+    listener: TcpListener,
+    library: Vec<GameMeta>,
+    lobby_game: GameId,
+) -> std::io::Result<()> {
+    run_inner(listener, library, Some(lobby_game), None, None, true, true).await
 }
 
 /// The one real body behind the `run*` family.
@@ -717,10 +731,13 @@ async fn run_inner(
     prewarm: Option<gamenight_installer::PrewarmHandle>,
     install_progress: Option<mpsc::UnboundedReceiver<gamenight_protocol::InstallStatus>>,
     music: bool,
+    exit_with_lobby: bool,
 ) -> std::io::Result<()> {
     let addr = listener.local_addr()?;
     info!(%addr, "gamenight daemon listening");
     let shared = Arc::new(Mutex::new(Shared::new(library, addr.to_string(), prewarm)));
+    shared.lock().await.exit_with_lobby = exit_with_lobby;
+    let watched_lobby = lobby_game.clone().filter(|_| exit_with_lobby);
     if let Some(rx) = install_progress {
         spawn_install_progress_pump(shared.clone(), rx);
     }
@@ -739,7 +756,9 @@ async fn run_inner(
         // what comes up first and the warm game arrives behind it.
         s.launch(&lobby_game);
         drop(s);
-        spawn_launcher_watch(shared.clone(), lobby_game);
+        if !exit_with_lobby {
+            spawn_launcher_watch(shared.clone(), lobby_game);
+        }
     }
     {
         // Warm something immediately rather than waiting for a game to
@@ -752,8 +771,30 @@ async fn run_inner(
         }
         s.apply_effects(fx, None);
     }
+    let mut lifetime_tick = tokio::time::interval(std::time::Duration::from_millis(200));
     loop {
-        let (stream, peer) = listener.accept().await?;
+        let accepted = tokio::select! {
+            accepted = listener.accept() => accepted,
+            _ = lifetime_tick.tick(), if watched_lobby.is_some() => {
+                let mut s = shared.lock().await;
+                let lobby = watched_lobby.as_ref().expect("guarded");
+                let child = if let Some(pending) = s.pending_launches.get_mut(lobby) {
+                    Some(&mut pending.child)
+                } else {
+                    s.running_children.get_mut(lobby)
+                };
+                let alive = match child {
+                    Some(child) => child.try_wait()?.is_none(),
+                    None => false,
+                };
+                if !alive {
+                    s.kill_all_children();
+                    return Ok(());
+                }
+                continue;
+            }
+        };
+        let (stream, peer) = accepted?;
         let shared = shared.clone();
         tokio::spawn(async move {
             if let Err(e) = handle_connection(stream, shared).await {
@@ -995,6 +1036,9 @@ async fn serve(
                 // If we spawned this process, reap it (crash or clean exit —
                 // GameDisconnected reconciles the night either way).
                 if let Some(mut child) = s.running_children.remove(game_id) {
+                    if s.exit_with_lobby {
+                        let _ = child.start_kill();
+                    }
                     tokio::spawn(async move {
                         let _ = child.wait().await;
                     });
@@ -1122,4 +1166,49 @@ fn message_to_command(
         ClientMessage::MediaControl { action } => Command::MediaControl { action },
     };
     Ok(Some(command))
+}
+
+#[cfg(test)]
+mod desktop_lifetime_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn desktop_exits_when_lobby_dies_before_hello() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        #[cfg(windows)]
+        let launch = serde_json::json!({"command":"cmd.exe", "args":["/C", "exit", "0"]});
+        #[cfg(not(windows))]
+        let launch = serde_json::json!({"command":"/bin/sh", "args":["-c", "exit 0"]});
+        let lobby = serde_json::from_value(serde_json::json!({
+            "id":"lobby", "title":"Test", "players":"1", "min_players":1,
+            "max_players":1, "emoji":"", "color":"#000000", "launch":launch
+        }))
+        .unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            run_inner(
+                listener,
+                vec![lobby],
+                Some(GameId::new("lobby")),
+                None,
+                None,
+                false,
+                true,
+            ),
+        )
+        .await
+        .expect("desktop kept running without its lobby")
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn resident_daemon_stays_available_without_lobby() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        assert!(tokio::time::timeout(
+            std::time::Duration::from_millis(300),
+            run_inner(listener, Vec::new(), None, None, None, false, false)
+        )
+        .await
+        .is_err());
+    }
 }

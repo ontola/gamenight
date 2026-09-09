@@ -34,3 +34,8 @@ tokio-tungstenite = "0.24"
 futures-util = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Fast native packaging smoke builds; production installers use release.
+[profile.ci]
+inherits = "dev"
+debug = 0

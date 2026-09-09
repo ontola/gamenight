@@ -19,7 +19,9 @@ cross-game controller identity are not finished features.
 A native Windows preview bundles the lobby, Pinpals and LÖVE.
 [Downloads](https://github.com/ontola/gamenight/releases) ·
 [Preview instructions and source versions](docs/windows-preview.md).
-Extract the ZIP and run `GameNight.exe`; no development tools are needed.
+For releases with a `Setup.exe`, run it once to install GameNight and receive
+updates automatically after closing the lobby. The portable ZIP remains available;
+extract it and run `GameNight.exe`. No development tools are needed.
 
 ## Try it locally
 

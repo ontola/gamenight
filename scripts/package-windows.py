@@ -12,8 +12,10 @@ def main():
     parser.add_argument('--love-zip', type=Path, required=True)
     parser.add_argument('--pinpals-zip', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--profile', choices=['dev', 'ci', 'release'], default='dev')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
+    profile_dir = 'debug' if args.profile == 'dev' else args.profile
     sources = [
         (args.love_zip, 'ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369', 'love-11.5-win64', 'love'),
         (args.pinpals_zip, 'b574829c2d1fac531fa73c4b13e7aba0758bd067f74c4651de01e75870e6e0f5',
@@ -26,8 +28,8 @@ def main():
     stage = args.output / 'gamenight-windows-preview'
     (stage / 'bin').mkdir(parents=True)
     for name in ['gamenight-daemon.exe', 'lobby.exe']:
-        shutil.copy2(args.target / 'debug' / name, stage / 'bin' / name)
-    shutil.copy2(args.target / 'debug/gamenight-launcher.exe', stage / 'GameNight.exe')
+        shutil.copy2(args.target / profile_dir / name, stage / 'bin' / name)
+    shutil.copy2(args.target / profile_dir / 'gamenight-launcher.exe', stage / 'GameNight.exe')
     for name in ['assets', 'packs', 'licenses']:
         shutil.copytree(repo / 'crates/lobby' / name, stage / 'lobby' / name)
     for name in ['LICENSE', 'CREDITS.md']:
@@ -37,6 +39,7 @@ def main():
     for name in ['LICENSE', 'THIRD_PARTY.md']:
         shutil.copy2(repo / name, stage / name)
     shutil.copy2(repo / 'docs/windows-preview.md', stage / 'README.md')
+    shutil.copy2(repo / 'docs/windows-distribution.md', stage / 'windows-distribution.md')
     for archive, _, prefix, destination in sources:
         with zipfile.ZipFile(archive) as z:
             for item in z.infolist():
