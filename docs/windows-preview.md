@@ -9,6 +9,11 @@ The portable ZIP also works: extract it and run **GameNight.exe**. Close the lob
 to close GameNight and all its games; there is no separate console to manage.
 The older `v0.1.0-preview.1` ZIP uses a console and Enter to exit instead.
 
+On first launch, Pinpals and its shared LÖVE runtime download automatically in
+the background. The lobby shows progress and remains usable while downloading.
+An internet connection is needed once; cached games work offline on later starts.
+Failed downloads appear in the lobby and are retried the next time GameNight starts.
+
 Connect two controllers and press a button on each to join the lobby. Pinpals
 is the first game. Walk onto Start and jump to play. Back/Select returns to
 the lobby. The game should remain hidden and silent while preparing.
@@ -26,14 +31,14 @@ save directory. `shelf.json` in this folder is generated, not a settings file.
 path for testing. It does not relocate a game's own saves. Uninstalling GameNight
 does not intentionally delete its external user data or the game's saves.
 
-## Included versions
+## Application and starter game versions
 
 - GameNight: native Windows developer build (unsigned).
-- Pinpals: Polle Pas's MIT-licensed game, using the GameNight integration fork
+- Pinpals (downloaded separately): Polle Pas's MIT-licensed game, using the GameNight integration fork
   at `95ea42fe544cf3906c90aeb556359180964c1e88`.
   [Upstream integration PR](https://github.com/Polleps/pinpals/pull/1) is pending;
   this is not an upstream Pinpals release.
-- LÖVE 11.5: official Windows x64 runtime, including its license notices.
+- LÖVE 11.5 (downloaded once and shared by compatible games): official Windows x64 runtime, including its license notices.
 - Lobby/Bones: see the included notices and media credits.
 
 This preview is intended for feedback. Controller mappings and focus should
@@ -48,7 +53,9 @@ From a native Windows checkout with Rust/MSVC and Python 3 installed:
 ./scripts/build-windows-preview.ps1 -OutputDir C:/builds/gamenight-preview -TargetDir C:/builds/gamenight-target
 ```
 
-Use a new output directory. The build fetches fixed Pinpals and LÖVE versions
-and validates their SHA-256 hashes. The package includes license notices.
+Use a new output directory. The package contains GameNight, its native runtime
+DLLs, lobby assets and a small starter catalogue. Game archives are not bundled.
+The background installer verifies each game and runtime against its pinned
+SHA-256 hash; the downloaded archives retain their license notices.
 For the installer and release workflow, see [Windows distribution](windows-distribution.md).
 Controller gameplay should still be tested before promoting a preview to stable.

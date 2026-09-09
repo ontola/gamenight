@@ -1,0 +1,40 @@
+{
+  "$schema": "../schema.json",
+  "id": "pinpals",
+  "title": "Pinpals",
+  "tagline": "Head-to-head pinball.",
+  "developer": "Polle Pas",
+  "players": {
+    "min": 2,
+    "max": 2,
+    "best": 2
+  },
+  "price": "free",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "color": "#f5a742",
+  "tags": [
+    "pinball",
+    "local-multiplayer"
+  ],
+  "links": {
+    "source": "https://github.com/Polleps/pinpals",
+    "integration": "https://github.com/Polleps/pinpals/pull/1"
+  },
+  "downloads": {
+    "windows": {
+      "url": "https://github.com/joepio/pinpals/archive/95ea42fe544cf3906c90aeb556359180964c1e88.zip",
+      "sha256": "b574829c2d1fac531fa73c4b13e7aba0758bd067f74c4651de01e75870e6e0f5",
+      "entrypoint": "pinpals-95ea42fe544cf3906c90aeb556359180964c1e88/main.lua",
+      "runtime": {
+        "id": "love-11-5",
+        "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
+        "sha256": "ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369",
+        "entrypoint": "love-11.5-win64/love.exe",
+        "argument": "game_directory"
+      }
+    }
+  }
+}

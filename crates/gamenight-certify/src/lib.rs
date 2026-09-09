@@ -907,6 +907,7 @@ mod tests {
         entry.downloads.insert(
             gamenight_catalog::current_platform().into(),
             Download {
+                runtime: None,
                 url: "https://example.com/x.tar.gz".into(),
                 sha256: "a".repeat(64),
                 size_mb: None,

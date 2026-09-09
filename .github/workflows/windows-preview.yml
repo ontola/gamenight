@@ -5,6 +5,9 @@ on:
       - '.github/workflows/windows-preview.yml'
       - 'scripts/*windows*'
       - 'crates/gamenight-daemon/**'
+      - 'crates/gamenight-installer/**'
+      - 'crates/gamenight-catalog/**'
+      - 'catalog/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
   workflow_dispatch:

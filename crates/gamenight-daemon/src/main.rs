@@ -64,8 +64,8 @@ async fn main() -> std::io::Result<()> {
                     }
                 }
             }
-            // Anything not yet installed downloads in the background — ready
-            // for the *next* start, so this one isn't held up waiting on it.
+            // Anything not yet installed downloads in the background and joins
+            // the shelf immediately through the install progress pump.
             // The handle lets the running party bump a game to the front of
             // that queue the moment it's wanted, instead of waiting for
             // catalogue order to get there.
@@ -115,7 +115,14 @@ async fn main() -> std::io::Result<()> {
     if std::env::var_os("GAMENIGHT_EXIT_WITH_LOBBY").is_some() {
         let lobby =
             lobby_game.ok_or_else(|| std::io::Error::other("Desktop mode requires a lobby"))?;
-        return gamenight_daemon::run_desktop(listener, library, lobby).await;
+        return gamenight_daemon::run_desktop(
+            listener,
+            library,
+            lobby,
+            prewarm_handle,
+            install_progress,
+        )
+        .await;
     }
     gamenight_daemon::run_with_prewarm_progress(
         listener,

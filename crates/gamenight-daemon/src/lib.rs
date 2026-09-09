@@ -502,6 +502,9 @@ fn spawn_install_progress_pump(
                 {
                     info!(game = %status.game, "background install joined the shelf");
                     let mut s = shared.lock().await;
+                    if let Some(launch) = &meta.launch {
+                        s.launch_specs.insert(meta.id.clone(), launch.clone());
+                    }
                     let fx = s.night.add_to_library(meta);
                     s.apply_effects(fx, None);
                 }
@@ -714,8 +717,19 @@ pub async fn run_desktop(
     listener: TcpListener,
     library: Vec<GameMeta>,
     lobby_game: GameId,
+    prewarm: Option<gamenight_installer::PrewarmHandle>,
+    install_progress: Option<mpsc::UnboundedReceiver<gamenight_protocol::InstallStatus>>,
 ) -> std::io::Result<()> {
-    run_inner(listener, library, Some(lobby_game), None, None, true, true).await
+    run_inner(
+        listener,
+        library,
+        Some(lobby_game),
+        prewarm,
+        install_progress,
+        true,
+        true,
+    )
+    .await
 }
 
 /// The one real body behind the `run*` family.

@@ -26,7 +26,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
-use gamenight_catalog::CatalogEntry;
+use gamenight_catalog::{CatalogEntry, Download, RuntimeArgument};
 use gamenight_protocol::{GameId, GameMeta, InstallState, InstallStatus, LaunchSpec};
 
 /// Where install progress goes. The daemon feeds these straight into the
@@ -90,6 +90,7 @@ struct Marker {
 pub struct InstalledGame {
     pub dir: PathBuf,
     pub executable: PathBuf,
+    pub runtime: Option<(PathBuf, RuntimeArgument)>,
 }
 
 impl InstalledGame {
@@ -98,10 +99,21 @@ impl InstalledGame {
     /// directory set to the install dir (so a game's relative asset paths
     /// resolve).
     pub fn launch_spec(&self) -> LaunchSpec {
+        let (command, args, cwd) = match &self.runtime {
+            Some((runtime, argument)) => {
+                let directory = self.executable.parent().unwrap_or(&self.dir);
+                let argument = match argument {
+                    RuntimeArgument::EntryPoint => self.executable.as_path(),
+                    RuntimeArgument::GameDirectory => directory,
+                };
+                (runtime, vec![argument.display().to_string()], directory)
+            }
+            None => (&self.executable, Vec::new(), self.dir.as_path()),
+        };
         LaunchSpec {
-            command: self.executable.display().to_string(),
-            args: Vec::new(),
-            cwd: Some(self.dir.display().to_string()),
+            command: command.display().to_string(),
+            args,
+            cwd: Some(cwd.display().to_string()),
             env: Default::default(),
         }
     }
@@ -145,6 +157,9 @@ pub struct PrewarmResult {
 /// - macOS: `~/Library/Application Support`
 /// - Windows: `%APPDATA%`
 pub fn install_dir() -> PathBuf {
+    if let Some(root) = std::env::var_os("GAMENIGHT_INSTALL_DIR") {
+        return PathBuf::from(root);
+    }
     let base = if cfg!(target_os = "windows") {
         std::env::var_os("APPDATA").map(PathBuf::from)
     } else if cfg!(target_os = "macos") {
@@ -182,16 +197,21 @@ fn binary_name(url: &str) -> &str {
 /// prewarm pass even starts.
 pub async fn already_installed(entry: &CatalogEntry, root: &Path) -> Option<InstalledGame> {
     let dl = entry.auto_download_here()?;
-    let game_dir = root.join(&entry.id);
-    let marker_path = game_dir.join(".gamenight-install.json");
-    let text = tokio::fs::read_to_string(&marker_path).await.ok()?;
-    let marker: Marker = serde_json::from_str(&text).ok()?;
-    if !marker.sha256.eq_ignore_ascii_case(&dl.sha256) {
-        return None;
-    }
+    let game_dir = root.join(&entry.id).join(dl.sha256.to_ascii_lowercase());
+    let executable = cached_artifact(dl, &game_dir).await?;
+    let runtime = if let Some(runtime) = &dl.runtime {
+        let path = runtime_dir(root, runtime);
+        Some((
+            cached_artifact(&runtime.download(), &path).await?,
+            runtime.argument,
+        ))
+    } else {
+        None
+    };
     Some(InstalledGame {
-        executable: resolve_executable(dl, &game_dir),
+        executable,
         dir: game_dir,
+        runtime,
     })
 }
 
@@ -235,48 +255,93 @@ async fn install_inner(
     let dl = entry
         .auto_download_here()
         .ok_or(InstallError::NotEligible)?;
-    let game_dir = root.join(&entry.id);
-
-    if let Some(installed) = already_installed(entry, root).await {
-        return Ok(installed);
-    }
-
-    tokio::fs::create_dir_all(root).await?;
-    let download_path = root.join(format!(".{}.download", entry.id));
-    info!(game = %entry.id, url = %dl.url, "downloading");
-    let result = download_and_verify(&dl.url, &dl.sha256, &download_path, progress).await;
-    let downloaded = match result {
-        Ok(()) => &download_path,
-        Err(e) => {
-            let _ = tokio::fs::remove_file(&download_path).await;
-            return Err(e);
-        }
+    let runtime = if let Some(runtime) = &dl.runtime {
+        let executable =
+            ensure_artifact(&runtime.download(), &runtime_dir(root, runtime), progress).await?;
+        Some((executable, runtime.argument))
+    } else {
+        None
     };
-
-    progress.report(InstallState::Extracting, None, None);
-    // Stale contents from a previous version get replaced wholesale.
-    let _ = tokio::fs::remove_dir_all(&game_dir).await;
-    tokio::fs::create_dir_all(&game_dir).await?;
-    let dl_owned = dl.clone();
-    let extract_dest = game_dir.clone();
-    let extract_src = downloaded.clone();
-    tokio::task::spawn_blocking(move || extract(&dl_owned, &extract_src, &extract_dest))
-        .await
-        .map_err(|e| InstallError::Extract(e.to_string()))??;
-    let _ = tokio::fs::remove_file(&download_path).await;
-
-    let marker_path = game_dir.join(".gamenight-install.json");
-    let marker = serde_json::to_string(&Marker {
-        sha256: dl.sha256.clone(),
-        url: dl.url.clone(),
-    })
-    .expect("Marker is always serializable");
-    tokio::fs::write(&marker_path, marker).await?;
-    info!(game = %entry.id, dir = %game_dir.display(), "installed");
+    let game_dir = root.join(&entry.id).join(dl.sha256.to_ascii_lowercase());
+    let executable = ensure_artifact(dl, &game_dir, progress).await?;
     Ok(InstalledGame {
-        executable: resolve_executable(dl, &game_dir),
         dir: game_dir,
+        executable,
+        runtime,
     })
+}
+
+fn runtime_dir(root: &Path, runtime: &gamenight_catalog::RuntimeDownload) -> PathBuf {
+    root.join(".runtimes")
+        .join(&runtime.id)
+        .join(runtime.sha256.to_ascii_lowercase())
+}
+
+async fn cached_artifact(dl: &Download, dir: &Path) -> Option<PathBuf> {
+    let text = tokio::fs::read_to_string(dir.join(".gamenight-install.json"))
+        .await
+        .ok()?;
+    let marker: Marker = serde_json::from_str(&text).ok()?;
+    let executable = resolve_executable(dl, dir);
+    if !marker.sha256.eq_ignore_ascii_case(&dl.sha256) || !executable.is_file() {
+        return None;
+    }
+    Some(executable)
+}
+
+/// Publish a complete immutable version only after verification and extraction.
+/// Other versions remain usable while downloading an update or after a failure.
+async fn ensure_artifact(
+    dl: &Download,
+    destination: &Path,
+    progress: &Progress<'_>,
+) -> Result<PathBuf, InstallError> {
+    if let Some(executable) = cached_artifact(dl, destination).await {
+        return Ok(executable);
+    }
+    let parent = destination
+        .parent()
+        .ok_or_else(|| std::io::Error::other("Missing install parent"))?;
+    tokio::fs::create_dir_all(parent).await?;
+    let staging = parent.join(format!(".staging-{}", uuid::Uuid::new_v4()));
+    let download = parent.join(format!(".download-{}", uuid::Uuid::new_v4()));
+    let result = async {
+        download_and_verify(&dl.url, &dl.sha256, &download, progress).await?;
+        progress.report(InstallState::Extracting, None, None);
+        tokio::fs::create_dir_all(&staging).await?;
+        let (spec, source, target) = (dl.clone(), download.clone(), staging.clone());
+        tokio::task::spawn_blocking(move || extract(&spec, &source, &target))
+            .await
+            .map_err(|e| InstallError::Extract(e.to_string()))??;
+        if !resolve_executable(dl, &staging).is_file() {
+            return Err(InstallError::Extract(
+                "Declared entrypoint is missing".into(),
+            ));
+        }
+        let marker = serde_json::to_vec(&Marker {
+            sha256: dl.sha256.clone(),
+            url: dl.url.clone(),
+        })
+        .expect("serializable marker");
+        tokio::fs::write(staging.join(".gamenight-install.json"), marker).await?;
+        if destination.exists() {
+            if let Some(executable) = cached_artifact(dl, destination).await {
+                return Ok(executable);
+            }
+            // A damaged cache is moved aside; never overwrite an active version.
+            tokio::fs::rename(
+                destination,
+                parent.join(format!(".damaged-{}", uuid::Uuid::new_v4())),
+            )
+            .await?;
+        }
+        tokio::fs::rename(&staging, destination).await?;
+        Ok(resolve_executable(dl, destination))
+    }
+    .await;
+    let _ = tokio::fs::remove_file(&download).await;
+    let _ = tokio::fs::remove_dir_all(&staging).await;
+    result
 }
 
 /// Something the party learned that should change what downloads next.
@@ -464,7 +529,13 @@ async fn download_and_verify(
     dest: &Path,
     progress: &Progress<'_>,
 ) -> Result<(), InstallError> {
-    let resp = reqwest::get(url)
+    let resp = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| InstallError::Http(e.to_string()))?
+        .get(url)
+        .send()
         .await
         .map_err(|e| InstallError::Http(e.to_string()))?;
     if !resp.status().is_success() {
@@ -619,7 +690,7 @@ mod tests {
     async fn already_installed_matches_a_verified_marker() {
         let entry = bare_binary_entry("marker-match", &"a".repeat(64));
         let root = tmp_dir("marker-match");
-        let game_dir = root.join(&entry.id);
+        let game_dir = root.join(&entry.id).join("a".repeat(64));
         tokio::fs::create_dir_all(&game_dir).await.unwrap();
         tokio::fs::write(
             game_dir.join(".gamenight-install.json"),
@@ -629,6 +700,9 @@ mod tests {
         .await
         .unwrap();
 
+        tokio::fs::write(game_dir.join("game-bin"), "binary")
+            .await
+            .unwrap();
         let installed = already_installed(&entry, &root)
             .await
             .expect("marker matches");
@@ -642,7 +716,7 @@ mod tests {
     async fn already_installed_ignores_a_stale_marker() {
         let entry = bare_binary_entry("marker-stale", &"a".repeat(64));
         let root = tmp_dir("marker-stale");
-        let game_dir = root.join(&entry.id);
+        let game_dir = root.join(&entry.id).join("a".repeat(64));
         tokio::fs::create_dir_all(&game_dir).await.unwrap();
         tokio::fs::write(
             game_dir.join(".gamenight-install.json"),
@@ -663,6 +737,7 @@ mod tests {
         let installed = InstalledGame {
             dir: PathBuf::from("/data/meta-check"),
             executable: PathBuf::from("/data/meta-check/game-bin"),
+            runtime: None,
         };
         let meta = game_meta(&entry, &installed);
         assert_eq!(meta.id, GameId::new("meta-check"));
@@ -836,3 +911,6 @@ mod tests {
         assert_eq!(order, vec!["c", "b", "a"]);
     }
 }
+
+#[cfg(test)]
+mod download_tests;

@@ -16,7 +16,8 @@ cross-game controller identity are not finished features.
 
 ## Windows preview
 
-A native Windows preview bundles the lobby, Pinpals and LÖVE.
+A native Windows preview includes the lobby and automatically downloads Pinpals
+and its shared LÖVE runtime on first launch. Cached games work offline.
 [Downloads](https://github.com/ontola/gamenight/releases) ·
 [Preview instructions and source versions](docs/windows-preview.md).
 For releases with a `Setup.exe`, run it once to install GameNight and receive

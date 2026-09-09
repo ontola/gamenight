@@ -146,6 +146,41 @@ pub struct Download {
     /// the download itself (its URL's filename) is the executable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entrypoint: Option<String>,
+    /// Shared interpreter needed to launch this game (downloaded once).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime: Option<RuntimeDownload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RuntimeDownload {
+    pub id: String,
+    pub url: String,
+    pub sha256: String,
+    pub entrypoint: String,
+    #[serde(default)]
+    pub argument: RuntimeArgument,
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeArgument {
+    #[default]
+    EntryPoint,
+    /// Pass the directory containing the game's entrypoint (e.g. LÖVE).
+    GameDirectory,
+}
+
+impl RuntimeDownload {
+    pub fn download(&self) -> Download {
+        Download {
+            url: self.url.clone(),
+            sha256: self.sha256.clone(),
+            size_mb: None,
+            entrypoint: Some(self.entrypoint.clone()),
+            runtime: None,
+        }
+    }
 }
 
 impl Download {
@@ -155,6 +190,14 @@ impl Download {
         let lower = self.url.to_ascii_lowercase();
         lower.ends_with(".tar.gz") || lower.ends_with(".tgz") || lower.ends_with(".zip")
     }
+}
+
+fn safe_entrypoint(path: &str) -> bool {
+    !path.is_empty()
+        && !path.contains(['\\', ':'])
+        && path
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
 pub const PLATFORMS: &[&str] = &["linux", "windows", "mac"];
@@ -265,9 +308,31 @@ pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
                  (which file inside it to run)"
             ),
         );
+        if let Some(runtime) = &dl.runtime {
+            check(
+                !runtime.id.is_empty()
+                    && runtime
+                        .id
+                        .bytes()
+                        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'),
+                "runtime id must be lowercase kebab-case",
+            );
+            check(
+                runtime.url.starts_with("https://"),
+                "runtime url must be https",
+            );
+            check(
+                runtime.sha256.len() == 64 && runtime.sha256.chars().all(|c| c.is_ascii_hexdigit()),
+                "runtime sha256 must be 64 hex chars",
+            );
+            check(
+                safe_entrypoint(&runtime.entrypoint),
+                "runtime entrypoint must be a relative path within the archive",
+            );
+        }
         if let Some(entrypoint) = &dl.entrypoint {
             check(
-                !entrypoint.starts_with('/') && !entrypoint.contains(".."),
+                safe_entrypoint(entrypoint),
                 &format!("{platform} entrypoint must be a relative path within the archive"),
             );
         }
@@ -421,6 +486,36 @@ mod tests {
     }
 
     #[test]
+    fn runtime_metadata_rejects_escaping_paths_and_unverified_downloads() {
+        let mut entry: CatalogEntry =
+            serde_json::from_str(include_str!("../../../catalog/games/pinpals.json")).unwrap();
+        assert!(validate(&entry, "pinpals.json").is_empty());
+        let runtime = entry
+            .downloads
+            .get_mut("windows")
+            .unwrap()
+            .runtime
+            .as_mut()
+            .unwrap();
+        runtime.entrypoint = "C:\\outside.exe".into();
+        runtime.id = "../outside".into();
+        runtime.url = "http://example.com/runtime.zip".into();
+        runtime.sha256 = "bad".into();
+        let errors = validate(&entry, "pinpals.json");
+        assert!(errors.len() >= 4, "{errors:?}");
+        for path in [
+            "/absolute",
+            "../escape",
+            "a/../../escape",
+            "C:/escape",
+            "a\\escape",
+            "",
+        ] {
+            assert!(!safe_entrypoint(path));
+        }
+    }
+
+    #[test]
     fn schema_json_is_up_to_date() {
         let committed = std::fs::read_to_string(workspace_schema_path()).expect(
             "catalog/schema.json is missing — run \
@@ -464,6 +559,7 @@ mod tests {
                 sha256: "a".repeat(64),
                 size_mb: None,
                 entrypoint: Some("x/game".into()),
+                runtime: None,
             },
         );
         assert!(e.auto_download_here().is_some());
@@ -510,6 +606,7 @@ mod tests {
                 sha256: "a".repeat(64),
                 size_mb: None,
                 entrypoint: Some("x/game".into()),
+                runtime: None,
             },
         );
         assert!(validate(&e, "paid-direct.json")
@@ -524,6 +621,7 @@ mod tests {
                 sha256: "nothex".into(),
                 size_mb: None,
                 entrypoint: None,
+                runtime: None,
             },
         );
         assert!(validate(&e, "bad-hash.json")
@@ -541,6 +639,7 @@ mod tests {
                 sha256: "a".repeat(64),
                 size_mb: None,
                 entrypoint: None,
+                runtime: None,
             },
         );
         assert!(validate(&e, "no-entrypoint.json")
@@ -566,6 +665,7 @@ mod tests {
                 sha256: "a".repeat(64),
                 size_mb: None,
                 entrypoint: None,
+                runtime: None,
             },
         );
         assert!(!validate(&bare, "bare-binary.json")

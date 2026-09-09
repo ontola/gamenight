@@ -123,6 +123,17 @@
             "null"
           ]
         },
+        "runtime": {
+          "description": "Shared interpreter needed to launch this game (downloaded once).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuntimeDownload"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "sha256": {
           "description": "Required — the daemon refuses unverifiable installs.",
           "type": "string"
@@ -278,6 +289,49 @@
         }
       },
       "additionalProperties": false
+    },
+    "RuntimeArgument": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "entry_point"
+          ]
+        },
+        {
+          "description": "Pass the directory containing the game's entrypoint (e.g. LÖVE).",
+          "type": "string",
+          "const": "game_directory"
+        }
+      ]
+    },
+    "RuntimeDownload": {
+      "type": "object",
+      "properties": {
+        "argument": {
+          "$ref": "#/$defs/RuntimeArgument",
+          "default": "entry_point"
+        },
+        "entrypoint": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "sha256",
+        "entrypoint"
+      ]
     }
   }
 }

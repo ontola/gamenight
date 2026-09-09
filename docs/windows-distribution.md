@@ -14,8 +14,7 @@ dotnet tool install --global vpk --version 1.2.0
 ```
 
 The default profile is `release`; `-BuildProfile ci` is a faster build for packaging
-checks. Choose a new output directory. The script verifies the pinned Pinpals
-and LOVE archive hashes, includes their notices, and produces `Setup.exe`, a
+checks. Choose a new output directory. The script packages GameNight and its starter catalogue, and produces `Setup.exe`, a
 portable ZIP, a full update package, a channel feed and SHA-256 checksums in
 `releases/`. This first implementation ships full updates. Delta packaging can
 be added later by supplying the preceding release to Velopack.
@@ -29,8 +28,8 @@ package includes their version and redistribution notice.
 The application IDs are `Ontola.GameNight.Preview` and `Ontola.GameNight`, and
 the channels are `win-preview` and `win-stable`. The installation directories
 are separate from `%LOCALAPPDATA%\GameNight` user data. Application updates
-replace the complete application folder, while pinned content is seeded once
-into version-specific user directories. Old content versions are retained.
+replace the complete application folder, while games and shared runtimes download independently
+into hash-specific directories under the user data folder. Old content versions are retained.
 Both channels share GameNight user data and cannot run simultaneously against
 that directory. LOVE manages Pinpals saves independently.
 
@@ -77,7 +76,7 @@ authenticating with Azure. Do not commit credentials or account-specific files.
 ## Lifecycle
 
 The launcher's very first call handles Velopack lifecycle hooks. Normal startup
-locks the user data directory, seeds content, and starts the daemon behind a
+locks the user data directory and starts the daemon behind a
 startup pipe. On Windows it assigns the daemon to a private job object before
 releasing the pipe, so every game inherits the job. Closing the lobby ends the
 desktop daemon; the launcher terminates and waits for all remaining descendants
@@ -89,3 +88,21 @@ session. Update failures are recorded in `updater.log`. There is no in-game
 restart prompt and no update replacement while a session is running. Controller
 input, focus, silent prewarm and fullscreen still require a real hardware check
 before promoting a preview to stable.
+
+## Starter downloads
+
+The Windows package ships `catalog/games/pinpals.json`, not game or LÖVE bytes.
+The desktop daemon uses the same installer queue as the standalone host and
+forwards download progress to the lobby. A finished install joins the playable
+shelf immediately without restarting. GameNight can open offline; playing a
+starter game the first time requires its download to finish.
+
+A catalogue download can declare a shared `runtime` with an ID, HTTPS URL,
+SHA-256, entrypoint and argument mode. `game_directory` passes the directory
+containing the game's entrypoint to LÖVE; `entry_point` passes the file itself.
+Runtimes are shared by ID and hash. Game and runtime entrypoints must both exist
+before an install becomes playable. Downloads extract into staging directories
+and publish only complete versions. Old versions and game saves are retained.
+Failures do not prevent the lobby from opening; restart to retry failed downloads.
+`GAMENIGHT_INSTALL_DIR` overrides the standalone install cache; the desktop
+launcher sets it to `%LOCALAPPDATA%\GameNight\games` (or its test data override).
