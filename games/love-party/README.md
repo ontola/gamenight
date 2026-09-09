@@ -105,7 +105,7 @@ scramble; further power-ups drop from crates.
   bombs or movement speed, with caps. Cross (C) restores the classic shape.
 
 Upgrades apply to newly placed bombs. Bomb markings show the explosion shape;
-cyan antennas mark remote bombs. Your scorecard lists your current upgrades.
+cyan antennas mark remote bombs. Bomb shapes, boots and remote antennas show your equipped powers.
 Walls stop every ray. Crates absorb a ray and reveal loot; other bombs chain.
 Flames are briefly dangerous, so wait for the fire to clear before grabbing loot.
 
@@ -146,3 +146,12 @@ team wipes, pulse cooldowns, splitters, pickups, aim deadzones and entity caps.
 A 270-second bot simulation exercises two, three and four players, with a
 220-enemy ceiling and bounded projectile/particle counts. Performance timing is
 reported for diagnosis, without a machine-dependent CI threshold.
+
+## Presentation
+
+During play, games show a compact player/score/timer row and the arena. Titles,
+taglines, control bars and power-up legends stay off the playfield. The standalone
+selection screen shows the selected game's controls; full keyboard bindings and
+power-up details are documented above. Arenas enlarge without changing simulation
+coordinates or stretching their shapes. Neon Siege keeps a small shared combo
+score below the arena and health indicators beside players.

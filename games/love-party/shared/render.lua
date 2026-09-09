@@ -33,14 +33,6 @@ function R.begin()
 	G.scale(scale)
 	G.setColor(0.035, 0.05, 0.09)
 	G.rectangle("fill", 0, 0, 1280, 800)
-	G.setColor(0.065, 0.085, 0.13)
-	G.setLineWidth(1)
-	for x = 0, 1280, 40 do
-		G.line(x, 145, x, 690)
-	end
-	for y = 145, 690, 40 do
-		G.line(0, y, 1280, y)
-	end
 end
 function R.finish()
 	G.pop()
@@ -87,22 +79,17 @@ function R.menu(modes, index, count)
 	end
 	centered(count .. " PLAYERS   •   F2 changes player count", 641, "body")
 	centered("1 / 2 / 3 / 4 / 5 choose     ENTER or controller A play", 683, "body", { 0.3, 0.92, 0.83 })
-	centered(
-		"Keyboard: WASD + Space   /   Arrows + Right Ctrl   /   IJKL + U   /   TFGH + R",
-		741,
-		"small",
-		{ 0.55, 0.65, 0.77 }
-	)
+	centered(modes[index].controls, 741, "small", { 0.55, 0.65, 0.77 })
 	R.finish()
 end
 function R.game(mode, s, remaining, finished, managed)
 	R.begin()
-	text("GAMENIGHT  /  PARTY PACK", 42, 22, "small", { 0.3, 0.92, 0.83 })
-	text(mode.title, 40, 48, "title")
-	text(mode.tagline, 42, 91, "small", { 0.55, 0.65, 0.77 })
-	G.setFont(R.fonts.huge)
-	G.setColor(remaining < 10 and { 1, 0.43, 0.40 } or { 0.91, 0.94, 1 })
-	G.printf(string.format("%02d", math.ceil(remaining)), 1080, 38, 150, "right")
+	-- Keep world coordinates stable; enlarge the arena independently of the HUD.
+	G.push()
+	local zoom = mode.id == "blast-party" and 1.38 or mode.id == "bumper-royale" and 1.23 or 1.065
+	G.translate(640, 425)
+	G.scale(zoom)
+	G.translate(-640, -417)
 	if mode.id == "neon-siege" then
 		require("games.siege_render").draw(s, G, R.fonts, player_color)
 	elseif mode.id == "blast-party" then
@@ -128,7 +115,6 @@ function R.game(mode, s, remaining, finished, managed)
 				G.circle("line", p.x, p.y, 25)
 			end
 		end
-		text("+3 knockout   /   -1 fall", 60, 655, "small")
 	elseif mode.id == "neon-trails" then
 		G.setColor(0.11, 0.15, 0.22)
 		G.rectangle("fill", 64, 155, 1152, 520)
@@ -163,22 +149,37 @@ function R.game(mode, s, remaining, finished, managed)
 				G.circle("line", p.x, p.y, 27)
 			end
 		end
-		text("+5 star   /   -10 hit   /   +1 per second", 60, 655, "small")
 	end
-	local width = 1160 / math.max(1, #s.players)
+	G.pop()
+	-- A single quiet row replaces the title, scorecards and persistent instructions.
+	G.setFont(R.fonts.small)
+	G.setColor(remaining < 10 and { 1, 0.43, 0.4 } or { 0.55, 0.62, 0.7 })
+	G.printf(string.format("%02d", math.ceil(remaining)), 595, 22, 90, "center")
+	local positions = { 28, 300, 760, 1032 }
 	for i, p in ipairs(s.players) do
-		local x = 60 + (i - 1) * width
-		G.setColor(0.055, 0.08, 0.13)
-		G.rectangle("fill", x, 703, width - 12, 54, 8, 8)
-		text(p.name, x + 14, 714, "body", player_color(p))
-		if mode.describe then
-			text(mode.describe(p), x + 14, 738, "small", { 0.65, 0.74, 0.83 })
+		local x = positions[i]
+		local c = player_color(p)
+		G.setColor(c)
+		G.circle("fill", x + 3, 30, 3)
+		G.setFont(R.fonts.small)
+		local name = p.name
+		while R.fonts.small:getWidth(name) > 130 do
+			name = name:sub(1, require("utf8").offset(name, -1) - 1)
 		end
-		G.setFont(R.fonts.body)
-		G.setColor(1, 1, 1)
-		G.printf(mode.coop and (p.hp .. " HP") or tostring(math.floor(p.score)), x, 714, width - 28, "right")
+		G.print(name, x + 15, 22)
+		G.setColor(0.7, 0.75, 0.8)
+		G.printf(
+			mode.coop and (p.hp == 0 and "down" or string.rep("·", p.hp)) or tostring(math.floor(p.score)),
+			x + 150,
+			22,
+			55,
+			"right"
+		)
 	end
-	centered(mode.controls .. "     " .. (managed and "BACK  lobby" or "ESC  menu"), 774, "small", { 0.55, 0.65, 0.77 })
+	if mode.coop then
+		centered(s.teamScore .. "   /   x" .. require("games.siege").multiplier(s), 768, "small", { 0.4, 0.65, 0.63 })
+	end
+
 	if finished then
 		G.setColor(0.02, 0.03, 0.06, 0.92)
 		G.rectangle("fill", 260, 255, 760, 290, 20, 20)

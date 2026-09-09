@@ -1,16 +1,5 @@
 local B = require("games.blast")
 local M = {}
-local labels = {
-	remote = "REMOTE",
-	kick = "KICK",
-	diagonal = "DIAGONAL",
-	beam = "BEAM",
-	star = "STAR",
-	range = "RANGE +",
-	capacity = "BOMB +",
-	speed = "SPEED +",
-	cross = "CROSS",
-}
 local glyphs = {
 	remote = "R",
 	kick = "K",
@@ -140,27 +129,6 @@ function M.draw(s, g, fonts, playerColor)
 			g.line(x - 8, y + 8, x + 8, y - 8)
 		end
 	end
-	g.setFont(fonts.small)
-	g.setColor(0.65, 0.74, 0.83)
-	g.printf("ROUND " .. s.round, 20, 163, 160, "center")
-	for i, power in ipairs({ "remote", "kick", "diagonal", "beam", "star" }) do
-		local y = 229 + (i - 1) * 82
-		icon(g, fonts, power, 56, y, 28)
-		g.setColor(0.8, 0.86, 0.93)
-		g.setFont(fonts.small)
-		g.print(labels[power], 79, y - 8)
-	end
-	g.setColor(0.65, 0.74, 0.83)
-	g.printf("PICK UP\nA NEW TRICK", 1092, 171, 165, "center")
-	for i, power in ipairs({ "range", "capacity", "speed", "cross" }) do
-		local y = 254 + (i - 1) * 83
-		icon(g, fonts, power, 1120, y, 28)
-		g.setColor(0.8, 0.86, 0.93)
-		g.setFont(fonts.small)
-		g.print(labels[power], 1143, y - 8)
-	end
-	g.setColor(0.65, 0.74, 0.83)
-	g.printf("+3 last alive\n+1 knockout\n-1 eliminated", 1090, 600, 170, "center")
 	if s.intermission then
 		g.setColor(0.02, 0.03, 0.06, 0.94)
 		g.rectangle("fill", 370, 335, 540, 125, 15, 15)
