@@ -39,9 +39,17 @@ function M.detach(pad)
 end
 function M.sample(slot)
 	local x, y, action, secondary = 0, 0, false, false
+	local aimX, aimY = 0, 0
 	local pad = M.pads[slot]
 	if pad and pad:isConnected() and pad:isGamepad() then
 		x, y = pad:getGamepadAxis("leftx"), pad:getGamepadAxis("lefty")
+		aimX, aimY = pad:getGamepadAxis("rightx"), pad:getGamepadAxis("righty")
+		local aim = math.sqrt(aimX * aimX + aimY * aimY)
+		if aim < 0.2 then
+			aimX, aimY = 0, 0
+		elseif aim > 1 then
+			aimX, aimY = aimX / aim, aimY / aim
+		end
 		if math.abs(x) < 0.2 then
 			x = 0
 		end
@@ -80,6 +88,6 @@ function M.sample(slot)
 	if n > 1 then
 		x, y = x / n, y / n
 	end
-	return { x = x, y = y, action = action, secondary = secondary }
+	return { x = x, y = y, action = action, secondary = secondary, aimX = aimX, aimY = aimY }
 end
 return M

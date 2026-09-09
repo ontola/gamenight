@@ -50,19 +50,19 @@ function R.menu(modes, index, count)
 	text("GAMENIGHT  /  THE FIRST COLLECTION", 70, 40, "small", { 0.3, 0.92, 0.83 })
 	text("GOOD FRIENDS.", 70, 78, "huge")
 	text("QUESTIONABLE ALLIANCES.", 70, 137, "huge")
-	text("Four little games. One very competitive couch.", 73, 215, "body", { 0.55, 0.65, 0.77 })
+	text("Five little games. One very busy couch.", 73, 215, "body", { 0.55, 0.65, 0.77 })
 	for i, mode in ipairs(modes) do
-		local x = 70 + ((i - 1) % 2) * 585
-		local y = 278 + math.floor((i - 1) / 2) * 171
-		local c = R.colors[i]
+		local x = 70 + ((i - 1) % 3) * 390
+		local y = 278 + math.floor((i - 1) / 3) * 171
+		local c = R.colors[(i - 1) % 4 + 1]
 		local chosen = i == index
 		G.setColor(chosen and 0.10 or 0.055, chosen and 0.16 or 0.085, chosen and 0.22 or 0.14)
-		G.rectangle("fill", x, y, 565, 150, 16, 16)
+		G.rectangle("fill", x, y, 370, 150, 16, 16)
 		G.setColor(c)
 		G.setLineWidth(chosen and 3 or 1)
-		G.rectangle("line", x, y, 565, 150, 16, 16)
+		G.rectangle("line", x, y, 370, 150, 16, 16)
 		text("0" .. i, x + 22, y + 17, "small", c)
-		local cx, cy = x + 75, y + 85
+		local cx, cy = x + 45, y + 90
 		if i == 1 then
 			G.circle("line", cx, cy, 28)
 			G.circle("fill", cx - 10, cy, 10)
@@ -70,7 +70,7 @@ function R.menu(modes, index, count)
 		elseif i == 2 then
 			G.setLineWidth(7)
 			G.line(cx - 25, cy + 23, cx - 25, cy - 21, cx + 14, cy - 21, cx + 14, cy + 13, cx + 35, cy + 13)
-		elseif i == 3 then
+		elseif i == 3 or i == 5 then
 			G.polygon("fill", cx, cy - 29, cx - 20, cy + 22, cx, cy + 10, cx + 20, cy + 22)
 		else
 			G.circle("fill", cx, cy, 23)
@@ -80,11 +80,13 @@ function R.menu(modes, index, count)
 			G.line(cx - 12, cy, cx + 12, cy)
 			G.line(cx, cy - 12, cx, cy + 12)
 		end
-		text(mode.title, x + 135, y + 37, "body", c)
-		text(mode.tagline, x + 135, y + 80, "small")
+		text(mode.title, x + 85, y + 37, "body", c)
+		G.setFont(R.fonts.small)
+		G.setColor(0.91, 0.94, 1)
+		G.printf(mode.tagline, x + 85, y + 80, 268)
 	end
 	centered(count .. " PLAYERS   •   F2 changes player count", 641, "body")
-	centered("1 / 2 / 3 / 4 choose     ENTER or controller A play", 683, "body", { 0.3, 0.92, 0.83 })
+	centered("1 / 2 / 3 / 4 / 5 choose     ENTER or controller A play", 683, "body", { 0.3, 0.92, 0.83 })
 	centered(
 		"Keyboard: WASD + Space   /   Arrows + Right Ctrl   /   IJKL + U   /   TFGH + R",
 		741,
@@ -101,7 +103,9 @@ function R.game(mode, s, remaining, finished, managed)
 	G.setFont(R.fonts.huge)
 	G.setColor(remaining < 10 and { 1, 0.43, 0.40 } or { 0.91, 0.94, 1 })
 	G.printf(string.format("%02d", math.ceil(remaining)), 1080, 38, 150, "right")
-	if mode.id == "blast-party" then
+	if mode.id == "neon-siege" then
+		require("games.siege_render").draw(s, G, R.fonts, player_color)
+	elseif mode.id == "blast-party" then
 		require("games.blast_render").draw(s, G, R.fonts, player_color)
 	elseif mode.id == "bumper-royale" then
 		G.setColor(0.09, 0.14, 0.2)
@@ -172,25 +176,31 @@ function R.game(mode, s, remaining, finished, managed)
 		end
 		G.setFont(R.fonts.body)
 		G.setColor(1, 1, 1)
-		G.printf(tostring(math.floor(p.score)), x, 714, width - 28, "right")
+		G.printf(mode.coop and (p.hp .. " HP") or tostring(math.floor(p.score)), x, 714, width - 28, "right")
 	end
 	centered(mode.controls .. "     " .. (managed and "BACK  lobby" or "ESC  menu"), 774, "small", { 0.55, 0.65, 0.77 })
 	if finished then
 		G.setColor(0.02, 0.03, 0.06, 0.92)
 		G.rectangle("fill", 260, 255, 760, 290, 20, 20)
-		local best = -math.huge
-		for _, p in ipairs(s.players) do
-			best = math.max(best, math.floor(p.score))
-		end
-		local winners = {}
-		for _, p in ipairs(s.players) do
-			if math.floor(p.score) == best then
-				winners[#winners + 1] = p.name
+		if mode.coop then
+			centered(s.over and "TEAM DOWN" or "TEAM SURVIVED", 290, "title", { 0.3, 0.92, 0.83 })
+			centered(s.kills .. " ENEMIES / WAVE " .. s.wave, 350, "body")
+			centered(s.teamScore .. " POINTS", 391, "huge")
+		else
+			local best = -math.huge
+			for _, p in ipairs(s.players) do
+				best = math.max(best, math.floor(p.score))
 			end
+			local winners = {}
+			for _, p in ipairs(s.players) do
+				if math.floor(p.score) == best then
+					winners[#winners + 1] = p.name
+				end
+			end
+			centered(#winners == 1 and "ROUND WINNER" or "SHARED VICTORY", 290, "small", { 0.3, 0.92, 0.83 })
+			centered(table.concat(winners, " + "), 336, "title")
+			centered(tostring(best) .. " POINTS", 391, "huge")
 		end
-		centered(#winners == 1 and "ROUND WINNER" or "SHARED VICTORY", 290, "small", { 0.3, 0.92, 0.83 })
-		centered(table.concat(winners, " + "), 336, "title")
-		centered(tostring(best) .. " POINTS", 391, "huge")
 		centered(managed and "Waiting for the party…" or "ENTER / A rematch   •   ESC menu", 490, "body")
 	end
 	R.finish()

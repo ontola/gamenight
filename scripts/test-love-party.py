@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--love", required=True)
     parser.add_argument("--pack", type=Path, required=True)
     args = parser.parse_args()
-    for game in ("bumper-royale", "neon-trails", "meteor-dash", "blast-party"):
+    for game in ("bumper-royale", "neon-trails", "meteor-dash", "blast-party", "neon-siege"):
         with socket.socket() as server:
             server.bind(("127.0.0.1", 0))
             server.listen()

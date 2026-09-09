@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import zipfile
 
-GAMES = {"bumper-royale": "Bumper Royale", "neon-trails": "Neon Trails", "meteor-dash": "Meteor Dash", "blast-party": "Blast Party"}
+GAMES = {"bumper-royale": "Bumper Royale", "neon-trails": "Neon Trails", "meteor-dash": "Meteor Dash", "blast-party": "Blast Party", "neon-siege": "Neon Siege"}
 RUNTIME = {
     "id": "love-11-5",
     "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",

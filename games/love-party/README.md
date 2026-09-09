@@ -1,6 +1,6 @@
 # GameNight LÖVE Party Pack
 
-Four original local multiplayer prototypes for 2–4 people. MIT licensed.
+Five original local multiplayer prototypes for 2–4 people. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
@@ -9,16 +9,18 @@ Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 | Bumper Royale | Knock friends out of a shrinking ring; +3 knockout, -1 fall | Move, A to dash |
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
+| Neon Siege | Survive together; shared score and combo, no friendly fire | Move, right stick to aim, A to dash, B for pulse |
 | Meteor Dash | Collect stars (+5), avoid hits (-10), survive (+1/second) | Move, A for shield dash |
 
-Matches last 60 seconds. Ties share victory. Every game supports 2, 3 or 4
+Competitive matches last 60 seconds. Ties share victory. Neon Siege is a
+90-second cooperative survival match, ending early if the entire team falls. Every game supports 2, 3 or 4
 players, bots for automated testing, and consistent seat colours (using GameNight player colours when supplied).
 Scores are displayed by the game; protocol v1 reports match completion but
 has no cross-game score submission message.
 
 ## Play
 
-Run `love games/love-party` from the repository. Choose a game with 1/2/3/4 or
+Run `love games/love-party` from the repository. Choose a game with 1/2/3/4/5 or
 the controller D-pad, Enter/A to start, F2 to choose 2–4 players.
 A packaged `.love` file opens its game directly. Escape/Back returns to the
 standalone menu; Enter/A starts a rematch after the result screen.
@@ -53,7 +55,7 @@ existing Pinpals catalogue entry remains independent of this pack.
 python scripts/package-love-party.py --output dist/party --love /path/to/love
 ```
 
-Produces four deterministic `.love` files, checksums, a collection ZIP and
+Produces five deterministic `.love` files, checksums, a collection ZIP and
 an optional `shelf.json` with absolute local paths. Merge those shelf entries
 with your lobby entry when configuring `GAMENIGHT_LIBRARY`. The build never
 changes the Windows installer's contents or assumes an unpublished download URL.
@@ -61,7 +63,7 @@ changes the Windows installer's contents or assumes an unpublished download URL.
 For a release, pass `--base-url https://your-host/immutable-release` to also
 generate Windows catalogue entries. Publish the `.love` files at that URL,
 then add the generated entries to the starter catalogue. The shared LÖVE
-runtime is reused, not included four times.
+runtime is reused, not included five times.
 
 ## Develop and test
 
@@ -119,3 +121,28 @@ There is no friendly-fire immunity; your own explosions are dangerous too.
 The tests cover 120 seeded arenas, blast shapes, walls/crates, chain reactions,
 remote ownership, kicking, press edges, upgrades and round resets. Bot soak tests
 exercise all four games with 2, 3 and 4 players.
+
+## Neon Siege
+
+A fast geometric co-op arena shooter for 2–4 local players. Weapons fire
+continuously. Aim with the right stick; releasing it auto-targets the nearest
+active enemy, so shared keyboard players can focus on moving and dodging.
+A/action dashes through danger with brief immunity (1.2-second cooldown).
+B/secondary clears nearby enemies and bullets (10-second cooldown).
+
+Chasers rush, weavers weave, splitters break into three shards, and forts shoot.
+New waves arrive every ten seconds; spawn rates increase with time and team size.
+Kills build a shared multiplier up to x5; damage or a 2.5-second gap resets it.
+Pickups grant spread, piercing or rapid fire for nine seconds, or repair one HP.
+
+Each player has three HP. Stay close to a fallen teammate for 1.2 seconds to
+revive them; they also return after six seconds if someone remains alive.
+An entire team down for two seconds ends the match. Everyone shares the score.
+Player bullets never hurt teammates. Shapes, particles and synthesized sounds
+are generated in code; there are no external art assets.
+
+Simulation tests cover swept bullet collisions, piercing, immunity, revives,
+team wipes, pulse cooldowns, splitters, pickups, aim deadzones and entity caps.
+A 270-second bot simulation exercises two, three and four players, with a
+220-enemy ceiling and bounded projectile/particle counts. Performance timing is
+reported for diagnosis, without a machine-dependent CI threshold.

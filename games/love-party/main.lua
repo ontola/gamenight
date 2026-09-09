@@ -1,4 +1,10 @@
-local modes = { require("games.bumper"), require("games.trails"), require("games.meteor"), require("games.blast") }
+local modes = {
+	require("games.bumper"),
+	require("games.trails"),
+	require("games.meteor"),
+	require("games.blast"),
+	require("games.siege"),
+}
 local U = require("shared.util")
 local Input = require("shared.input")
 local Lifecycle = require("shared.lifecycle")
@@ -8,8 +14,10 @@ local Audio = require("shared.audio")
 local state, bridge, mode, remaining, finished, accumulator
 local selected, count, menu = 1, 2, true
 local managed = os.getenv("GAMENIGHT") == "1"
-local duration = tonumber(os.getenv("GNLOVE_MATCH_SECONDS")) or 60
-duration = U.clamp(duration, 1, 600)
+local duration = tonumber(os.getenv("GNLOVE_MATCH_SECONDS"))
+if duration then
+	duration = U.clamp(duration, 1, 600)
+end
 local function pads()
 	return love.joystick and love.joystick.getJoysticks() or {}
 end
@@ -17,7 +25,7 @@ local function prepare(seats, players)
 	local roster = U.players(seats, players)
 	Input.bind(roster, pads())
 	state = mode.new(roster, U.rng(tonumber(os.getenv("GNLOVE_SEED")) or os.time()))
-	remaining, finished, accumulator = duration, false, 0
+	remaining, finished, accumulator = duration or mode.duration or 60, false, 0
 	menu = false
 end
 local function standalone()
@@ -117,21 +125,30 @@ function love.update(dt)
 		for i, p in ipairs(state.players) do
 			before[i] = p.score
 		end
+		local events = {}
+		for name, value in pairs(state.sfx or {}) do
+			events[name] = value
+		end
 		local blasts = state.blastCount or 0
 		mode.update(state, 1 / 120, inputs)
 		if (state.blastCount or 0) > blasts then
 			Audio.play("blast")
 		end
+		for name, value in pairs(state.sfx or {}) do
+			if value > (events[name] or 0) then
+				Audio.play(name)
+			end
+		end
 		for i, p in ipairs(state.players) do
-			if p.score - before[i] >= 3 then
+			if not mode.coop and p.score - before[i] >= 3 then
 				Audio.play("point")
-			elseif p.score < before[i] then
+			elseif not mode.coop and p.score < before[i] then
 				Audio.play("hit")
 			end
 		end
 		remaining = math.max(0, remaining - 1 / 120)
 		accumulator = accumulator - 1 / 120
-		if remaining == 0 then
+		if remaining == 0 or state.over then
 			finished = true
 			Audio.play("finish")
 			if bridge then
@@ -164,7 +181,7 @@ function love.keypressed(key)
 		menu = true
 		state = nil
 	elseif menu then
-		if key == "1" or key == "2" or key == "3" or key == "4" then
+		if tonumber(key) and tonumber(key) >= 1 and tonumber(key) <= #modes then
 			selected = tonumber(key)
 		elseif key == "f2" then
 			count = count == 4 and 2 or count + 1
