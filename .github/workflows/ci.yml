@@ -1,0 +1,51 @@
+name: Build and test
+on: [push, pull_request, workflow_dispatch]
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  runtime:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libasound2-dev libx11-dev libxkbcommon-dev libwayland-dev libxcursor-dev libxi-dev libxrandr-dev
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build --workspace --locked
+      - if: runner.os != 'Windows'
+        run: cargo run -p gamenight-certify -- demo-game -- target/debug/demo-game 1
+      - if: runner.os == 'Windows'
+        run: cargo run -p gamenight-certify -- demo-game -- target/debug/demo-game.exe 1
+      - if: runner.os != 'Windows'
+        run: |
+          cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
+          cargo run -p gamenight-certify -- c-game -- /tmp/c-game
+  lobby:
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/lobby
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libasound2-dev libx11-dev libxkbcommon-dev libwayland-dev libxcursor-dev libxi-dev libxrandr-dev
+      - run: cargo build --manifest-path crates/lobby/Cargo.toml --locked
