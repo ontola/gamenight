@@ -6,7 +6,7 @@
 //! [`Command`]s and executes the returned [`Effect`]s. That keeps every
 //! transition rule unit-testable.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use gamenight_protocol::{
     GameId, GameMeta, GameSettings, InstallState, InstallStatus, MediaAction, NowPlaying,
@@ -196,6 +196,8 @@ pub struct GameNight {
     /// they have gone stale — the party keeps changing while a game warms,
     /// and a session prepared for one player must not be started for two.
     warm_seats: Vec<Seat>,
+    // Bounded tombstones for replies already in flight when Dispose is sent.
+    retired_sessions: VecDeque<SessionId>,
     history: Vec<GameId>,
     vote: VoteBoard,
     /// A transition has been requested (skip button, vote, finished game) but
@@ -253,6 +255,7 @@ impl GameNight {
             active: None,
             warm: None,
             warm_seats: Vec::new(),
+            retired_sessions: VecDeque::new(),
             history: Vec::new(),
             vote: VoteBoard::default(),
             pending_transition: false,
@@ -941,6 +944,11 @@ impl GameNight {
     }
 
     fn on_session_ready(&mut self, session: SessionId, fx: &mut Vec<Effect>) {
+        // Loading may finish after a seat change has replaced the session.
+        // Dispose and Ready cross in flight; this is not a game error.
+        if self.retired_sessions.contains(&session) {
+            return;
+        }
         match &mut self.warm {
             Some(w) if w.id == session && w.phase == SessionPhase::Preparing => {
                 w.advance(SessionPhase::Ready).expect("checked");
@@ -1382,12 +1390,21 @@ impl GameNight {
         }
     }
 
+    fn remember_disposed(&mut self, session: SessionId) {
+        const RECENT_DISPOSALS: usize = 64;
+        if self.retired_sessions.len() == RECENT_DISPOSALS {
+            self.retired_sessions.pop_front();
+        }
+        self.retired_sessions.push_back(session);
+    }
+
     fn dispose_active(&mut self, fx: &mut Vec<Effect>) {
         if let Some(mut a) = self.active.take() {
             // Whatever pause the overlay held on this session dies with it.
             self.overlay_paused = false;
             self.history.push(a.game.clone());
             a.advance(SessionPhase::Disposed).expect("live session");
+            self.remember_disposed(a.id);
             fx.push(Effect::ToGame {
                 game: a.game,
                 session: a.id,
@@ -1400,6 +1417,7 @@ impl GameNight {
         self.warm_seats.clear();
         if let Some(mut w) = self.warm.take() {
             w.advance(SessionPhase::Disposed).expect("live session");
+            self.remember_disposed(w.id);
             fx.push(Effect::ToGame {
                 game: w.game,
                 session: w.id,

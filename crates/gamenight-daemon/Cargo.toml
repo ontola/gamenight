@@ -1,5 +1,6 @@
 [package]
 name = "gamenight-daemon"
+default-run = "gamenight-daemon"
 description = "The GameNight daemon: hosts the party, talks the protocol to games and overlays over WebSockets."
 version.workspace = true
 edition.workspace = true

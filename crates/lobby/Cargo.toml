@@ -188,3 +188,14 @@ ignored = [
 [patch.'https://github.com/fishfolk/bones']
 bones_framework     = { path = "../../vendor/bones/framework_crates/bones_framework" }
 bones_bevy_renderer = { path = "../../vendor/bones/framework_crates/bones_bevy_renderer" }
+
+# CI verifies portability without spending release-style optimization time.
+[profile.ci]
+inherits = "dev"
+opt-level = 0
+debug = 0
+
+[profile.ci.package."*"]
+opt-level = 0
+codegen-units = 16
+debug = 0

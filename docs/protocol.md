@@ -492,3 +492,10 @@ daemon → towerfall: prepare        (playlist wraps; warm again)
 Downloads, remote seats over the network, voice, input routing, GPU/memory
 budgeting for multiple warm sessions. They will arrive as new message types —
 old games won't notice.
+
+### Ready crossing Dispose
+
+A host may replace a preparing session when seats change. A `ready` reply for
+a recently disposed session can already be in flight. GameNight ignores these
+late replies for the 64 most recent disposals; it never applies them to the
+replacement session. Unknown session IDs still produce a protocol error.

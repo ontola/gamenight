@@ -427,7 +427,7 @@ mod tests {
              `cargo run -p gamenight-catalog -- --write-schema`",
         );
         assert_eq!(
-            committed,
+            committed.replace("\r\n", "\n"),
             json_schema_pretty(),
             "catalog/schema.json is stale — run \
              `cargo run -p gamenight-catalog -- --write-schema`"

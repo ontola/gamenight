@@ -1,0 +1,26 @@
+name: Package Windows preview
+on: [workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            crates/lobby -> target
+      - name: Build native preview with pinned Pinpals and LOVE
+        shell: pwsh
+        run: ./scripts/build-windows-preview.ps1 -OutputDir "$env:RUNNER_TEMP/preview" -TargetDir "$env:GITHUB_WORKSPACE/target"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamenight-windows-preview
+          path: |
+            ${{ runner.temp }}/preview/gamenight-windows-preview.zip
+            ${{ runner.temp }}/preview/SHA256SUMS.txt
+          if-no-files-found: error
