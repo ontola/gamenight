@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameNight - Local Character Studio</title>
+  <style>
+    /* Mobile first: this page is reached by scanning a QR with a phone, so
+       the phone layout is the layout, and the desktop one is the exception. */
+    .face-tex-box {
+      display: flex; justify-content: center; padding: 0.5rem;
+      background: #0f172a; border-radius: 10px; margin-top: 0.4rem;
+    }
+    #face-texture-canvas {
+      width: 184px; height: 128px; image-rendering: pixelated;
+      border: 1px solid #2b3550; border-radius: 6px;
+    }
+
+    .blocked {
+      display: none; margin: 0 0 1rem; padding: 0.9rem 1rem;
+      border: 2px solid #b45309; border-radius: 12px;
+      background: #2a1a06; color: #fde68a; font-size: 0.95rem;
+    }
+    .blocked-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 0.35rem; }
+    .blocked-hint { margin-top: 0.4rem; color: #fbbf24; font-size: 0.85rem; }
+
+    .identity-row { display: flex; align-items: center; gap: 0.5rem; }
+    .name-input {
+      flex: 1; min-width: 0; font-size: 1.6rem; font-weight: 800;
+      background: transparent; border: none; border-bottom: 2px dashed #2b3550;
+      color: #f8fafc; padding: 0.25rem 0.1rem;
+    }
+    .name-input:focus { outline: none; border-bottom-color: #6366f1; }
+    .identity-hint { font-size: 0.8rem; color: #64748b; margin-top: 0.35rem; }
+    .icon-btn {
+      flex: none; width: 44px; height: 44px; border-radius: 10px;
+      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
+      font-size: 1.1rem; cursor: pointer;
+    }
+    .icon-btn:hover { background: #2b3550; }
+
+    /* Touch targets: 44px is the smallest thing a thumb reliably hits. */
+    .tool-btn { min-height: 44px; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+    /* Artwork as a list — the old thumbnail grid put three controls inside
+       48 pixels, which is unusable on a phone. */
+    .artwork-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
+    /* Wraps, so three 44px-tall buttons plus a preview can never be wider
+       than a phone. The row used to hold a growing "Editing" label, which
+       pushed the buttons past the edge and took the whole page with it. */
+    .artwork-row {
+      display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem;
+      border: 2px solid #2b3550; border-radius: 10px; background: #0f172a;
+      flex-wrap: wrap;
+    }
+    .artwork-row.active { border-color: #6366f1; }
+    .artwork-row canvas {
+      width: 52px; height: 52px; image-rendering: pixelated; flex: none;
+      border-radius: 6px; background:
+        repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 12px 12px;
+    }
+    /* A badge, not a spacer: it states which face is open without claiming
+       any width of its own. */
+    .artwork-row .badge {
+      flex: none; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em;
+      color: #a5b4fc; text-transform: uppercase;
+    }
+    .artwork-row .row-actions {
+      display: flex; gap: 0.3rem; flex: 1 1 100%; min-width: 0;
+    }
+    .artwork-row .row-actions button {
+      flex: 1 1 0; min-width: 0;
+      min-height: 44px; padding: 0 0.4rem; border-radius: 8px;
+      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
+      font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+    }
+    .artwork-row .row-actions button:hover { background: #2b3550; }
+
+    /* Roomier screens can put the buttons back on the same line. */
+    @media (min-width: 560px) {
+      .artwork-row .row-actions { flex: 0 1 auto; margin-left: auto; }
+      .artwork-row .row-actions button { flex: none; padding: 0 0.9rem; }
+    }
+
+    /* Transparent pixels read as a checkerboard, so "no colour" is visibly
+       different from "dark colour". */
+    #pixel-grid .pixel.empty {
+      background:
+        repeating-conic-gradient(#1b2438 0% 25%, #131c2e 0% 50%) 50% / 8px 8px;
+    }
+    .canvas-container { touch-action: none; }
+    #preview-canvas {
+      width: 192px; height: 300px; image-rendering: pixelated;
+      background: #1b2438; border-radius: 10px;
+    }
+    .status { font-size: 0.9rem; text-align: center; color: #34d399; min-height: 1.2rem; }
+
+    @media (min-width: 900px) {
+      .name-input { font-size: 2rem; }
+    }
+
+    .artwork-gallery {
+      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;
+    }
+    .artwork-card {
+      position: relative; border: 2px solid #2b3550; border-radius: 8px;
+      padding: 4px; background: #0f172a; cursor: pointer; line-height: 0;
+    }
+    .artwork-card.active { border-color: #6366f1; }
+    .artwork-card canvas {
+      width: 48px; height: 48px; image-rendering: pixelated; display: block;
+    }
+    .artwork-actions {
+      display: flex; gap: 2px; margin-top: 3px; line-height: 1;
+    }
+    .artwork-actions button {
+      flex: 1; font-size: 0.7rem; padding: 1px 0; border-radius: 4px;
+      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
+      cursor: pointer;
+    }
+    .artwork-actions button:hover { background: #2b3550; }
+    .artwork-new {
+      width: 56px; height: 56px; border: 2px dashed #2b3550; border-radius: 8px;
+      background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer;
+    }
+    .artwork-new:hover { border-color: #6366f1; color: #6366f1; }
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #161e2e;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #2e3a52;
+      --grid-border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1rem;
+    }
+
+    header {
+      width: 100%;
+      max-width: 900px;
+      /* Mobile first: brand over tabs. Side by side, the three tab labels
+         plus the wordmark are wider than a phone and pushed the whole page
+         into a horizontal scroll. */
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.6rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.3rem;
+      width: 100%;
+    }
+
+    @media (min-width: 700px) {
+      header {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-tabs { width: auto; }
+    }
+
+    .brand {
+      font-size: 0.85rem;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.2rem;
+      color: #818cf8;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #111827;
+      padding: 0.25rem;
+      border-radius: 8px;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      /* Equal thirds so three tabs always fit the width exactly, however
+         narrow the screen is. */
+      flex: 1;
+      min-width: 0;
+      padding: 0.6rem 0.4rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+
+    @media (min-width: 700px) {
+      .nav-btn { flex: none; padding: 0.5rem 1rem; font-size: 1rem; }
+    }
+
+    .nav-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    main {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    .editor-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    @media(min-width: 768px) {
+      .editor-layout {
+        grid-template-columns: 340px 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #e2e8f0;
+    }
+
+    /* Pixel Grid */
+    .canvas-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    #pixel-grid {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 1px;
+      background: var(--grid-border);
+      width: 280px;
+      height: 280px;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    .pixel {
+      background: #1e293b;
+      aspect-ratio: 1;
+    }
+
+    /* Tools */
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .tool-btn {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 0.8rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .tool-btn.active {
+      border-color: var(--accent);
+      background: #312e81;
+    }
+
+    .palette {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      margin-top: 0.5rem;
+    }
+    /* 40px is a thumb-sized target; the swatches had no size rule at all
+       before, so they collapsed to nothing. */
+    .swatch {
+      width: 40px; height: 40px; border-radius: 8px; cursor: pointer;
+      border: 2px solid #2b3550;
+    }
+    .swatch.active { border-color: #ffffff; transform: scale(1.08); }
+
+    .color-swatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s;
+    }
+
+    .color-swatch.selected {
+      border-color: #fff;
+      transform: scale(1.15);
+    }
+
+    /* Profile Info */
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+    input[type="text"] {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      color: #fff;
+      padding: 0.6rem 0.8rem;
+      border-radius: 6px;
+      font-size: 1rem;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* Character Animation Preview */
+    .preview-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.8rem;
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 8px;
+    }
+
+    #preview-canvas {
+      width: 64px;
+      height: 64px;
+      image-rendering: pixelated;
+      animation: idleBob 1.2s infinite ease-in-out;
+    }
+
+    @keyframes idleBob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+
+    /* QR pairing box */
+    .qr-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <span>🎮 GAMENIGHT</span>
+    </div>
+    <div class="nav-tabs">
+      <button class="nav-btn active" onclick="switchTab('character')">Character</button>
+      <button class="nav-btn" onclick="switchTab('session')">Session</button>
+    </div>
+  </header>
+
+  <div id="session-banner" style="display:none; background: linear-gradient(90deg, #6366f1, #a855f7); color: #fff; padding: 0.8rem 1.5rem; text-align: center; font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid rgba(255,255,255,0.2);">
+    📱 Scanned Game Session Code: <span id="session-id-display">gn-8f92a1</span> — Customize your character below and join the game!
+  </div>
+
+  <main>
+    <!-- TAB 1: CHARACTER EDITOR -->
+    <div id="tab-character" class="tab-content active">
+      <!-- Identity: the first thing you see, and the first thing you change. -->
+      <div class="card identity">
+        <div class="identity-row">
+          <input id="player-name" class="name-input" value="" maxlength="20"
+                 aria-label="Your name" autocomplete="off" spellcheck="false">
+          <button class="icon-btn" id="name-edit" title="Edit your name" aria-label="Edit your name">✏️</button>
+          <button class="icon-btn" id="name-dice" title="Random name" aria-label="Random name">🎲</button>
+        </div>
+        <div class="identity-hint">This is the name above your character.</div>
+      </div>
+
+      <!-- The character, not just the face: what you'll actually see on the TV. -->
+      <div class="card">
+        <div class="card-title">Your character</div>
+        <div class="preview-box">
+          <canvas id="preview-canvas" width="96" height="150"></canvas>
+        </div>
+
+        <label>Character colour</label>
+        <div class="palette" id="character-colors"></div>
+
+        <label style="margin-top:0.75rem;">Face texture, actual size in game</label>
+        <div class="face-tex-box">
+          <canvas id="face-texture-canvas" width="46" height="32"></canvas>
+        </div>
+        <div class="identity-hint">
+          Your 16×16 drawing sits on the character's head. Anything outside
+          the marked square is skin, not paint.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Draw your face</div>
+        <div class="canvas-container">
+          <div id="pixel-grid"></div>
+        </div>
+
+        <div class="toolbar">
+          <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')">✏️ Draw</button>
+          <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')">🧹 Erase</button>
+          <button class="tool-btn" id="tool-fill" onclick="setTool('fill')">🪣 Fill</button>
+          <button class="tool-btn" id="btn-undo" onclick="undo()">↩️ Undo</button>
+          <button class="tool-btn" onclick="clearCanvas()">🗑️ Clear</button>
+          <button class="tool-btn" onclick="loadPreset()">🎲 Random</button>
+        </div>
+
+        <label>Face colours</label>
+        <div class="palette" id="palette-swatches"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">My faces</div>
+        <div id="artwork-gallery" class="artwork-list"></div>
+        <button class="btn-primary" onclick="newArtwork()">＋ New face</button>
+      </div>
+
+      <div id="status-msg" class="status"></div>
+    </div>
+
+    <!-- TAB 3: SESSION & QR -->
+    <div id="tab-session" class="tab-content">
+      <div class="card qr-card">
+        <div class="card-title">Scan QR Code with Phone</div>
+        <p style="color: var(--muted);">Scan to edit your character on mobile and load directly into the couch party!</p>
+        <img src="/qr" alt="QR Code" style="border-radius: 8px; border: 4px solid var(--accent); padding: 8px; background: #0f172a;" />
+        <div style="font-size: 0.85rem; color: var(--muted)">http://127.0.0.1:7913/mobile</div>
+      </div>
+
+
+    </div>
+  </main>
+
+  <script>
+    // ---- Identity state -------------------------------------------------
+    let profileId = localStorage.getItem('gamenight_profile_id')
+      || ('prof_' + Math.random().toString(36).slice(2, 11));
+    localStorage.setItem('gamenight_profile_id', profileId);
+
+    // Set when this page was opened by scanning the QR above a character's
+    // head: that body is already in the party, so the profile is applied to
+    // it rather than adding a second, bodiless player.
+    const params = new URLSearchParams(window.location.search);
+    const claimPlayerId = params.get('claim');
+    // Set when the wall QR was aimed at a seat by someone standing on the
+    // sign-in pad. Preferred over a player id: seats survive a lobby restart.
+    const claimSeat = params.get('seat');
+
+    // The party member this profile is bound to when we weren't opened from
+    // a character's QR — remembered from the first join so later saves
+    // update that player instead of adding another one each time.
+    let boundPlayerId = localStorage.getItem('gamenight_bound_player') || null;
+    let currentArtworkId = localStorage.getItem('gamenight_current_artwork') || null;
+
+    const GRID_SIZE = 16;
+
+    // `null` means transparent. A face should be a *face* — filling the grid
+    // with a background colour by default gives everyone an opaque tile with
+    // a head buried in it, which is why the old sentinel-colour approach was
+    // wrong in the first place.
+    let gridData = Array(GRID_SIZE * GRID_SIZE).fill(null);
+    const EMPTY = null;
+
+    // Undo history. Bounded — this is a 16x16 grid on a phone, not Photoshop.
+    const UNDO_LIMIT = 40;
+    let undoStack = [];
+
+    function pushUndo() {
+      undoStack.push(gridData.slice());
+      if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+      refreshUndoButton();
+    }
+
+    function undo() {
+      const prev = undoStack.pop();
+      if (!prev) return;
+      gridData = prev;
+      renderGrid();
+      refreshUndoButton();
+      onArtworkChanged();
+    }
+
+    function refreshUndoButton() {
+      const b = document.getElementById('btn-undo');
+      if (b) b.disabled = undoStack.length === 0;
+    }
+
+    const PALETTE = [
+      '#ff5555', '#ffaa00', '#ffff55', '#55ff55', '#55ffff', '#5555ff', '#ff55ff',
+      '#ffffff', '#c0c0c0', '#808080', '#404040', '#000000',
+      '#8b4513', '#ffc0cb', '#7ddf64', '#c792ea'
+    ];
+    let currentColor = PALETTE[0];
+    let currentTool = 'pencil';
+
+    function renderPalette() {
+      const el = document.getElementById('palette-swatches');
+      el.innerHTML = '';
+      PALETTE.forEach(col => {
+        const sw = document.createElement('div');
+        sw.className = 'swatch' + (col === currentColor ? ' active' : '');
+        sw.style.background = col;
+        sw.onclick = () => { currentColor = col; renderPalette(); };
+        el.appendChild(sw);
+      });
+    }
+
+    function renderGrid() {
+      const container = document.getElementById('pixel-grid');
+      container.innerHTML = '';
+      gridData.forEach((color, idx) => {
+        const div = document.createElement('div');
+        div.className = 'pixel' + (color === EMPTY ? ' empty' : '');
+        // Unpainted cells show the character colour, so the canvas previews
+        // the head you're drawing on rather than a checkerboard. "Empty" and
+        // "painted the same colour" looking identical is correct: in game
+        // both come out as skin.
+        div.style.background = color === EMPTY ? characterColor : color;
+        div.dataset.idx = idx;
+        container.appendChild(div);
+      });
+      updatePreview();
+    }
+
+    // ---- Drawing -------------------------------------------------------
+    // Pointer events rather than mouse events: they cover touch, pen and
+    // mouse in one path, so dragging works on a phone. The grid was
+    // tap-only before because mousedown/mouseenter never fire for touch —
+    // a finger sliding across the screen produces pointermove on the
+    // element it started on, so we hit-test coordinates instead.
+    let drawing = false;
+    let strokeDirty = false;
+
+    function idxFromPoint(x, y) {
+      const el = document.elementFromPoint(x, y);
+      if (!el || !el.classList.contains('pixel')) return null;
+      const idx = parseInt(el.dataset.idx, 10);
+      return Number.isNaN(idx) ? null : idx;
+    }
+
+    function bindCanvas() {
+      const grid = document.getElementById('pixel-grid');
+
+      grid.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        drawing = true;
+        strokeDirty = false;
+        // One undo entry per stroke, not per pixel.
+        pushUndo();
+        paintAt(e.clientX, e.clientY);
+        grid.setPointerCapture(e.pointerId);
+      });
+
+      grid.addEventListener('pointermove', (e) => {
+        if (!drawing) return;
+        e.preventDefault();
+        paintAt(e.clientX, e.clientY);
+      });
+
+      const stop = () => {
+        if (!drawing) return;
+        drawing = false;
+        // A stroke that changed nothing shouldn't cost an undo step.
+        if (!strokeDirty) { undoStack.pop(); refreshUndoButton(); }
+        else onArtworkChanged();
+      };
+      grid.addEventListener('pointerup', stop);
+      grid.addEventListener('pointercancel', stop);
+      grid.addEventListener('pointerleave', stop);
+    }
+
+    function paintAt(x, y) {
+      const idx = idxFromPoint(x, y);
+      if (idx === null) return;
+      const before = gridData[idx];
+      applyToolInner(idx);
+      if (gridData[idx] !== before) {
+        strokeDirty = true;
+        renderGrid();
+      }
+    }
+
+    function setTool(tool) {
+      currentTool = tool;
+      ['pencil', 'eraser', 'fill'].forEach(t => {
+        const b = document.getElementById('tool-' + t);
+        if (b) b.classList.toggle('active', t === tool);
+      });
+    }
+
+    function applyToolInner(idx) {
+      if (currentTool === 'pencil') {
+        gridData[idx] = currentColor;
+      } else if (currentTool === 'eraser') {
+        gridData[idx] = EMPTY;
+      } else if (currentTool === 'fill') {
+        floodFill(idx, gridData[idx], currentColor);
+      }
+    }
+
+    function floodFill(startIdx, targetColor, replacementColor) {
+      if (targetColor === replacementColor) return;
+      const queue = [startIdx];
+      const visited = new Set();
+      while (queue.length) {
+        const curr = queue.shift();
+        if (visited.has(curr) || curr < 0 || curr >= gridData.length) continue;
+        visited.add(curr);
+        if (gridData[curr] !== targetColor) continue;
+        gridData[curr] = replacementColor;
+        const r = Math.floor(curr / GRID_SIZE), c = curr % GRID_SIZE;
+        if (r > 0) queue.push(curr - GRID_SIZE);
+        if (r < GRID_SIZE - 1) queue.push(curr + GRID_SIZE);
+        if (c > 0) queue.push(curr - 1);
+        if (c < GRID_SIZE - 1) queue.push(curr + 1);
+      }
+    }
+
+    function clearCanvas() {
+      pushUndo();
+      gridData = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
+      renderGrid();
+      onArtworkChanged();
+    }
+
+    // ---- Faces ---------------------------------------------------------
+    // Twelve starting faces, all drawn here from scratch. None of them are
+    // derived from the lobby's old art: that art was CC BY-NC and cannot ship in a
+    // commercial product, and a face you can recognise from the base game is
+    // a worse starting point than one that's obviously yours to change.
+    //
+    // Each is features only, on a transparent background — the character's
+    // colour shows through as skin. Painting a backdrop behind your face is a
+    // habit worth not teaching.
+    const INK = '#1a1a1a';
+    const WHITE = '#ffffff';
+
+    // Small drawing helpers, so a face is a recipe rather than 256 literals.
+    function facePad() {
+      const g = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
+      const put = (r, c, col) => {
+        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) g[r * GRID_SIZE + c] = col;
+      };
+      const box = (r0, r1, c0, c1, col) => {
+        for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) put(r, c, col);
+      };
+      const api = {
+        g, put, box,
+        // Round eye: white with a pupil looking slightly inward.
+        eyesRound(row, ink = INK) {
+          for (const c of [3, 9]) {
+            box(row, row + 2, c, c + 3, WHITE);
+            box(row + 1, row + 2, c + 1, c + 2, ink);
+          }
+          return api;
+        },
+        eyesDot(row, ink = INK) {
+          box(row, row + 1, 4, 5, ink);
+          box(row, row + 1, 10, 11, ink);
+          return api;
+        },
+        eyesWide(row, ink = INK) {
+          for (const c of [3, 9]) {
+            box(row, row + 3, c, c + 3, WHITE);
+            box(row + 1, row + 2, c + 1, c + 2, ink);
+          }
+          return api;
+        },
+        eyesClosed(row, ink = INK) {
+          box(row + 1, row + 1, 3, 6, ink);
+          box(row + 1, row + 1, 9, 12, ink);
+          return api;
+        },
+        eyesSquare(row, col1 = '#5ce1ff', ink = INK) {
+          for (const c of [3, 9]) {
+            box(row, row + 3, c, c + 3, ink);
+            box(row + 1, row + 2, c + 1, c + 2, col1);
+          }
+          return api;
+        },
+        wink(row, ink = INK) {
+          box(row, row + 2, 3, 6, WHITE);
+          box(row + 1, row + 2, 4, 5, ink);
+          box(row + 1, row + 1, 9, 12, ink);   // the closed one
+          return api;
+        },
+        brows(row, ink = INK, angry = true) {
+          if (angry) {
+            box(row, row, 3, 5, ink); put(row + 1, 6, ink);
+            box(row, row, 10, 12, ink); put(row + 1, 9, ink);
+          } else {
+            box(row, row, 3, 6, ink);
+            box(row, row, 9, 12, ink);
+          }
+          return api;
+        },
+        starEyes(row, col = '#ffe066') {
+          for (const c of [4, 10]) {
+            put(row, c, col);
+            box(row + 1, row + 1, c - 1, c + 1, col);
+            put(row + 2, c, col);
+          }
+          return api;
+        },
+        eyepatch(row, ink = INK) {
+          box(row, row + 3, 9, 12, ink);
+          box(row - 1, row - 1, 8, 13, ink);   // the strap
+          box(row, row + 2, 3, 6, WHITE);
+          box(row + 1, row + 2, 4, 5, ink);
+          return api;
+        },
+        glasses(row, frame = '#4a5568') {
+          box(row, row + 3, 2, 6, frame);
+          box(row + 1, row + 2, 3, 5, WHITE);
+          box(row, row + 3, 9, 13, frame);
+          box(row + 1, row + 2, 10, 12, WHITE);
+          box(row + 1, row + 1, 7, 8, frame);  // bridge
+          return api;
+        },
+        mouthSmile(row, ink = INK) {
+          box(row, row, 5, 10, ink);
+          put(row - 1, 4, ink); put(row - 1, 11, ink);
+          return api;
+        },
+        mouthGrin(row, ink = INK) {
+          box(row, row + 2, 4, 11, ink);
+          box(row + 1, row + 1, 5, 10, WHITE);   // teeth
+          return api;
+        },
+        mouthOpen(row, ink = INK, inner = '#ff7a7a') {
+          box(row, row + 2, 5, 10, ink);
+          box(row + 1, row + 1, 6, 9, inner);
+          return api;
+        },
+        mouthFrown(row, ink = INK) {
+          box(row + 1, row + 1, 5, 10, ink);
+          put(row, 4, ink); put(row, 11, ink);
+          return api;
+        },
+        mouthLine(row, ink = INK) {
+          box(row, row, 6, 9, ink);
+          return api;
+        },
+        mouthTongue(row, ink = INK, tongue = '#ff6b9d') {
+          box(row, row, 5, 10, ink);
+          box(row + 1, row + 2, 7, 9, tongue);
+          return api;
+        },
+        fangs(row, ink = INK) {
+          box(row, row, 4, 11, ink);
+          put(row + 1, 5, WHITE); put(row + 1, 10, WHITE);
+          return api;
+        },
+        mouthGrid(row, ink = INK) {
+          for (let c = 5; c <= 10; c += 2) box(row, row + 1, c, c, ink);
+          box(row + 2, row + 2, 5, 10, ink);
+          return api;
+        },
+        blush(row, col = '#ff8fa3') {
+          box(row, row + 1, 1, 2, col);
+          box(row, row + 1, 13, 14, col);
+          return api;
+        },
+        freckles(row, col = '#b5651d') {
+          for (const c of [2, 4, 11, 13]) { put(row, c, col); put(row + 1, c + 1, col); }
+          return api;
+        },
+        antenna(col = '#9aa5b1', bulb = '#ff5555') {
+          box(0, 2, 7, 8, col);
+          put(0, 7, bulb); put(0, 8, bulb);
+          return api;
+        },
+        moustache(row, col = '#5b3a1a') {
+          box(row, row, 4, 11, col);
+          put(row + 1, 4, col); put(row + 1, 11, col);
+          return api;
+        },
+        done() { return g; }
+      };
+      return api;
+    }
+
+    // Twelve recipes. Distinct silhouettes, not palette swaps of one design.
+    const FACE_RECIPES = [
+      { name: 'Happy',     build: () => facePad().eyesRound(5).mouthSmile(11).blush(9).done() },
+      { name: 'Grin',      build: () => facePad().eyesRound(4).mouthGrin(10).done() },
+      { name: 'Sleepy',    build: () => facePad().eyesClosed(6).mouthLine(11).blush(9).done() },
+      { name: 'Grumpy',    build: () => facePad().brows(3).eyesDot(5).mouthFrown(11).done() },
+      { name: 'Surprised', build: () => facePad().eyesWide(4).mouthOpen(10).done() },
+      { name: 'Cheeky',    build: () => facePad().wink(5).mouthTongue(11).blush(9).done() },
+      { name: 'Fangs',     build: () => facePad().eyesDot(5).fangs(11).brows(3, INK, true).done() },
+      { name: 'Freckles',  build: () => facePad().eyesRound(5).freckles(9).mouthSmile(12).done() },
+      { name: 'Pirate',    build: () => facePad().eyepatch(5).mouthGrin(11).done() },
+      { name: 'Nerd',      build: () => facePad().glasses(4).mouthLine(11).freckles(9).done() },
+      { name: 'Starry',    build: () => facePad().starEyes(5).mouthOpen(11).done() },
+      { name: 'Robot',     build: () => facePad().antenna().eyesSquare(5).mouthGrid(11).done() },
+    ];
+
+    // Never hand out the same face twice running: pressing 🎲 and getting no
+    // visible change reads as a broken button rather than bad luck.
+    let lastFaceIdx = -1;
+    function randomFace() {
+      let i = Math.floor(Math.random() * FACE_RECIPES.length);
+      if (FACE_RECIPES.length > 1 && i === lastFaceIdx) {
+        i = (i + 1 + Math.floor(Math.random() * (FACE_RECIPES.length - 1)))
+            % FACE_RECIPES.length;
+      }
+      lastFaceIdx = i;
+      return FACE_RECIPES[i].build();
+    }
+
+    function loadPreset() {
+      pushUndo();
+      gridData = randomFace();
+      renderGrid();
+      onArtworkChanged();
+    }
+
+    // ---- Preview -------------------------------------------------------
+    // Shows the whole character, not a floating head. The body is drawn
+    // here rather than taken from the lobby: its old art was CC BY-NC, which a
+    // commercial product can't ship.
+    // The character's own colour: skin, and therefore the backdrop your face
+    // is drawn on. One deliberate choice rather than something inferred from
+    // the art — deriving it meant recolouring your character by accident
+    // every time you changed the drawing.
+    const CHARACTER_COLORS = [
+      '#ff5555', '#ff8f3f', '#ffc94a', '#7ddf64', '#3fd0c9',
+      '#55a0ff', '#8b7bff', '#c792ea', '#ff7ab8', '#b0764a',
+      '#9aa5b1', '#4a5568'
+    ];
+    let characterColor = localStorage.getItem('gamenight_character_color')
+      || CHARACTER_COLORS[Math.floor(Math.random() * CHARACTER_COLORS.length)];
+
+    function setCharacterColor(col) {
+      characterColor = col;
+      localStorage.setItem('gamenight_character_color', col);
+      renderCharacterColors();
+      // The grid's empty cells *are* the character, so the canvas has to
+      // repaint too — that is the whole point of using it as the backdrop.
+      renderGrid();
+      scheduleSave();
+    }
+
+    function renderCharacterColors() {
+      const el = document.getElementById('character-colors');
+      if (!el) return;
+      el.innerHTML = '';
+      CHARACTER_COLORS.forEach(col => {
+        const sw = document.createElement('div');
+        sw.className = 'swatch' + (col === characterColor ? ' active' : '');
+        sw.style.background = col;
+        sw.onclick = () => setCharacterColor(col);
+        el.appendChild(sw);
+      });
+    }
+
+    function accentColor() {
+      return characterColor;
+    }
+
+    // the lobby's face layer is a 46x32 tile, and the drawn avatar is rendered
+    // into a 30x30 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
+    // shows that tile at actual proportions, so it's obvious how much of the
+    // head is yours and how much is skin.
+    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = 30;
+
+    function updateFaceTexture() {
+      const cvs = document.getElementById('face-texture-canvas');
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, FACE_TILE_W, FACE_TILE_H);
+
+      // Everything outside the drawing is the character showing through.
+      ctx.fillStyle = characterColor;
+      ctx.fillRect(0, 0, FACE_TILE_W, FACE_TILE_H);
+
+      const ox = (FACE_TILE_W - FACE_ART) / 2;
+      const oy = (FACE_TILE_H - FACE_ART) / 2;
+      const px = FACE_ART / GRID_SIZE;
+      gridData.forEach((col, i) => {
+        if (col === EMPTY) return;
+        ctx.fillStyle = col;
+        ctx.fillRect(
+          ox + (i % GRID_SIZE) * px,
+          oy + Math.floor(i / GRID_SIZE) * px,
+          px, px
+        );
+      });
+
+      // Mark where the drawing ends.
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(ox, oy, FACE_ART, FACE_ART);
+    }
+
+    function updatePreview() {
+      const cvs = document.getElementById('preview-canvas');
+      if (!cvs) return;
+      const ctx = cvs.getContext('2d');
+      ctx.clearRect(0, 0, cvs.width, cvs.height);
+      ctx.imageSmoothingEnabled = false;
+
+      const tint = accentColor();
+      const S = 5;                       // grid pixel -> canvas pixels
+      const headX = (cvs.width - GRID_SIZE * S) / 2;
+      const headY = 4;
+      const headBottom = headY + GRID_SIZE * S;
+
+      // Body, in the accent colour so the whole character reads as yours.
+      const bodyTop = headBottom - 6;
+      ctx.fillStyle = tint;
+      ctx.fillRect(headX + 16, bodyTop, 48, 38);          // torso
+      ctx.fillRect(headX + 4,  bodyTop + 6, 12, 24);      // left arm
+      ctx.fillRect(headX + 64, bodyTop + 6, 12, 24);      // right arm
+      ctx.fillRect(headX + 22, bodyTop + 38, 13, 16);     // left leg
+      ctx.fillRect(headX + 45, bodyTop + 38, 13, 16);     // right leg
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      ctx.fillRect(headX + 16, bodyTop + 27, 48, 9);      // belt shadow
+
+      // Head shape behind the face, so drawn features sit on a head rather
+      // than floating in space.
+      ctx.fillStyle = tint;
+      ctx.fillRect(headX + S, headY + S, (GRID_SIZE - 2) * S, (GRID_SIZE - 2) * S);
+
+      // The player's face on top.
+      gridData.forEach((col, i) => {
+        if (col === EMPTY) return;
+        ctx.fillStyle = col;
+        ctx.fillRect(headX + (i % GRID_SIZE) * S, headY + Math.floor(i / GRID_SIZE) * S, S, S);
+      });
+
+      updateFaceTexture();
+    }
+
+    // ---- Names ---------------------------------------------------------
+    const FUN_NAMES = ['Falcon','Panda','Mango','Rocket','Disco','Waffle','Ninja','Pickle',
+                       'Comet','Biscuit','Tiger','Noodle'];
+    function randomName() {
+      return FUN_NAMES[Math.floor(Math.random() * FUN_NAMES.length)];
+    }
+    // ---- Avatar wire format --------------------------------------------
+    // Matches crates/gamenight-protocol/src/avatar.rs. `null` is
+    // transparent, explicitly — no magic background colour.
+    function encodeAvatar(grid) {
+      return JSON.stringify({ v: 1, w: GRID_SIZE, h: GRID_SIZE, px: grid });
+    }
+
+    function decodeAvatar(text) {
+      try {
+        const o = JSON.parse(text);
+        if (Array.isArray(o)) {
+          // Legacy: bare array with the old sentinel colour for "empty".
+          return o.map(c => (c === '#0f172a' ? EMPTY : c));
+        }
+        if (o && o.v === 1 && Array.isArray(o.px)) return o.px.map(c => c ?? EMPTY);
+      } catch (e) {}
+      return null;
+    }
+
+    function init() {
+      const parts = window.location.pathname.split('/');
+      const idx = parts.indexOf('session');
+      if (idx !== -1 && parts[idx + 1]) {
+        const banner = document.getElementById('session-banner');
+        if (banner) {
+          banner.style.display = 'block';
+          document.getElementById('session-id-display').innerText = parts[idx + 1];
+        }
+      }
+
+      renderCharacterColors();
+      renderGrid();
+      renderPalette();
+      bindCanvas();
+      refreshUndoButton();
+
+      const nameEl = document.getElementById('player-name');
+      nameEl.addEventListener('input', scheduleSave);
+      document.getElementById('name-edit').onclick = () => {
+        nameEl.focus();
+        nameEl.select();
+      };
+      document.getElementById('name-dice').onclick = () => {
+        nameEl.value = randomName();
+        scheduleSave();
+      };
+
+      loadProfileData();
+    }
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      event.target.classList.add('active');
+    }
+
+    async function loadProfileData() {
+      let savedAvatar = null;
+      try {
+        const res = await fetch('/api/profiles/' + profileId);
+        if (res.ok) {
+          const prof = await res.json();
+          document.getElementById('player-name').value = prof.username || randomName();
+          if (prof.color) {
+            characterColor = prof.color;
+            localStorage.setItem('gamenight_character_color', prof.color);
+            renderCharacterColors();
+          }
+          if (prof.avatar) savedAvatar = decodeAvatar(prof.avatar);
+        } else {
+          // Not signed in / no profile yet: give them an identity rather
+          // than an empty field to stare at.
+          document.getElementById('player-name').value = randomName();
+        }
+      } catch (e) {
+      }
+
+      // Start from something drawable. An empty grid is a blank stare; a
+      // ready-made head gives you a shape to push around.
+      let list = loadArtworks();
+      if (!list.length) {
+        newArtwork(savedAvatar || randomFace(), 'My face');
+        return;
+      }
+      if (!currentArtworkId || !list.find(a => a.id === currentArtworkId)) {
+        currentArtworkId = list[0].id;
+      }
+      selectArtwork(currentArtworkId);
+    }
+
+    // ---- Auto-save ------------------------------------------------------
+    // Every edit is pushed through on its own; there is no save button. Edits
+    // are debounced so dragging the pencil across the grid is one request at
+    // the end of the stroke rather than one per pixel.
+    let saveTimer = null;
+    let savingNow = false;
+    let savePending = false;
+
+    function showBlocked(title, line1, line2) {
+      let el = document.getElementById('blocked-banner');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'blocked-banner';
+        el.className = 'blocked';
+        document.querySelector('main').prepend(el);
+      }
+      el.innerHTML = '';
+      const h = document.createElement('div');
+      h.className = 'blocked-title';
+      h.innerText = '⚠️ ' + title;
+      const p1 = document.createElement('div');
+      p1.innerText = line1;
+      const p2 = document.createElement('div');
+      p2.className = 'blocked-hint';
+      p2.innerText = line2;
+      el.append(h, p1, p2);
+      el.style.display = 'block';
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      status('');
+    }
+
+    function hideBlocked() {
+      const el = document.getElementById('blocked-banner');
+      if (el) el.style.display = 'none';
+    }
+
+    function status(msg, colour) {
+      const el = document.getElementById('status-msg');
+      el.innerText = msg;
+      el.style.color = colour || '#34d399';
+    }
+
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      status('Saving…', '#94a3b8');
+      saveTimer = setTimeout(() => { pushProfile(); }, 400);
+    }
+
+    async function pushProfile() {
+      // Collapse overlapping saves: a request already in flight means this
+      // one can wait and pick up the newest state when that finishes.
+      if (savingNow) { savePending = true; return; }
+      savingNow = true;
+      try {
+        const prof = {
+          id: profileId,
+          username: document.getElementById('player-name').value,
+          color: accentColor(),
+          avatar: encodeAvatar(gridData),
+        };
+        const res = await fetch('/api/profiles', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(prof)
+        });
+        if (!res.ok) { status('⚠️ Could not save profile', '#f87171'); return; }
+
+        // Push straight through to the party. `claim` is whichever player
+        // this profile is bound to — the character whose QR was scanned, or
+        // the one our first join created. Sending it makes every later save
+        // an update rather than a second JoinParty.
+        const target = claimPlayerId || boundPlayerId;
+        const join = await fetch('/api/profiles/' + profileId + '/join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            claim: target,
+            seat: claimSeat === null ? null : Number(claimSeat)
+          })
+        });
+        if (join.ok) {
+          const data = await join.json();
+          if (data.status === 'no_such_seat') {
+            status('⚠️ ' + data.message, '#fbbf24');
+            return;
+          }
+          if (data.status === 'already_signed_in') {
+            // A dead end until they do something about it, so it gets a
+            // banner rather than a line of status text that scrolls past.
+            showBlocked(
+              "You're already signed in",
+              data.seat === null || data.seat === undefined
+                ? 'This phone is already playing as another character.'
+                : ('This phone is already playing as the character on seat '
+                   + (data.seat + 1) + '.'),
+              'Leave that character first, or use a different phone.'
+            );
+            return;
+          }
+          hideBlocked();
+          if (!boundPlayerId && data.player_id) {
+            boundPlayerId = data.player_id;
+            localStorage.setItem('gamenight_bound_player', boundPlayerId);
+          }
+          status(target ? '✓ Synced to your character' : '✓ Joined the party');
+        } else {
+          status('⚠️ Saved locally — is the daemon running?', '#fbbf24');
+        }
+      } catch (e) {
+        status('⚠️ Saved locally — is the daemon running?', '#fbbf24');
+      } finally {
+        savingNow = false;
+        if (savePending) { savePending = false; pushProfile(); }
+      }
+    }
+
+    // ---- Artwork gallery ------------------------------------------------
+    // A list of saved pieces, so experimenting never costs you the last one.
+    function loadArtworks() {
+      try {
+        return JSON.parse(localStorage.getItem('gamenight_artworks') || '[]');
+      } catch (e) { return []; }
+    }
+
+    function saveArtworks(list) {
+      localStorage.setItem('gamenight_artworks', JSON.stringify(list));
+    }
+
+    /// Write the live grid back into the artwork it came from, then save.
+    function onArtworkChanged() {
+      const list = loadArtworks();
+      const cur = list.find(a => a.id === currentArtworkId);
+      if (cur) {
+        cur.data = gridData.slice();
+        saveArtworks(list);
+      }
+      renderGallery();
+      updatePreview();
+      scheduleSave();
+    }
+
+    function newArtwork(data, name) {
+      const list = loadArtworks();
+      const art = {
+        id: 'art_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+        name: name || ('Sketch ' + (list.length + 1)),
+        data: data || randomFace()
+      };
+      list.push(art);
+      saveArtworks(list);
+      selectArtwork(art.id);
+      return art;
+    }
+
+    function cloneArtwork(id) {
+      const list = loadArtworks();
+      const src = list.find(a => a.id === id);
+      if (!src) return;
+      newArtwork(src.data.slice(), src.name + ' copy');
+    }
+
+    function deleteArtwork(id) {
+      let list = loadArtworks().filter(a => a.id !== id);
+      saveArtworks(list);
+      if (currentArtworkId === id) {
+        if (list.length) selectArtwork(list[0].id);
+        else newArtwork();
+      } else {
+        renderGallery();
+      }
+    }
+
+    /// Loading a piece into the editor is the one deliberate button press —
+    /// it replaces what's on the canvas, so it shouldn't happen by accident.
+    function selectArtwork(id) {
+      const art = loadArtworks().find(a => a.id === id);
+      if (!art) return;
+      currentArtworkId = id;
+      localStorage.setItem('gamenight_current_artwork', id);
+      gridData = art.data.slice();
+      renderGrid();
+      renderGallery();
+      updatePreview();
+      scheduleSave();
+    }
+
+    function renderGallery() {
+      const el = document.getElementById('artwork-gallery');
+      if (!el) return;
+      const list = loadArtworks();
+      el.innerHTML = '';
+
+      list.forEach(art => {
+        const row = document.createElement('div');
+        row.className = 'artwork-row' + (art.id === currentArtworkId ? ' active' : '');
+
+        const cvs = document.createElement('canvas');
+        cvs.width = 16; cvs.height = 16;
+        const ctx = cvs.getContext('2d');
+        art.data.forEach((col, i) => {
+          if (col) { ctx.fillStyle = col; ctx.fillRect(i % 16, Math.floor(i / 16), 1, 1); }
+        });
+        row.appendChild(cvs);
+
+        if (art.id === currentArtworkId) {
+          const badge = document.createElement('div');
+          badge.className = 'badge';
+          badge.innerText = 'Editing';
+          row.appendChild(badge);
+        }
+
+        // Loading replaces the canvas, so it stays a deliberate press.
+        const load = document.createElement('button');
+        load.innerText = 'Load';
+        load.onclick = () => selectArtwork(art.id);
+        const clone = document.createElement('button');
+        clone.innerText = 'Copy';
+        clone.onclick = () => cloneArtwork(art.id);
+        const del = document.createElement('button');
+        del.innerText = 'Delete';
+        del.onclick = () => deleteArtwork(art.id);
+        const actions = document.createElement('div');
+        actions.className = 'row-actions';
+        actions.append(load, clone, del);
+        row.appendChild(actions);
+        el.appendChild(row);
+      });
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>

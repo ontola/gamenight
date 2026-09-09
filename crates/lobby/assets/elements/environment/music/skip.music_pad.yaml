@@ -1,0 +1,6 @@
+# The floor zone a player jumps into to skip to the next track.
+body_size: [56, 14]
+# Longer than the pause pad's: a skip is the one of the two that can't be
+# undone by jumping on it again, so a stray second landing costs a track.
+cooldown_secs: 0.4
+skips: true

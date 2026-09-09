@@ -1,0 +1,11 @@
+# The opening a player walks into to leave the party.
+#
+# Narrower and shorter than the drawn doorway: the trigger is the *threshold*,
+# not the whole frame, so brushing the jamb on the way past does nothing.
+body_size: [44, 76]
+# Long enough that walking past cannot do it, short enough that walking in
+# deliberately does not feel like waiting.
+dwell_secs: 0.7
+# Two seconds before that pad may rejoin, so the stick you left with does not
+# immediately walk you back in.
+rejoin_block_secs: 2.0

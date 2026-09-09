@@ -1,0 +1,16 @@
+[package]
+name = "gamenight-sdk"
+description = "Rust SDK for games joining a GameNight party: receive a session, seats and players; report ready and finished."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+gamenight-protocol = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

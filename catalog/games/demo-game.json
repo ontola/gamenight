@@ -1,0 +1,25 @@
+{
+  "$schema": "../schema.json",
+  "id": "demo-game",
+  "title": "Demo Game",
+  "tagline": "The Rust SDK reference integration.",
+  "developer": "GameNight contributors",
+  "players": { "min": 1, "max": 4 },
+  "match_minutes": 1,
+  "price": "free",
+  "tags": ["demo", "reference"],
+  "emoji": "🦀",
+  "color": "#7c5cff",
+  "integration": {
+    "level": "certified",
+    "protocol": 1,
+    "certified_with": "gamenight-certify 0.1.0"
+  },
+  "requirements": {
+    "disk_mb": 10,
+    "ram_mb": 32,
+    "cpu": "anything",
+    "gpu": "none"
+  },
+  "bundled": "examples/demo-game"
+}

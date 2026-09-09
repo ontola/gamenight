@@ -1,0 +1,8 @@
+locales: [en-US]
+resources:
+  # Menus are gone — the lobby opens straight into the room — so the
+  # branding/menu/settings/player-select/map-select/controls/editor strings
+  # went with them. What is left is what the running lobby actually says.
+  - debug-tools.ftl
+  - network-game.ftl
+  - scoring.ftl

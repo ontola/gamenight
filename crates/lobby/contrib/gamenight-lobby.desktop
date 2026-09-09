@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=GameNight Lobby
+Comment=The couch you gather on before the game starts
+Exec=lobby
+Terminal=false
+Type=Application
+Categories=Game;ActionGame;

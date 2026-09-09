@@ -1,0 +1,5 @@
+# The floor zone a player jumps into to pause (or restart) the host's music.
+body_size: [56, 14]
+# One landing is one press, however many frames the physics takes to settle it.
+cooldown_secs: 0.25
+skips: false

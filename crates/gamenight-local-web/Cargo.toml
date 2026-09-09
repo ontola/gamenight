@@ -1,0 +1,21 @@
+[package]
+name = "gamenight-local-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+gamenight-protocol = { path = "../gamenight-protocol" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+axum = { version = "0.7", features = ["json"] }
+qrcode = "0.14"
+
+[dev-dependencies]
+gamenight-daemon = { path = "../gamenight-daemon" }

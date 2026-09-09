@@ -1,0 +1,25 @@
+/web
+/target
+/web-target
+src/.DS_Store
+.DS_Store
+/.idea/
+book/dist
+.vscode
+trace-*.json
+perf.data*
+callgrind.out*
+.cargo
+steam/packaged/**
+
+# Python bytecode from the reskin tooling
+__pycache__/
+
+# Generated art awaiting review — regenerate with generate.py
+staging/
+
+# Local tooling venv
+tools/.venv/
+
+# Originals the pixelart tooling saves before it overwrites an asset
+.pixel-backup/

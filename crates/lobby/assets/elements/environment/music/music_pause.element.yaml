@@ -1,0 +1,7 @@
+name: Music — Pause
+category: GameNight
+editor:
+  grab_size: [56, 32]
+  grab_offset: [0, 0]
+  show_name: true
+data: pause.music_pad.yaml
