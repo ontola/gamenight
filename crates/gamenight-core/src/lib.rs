@@ -1724,6 +1724,44 @@ mod player_count_fit_tests {
         );
     }
 
+    #[test]
+    fn late_ready_after_seat_change_does_not_reject_or_start_the_new_session() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("wide", 1, 4, None)]);
+        night.handle(join("a"));
+        night.handle(Command::GameConnected {
+            game: GameId::new("wide"),
+        });
+        let old = night.snapshot().warm_session.unwrap().id;
+        let effects = night.handle(join("b"));
+        let (_, new) = prepared_session(&effects).unwrap();
+        assert_ne!(old, new);
+        let late = night.handle(Command::SessionReady { session: old });
+        assert!(!late
+            .iter()
+            .any(|effect| matches!(effect, Effect::Reject { .. })));
+        assert!(!late.iter().any(|effect| matches!(
+            effect,
+            Effect::ToGame {
+                command: GameCommand::Start,
+                ..
+            }
+        )));
+        assert_eq!(
+            night.snapshot().warm_session.unwrap().phase,
+            SessionPhase::Preparing
+        );
+        let ready = night.handle(Command::SessionReady { session: new });
+        assert!(ready.iter().any(|effect| matches!(effect, Effect::ToGame { session, command: GameCommand::Start, .. } if *session == new)));
+        // An invented session is still a protocol error.
+        let unknown = night.handle(Command::SessionReady {
+            session: SessionId::new(),
+        });
+        assert!(unknown
+            .iter()
+            .any(|effect| matches!(effect, Effect::Reject { .. })));
+    }
+
     /// Re-warming throws away a loaded process, so only seating does it.
     /// Everything else about a player — their name, their avatar — leaves the
     /// warm session exactly where it is.
