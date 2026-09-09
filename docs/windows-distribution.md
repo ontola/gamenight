@@ -13,7 +13,7 @@ dotnet tool install --global vpk --version 1.2.0
 ./scripts/build-windows-installer.ps1 -Version 0.1.0-preview.2 -Channel preview -OutputDir C:/builds/preview2 -TargetDir C:/builds/target
 ```
 
-The default profile is `release`; `-Profile ci` is a faster build for packaging
+The default profile is `release`; `-BuildProfile ci` is a faster build for packaging
 checks. Choose a new output directory. The script verifies the pinned Pinpals
 and LOVE archive hashes, includes their notices, and produces `Setup.exe`, a
 portable ZIP, a full update package, a channel feed and SHA-256 checksums in

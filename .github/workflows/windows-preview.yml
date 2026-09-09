@@ -25,7 +25,7 @@ permissions:
   contents: read
 concurrency:
   group: windows-installer-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   package:
     runs-on: windows-latest
@@ -63,11 +63,11 @@ jobs:
           SIGNING_ACCOUNT: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
           SIGNING_PROFILE: ${{ vars.WINDOWS_SIGNING_PROFILE }}
         run: |
-          $version = if ($env:RELEASE_VERSION) { $env:RELEASE_VERSION } else { "0.0.0-ci.$env:GITHUB_RUN_NUMBER" }
+          $version = if ($env:RELEASE_VERSION) { $env:RELEASE_VERSION } else { "0.1.0-ci.$env:GITHUB_RUN_NUMBER" }
           $channel = if ($env:RELEASE_CHANNEL) { $env:RELEASE_CHANNEL } else { 'preview' }
-          $profile = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { 'release' } else { 'ci' }
+          $buildProfile = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { 'release' } else { 'ci' }
           $params = @{
-            Version = $version; Channel = $channel; Profile = $profile
+            Version = $version; Channel = $channel; BuildProfile = $buildProfile
             OutputDir = "$env:RUNNER_TEMP/installer"; TargetDir = "$env:GITHUB_WORKSPACE/target"
           }
           if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:SIGNING_ENDPOINT) {
