@@ -110,8 +110,8 @@ The lobby and vendored Bones retain their own upstream notices. See
 
 ### LÖVE party games
 
-The [LÖVE Party Pack](games/love-party/README.md) contains three original local
-multiplayer games for 2–4 players: Bumper Royale, Neon Trails and Meteor Dash.
+The [LÖVE Party Pack](games/love-party/README.md) contains four original local
+multiplayer games for 2–4 players: Bumper Royale, Neon Trails, Meteor Dash and Blast Party.
 Run `love games/love-party` or build individual `.love` files with
 `scripts/package-love-party.py`. The pack shares one GameNight adapter and
 includes simulation tests plus native Windows protocol certification in CI.

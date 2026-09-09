@@ -112,7 +112,7 @@ function tests.meteor_shield()
 	equal(#s.objects, 0)
 end
 function tests.bot_soak_all_player_counts()
-	for _, name in ipairs({ "bumper", "trails", "meteor" }) do
+	for _, name in ipairs({ "bumper", "trails", "meteor", "blast" }) do
 		local m = require("games." .. name)
 		for n = 2, 4 do
 			local s = m.new(roster(n), U.rng(123))
@@ -129,6 +129,7 @@ function tests.bot_soak_all_player_counts()
 		end
 	end
 end
+require("tests.blast")
 local n = 0
 for name, test in pairs(tests) do
 	test()

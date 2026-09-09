@@ -1,4 +1,4 @@
-local modes = { require("games.bumper"), require("games.trails"), require("games.meteor") }
+local modes = { require("games.bumper"), require("games.trails"), require("games.meteor"), require("games.blast") }
 local U = require("shared.util")
 local Input = require("shared.input")
 local Lifecycle = require("shared.lifecycle")
@@ -24,10 +24,13 @@ local function standalone()
 	mode = modes[selected]
 	local seats, players = {}, {}
 	for i = 1, count do
-		seats[i] = { index = i - 1, occupant = {
-			kind = os.getenv("GNLOVE_DEMO") == "1" and "ai" or "local",
-			player_id = tostring(i),
-		} }
+		seats[i] = {
+			index = i - 1,
+			occupant = {
+				kind = os.getenv("GNLOVE_DEMO") == "1" and "ai" or "local",
+				player_id = tostring(i),
+			},
+		}
 		players[i] = { id = tostring(i), name = ({ "MINT", "CORAL", "GOLD", "VIOLET" })[i] }
 	end
 	prepare(seats, players)
@@ -114,7 +117,11 @@ function love.update(dt)
 		for i, p in ipairs(state.players) do
 			before[i] = p.score
 		end
+		local blasts = state.blastCount or 0
 		mode.update(state, 1 / 120, inputs)
+		if (state.blastCount or 0) > blasts then
+			Audio.play("blast")
+		end
 		for i, p in ipairs(state.players) do
 			if p.score - before[i] >= 3 then
 				Audio.play("point")
@@ -157,7 +164,7 @@ function love.keypressed(key)
 		menu = true
 		state = nil
 	elseif menu then
-		if key == "1" or key == "2" or key == "3" then
+		if key == "1" or key == "2" or key == "3" or key == "4" then
 			selected = tonumber(key)
 		elseif key == "f2" then
 			count = count == 4 and 2 or count + 1
@@ -179,9 +186,9 @@ function love.gamepadpressed(_, button)
 		menu = true
 		state = nil
 	elseif menu and button == "dpright" then
-		selected = selected % 3 + 1
+		selected = selected % #modes + 1
 	elseif menu and button == "dpleft" then
-		selected = (selected + 1) % 3 + 1
+		selected = (selected + #modes - 2) % #modes + 1
 	end
 end
 function love.joystickadded(pad)

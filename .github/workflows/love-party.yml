@@ -51,7 +51,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Certifier build failed' }
           $env:GNLOVE_HEADLESS = '1'
           $env:GNLOVE_MATCH_SECONDS = '1'
-          foreach ($game in @('bumper-royale', 'neon-trails', 'meteor-dash')) {
+          foreach ($game in @('bumper-royale', 'neon-trails', 'meteor-dash', 'blast-party')) {
             & target/debug/gamenight-certify.exe $game -- "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" "$pwd/dist/party/$game.love"
             if ($LASTEXITCODE -ne 0) { throw "Certification failed: $game" }
           }

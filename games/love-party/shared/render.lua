@@ -2,10 +2,11 @@ local R = { colors = { { 0.30, 0.92, 0.83 }, { 1, 0.43, 0.40 }, { 1, 0.82, 0.32 
 local G
 local function player_color(p)
 	if p.color and p.color:match("^#%x%x%x%x%x%x$") then
-		return { tonumber(p.color:sub(2, 3), 16) / 255, tonumber(p.color:sub(4, 5), 16) / 255, tonumber(
-			p.color:sub(6, 7),
-			16
-		) / 255 }
+		return {
+			tonumber(p.color:sub(2, 3), 16) / 255,
+			tonumber(p.color:sub(4, 5), 16) / 255,
+			tonumber(p.color:sub(6, 7), 16) / 255,
+		}
 	end
 	return R.colors[p.slot]
 end
@@ -46,39 +47,47 @@ function R.finish()
 end
 function R.menu(modes, index, count)
 	R.begin()
-	text("GAMENIGHT  /  THE FIRST COLLECTION", 70, 48, "small", { 0.3, 0.92, 0.83 })
-	text("GOOD FRIENDS.", 70, 91, "huge")
-	text("QUESTIONABLE ALLIANCES.", 70, 150, "huge")
-	text("Three little games. One very competitive couch.", 73, 223, "body", { 0.55, 0.65, 0.77 })
+	text("GAMENIGHT  /  THE FIRST COLLECTION", 70, 40, "small", { 0.3, 0.92, 0.83 })
+	text("GOOD FRIENDS.", 70, 78, "huge")
+	text("QUESTIONABLE ALLIANCES.", 70, 137, "huge")
+	text("Four little games. One very competitive couch.", 73, 215, "body", { 0.55, 0.65, 0.77 })
 	for i, mode in ipairs(modes) do
-		local x = 70 + (i - 1) * 386
+		local x = 70 + ((i - 1) % 2) * 585
+		local y = 278 + math.floor((i - 1) / 2) * 171
 		local c = R.colors[i]
-		local selected = i == index
-		G.setColor(selected and 0.10 or 0.055, selected and 0.16 or 0.085, selected and 0.22 or 0.14)
-		G.rectangle("fill", x, 307, 365, 290, 18, 18)
+		local chosen = i == index
+		G.setColor(chosen and 0.10 or 0.055, chosen and 0.16 or 0.085, chosen and 0.22 or 0.14)
+		G.rectangle("fill", x, y, 565, 150, 16, 16)
 		G.setColor(c)
-		G.setLineWidth(selected and 3 or 1)
-		G.rectangle("line", x, 307, 365, 290, 18, 18)
-		text("0" .. i, x + 25, 331, "title", c)
+		G.setLineWidth(chosen and 3 or 1)
+		G.rectangle("line", x, y, 565, 150, 16, 16)
+		text("0" .. i, x + 22, y + 17, "small", c)
+		local cx, cy = x + 75, y + 85
 		if i == 1 then
-			G.circle("line", x + 180, 417, 35)
-			G.circle("fill", x + 170, 412, 12)
-			G.circle("fill", x + 207, 425, 12)
+			G.circle("line", cx, cy, 28)
+			G.circle("fill", cx - 10, cy, 10)
+			G.circle("fill", cx + 19, cy + 9, 10)
 		elseif i == 2 then
-			G.setLineWidth(8)
-			G.line(x + 125, 440, x + 125, 390, x + 200, 390, x + 200, 427, x + 237, 427)
+			G.setLineWidth(7)
+			G.line(cx - 25, cy + 23, cx - 25, cy - 21, cx + 14, cy - 21, cx + 14, cy + 13, cx + 35, cy + 13)
+		elseif i == 3 then
+			G.polygon("fill", cx, cy - 29, cx - 20, cy + 22, cx, cy + 10, cx + 20, cy + 22)
 		else
-			G.polygon("fill", x + 180, 382, x + 158, 435, x + 180, 422, x + 202, 435)
-			G.circle("line", x + 230, 389, 12)
+			G.circle("fill", cx, cy, 23)
+			G.setLineWidth(3)
+			G.line(cx + 12, cy - 19, cx + 25, cy - 34, cx + 35, cy - 29)
+			G.setColor(0.035, 0.05, 0.09)
+			G.line(cx - 12, cy, cx + 12, cy)
+			G.line(cx, cy - 12, cx, cy + 12)
 		end
-		text(mode.title, x + 25, 487, "body", c)
-		text(mode.tagline, x + 25, 529, "small")
+		text(mode.title, x + 135, y + 37, "body", c)
+		text(mode.tagline, x + 135, y + 80, "small")
 	end
-	centered(count .. " PLAYERS   •   F2 changes player count", 638, "body")
-	centered("1 / 2 / 3  choose     ENTER or controller A  play", 680, "body", { 0.3, 0.92, 0.83 })
+	centered(count .. " PLAYERS   •   F2 changes player count", 641, "body")
+	centered("1 / 2 / 3 / 4 choose     ENTER or controller A play", 683, "body", { 0.3, 0.92, 0.83 })
 	centered(
 		"Keyboard: WASD + Space   /   Arrows + Right Ctrl   /   IJKL + U   /   TFGH + R",
-		743,
+		741,
 		"small",
 		{ 0.55, 0.65, 0.77 }
 	)
@@ -92,7 +101,9 @@ function R.game(mode, s, remaining, finished, managed)
 	G.setFont(R.fonts.huge)
 	G.setColor(remaining < 10 and { 1, 0.43, 0.40 } or { 0.91, 0.94, 1 })
 	G.printf(string.format("%02d", math.ceil(remaining)), 1080, 38, 150, "right")
-	if mode.id == "bumper-royale" then
+	if mode.id == "blast-party" then
+		require("games.blast_render").draw(s, G, R.fonts, player_color)
+	elseif mode.id == "bumper-royale" then
 		G.setColor(0.09, 0.14, 0.2)
 		G.circle("fill", 640, 410, s.radius)
 		G.setColor(0.3, 0.92, 0.83, 0.12)
@@ -156,6 +167,9 @@ function R.game(mode, s, remaining, finished, managed)
 		G.setColor(0.055, 0.08, 0.13)
 		G.rectangle("fill", x, 703, width - 12, 54, 8, 8)
 		text(p.name, x + 14, 714, "body", player_color(p))
+		if mode.describe then
+			text(mode.describe(p), x + 14, 738, "small", { 0.65, 0.74, 0.83 })
+		end
 		G.setFont(R.fonts.body)
 		G.setColor(1, 1, 1)
 		G.printf(tostring(math.floor(p.score)), x, 714, width - 28, "right")

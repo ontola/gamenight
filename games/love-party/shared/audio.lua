@@ -3,7 +3,7 @@ function A.load()
 	if not love.sound or not love.audio then
 		return
 	end
-	for name, frequency in pairs({ point = 740, hit = 160, finish = 980 }) do
+	for name, frequency in pairs({ point = 740, hit = 160, finish = 980, blast = 90 }) do
 		local rate, count = 22050, 3308
 		local data = love.sound.newSoundData(count, rate, 16, 1)
 		for i = 0, count - 1 do

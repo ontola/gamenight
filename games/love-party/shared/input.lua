@@ -2,10 +2,10 @@ local M = {
 	pads = {},
 	active = {},
 	keys = {
-		{ "a", "d", "w", "s", "space" },
-		{ "left", "right", "up", "down", "rctrl" },
-		{ "j", "l", "i", "k", "u" },
-		{ "f", "h", "t", "g", "r" },
+		{ "a", "d", "w", "s", "space", "lshift" },
+		{ "left", "right", "up", "down", "rctrl", "rshift" },
+		{ "j", "l", "i", "k", "u", "o" },
+		{ "f", "h", "t", "g", "r", "y" },
 	},
 }
 function M.bind(players, pads)
@@ -38,7 +38,7 @@ function M.detach(pad)
 	end
 end
 function M.sample(slot)
-	local x, y, action = 0, 0, false
+	local x, y, action, secondary = 0, 0, false, false
 	local pad = M.pads[slot]
 	if pad and pad:isConnected() and pad:isGamepad() then
 		x, y = pad:getGamepadAxis("leftx"), pad:getGamepadAxis("lefty")
@@ -59,6 +59,7 @@ function M.sample(slot)
 			y = 1
 		end
 		action = pad:isGamepadDown("a")
+		secondary = pad:isGamepadDown("b")
 	end
 	if love.keyboard and M.active[slot] then
 		local k = M.keys[slot]
@@ -73,11 +74,12 @@ function M.sample(slot)
 			y = 1
 		end
 		action = action or love.keyboard.isDown(k[5])
+		secondary = secondary or love.keyboard.isDown(k[6])
 	end
 	local n = math.sqrt(x * x + y * y)
 	if n > 1 then
 		x, y = x / n, y / n
 	end
-	return { x = x, y = y, action = action }
+	return { x = x, y = y, action = action, secondary = secondary }
 end
 return M
