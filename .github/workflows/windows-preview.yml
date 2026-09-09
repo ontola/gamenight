@@ -8,6 +8,8 @@ on:
       - 'crates/gamenight-installer/**'
       - 'crates/gamenight-catalog/**'
       - 'catalog/**'
+      - 'crates/lobby/**'
+      - 'vendor/bones/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
   workflow_dispatch:

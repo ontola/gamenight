@@ -58,6 +58,7 @@ pub enum NextGameStatus {
     /// what a first run needs — the shelf is genuinely empty, so this is the
     /// only true thing the screen can say.
     Downloading(String, Option<u8>),
+    DownloadFailed(String),
     /// Genuinely nothing to play — an empty shelf.
     Empty,
     /// The party has to choose before anything else happens.
@@ -421,6 +422,13 @@ impl GameNightBridge {
             .find(|i| !matches!(i.state, InstallState::Installed | InstallState::Failed))
         {
             return NextGameStatus::Downloading(arriving.title.clone(), arriving.percent);
+        }
+        if let Some(failed) = self
+            .latest_installs
+            .iter()
+            .find(|i| i.state == InstallState::Failed)
+        {
+            return NextGameStatus::DownloadFailed(failed.title.clone());
         }
         NextGameStatus::Empty
     }
@@ -3585,6 +3593,11 @@ fn sync_next_game_tv_system(
             },
             Color::rgba(0.55, 0.85, 1.0, 0.95),
             t.clone(),
+        ),
+        NextGameStatus::DownloadFailed(title) => (
+            "DOWNLOAD FAILED".to_string(),
+            Color::rgba(1.0, 0.55, 0.4, 0.95),
+            format!("{title} — restart to retry"),
         ),
         NextGameStatus::Voting => (
             "VOTE".to_string(),
