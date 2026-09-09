@@ -21,3 +21,17 @@ cooked-ID/raw-ID cache mismatch during concurrent asset loading.
 
 Vendoring makes a new clone build without a private fork or an untracked
 patch. Update the snapshot, revision and modification note together.
+
+## Windows binary distributions
+
+Windows packages include the Microsoft Visual C++ Runtime DLLs from the build
+machine's licensed Visual Studio redistributable directory, under Microsoft's
+license terms. These files are not part of GameNight's MIT-licensed source.
+`notices/msvc-runtime.txt` in each package identifies the runtime version.
+See Microsoft's [redistribution documentation](https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files).
+The app-local copies must be refreshed through GameNight releases when Microsoft
+updates the runtime; they are not maintained by Windows Update.
+
+The pinned LOVE distribution also includes its own runtime libraries and license
+notices. Pinpals and its selected source revision are listed in the Windows
+preview instructions shipped with the package.

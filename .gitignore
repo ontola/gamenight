@@ -8,3 +8,6 @@
 .DS_Store
 .godot/
 *.import
+
+__pycache__/
+*.pyc

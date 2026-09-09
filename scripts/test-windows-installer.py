@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import time
 import uuid
+from windows_runtime import find_crt
 
 
 def wait_for(predicate, message, seconds=60):
@@ -75,6 +76,8 @@ def main():
     stage.mkdir()
     data.mkdir()
     shutil.copy2(args.binary, stage / 'Smoke.exe')
+    for library in find_crt().glob('*.dll'):
+        shutil.copy2(library, stage / library.name)
     (stage / 'pinpals').mkdir()
     (stage / 'pinpals/main.lua').write_text('original content')
     app_id = 'GameNightSmoke.' + uuid.uuid4().hex
@@ -119,6 +122,10 @@ def main():
     try:
         process, report = start(root / 'offline-feed')
         assert report['version'] == '1.0.0'
+        module = run('powershell', '-NoProfile', '-Command',
+                     "(Get-Process -Id $env:GAMENIGHT_SMOKE_PID).Modules | Where-Object { $_.ModuleName -eq 'VCRUNTIME140.dll' } | Select-Object -ExpandProperty FileName",
+                     env=dict(os.environ, GAMENIGHT_SMOKE_PID=str(report['pid']))).stdout.strip()
+        assert Path(module).resolve() == (installed / 'current/vcruntime140.dll').resolve(), 'App used a system runtime instead of its bundled DLL'
         wait_for(lambda: log_contains('skipped'), 'Offline update did not fail gracefully')
         close(process, report)
         # A failed checksum must leave the installed app intact.
@@ -150,7 +157,7 @@ def main():
         assert (data / 'settings.json').read_text() == 'preserve this setting'
         assert (Path(report['content']) / 'main.lua').read_text() == 'original content'
         close(process, report)
-        print('PASS: install, offline start, corrupt download, deferred update, restart, data preservation, child cleanup')
+        print('PASS: install, offline start, corrupt download, deferred update, restart, data preservation, child cleanup, app-local C++ runtime')
     finally:
         # Scope cleanup to the uniquely identified fixture installation only.
         if 'process' in locals() and process.poll() is None:

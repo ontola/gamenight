@@ -4,6 +4,8 @@ import hashlib
 from pathlib import Path
 import shutil
 import zipfile
+from windows_runtime import find_crt
+
 
 
 def main():
@@ -16,6 +18,7 @@ def main():
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     profile_dir = 'debug' if args.profile == 'dev' else args.profile
+    crt = find_crt()
     sources = [
         (args.love_zip, 'ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369', 'love-11.5-win64', 'love'),
         (args.pinpals_zip, 'b574829c2d1fac531fa73c4b13e7aba0758bd067f74c4651de01e75870e6e0f5',
@@ -30,6 +33,18 @@ def main():
     for name in ['gamenight-daemon.exe', 'lobby.exe']:
         shutil.copy2(args.target / profile_dir / name, stage / 'bin' / name)
     shutil.copy2(args.target / profile_dir / 'gamenight-launcher.exe', stage / 'GameNight.exe')
+    # Rust/MSVC binaries dynamically import these DLLs. App-local deployment
+    # supports a clean Windows account without installing a machine-wide runtime.
+    for library in crt.glob('*.dll'):
+        for destination in [stage, stage / 'bin']:
+            shutil.copy2(library, destination / library.name)
+    (stage / 'notices').mkdir(exist_ok=True)
+    (stage / 'notices/msvc-runtime.txt').write_text(
+        f'Microsoft Visual C++ Runtime ({crt.parent.parent.name}, x64)\n'
+        'Copyright Microsoft Corporation. All rights reserved.\n'
+        'Redistributed under the Microsoft Visual Studio license terms.\n'
+        'https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files\n', encoding='utf-8')
+
     for name in ['assets', 'packs', 'licenses']:
         shutil.copytree(repo / 'crates/lobby' / name, stage / 'lobby' / name)
     for name in ['LICENSE', 'CREDITS.md']:

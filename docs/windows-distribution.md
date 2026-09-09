@@ -20,6 +20,12 @@ portable ZIP, a full update package, a channel feed and SHA-256 checksums in
 `releases/`. This first implementation ships full updates. Delta packaging can
 be added later by supplying the preceding release to Velopack.
 
+Visual C++ runtime DLLs are copied from the installed toolchain's redistributable
+directory alongside the launcher and native binaries, avoiding a separate
+machine-wide prerequisite installer. Keep the build toolchain patched: GameNight
+releases are responsible for updating these app-local runtime copies. The
+package includes their version and redistribution notice.
+
 The application IDs are `Ontola.GameNight.Preview` and `Ontola.GameNight`, and
 the channels are `win-preview` and `win-stable`. The installation directories
 are separate from `%LOCALAPPDATA%\GameNight` user data. Application updates
@@ -34,7 +40,7 @@ The normal **Build and test** workflow tests the runtime on Windows, Linux and
 macOS. Windows also installs an isolated fixture using real Velopack installers
 and the production update/data/process helpers. It checks offline startup,
 rejection of a corrupt update, deferral until exit, restart on the new version,
-data preservation and termination of a child process. It uses a unique app ID
+data preservation, termination of a child process and use of the bundled C++ runtime. It uses a unique app ID
 and uninstalls the fixture after the test. This is not a controller/GPU test.
 
 **Windows installer** builds a complete package on relevant pull requests using
