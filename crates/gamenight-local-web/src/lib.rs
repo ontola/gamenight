@@ -126,60 +126,24 @@ async fn save_profile(
     Json(profile)
 }
 
-/// How long to wait for the daemon to acknowledge a join before giving up.
-/// Short: this is a local socket, and a slow answer must not hang the page.
-const DAEMON_REPLY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+mod daemon;
+use daemon::{read_welcome, wait_for_new_player};
 
-type DaemonWs =
-    tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
-
-/// Read up to the daemon's `welcome`, which carries the party as it stands.
-async fn read_welcome(ws: &mut DaemonWs) -> Option<gamenight_protocol::PartySnapshot> {
-    use futures_util::StreamExt;
-    tokio::time::timeout(DAEMON_REPLY_TIMEOUT, async {
-        while let Some(Ok(msg)) = ws.next().await {
-            if let tokio_tungstenite::tungstenite::Message::Text(t) = msg {
-                if let Ok(gamenight_protocol::ServerMessage::Welcome { party, .. }) =
-                    serde_json::from_str(&t)
-                {
-                    return Some(party);
-                }
-            }
-        }
-        None
-    })
-    .await
-    .ok()
-    .flatten()
-}
-
-/// Watch party snapshots until one contains a player that wasn't there
-/// before — that's the one our `JoinParty` just created.
-async fn wait_for_new_player(
-    ws: &mut DaemonWs,
-    existing: &std::collections::HashSet<PlayerId>,
-) -> Option<PlayerId> {
-    use futures_util::StreamExt;
-    tokio::time::timeout(DAEMON_REPLY_TIMEOUT, async {
-        while let Some(Ok(msg)) = ws.next().await {
-            if let tokio_tungstenite::tungstenite::Message::Text(t) = msg {
-                if let Ok(gamenight_protocol::ServerMessage::PartyState { party }) =
-                    serde_json::from_str(&t)
-                {
-                    if let Some(p) = party.players.iter().find(|p| !existing.contains(&p.id)) {
-                        return Some(p.id);
-                    }
-                }
-            }
-        }
-        None
-    })
-    .await
-    .ok()
-    .flatten()
-}
-
+/// No join request may wait indefinitely on a daemon connection.
 async fn join_session(
+    id: Path<String>,
+    state: State<SharedState>,
+    request: Json<JoinSessionRequest>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    tokio::time::timeout(
+        daemon::REPLY_TIMEOUT * 3,
+        join_session_inner(id, state, request),
+    )
+    .await
+    .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
+}
+
+async fn join_session_inner(
     Path(id): Path<String>,
     State(state): State<SharedState>,
     Json(req): Json<JoinSessionRequest>,
@@ -196,7 +160,13 @@ async fn join_session(
     let daemon_addr = state.lock().unwrap().daemon_addr.clone();
 
     let ws_url = format!("ws://{daemon_addr}");
-    match tokio_tungstenite::connect_async(&ws_url).await {
+    match tokio::time::timeout(
+        daemon::REPLY_TIMEOUT,
+        tokio_tungstenite::connect_async(&ws_url),
+    )
+    .await
+    .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
+    {
         Ok((mut ws_stream, _)) => {
             use futures_util::SinkExt;
 
@@ -205,11 +175,12 @@ async fn join_session(
                 game: None,
                 token: None,
             };
-            let _ = ws_stream
+            ws_stream
                 .send(tokio_tungstenite::tungstenite::Message::Text(
                     hello.to_json(),
                 ))
-                .await;
+                .await
+                .map_err(|_| StatusCode::BAD_GATEWAY)?;
 
             // Who was in the party before we touched it, so a fresh join can
             // be identified by difference. The studio needs that id back:
@@ -217,16 +188,16 @@ async fn join_session(
             // is what makes saving-on-every-keystroke safe. Without it, each
             // save would be another `JoinParty` and the party would fill up
             // with duplicates of the same person.
-            let party = read_welcome(&mut ws_stream).await;
-            let existing: std::collections::HashSet<PlayerId> = party
-                .as_ref()
-                .map(|p| p.players.iter().map(|pl| pl.id).collect())
-                .unwrap_or_default();
+            let party = read_welcome(&mut ws_stream)
+                .await
+                .map_err(StatusCode::from)?;
+            let existing: std::collections::HashSet<PlayerId> =
+                party.players.iter().map(|player| player.id).collect();
 
             // A seat wins over an explicit id, and is resolved now rather
             // than trusted from the URL.
-            let seat_target = match (req.seat, party.as_ref()) {
-                (Some(seat), Some(party)) => {
+            let seat_target = match req.seat {
+                Some(seat) => {
                     let occupant = party
                         .seats
                         .iter()
@@ -259,18 +230,14 @@ async fn join_session(
                 st.bindings.get(&id).copied()
             };
             if let (Some(held), Some(want)) = (already, target) {
-                let still_seated = party
-                    .as_ref()
-                    .map(|p| p.players.iter().any(|pl| pl.id == held))
-                    .unwrap_or(false);
+                let still_seated = party.players.iter().any(|player| player.id == held);
                 if still_seated && held != want {
                     let seat_of = |pid: PlayerId| {
-                        party.as_ref().and_then(|p| {
-                            p.seats
-                                .iter()
-                                .find(|s| s.occupant.player_id() == Some(pid))
-                                .map(|s| s.index)
-                        })
+                        party
+                            .seats
+                            .iter()
+                            .find(|seat| seat.occupant.player_id() == Some(pid))
+                            .map(|seat| seat.index)
                     };
                     tracing::info!(
                         profile = %id,
@@ -320,15 +287,20 @@ async fn join_session(
                 }],
             };
             for msg in &messages {
-                let _ = ws_stream
+                ws_stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(msg.to_json()))
-                    .await;
+                    .await
+                    .map_err(|_| StatusCode::BAD_GATEWAY)?;
             }
 
             // A fresh join has to report which player it created.
             let player_id = match target {
                 Some(id) => Some(id),
-                None => wait_for_new_player(&mut ws_stream, &existing).await,
+                None => Some(
+                    wait_for_new_player(&mut ws_stream, &existing)
+                        .await
+                        .map_err(StatusCode::from)?,
+                ),
             };
 
             if let Some(pid) = player_id {

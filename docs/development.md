@@ -35,3 +35,6 @@ session prewarming remains enabled.
 The daemon's HTTP studio is optional. `--studio` enables LAN QR pairing on
 port 7913. The control protocol stays on loopback port 7912 (or the launcher's `--port`). Only use the
 studio on a trusted LAN; see [security scope](../SECURITY.md).
+
+The [local web API](local-web-api.md) documents profile operations, join outcomes
+and daemon failure semantics.

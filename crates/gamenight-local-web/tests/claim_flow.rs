@@ -744,3 +744,68 @@ async fn local_studio_excludes_commerce() {
         );
     }
 }
+
+async fn save_test_profile(server: &str) {
+    let (status, _) = post(
+        server,
+        "/api/profiles",
+        r##"{"id":"failure-test","username":"Ada","color":"#ff0000","avatar":""}"##,
+    )
+    .await;
+    assert_eq!(status, 200);
+}
+
+#[tokio::test]
+async fn disconnected_daemon_does_not_report_a_successful_join() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server = start_server(&listener.local_addr().unwrap().to_string()).await;
+    let peer = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        assert!(matches!(ws.next().await, Some(Ok(Message::Text(_)))));
+        ws.close(None).await.unwrap();
+    });
+    save_test_profile(&server).await;
+    let (status, _) = post(&server, "/api/profiles/failure-test/join", "{}").await;
+    assert_eq!(status, 502);
+    peer.await.unwrap();
+}
+
+#[tokio::test]
+async fn silent_daemon_times_out_without_receiving_join_commands() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let server = start_server(&listener.local_addr().unwrap().to_string()).await;
+    let peer = tokio::spawn(async move {
+        let (stream, _) = listener.accept().await.unwrap();
+        let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+        assert!(matches!(ws.next().await, Some(Ok(Message::Text(_)))));
+        // Keep the socket alive, but never send the required Welcome.
+        assert!(!matches!(ws.next().await, Some(Ok(Message::Text(_)))));
+    });
+    save_test_profile(&server).await;
+    let (status, _) = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        post(&server, "/api/profiles/failure-test/join", "{}"),
+    )
+    .await
+    .expect("HTTP request must be bounded");
+    assert_eq!(status, 504);
+    peer.await.unwrap();
+}
+
+#[tokio::test]
+async fn browser_cannot_override_the_host_daemon_address() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    save_test_profile(&server).await;
+    let (status, _) = post(
+        &server,
+        "/api/profiles/failure-test/join",
+        r#"{"daemon_addr":"127.0.0.1:1"}"#,
+    )
+    .await;
+    assert_eq!(status, 200);
+    let party = watcher.wait_for(|party| !party.players.is_empty()).await;
+    assert_eq!(party.players[0].name, "Ada");
+}
