@@ -10,6 +10,4 @@ and seat claims from devices on a trusted LAN. It has no account login and
 must not be deployed as a public web service. The daemon address is configured
 by the host, never chosen by an incoming browser request.
 
-Please do not include secrets or personal data in public bug reports. Before
-public release, maintainers must configure a private vulnerability-reporting
-channel in the repository settings.
+Please do not include secrets or personal data in public bug reports. Report vulnerabilities privately through the repository's Security tab on GitHub.

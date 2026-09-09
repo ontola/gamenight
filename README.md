@@ -14,6 +14,13 @@ cross-game controller identity are not finished features.
 [Get started](#try-it-locally) · [Integrate a game](docs/integrating-your-game.md) ·
 [Protocol](docs/protocol.md) · [Contribute](CONTRIBUTING.md)
 
+## Windows preview
+
+A native Windows preview bundles the lobby, Pinpals and LÖVE.
+[Downloads](https://github.com/ontola/gamenight/releases) ·
+[Preview instructions and source versions](docs/windows-preview.md).
+Extract the ZIP and run `GameNight.exe`; no development tools are needed.
+
 ## Try it locally
 
 Install a current stable Rust toolchain and Python 3. On Windows, use the
