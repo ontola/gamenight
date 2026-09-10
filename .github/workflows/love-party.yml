@@ -44,6 +44,11 @@ jobs:
           python scripts/package-love-party.py --output dist/repeated
           if ($LASTEXITCODE -ne 0) { throw 'Repeat packaging failed' }
           if ((Get-FileHash dist/party/gamenight-love-party.zip).Hash -ne (Get-FileHash dist/repeated/gamenight-love-party.zip).Hash) { throw 'Non-deterministic package' }
+      - name: Render every packaged game
+        shell: pwsh
+        run: |
+          python scripts/test-love-party-render.py --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --pack dist/party
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged game rendering failed' }
       - name: Certify every packaged game against GameNight
         shell: pwsh
         run: |

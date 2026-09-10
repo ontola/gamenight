@@ -1,5 +1,7 @@
 local R = { colors = { { 0.30, 0.92, 0.83 }, { 1, 0.43, 0.40 }, { 1, 0.82, 0.32 }, { 0.61, 0.53, 1 } } }
 local G
+local BlastRender = require("games.blast_render")
+local SiegeRender = require("games.siege_render")
 local function player_color(p)
 	if p.color and p.color:match("^#%x%x%x%x%x%x$") then
 		return {
@@ -72,9 +74,9 @@ function R.game(mode, s, remaining, finished, managed)
 	if mode.draw then
 		mode.draw(s, G, R.fonts, player_color)
 	elseif mode.id == "neon-siege" then
-		require("games.siege_render").draw(s, G, R.fonts, player_color)
+		SiegeRender.draw(s, G, R.fonts, player_color)
 	elseif mode.id == "blast-party" then
-		require("games.blast_render").draw(s, G, R.fonts, player_color)
+		BlastRender.draw(s, G, R.fonts, player_color)
 	elseif mode.id == "bumper-royale" then
 		G.setColor(0.09, 0.14, 0.2)
 		G.circle("fill", 640, 410, s.radius)

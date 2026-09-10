@@ -164,6 +164,12 @@ function love.update(dt)
 	end
 end
 function love.draw()
+	if os.getenv("GNLOVE_RENDER_SMOKE") == "1" and state then
+		local ok, err = pcall(Render.game, mode, state, remaining, finished, managed)
+		print(ok and ("PASS rendered " .. mode.id) or tostring(err))
+		love.event.quit(ok and 0 or 1)
+		return
+	end
 	if os.getenv("GNLOVE_TEST") == "1" then
 		return
 	end
