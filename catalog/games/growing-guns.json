@@ -1,0 +1,43 @@
+{
+  "$schema": "../schema.json",
+  "id": "growing-guns",
+  "title": "Growing Guns",
+  "tagline": "Fast arena FPS — the loser of each round picks the upgrade.",
+  "developer": "Joep Meindertsma",
+  "players": {
+    "min": 2,
+    "max": 4,
+    "best": 2
+  },
+  "match_minutes": 5,
+  "price": "free",
+  "tags": [
+    "versus",
+    "fps",
+    "arena",
+    "splitscreen",
+    "godot"
+  ],
+  "emoji": "🔫",
+  "color": "#ffb454",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "requirements": {
+    "disk_mb": 400,
+    "ram_mb": 2048,
+    "cpu": "any dual-core",
+    "gpu": "anything with Vulkan/Metal (integrated is fine)"
+  },
+  "links": {
+    "itch": "https://joepio.itch.io/growing-guns"
+  },
+  "downloads": {
+    "mac": {
+      "url": "https://gamenight.ontola.io/games/growing-guns/mac/2b6e727ec916.zip",
+      "sha256": "2b6e727ec9168e50973e7472ff5b65ae5bc9e2ad675dd2f1c361f9681b704d53",
+      "entrypoint": "Growing Guns.app/Contents/MacOS/Growing Guns"
+    }
+  }
+}
