@@ -51,6 +51,7 @@ pub struct NextGameTrigger {
     /// easing back to 0 over `PAD_PRESS_SECONDS`.
     pub press: f32,
     pub skip_press: f32,
+    pub play_press: f32,
     /// Pad and screen geometry, copied off the element meta at hydrate so the
     /// bevy side can lay the TV and its buttons out without resolving the
     /// asset every frame.
@@ -63,29 +64,26 @@ pub struct NextGameTrigger {
 /// between them: two buttons drawn edge to edge read as one striped block,
 /// and "back into your game" sitting flush against "leave your game" is a
 /// thing somebody will mis-hit at speed.
-const FACE_SHARE: f32 = 0.34;
-
-/// The two buttons, as (centre, size), given where the slab is and how big
-/// it is. Faces at the far ends, gap in the middle.
-///
-/// One solid underneath both, and one landing test across the whole of it:
-/// splitting the *collider* would leave a seam for a player to jump into and
-/// press nothing, and two overlapping tests would make whoever straddles the
-/// middle press both. Which button you hit is decided afterwards, by which
-/// side of the middle you came down on — so the gap is a visual one, and
-/// landing in it still works.
-pub fn pad_halves(pos: Vec2, size: Vec2) -> ((Vec2, Vec2), (Vec2, Vec2)) {
-    let face = Vec2::new(size.x * FACE_SHARE, size.y);
-    let inset = size.x / 2.0 - face.x / 2.0;
-    (
-        (Vec2::new(pos.x - inset, pos.y), face),
-        (Vec2::new(pos.x + inset, pos.y), face),
-    )
+pub fn pad_thirds(pos: Vec2, size: Vec2) -> [(Vec2, Vec2); 3] {
+    let width = size.x / 3.0;
+    [0, 1, 2].map(|index| {
+        (
+            Vec2::new(pos.x + (index as f32 - 1.0) * width, pos.y),
+            Vec2::new(width * 0.82, size.y),
+        )
+    })
 }
 
-/// How long the pad ignores further landings after starting a game. Long
-/// enough to cover a bouncy touchdown, short enough that it's never what
-/// stops somebody starting the next match.
+fn button_at(x: f32, center: f32, width: f32) -> usize {
+    if x < center - width / 6.0 {
+        0
+    } else if x > center + width / 6.0 {
+        2
+    } else {
+        1
+    }
+}
+
 const COOLDOWN_SECS: f32 = 0.5;
 
 fn hydrate(
@@ -149,6 +147,7 @@ fn hydrate(
                     cooling: 0.0,
                     press: 0.0,
                     skip_press: 0.0,
+                    play_press: 0.0,
                     body_size: *body_size,
                     screen_size: *screen_size,
                     screen_offset: *screen_offset,
@@ -178,6 +177,7 @@ fn update(
         trigger.cooling = (trigger.cooling - dt).max(0.0);
         trigger.press = (trigger.press - dt / PAD_PRESS_SECONDS).max(0.0);
         trigger.skip_press = (trigger.skip_press - dt / PAD_PRESS_SECONDS).max(0.0);
+        trigger.play_press = (trigger.play_press - dt / PAD_PRESS_SECONDS).max(0.0);
         if trigger.cooling > 0.0 {
             continue;
         }
@@ -201,22 +201,36 @@ fn update(
         else {
             continue;
         };
-        if x > solid.pos.x {
-            trigger.cooling = COOLDOWN_SECS;
-            trigger.skip_press = 1.0;
-            bridge.skip_next_game();
-        } else {
-            // A game that hasn't finished warming cannot be started, only
-            // waited for. Pressing anyway would have the party staring at a
-            // lobby that ignored the button they just pushed — so the button
-            // doesn't move either, and the screen above it goes on saying how
-            // far along the loading is.
-            if button == crate::gamenight::TvButton::Disabled {
-                continue;
+        match button_at(x, solid.pos.x, solid.size.x) {
+            0 if button != crate::gamenight::TvButton::Disabled => {
+                trigger.press = 1.0;
+                bridge.press_tv_button();
             }
-            trigger.cooling = COOLDOWN_SECS;
-            trigger.press = 1.0;
-            bridge.press_tv_button();
+            1 if bridge.next_game_is_ready() => {
+                trigger.play_press = 1.0;
+                bridge.play_next_game();
+            }
+            2 if bridge.can_skip_next_game() => {
+                trigger.skip_press = 1.0;
+                bridge.skip_next_game();
+            }
+            _ => continue,
+        }
+        trigger.cooling = COOLDOWN_SECS;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn button_faces_match_landing_regions() {
+        let pos = Vec2::new(560.0, 160.0);
+        let size = Vec2::new(240.0, 14.0);
+        for (index, (center, face)) in pad_thirds(pos, size).into_iter().enumerate() {
+            for x in [center.x - face.x / 2.0, center.x, center.x + face.x / 2.0] {
+                assert_eq!(button_at(x, pos.x, size.x), index);
+            }
         }
     }
 }
