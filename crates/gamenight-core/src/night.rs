@@ -61,6 +61,11 @@ pub enum Command {
         a: u8,
         b: u8,
     },
+    /// Physical gamepad's ordinal in the host's connected-controller list.
+    BindController {
+        player_id: PlayerId,
+        controller: String,
+    },
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
     },
@@ -203,6 +208,8 @@ pub struct GameNight {
     /// and a session prepared for one player must not be started for two.
     warm_seats: Vec<Seat>,
     active_seats: Vec<Seat>,
+    warm_players: Vec<Player>,
+    active_players: Vec<Player>,
     // Bounded tombstones for replies already in flight when Dispose is sent.
     retired_sessions: VecDeque<SessionId>,
     history: Vec<GameId>,
@@ -263,6 +270,8 @@ impl GameNight {
             warm: None,
             warm_seats: Vec::new(),
             active_seats: Vec::new(),
+            warm_players: Vec::new(),
+            active_players: Vec::new(),
             retired_sessions: VecDeque::new(),
             history: Vec::new(),
             vote: VoteBoard::default(),
@@ -393,6 +402,24 @@ impl GameNight {
                 self.on_set_player_avatar(player_id, avatar, &mut fx)
             }
             Command::AssignSeat { seat, occupant } => self.on_assign_seat(seat, occupant, &mut fx),
+            Command::BindController {
+                player_id,
+                controller,
+            } => {
+                if let Some(seat) = self
+                    .seats
+                    .iter_mut()
+                    .find(|s| s.occupant.player_id() == Some(player_id))
+                {
+                    seat.controller = Some(controller);
+                    self.rewarm_if_misfit(&mut fx);
+                    fx.push(Effect::StateChanged);
+                } else {
+                    fx.push(Effect::Reject {
+                        reason: "unknown seated player".into(),
+                    });
+                }
+            }
             Command::SwapSeats { a, b } => self.on_swap_seats(a, b, &mut fx),
             Command::SetPlaylist { entries } => self.on_set_playlist(entries, &mut fx),
             Command::MovePlaylistEntry { expected, from, to } => {
@@ -613,6 +640,7 @@ impl GameNight {
                 reason: format!("no such player: {:?}", player_id.0),
             });
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_swap_seats(&mut self, a: u8, b: u8, fx: &mut Vec<Effect>) {
@@ -659,7 +687,8 @@ impl GameNight {
         if let Some(active) = &self.active {
             if self.overlay_open
                 && self.overlay_paused
-                && self.active_seats != self.seats_for(&active.game)
+                && (self.active_seats != self.seats_for(&active.game)
+                    || self.active_players != self.players)
             {
                 let index = active.playlist_index;
                 let fits = self.game_has_capacity(&active.game);
@@ -761,6 +790,7 @@ impl GameNight {
                 reason: "unknown player".into(),
             }),
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_set_player_color(&mut self, player_id: PlayerId, color: String, fx: &mut Vec<Effect>) {
@@ -773,6 +803,7 @@ impl GameNight {
                 reason: "unknown player".into(),
             }),
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_assign_seat(&mut self, seat: u8, occupant: SeatOccupant, fx: &mut Vec<Effect>) {
@@ -1334,7 +1365,7 @@ impl GameNight {
             self.maybe_warm(fx);
             return;
         }
-        if self.warm_seats != self.seats_for(&warm.game) {
+        if self.warm_seats != self.seats_for(&warm.game) || self.warm_players != self.players {
             // Same game, new seating: warm it again rather than hunt for a
             // better title. `maybe_warm` re-reads the seats.
             self.dispose_warm(fx);
@@ -1412,6 +1443,7 @@ impl GameNight {
             .expect("new session");
         let seats = self.seats_for(&game);
         self.warm_seats = seats.clone();
+        self.warm_players = self.players.clone();
         fx.push(Effect::ToGame {
             game,
             session: session.id,
@@ -1468,6 +1500,7 @@ impl GameNight {
                 self.dispose_active(fx);
                 let mut next = self.warm.take().expect("checked");
                 self.active_seats = std::mem::take(&mut self.warm_seats);
+                self.active_players = std::mem::take(&mut self.warm_players);
                 next.advance(SessionPhase::Running)
                     .expect("ready -> running");
                 fx.push(Effect::ToGame {

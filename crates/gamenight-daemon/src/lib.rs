@@ -1168,6 +1168,13 @@ fn message_to_command(
         }
         ClientMessage::AssignSeat { seat, occupant } => Command::AssignSeat { seat, occupant },
         ClientMessage::SwapSeats { a, b } => Command::SwapSeats { a, b },
+        ClientMessage::BindController {
+            player_id,
+            controller,
+        } => Command::BindController {
+            player_id,
+            controller,
+        },
         ClientMessage::SetPlaylist { entries } => Command::SetPlaylist { entries },
         ClientMessage::MovePlaylistEntry { expected, from, to } => {
             Command::MovePlaylistEntry { expected, from, to }

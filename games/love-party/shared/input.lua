@@ -14,8 +14,9 @@ function M.bind(players, pads)
 	for _, p in ipairs(players) do
 		M.active[p.slot] = not p.bot
 		if not p.bot then
-			M.pads[p.slot] = pads[p.slot]
-			M.keyboardOnly[p.slot] = pads[p.slot] == nil
+			local ordinal = p.controller and tonumber(p.controller:match("^ordinal:(%d+)$"))
+			M.pads[p.slot] = pads[ordinal and ordinal + 1 or p.slot]
+			M.keyboardOnly[p.slot] = not p.controller and M.pads[p.slot] == nil
 		end
 	end
 end

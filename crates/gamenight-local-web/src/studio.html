@@ -1176,6 +1176,9 @@
 
     async function loadProfileData() {
       let savedAvatar = null;
+      let cachedProfile = null;
+      try { cachedProfile = JSON.parse(localStorage.getItem('gamenight_saved_profile')); } catch (_) {}
+      document.getElementById('player-name').value = cachedProfile?.username || randomName();
       try {
         const res = await fetch('/api/profiles/' + profileId);
         if (res.ok) {
@@ -1190,7 +1193,7 @@
         } else {
           // Not signed in / no profile yet: give them an identity rather
           // than an empty field to stare at.
-          document.getElementById('player-name').value = randomName();
+          document.getElementById('player-name').value = cachedProfile?.username || randomName();
         }
       } catch (e) {
       }
@@ -1268,6 +1271,7 @@
           color: accentColor(),
           avatar: encodeAvatar(gridData),
         };
+        localStorage.setItem('gamenight_saved_profile', JSON.stringify(prof));
         const res = await fetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -698,6 +698,11 @@ pub enum ClientMessage {
         a: u8,
         b: u8,
     },
+    /// Physical gamepad's ordinal in the host's connected-controller list.
+    BindController {
+        player_id: PlayerId,
+        controller: String,
+    },
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
     },

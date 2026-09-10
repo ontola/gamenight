@@ -55,6 +55,20 @@ function tests.lifecycle()
 	equal(l.phase, "idle")
 	equal(l.session, nil)
 end
+function tests.controller_identity_is_independent_of_join_order()
+	local input = require("shared.input")
+	local first, second, third = {}, {}, {}
+	local players = U.players({
+		{ index = 0, occupant = { kind = "local", player_id = "a" }, controller = "ordinal:2" },
+		{ index = 1, occupant = { kind = "local", player_id = "b" }, controller = "ordinal:0" },
+		{ index = 2, occupant = { kind = "local", player_id = "c" }, controller = "ordinal:1" },
+	}, { { id = "a", name = "Ada" }, { id = "b", name = "Bea" }, { id = "c", name = "Cam" } })
+	input.bind(players, { first, second, third })
+	equal(players[1].name, "Ada")
+	equal(input.pads[1], third)
+	equal(input.pads[2], first)
+	equal(input.pads[3], second)
+end
 function tests.controllers_keep_seat_holes()
 	local input = require("shared.input")
 	local a, b, c = {}, {}, {}

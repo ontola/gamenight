@@ -1742,6 +1742,13 @@ fn global_input_system(
         let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
         for (pad, player_id) in input.newly_confirmed.drain(..) {
             bridge.player_gamepad.insert(player_id, pad);
+            let mut connected: Vec<_> = gamepads.iter().map(|g| g.id).collect();
+            connected.sort_unstable();
+            if let Some(index) = connected.iter().position(|id| *id == pad as usize) {
+                let _ = join_tx.try_send(ClientMessage::BindController {
+                    player_id, controller: format!("ordinal:{index}"),
+                });
+            }
         }
         bridge.lobby_rebuild_at = Some(std::time::Instant::now() + LOBBY_REBUILD_DEBOUNCE);
     }

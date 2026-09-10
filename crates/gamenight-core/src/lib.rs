@@ -225,6 +225,25 @@ mod night_tests {
         )));
     }
 
+    #[test]
+    fn controller_binding_is_sent_with_the_named_player_to_the_game() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ada", Some(0), None));
+        let player_id = night.snapshot().players[0].id;
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let fx = night.handle(Command::BindController {
+            player_id,
+            controller: "ordinal:2".into(),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { seats, players }, .. }
+            if seats[0].controller.as_deref() == Some("ordinal:2") && seats[0].occupant.player_id() == Some(player_id) && players[0].name == "Ada")));
+    }
+
     /// The whole MVP evening: two games connect, playlist set, first game
     /// auto-starts, "Next" transitions instantly, the previous game is
     /// disposed and the following one warms.
@@ -1896,11 +1915,9 @@ mod player_count_fit_tests {
             .any(|effect| matches!(effect, Effect::Reject { .. })));
     }
 
-    /// Re-warming throws away a loaded process, so only seating does it.
-    /// Everything else about a player — their name, their avatar — leaves the
-    /// warm session exactly where it is.
+    /// Prepare carries profiles, so a changed name must reach the warm game.
     #[test]
-    fn a_rename_leaves_the_warm_session_alone() {
+    fn a_rename_refreshes_the_warm_profile() {
         let mut night = GameNight::default();
         night.set_library(vec![game("wide", 1, 4, None)]);
         night.handle(join("a"));
@@ -1911,15 +1928,12 @@ mod player_count_fit_tests {
         assert!(before.is_some());
 
         let player_id = night.snapshot().players[0].id;
-        night.handle(Command::RenamePlayer {
+        let fx = night.handle(Command::RenamePlayer {
             player_id,
             name: "Ada".into(),
         });
-        assert_eq!(
-            night.snapshot().warm_session.map(|s| s.id),
-            before,
-            "a rename is not a seating change"
-        );
+        assert_ne!(night.snapshot().warm_session.map(|s| s.id), before);
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { players, .. }, .. } if players.iter().any(|p| p.name == "Ada"))));
     }
 
     /// Nothing fits: warm something anyway. A lobby that can't start a game
