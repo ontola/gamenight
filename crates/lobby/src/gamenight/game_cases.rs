@@ -212,7 +212,7 @@ pub(super) fn spawn_shelf(
         );
         return;
     }
-    // Later games are narrow book spines. First is presented face-on and taller.
+    // Later games are narrow book spines. All cases share the same top and baseline.
     for (index, case) in cases.iter().take(6).enumerate().skip(1).rev() {
         let x = 48.0 + (index - 1) as f32 * 23.0 + motion * 22.0;
         let accent =
@@ -220,21 +220,21 @@ pub(super) fn spawn_shelf(
         block(
             parent,
             x,
-            -11.0,
+            2.0,
             0.1,
             21.0,
-            60.0,
+            90.0,
             Color::rgb(0.055, 0.07, 0.12),
         );
-        block(parent, x, -11.0, 0.2, 17.0, 58.0, accent);
+        block(parent, x, 2.0, 0.2, 17.0, 88.0, Color::rgb(0.10, 0.13, 0.19));
         block(
             parent,
             x - 6.0,
-            -11.0,
+            2.0,
             0.3,
             2.0,
-            54.0,
-            Color::rgba(1.0, 1.0, 1.0, 0.25),
+            84.0,
+            accent,
         );
         let title = super::ellipsize(&case.title, 15);
         parent.spawn(Text2dBundle {
@@ -242,12 +242,12 @@ pub(super) fn spawn_shelf(
                 title,
                 TextStyle {
                     font: font.clone(),
-                    font_size: 8.0,
+                    font_size: 10.0,
                     color: Color::WHITE,
                 },
             ),
             transform: Transform {
-                translation: Vec3::new(x, -10.0, 0.6),
+                translation: Vec3::new(x + 1.0, 2.0, 0.6),
                 rotation: Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
                 ..default()
             },

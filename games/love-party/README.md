@@ -1,16 +1,16 @@
 # GameNight LÖVE Party Pack
 
-Eight original local multiplayer prototypes for 2–4 people. MIT licensed.
+Five original local multiplayer prototypes for 2–4 people. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
 | Game | Goal | Controls |
 | --- | --- | --- |
-| Bumper Royale | Knock friends out of a shrinking ring; +3 knockout, -1 fall | Move, A to dash |
+| Ricochet Club | Tank combat with bouncing shots and destructible cover | Move, right stick aim, RB/RT fire, B shield |
+| Paint Rush | Cover the most territory in your colour | Move, A paint burst |
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
 | Neon Siege | Survive together; shared score and combo, no friendly fire | Move, right stick to aim, A to dash, B for pulse |
-| Meteor Dash | Collect stars (+5), avoid hits (-10), survive (+1/second) | Move, A for shield dash |
 
 Competitive matches last 60 seconds. Ties share victory. Neon Siege is a
 90-second cooperative survival match, ending early if the entire team falls. Every game supports 2, 3 or 4
@@ -73,7 +73,7 @@ in `main.lua` and the packaging script. Keep simulation free of LÖVE APIs.
 
 ```sh
 GNLOVE_HEADLESS=1 GNLOVE_TEST=1 love games/love-party
-GNLOVE_DEMO=1 GNLOVE_GAME=bumper-royale love games/love-party
+GNLOVE_DEMO=1 GNLOVE_GAME=neon-trails love games/love-party
 ```
 
 `GNLOVE_MATCH_SECONDS` and `GNLOVE_SEED` support reproducible tests. Native
@@ -170,13 +170,9 @@ score below the arena and health indicators beside players.
 - **Paint Rush** (`paint-rush`): move to colour tiles and steal opponents' territory.
   A paints a diamond-shaped burst every four seconds. Your score is the number
   of tiles currently owned. Simultaneous claims leave a tile unchanged.
-- **Anticonception** (`orbit-guard`): cooperate to protect a five-hit egg for 90
-  seconds. Left/right rotates your shield; A boosts rotation and B widens your
-  shield for one second (four-second cooldown). Enemies spawn on the outer ring after a three-second grace period, with at least
-  two seconds to react before they reach the shields. Interceptions earn 10 shared
-  points. Core destruction ends the match. Everyone shares the core's health.
-
-All three support 2–4 local players, shared keyboards, controllers and bots.
+Both support 2–4 local players, shared keyboards, controllers and bots.
 Secondary keyboard keys are Left Shift, Right Shift, O and Y. Tests exercise
 collisions, shield timing, paint ownership, core damage and 95-second simulations
 at each supported player count. They remain prototypes pending human playtesting.
+
+Bumper Royale, Anticonception and Meteor Dash have been retired after playtesting. Their source remains in version control for reference, but they are excluded from the playable collection and release packages.
