@@ -4,6 +4,9 @@ local modes = {
 	require("games.meteor"),
 	require("games.blast"),
 	require("games.siege"),
+	require("games.ricochet"),
+	require("games.paint"),
+	require("games.orbit"),
 }
 local U = require("shared.util")
 local Input = require("shared.input")

@@ -39,58 +39,35 @@ function R.finish()
 end
 function R.menu(modes, index, count)
 	R.begin()
-	text("GAMENIGHT  /  THE FIRST COLLECTION", 70, 40, "small", { 0.3, 0.92, 0.83 })
-	text("GOOD FRIENDS.", 70, 78, "huge")
-	text("QUESTIONABLE ALLIANCES.", 70, 137, "huge")
-	text("Five little games. One very busy couch.", 73, 215, "body", { 0.55, 0.65, 0.77 })
+	centered("Choose a game", 80, "title")
 	for i, mode in ipairs(modes) do
-		local x = 70 + ((i - 1) % 3) * 390
-		local y = 278 + math.floor((i - 1) / 3) * 171
+		local x = 110 + (i - 1) % 2 * 550
+		local y = 165 + math.floor((i - 1) / 2) * 108
 		local c = R.colors[(i - 1) % 4 + 1]
-		local chosen = i == index
-		G.setColor(chosen and 0.10 or 0.055, chosen and 0.16 or 0.085, chosen and 0.22 or 0.14)
-		G.rectangle("fill", x, y, 370, 150, 16, 16)
-		G.setColor(c)
-		G.setLineWidth(chosen and 3 or 1)
-		G.rectangle("line", x, y, 370, 150, 16, 16)
-		text("0" .. i, x + 22, y + 17, "small", c)
-		local cx, cy = x + 45, y + 90
-		if i == 1 then
-			G.circle("line", cx, cy, 28)
-			G.circle("fill", cx - 10, cy, 10)
-			G.circle("fill", cx + 19, cy + 9, 10)
-		elseif i == 2 then
-			G.setLineWidth(7)
-			G.line(cx - 25, cy + 23, cx - 25, cy - 21, cx + 14, cy - 21, cx + 14, cy + 13, cx + 35, cy + 13)
-		elseif i == 3 or i == 5 then
-			G.polygon("fill", cx, cy - 29, cx - 20, cy + 22, cx, cy + 10, cx + 20, cy + 22)
-		else
-			G.circle("fill", cx, cy, 23)
-			G.setLineWidth(3)
-			G.line(cx + 12, cy - 19, cx + 25, cy - 34, cx + 35, cy - 29)
-			G.setColor(0.035, 0.05, 0.09)
-			G.line(cx - 12, cy, cx + 12, cy)
-			G.line(cx, cy - 12, cx, cy + 12)
-		end
-		text(mode.title, x + 85, y + 37, "body", c)
-		G.setFont(R.fonts.small)
-		G.setColor(0.91, 0.94, 1)
-		G.printf(mode.tagline, x + 85, y + 80, 268)
+		G.setColor(i == index and { 0.09, 0.14, 0.18 } or { 0.04, 0.055, 0.085 })
+		G.rectangle("fill", x, y, 510, 88, 8, 8)
+		text(tostring(i), x + 20, y + 19, "small", c)
+		text(mode.title, x + 52, y + 16, "body", c)
+		text(mode.tagline, x + 52, y + 48, "small", { 0.55, 0.62, 0.7 })
 	end
-	centered(count .. " PLAYERS   •   F2 changes player count", 641, "body")
-	centered("1 / 2 / 3 / 4 / 5 choose     ENTER or controller A play", 683, "body", { 0.3, 0.92, 0.83 })
-	centered(modes[index].controls, 741, "small", { 0.55, 0.65, 0.77 })
+	centered(count .. " players  /  F2     1–" .. #modes .. " or D-pad choose     Enter / A play", 645, "small")
+	centered(modes[index].controls, 704, "small", { 0.55, 0.65, 0.77 })
+	centered("Keyboard: WASD + Space / Arrows + Right Ctrl / IJKL + U / TFGH + R", 744, "small", { 0.4, 0.48, 0.56 })
 	R.finish()
 end
 function R.game(mode, s, remaining, finished, managed)
 	R.begin()
 	-- Keep world coordinates stable; enlarge the arena independently of the HUD.
 	G.push()
-	local zoom = mode.id == "blast-party" and 1.38 or mode.id == "bumper-royale" and 1.23 or 1.065
+	local zoom = mode.id == "blast-party" and 1.38
+		or (mode.id == "bumper-royale" or mode.id == "orbit-guard") and 1.23
+		or 1.065
 	G.translate(640, 425)
 	G.scale(zoom)
 	G.translate(-640, -417)
-	if mode.id == "neon-siege" then
+	if mode.draw then
+		mode.draw(s, G, R.fonts, player_color)
+	elseif mode.id == "neon-siege" then
 		require("games.siege_render").draw(s, G, R.fonts, player_color)
 	elseif mode.id == "blast-party" then
 		require("games.blast_render").draw(s, G, R.fonts, player_color)
@@ -177,7 +154,12 @@ function R.game(mode, s, remaining, finished, managed)
 		)
 	end
 	if mode.coop then
-		centered(s.teamScore .. "   /   x" .. require("games.siege").multiplier(s), 768, "small", { 0.4, 0.65, 0.63 })
+		centered(
+			s.teamScore .. "   /   x" .. (mode.id == "neon-siege" and require("games.siege").multiplier(s) or 1),
+			768,
+			"small",
+			{ 0.4, 0.65, 0.63 }
+		)
 	end
 
 	if finished then

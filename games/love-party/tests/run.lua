@@ -131,6 +131,7 @@ function tests.bot_soak_all_player_counts()
 end
 require("tests.blast")
 require("tests.siege")
+require("tests.collection")
 local n = 0
 for name, test in pairs(tests) do
 	test()

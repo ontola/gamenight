@@ -1,6 +1,6 @@
 # GameNight LÖVE Party Pack
 
-Five original local multiplayer prototypes for 2–4 people. MIT licensed.
+Eight original local multiplayer prototypes for 2–4 people. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
@@ -20,7 +20,7 @@ has no cross-game score submission message.
 
 ## Play
 
-Run `love games/love-party` from the repository. Choose a game with 1/2/3/4/5 or
+Run `love games/love-party` from the repository. Choose a game with 1–8 or
 the controller D-pad, Enter/A to start, F2 to choose 2–4 players.
 A packaged `.love` file opens its game directly. Escape/Back returns to the
 standalone menu; Enter/A starts a rematch after the result screen.
@@ -55,7 +55,7 @@ existing Pinpals catalogue entry remains independent of this pack.
 python scripts/package-love-party.py --output dist/party --love /path/to/love
 ```
 
-Produces five deterministic `.love` files, checksums, a collection ZIP and
+Produces eight deterministic `.love` files, checksums, a collection ZIP and
 an optional `shelf.json` with absolute local paths. Merge those shelf entries
 with your lobby entry when configuring `GAMENIGHT_LIBRARY`. The build never
 changes the Windows installer's contents or assumes an unpublished download URL.
@@ -63,7 +63,7 @@ changes the Windows installer's contents or assumes an unpublished download URL.
 For a release, pass `--base-url https://your-host/immutable-release` to also
 generate Windows catalogue entries. Publish the `.love` files at that URL,
 then add the generated entries to the starter catalogue. The shared LÖVE
-runtime is reused, not included five times.
+runtime is reused, not included eight times.
 
 ## Develop and test
 
@@ -155,3 +155,22 @@ selection screen shows the selected game's controls; full keyboard bindings and
 power-up details are documented above. Arenas enlarge without changing simulation
 coordinates or stretching their shapes. Neon Siege keeps a small shared combo
 score below the arena and health indicators beside players.
+
+## More games
+
+- **Ricochet Club** (`ricochet-club`): move tanks, aim with the right stick (or
+  movement direction), hold A to fire. Shots bounce up to four times. A hit earns
+  +3 and costs the target 1; your own bounced shots cost you 1. B shields for
+  0.6 seconds with a three-second cooldown. Hits grant brief invulnerability.
+- **Paint Rush** (`paint-rush`): move to colour tiles and steal opponents' territory.
+  A paints a diamond-shaped burst every four seconds. Your score is the number
+  of tiles currently owned. Simultaneous claims leave a tile unchanged.
+- **Orbit Guard** (`orbit-guard`): cooperate to protect a five-hit core for 90
+  seconds. Left/right rotates your shield; A boosts rotation and B widens your
+  shield for one second (four-second cooldown). Interceptions earn 10 shared
+  points. Core destruction ends the match. Everyone shares the core's health.
+
+All three support 2–4 local players, shared keyboards, controllers and bots.
+Secondary keyboard keys are Left Shift, Right Shift, O and Y. Tests exercise
+collisions, shield timing, paint ownership, core damage and 95-second simulations
+at each supported player count. They remain prototypes pending human playtesting.
