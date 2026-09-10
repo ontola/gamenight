@@ -3101,6 +3101,7 @@ struct LobbyQrSign(String);
 fn sync_lobby_qr_system(
     mut commands: bevy::prelude::Commands,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
+    asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
     mut images: bevy::prelude::ResMut<bevy::prelude::Assets<bevy::render::texture::Image>>,
     mut existing: bevy::prelude::Query<(
         bevy::prelude::Entity,
@@ -3132,20 +3133,24 @@ fn sync_lobby_qr_system(
         .shared_resource::<GameNightBridge>()
         .claim_seat();
     let url = seat.map(|seat| format!("{}?seat={}", lobby_join_url(), seat));
+    let name = {
+        let bridge = bones_game.0.shared_resource::<GameNightBridge>();
+        seat.and_then(|seat| bridge.seat_player(seat as u32))
+            .and_then(|id| bridge.latest_players.iter().find(|player| player.id == id))
+            .map(|player| player.name.clone())
+    };
+    let fingerprint = format!("{:?}|{:?}", url, name);
 
     // Already up and still encoding the right thing: just track the element.
     if let Some((entity, shown, mut transform)) = existing.iter_mut().next() {
         transform.translation = Vec3::new(pos.x, pos.y, LOBBY_PROP_Z);
-        if shown.0 == url.clone().unwrap_or_default() {
+        if shown.0 == fingerprint {
             return;
         }
         commands.entity(entity).despawn_recursive();
     }
 
-    // The slab the code is set into — and the thing players stand on. No
-    // caption, no printed URL: this is a machine in the room now, not a
-    // poster, and the code is the whole message. Who it's currently aimed at
-    // is said by the button it sits on, which is right on top of it.
+    // Keep the caption outside the QR quiet zone so it remains scannable.
     let board = size + Vec2::splat(SCREEN_FRAME * 2.0);
     let code = url
         .as_deref()
@@ -3154,7 +3159,7 @@ fn sync_lobby_qr_system(
 
     commands
         .spawn((
-            LobbyQrSign(url.unwrap_or_default()),
+            LobbyQrSign(fingerprint),
             SpatialBundle {
                 transform: Transform::from_xyz(pos.x, pos.y, LOBBY_PROP_Z),
                 ..default()
@@ -3170,6 +3175,20 @@ fn sync_lobby_qr_system(
                     Color::rgb(0.075, 0.035, 0.055)
                 },
             );
+            if let Some(name) = name {
+                parent.spawn(Text2dBundle {
+                    text: Text::from_section(
+                        ellipsize(&name, 18),
+                        TextStyle {
+                            font: asset_server.load("ui/FairfaxSM.ttf"),
+                            font_size: 12.0,
+                            color: Color::WHITE,
+                        },
+                    ).with_alignment(TextAlignment::Center),
+                    transform: Transform::from_xyz(0.0, -board.y / 2.0 - 9.0, 0.2),
+                    ..default()
+                });
+            }
             if let Some(code) = code {
                 parent.spawn(SpriteBundle {
                     texture: code,
@@ -3383,7 +3402,7 @@ fn spawn_pad_button(
             });
             let mut label_entity = face.spawn(Text2dBundle {
                 text: Text::from_section(
-                    if matches!(pad, PadButton::NextGame { .. }) { format!("{label}\nHOLD 2s") } else { label.to_string() },
+                    label.to_string(),
                     TextStyle {
                         font,
                         font_size: if matches!(pad, PadButton::NextGame { .. }) { 10.0 } else { 13.0 },
@@ -3490,7 +3509,7 @@ fn press_pads_system(
         let progress = presses.of(label.pad);
         text.sections[0].value = if progress > 0.0 {
             format!("{}\n{:.1}s", label.label, (1.0 - progress) * crate::core::elements::next_game_trigger::HOLD_SECONDS)
-        } else { format!("{}\nHOLD 2s", label.label) };
+        } else { label.label.to_string() };
     }
 
 }
