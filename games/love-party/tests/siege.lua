@@ -137,7 +137,7 @@ function tests.bounded_four_player_stress()
 				assert(p.x == p.x and p.y == p.y and p.hp == 3)
 			end
 		end
-		assert(s.kills > 100 and s.wave >= 9)
+		assert(s.kills > 20 and s.wave >= 3)
 	end
 	print(
 		string.format(
@@ -146,6 +146,61 @@ function tests.bounded_four_player_stress()
 			peak
 		)
 	)
+end
+function tests.waves_warn_clear_and_rest_before_advancing()
+	local W = require("games.siege_waves")
+	local s = fresh()
+	local spawn = function(state, kind, x, y, delay)
+		M.spawn(state, kind, x, y, delay)
+	end
+	W.update(s, 2, spawn)
+	assert(s.wave == 1 and #s.enemies == 0)
+	W.update(s, 0.01, spawn)
+	assert(#s.enemies > 0)
+	for _, e in ipairs(s.enemies) do
+		assert(e.warm >= 1.4)
+	end
+	for _ = 1, 100 do
+		W.update(s, 1, spawn)
+	end
+	assert(s.wave == 1 and #s.waveQueue == 0, "uncleared wave must not snowball")
+	s.enemies = {}
+	W.update(s, 0.01, spawn)
+	assert(s.wavePhase == "rest")
+	W.update(s, 2.9, spawn)
+	assert(s.wave == 1 and #s.enemies == 0)
+	W.update(s, 0.11, spawn)
+	assert(s.wave == 2)
+	for number = 1, 12 do
+		local plan, name = W.plan(number, 4, 1422, 800)
+		assert(#plan <= 32 and name == W.names[(number - 1) % 4 + 1])
+		for _, e in ipairs(plan) do
+			assert(e.x >= 0 and e.x <= 1422 and e.y >= 0 and e.y <= 800)
+			if number < 3 then
+				assert(e.kind == "chaser")
+			end
+			if number < 5 then
+				assert(e.kind ~= "splitter")
+			end
+			if number < 7 then
+				assert(e.kind ~= "fort")
+			end
+		end
+	end
+end
+function tests.fullscreen_bounds_resize_and_spawn_safety()
+	local s = fresh()
+	M.resize(s, 1920, 1080)
+	assert(math.abs(s.width - 1422.222) < 0.01)
+	local p = s.players[1]
+	p.x = 19
+	p.y = 19
+	M.update(s, 0.1, { { x = -1, y = -1 }, { x = 0, y = 0 } })
+	assert(p.x == 18 and p.y == 18)
+	local e = M.spawn(s, "chaser", p.x, p.y, 0.001)
+	p.invul = 0
+	tick(s)
+	assert(e.warm > 0 and p.hp == 3, "warning must not activate on a player")
 end
 for name, test in pairs(tests) do
 	test()

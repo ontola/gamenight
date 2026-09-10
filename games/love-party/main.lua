@@ -118,6 +118,9 @@ function love.update(dt)
 	if not state or finished or (bridge and bridge.phase ~= "running") then
 		return
 	end
+	if mode.resize and love.graphics then
+		mode.resize(state, love.graphics.getDimensions())
+	end
 	accumulator = accumulator + math.min(dt, 0.1)
 	while accumulator >= 1 / 120 and not finished do
 		local inputs = {}

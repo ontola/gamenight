@@ -13,20 +13,20 @@ function M.draw(s, G, fonts, playerColor)
 		end
 		G.polygon("line", points)
 	end
-	local sx, sy = G.transformPoint(60, 145)
-	local ex, ey = G.transformPoint(1220, 690)
+	local sx, sy = G.transformPoint(0, 0)
+	local ex, ey = G.transformPoint(s.width, s.height)
 	G.setScissor(sx, sy, ex - sx, ey - sy)
 	G.push()
 	G.translate(math.sin(s.time * 83) * s.shake, math.cos(s.time * 97) * s.shake * 0.6)
 	G.setColor(0.025, 0.043, 0.075)
-	G.rectangle("fill", 60, 145, 1160, 545)
+	G.rectangle("fill", -10, -10, s.width + 20, s.height + 20)
 	G.setColor(0.055, 0.095, 0.13)
 	G.setLineWidth(1)
-	for x = 60, 1220, 40 do
-		G.line(x, 145, x, 690)
+	for x = 0, s.width, 40 do
+		G.line(x, 0, x, s.height)
 	end
-	for y = 145, 690, 40 do
-		G.line(60, y, 1220, y)
+	for y = 0, s.height, 40 do
+		G.line(0, y, s.width, y)
 	end
 	for _, r in ipairs(s.rings) do
 		tint(r.color, r.ttl / 0.35 * 0.7)
@@ -62,7 +62,9 @@ function M.draw(s, G, fonts, playerColor)
 		if e.warm > 0 then
 			tint(c, 0.25)
 			G.setLineWidth(1)
-			G.circle("line", e.x, e.y, e.r + e.warm * 28)
+			G.circle("line", e.x, e.y, e.r + e.warm * 22)
+			tint(c, 0.65)
+			G.circle("line", e.x, e.y, 5)
 		else
 			tint(c, 0.15)
 			G.setLineWidth(7)
@@ -136,8 +138,12 @@ function M.draw(s, G, fonts, playerColor)
 	end
 	G.pop()
 	G.setScissor()
-	G.setLineWidth(1)
-	G.setColor(0.2, 0.5, 0.55)
-	G.rectangle("line", 60, 145, 1160, 545)
+	G.setFont(fonts.small)
+	G.setColor(0.55, 0.7, 0.75, 0.8)
+	if s.wavePhase == "rest" then
+		G.printf("WAVE " .. (s.wave + 1) .. "  /  " .. math.ceil(s.waveRest), 0, 65, s.width, "center")
+	elseif s.waveClock < 2 then
+		G.printf("WAVE " .. s.wave .. "  /  " .. s.waveName, 0, 65, s.width, "center")
+	end
 end
 return M

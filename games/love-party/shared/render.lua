@@ -22,17 +22,18 @@ end
 local function centered(value, y, font, color)
 	G.setFont(R.fonts[font or "body"])
 	G.setColor(color or { 0.91, 0.94, 1 })
-	G.printf(value, 0, y, 1280, "center")
+	G.printf(value, 0, y, R.width or 1280, "center")
 end
-function R.begin()
+function R.begin(worldWidth)
+	R.width = worldWidth or 1280
 	local w, h = G.getDimensions()
-	local scale = math.min(w / 1280, h / 800)
+	local scale = math.min(w / R.width, h / 800)
 	G.clear(0.018, 0.027, 0.055)
 	G.push()
-	G.translate((w - 1280 * scale) / 2, (h - 800 * scale) / 2)
+	G.translate((w - R.width * scale) / 2, (h - 800 * scale) / 2)
 	G.scale(scale)
 	G.setColor(0.035, 0.05, 0.09)
-	G.rectangle("fill", 0, 0, 1280, 800)
+	G.rectangle("fill", 0, 0, R.width, 800)
 end
 function R.finish()
 	G.pop()
@@ -56,15 +57,17 @@ function R.menu(modes, index, count)
 	R.finish()
 end
 function R.game(mode, s, remaining, finished, managed)
-	R.begin()
+	R.begin(mode.id == "neon-siege" and s.width or nil)
 	-- Keep world coordinates stable; enlarge the arena independently of the HUD.
 	G.push()
 	local zoom = mode.id == "blast-party" and 1.38
 		or (mode.id == "bumper-royale" or mode.id == "orbit-guard") and 1.23
 		or 1.065
-	G.translate(640, 425)
-	G.scale(zoom)
-	G.translate(-640, -417)
+	if mode.id ~= "neon-siege" then
+		G.translate(640, 425)
+		G.scale(zoom)
+		G.translate(-640, -417)
+	end
 	if mode.draw then
 		mode.draw(s, G, R.fonts, player_color)
 	elseif mode.id == "neon-siege" then
@@ -131,8 +134,8 @@ function R.game(mode, s, remaining, finished, managed)
 	-- A single quiet row replaces the title, scorecards and persistent instructions.
 	G.setFont(R.fonts.small)
 	G.setColor(remaining < 10 and { 1, 0.43, 0.4 } or { 0.55, 0.62, 0.7 })
-	G.printf(string.format("%02d", math.ceil(remaining)), 595, 22, 90, "center")
-	local positions = { 28, 300, 760, 1032 }
+	G.printf(string.format("%02d", math.ceil(remaining)), R.width / 2 - 45, 22, 90, "center")
+	local positions = { 28, R.width * 0.23, R.width * 0.59, R.width - 248 }
 	for i, p in ipairs(s.players) do
 		local x = positions[i]
 		local c = player_color(p)

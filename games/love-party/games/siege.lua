@@ -1,4 +1,5 @@
 local U = require("shared.util")
+local Waves = require("games.siege_waves")
 local M = {
 	id = "neon-siege",
 	title = "NEON SIEGE",
@@ -6,7 +7,7 @@ local M = {
 	coop = true,
 	duration = 90,
 	controls = "MOVE left stick / keys   AIM right stick / auto   DASH A / action   PULSE B / secondary",
-	limits = { enemies = 220, shots = 600, hostile = 160, particles = 650, pickups = 36 },
+	limits = { enemies = 64, shots = 600, hostile = 160, particles = 650, pickups = 36 },
 }
 local specs = {
 	chaser = { hp = 1, r = 11, speed = 115, value = 10 },
@@ -58,23 +59,19 @@ function M.spawn(s, kind, x, y, delay)
 		return nil
 	end
 	local def = specs[kind]
-	local e =
-		{ kind = kind, x = x, y = y, hp = def.hp, r = def.r, phase = s.rng() * 6.28, warm = delay or 0.6, fire = 1.0
-			+ s.rng(), flash = 0 }
+	local e = {
+		kind = kind,
+		x = x,
+		y = y,
+		hp = def.hp,
+		r = def.r,
+		phase = s.rng() * 6.28,
+		warm = delay or 0.6,
+		fire = 1.0 + s.rng(),
+		flash = 0,
+	}
 	s.enemies[#s.enemies + 1] = e
 	return e
-end
-local function edgeSpawn(s, kind)
-	local side = s.rng(1, 4)
-	local x, y
-	if side <= 2 then
-		x = side == 1 and 72 or 1208
-		y = s.rng(174, 661)
-	else
-		x = s.rng(80, 1200)
-		y = side == 3 and 159 or 677
-	end
-	return M.spawn(s, kind, x, y, 0.7)
 end
 function M.new(players, rng)
 	local s = {
@@ -88,8 +85,14 @@ function M.new(players, rng)
 		rings = {},
 		sfx = {},
 		time = 0,
-		wave = 1,
-		spawnClock = 0,
+		wave = 0,
+		width = 1280,
+		height = 800,
+		wavePhase = "rest",
+		waveRest = 2,
+		waveClock = 0,
+		waveQueue = {},
+		waveName = "SWEEP",
 		teamScore = 0,
 		chain = 0,
 		comboTime = 0,
@@ -111,10 +114,21 @@ function M.new(players, rng)
 		p.revive = 0
 		p.score = 0
 	end
-	for _ = 1, 10 do
-		edgeSpawn(s, "chaser")
-	end
 	return s
+end
+-- Keep world units uniform while using the actual display aspect ratio.
+function M.resize(s, width, height)
+	local newWidth = 800 * width / math.max(1, height)
+	if math.abs(newWidth - s.width) < 0.01 then
+		return
+	end
+	local ratio = newWidth / s.width
+	for _, list in ipairs({ s.players, s.enemies, s.shots, s.hostile, s.pickups, s.particles, s.rings, s.waveQueue }) do
+		for _, v in ipairs(list) do
+			v.x = v.x * ratio
+		end
+	end
+	s.width = newWidth
 end
 function M.multiplier(s)
 	return math.min(5, 1 + math.floor(s.chain / 12))
@@ -223,11 +237,16 @@ local function shoot(s, p, dx, dy)
 			break
 		end
 		local x, y = dx * math.cos(a) - dy * math.sin(a), dx * math.sin(a) + dy * math.cos(a)
-		s.shots[#s.shots + 1] =
-			{ x = p.x + x * 15, y = p.y + y * 15, vx = x * 860, vy = y * 860, ttl = 1.35, owner = p, hits = p.power
-						== "pierce"
-					and 3
-				or 1, hit = {} }
+		s.shots[#s.shots + 1] = {
+			x = p.x + x * 15,
+			y = p.y + y * 15,
+			vx = x * 860,
+			vy = y * 860,
+			ttl = 1.35,
+			owner = p,
+			hits = p.power == "pierce" and 3 or 1,
+			hit = {},
+		}
 	end
 	sound(s, "shot")
 end
@@ -273,8 +292,8 @@ local function playerStep(s, p, c, dt)
 		dx, dy = p.dashX, p.dashY
 		speed = 920
 	end
-	p.x = U.clamp(p.x + dx * speed * dt, 76, 1204)
-	p.y = U.clamp(p.y + dy * speed * dt, 165, 673)
+	p.x = U.clamp(p.x + dx * speed * dt, 18, s.width - 18)
+	p.y = U.clamp(p.y + dy * speed * dt, 18, s.height - 18)
 	if c.secondary then
 		M.pulse(s, p)
 	end
@@ -310,14 +329,22 @@ end
 local function enemiesStep(s, dt)
 	for _, e in ipairs(s.enemies) do
 		if not e.dead then
-			e.warm = math.max(0, e.warm - dt)
+			if e.warm > 0 then
+				e.warm = math.max(0, e.warm - dt)
+				if e.warm == 0 then
+					local _, distance = nearest(s, e.x, e.y)
+					if distance < 80 ^ 2 then
+						e.warm = 0.15
+					end
+				end
+			end
 			e.flash = math.max(0, e.flash - dt)
 			local p = nearest(s, e.x, e.y)
 			if p and e.warm == 0 then
 				local dx, dy = p.x - e.x, p.y - e.y
 				local length = math.max(1, U.length(dx, dy))
 				dx, dy = dx / length, dy / length
-				local speed = specs[e.kind].speed * (1 + math.min(0.7, s.time * 0.005))
+				local speed = specs[e.kind].speed * (1 + math.min(0.30, math.max(0, s.wave - 1) * 0.035))
 				if e.kind == "weaver" then
 					local wave = math.sin(s.time * 5 + e.phase) * 0.85
 					dx, dy = dx - dy * wave, dy + dx * wave
@@ -385,7 +412,7 @@ local function shotsStep(s, dt)
 			end
 		end
 		b.x, b.y = x, y
-		if b.ttl <= 0 or b.hits == 0 or x < 55 or x > 1225 or y < 144 or y > 694 then
+		if b.ttl <= 0 or b.hits == 0 or x < -20 or x > s.width + 20 or y < -20 or y > s.height + 20 then
 			s.shots[i] = s.shots[#s.shots]
 			s.shots[#s.shots] = nil
 		end
@@ -402,7 +429,7 @@ local function shotsStep(s, dt)
 			end
 		end
 		b.x, b.y = x, y
-		if b.ttl <= 0 or x < 55 or x > 1225 or y < 144 or y > 694 then
+		if b.ttl <= 0 or x < -20 or x > s.width + 20 or y < -20 or y > s.height + 20 then
 			s.hostile[i] = s.hostile[#s.hostile]
 			s.hostile[#s.hostile] = nil
 		end
@@ -459,26 +486,7 @@ function M.update(s, dt, inputs)
 	if s.comboTime == 0 then
 		s.chain = 0
 	end
-	local wave = 1 + math.floor(s.time / 10)
-	if wave > s.wave then
-		s.wave = wave
-		for _ = 1, math.min(22, 8 + wave * 2) do
-			edgeSpawn(s, "weaver")
-		end
-	end
-	local rate = math.min(23, 5 + s.time * 0.18) * (1 + (#s.players - 1) * 0.35)
-	s.spawnClock = s.spawnClock + dt * rate
-	while s.spawnClock >= 1 do
-		s.spawnClock = s.spawnClock - 1
-		local n = s.rng()
-		edgeSpawn(
-			s,
-			s.time > 15 and n < 0.12 and "fort"
-				or s.time > 8 and n < 0.25 and "splitter"
-				or n < 0.48 and "weaver"
-				or "chaser"
-		)
-	end
+	Waves.update(s, dt, M.spawn)
 	for i, p in ipairs(s.players) do
 		playerStep(s, p, inputs[i], dt)
 	end
@@ -516,7 +524,7 @@ function M.describe(p)
 		.. (p.pulseClock == 0 and "READY" or math.ceil(p.pulseClock) .. "s")
 end
 function M.bot(s, p)
-	local dx, dy = (640 - p.x) * 0.001, (415 - p.y) * 0.001
+	local dx, dy = (s.width / 2 - p.x) * 0.001, (s.height / 2 - p.y) * 0.001
 	local nearby = 0
 	for _, e in ipairs(s.enemies) do
 		if not e.dead then

@@ -131,7 +131,11 @@ A/action dashes through danger with brief immunity (1.2-second cooldown).
 B/secondary clears nearby enemies and bullets (10-second cooldown).
 
 Chasers rush, weavers weave, splitters break into three shards, and forts shoot.
-New waves arrive every ten seconds; spawn rates increase with time and team size.
+Waves cycle through sweeps, pincers, corner attacks and crosswinds. Groups arrive
+2.2 seconds apart with 1.4-second warnings. Clear every enemy to earn a three-second
+break before the next wave. Counts increase gradually (up to 32 main enemies);
+weavers unlock at wave 3, splitters at 5 and forts at 7. Enemy speed rises modestly
+with wave number, capped at +30%. Warnings stay harmless while a player is too close.
 Kills build a shared multiplier up to x5; damage or a 2.5-second gap resets it.
 Pickups grant spread, piercing or rapid fire for nine seconds, or repair one HP.
 
@@ -144,7 +148,7 @@ are generated in code; there are no external art assets.
 Simulation tests cover swept bullet collisions, piercing, immunity, revives,
 team wipes, pulse cooldowns, splitters, pickups, aim deadzones and entity caps.
 A 270-second bot simulation exercises two, three and four players, with a
-220-enemy ceiling and bounded projectile/particle counts. Performance timing is
+64-enemy ceiling (including splitter shards) and bounded projectile/particle counts. Performance timing is
 reported for diagnosis, without a machine-dependent CI threshold.
 
 ## Presentation
@@ -152,8 +156,9 @@ reported for diagnosis, without a machine-dependent CI threshold.
 During play, games show a compact player/score/timer row and the arena. Titles,
 taglines, control bars and power-up legends stay off the playfield. The standalone
 selection screen shows the selected game's controls; full keyboard bindings and
-power-up details are documented above. Arenas enlarge without changing simulation
-coordinates or stretching their shapes. Neon Siege keeps a small shared combo
+power-up details are documented above. Other arenas enlarge without changing simulation
+coordinates or stretching their shapes. Neon Siege uses the full display as its
+arena, with no border or letterboxing, and adapts its world width to the display. Neon Siege keeps a small shared combo
 score below the arena and health indicators beside players.
 
 ## More games
