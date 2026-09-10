@@ -1,3 +1,4 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/87333478?s=200&v=4")]
 // This cfg_attr is needed because `rustdoc::all` includes lints not supported on stable
 #![cfg_attr(doc, allow(unknown_lints))]

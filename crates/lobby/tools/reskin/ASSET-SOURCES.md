@@ -85,3 +85,17 @@ stay white against the tinted skin.
   keep Fish Folk's naming. Those are identifiers, not media, so they carry no
   licence risk — but they should be renamed before the lobby is presented as
   ours.
+
+## PixelLab lobby preview (September 2026)
+
+The four player body and face sheets and `pixellab-tv.png` now use the reviewed
+PixelLab benchmark. These generated assets are not part of the Kenney CC0 pack.
+See `docs/art/pixellab-benchmark/README.md` for generation and rights provenance.
+Rebuild with `python crates/lobby/tools/reskin/build_pixellab.py` (Pillow).
+
+All outfits derive from character 1, recoloured to distinguish players. Walk is
+four frames. Rise, fall and crouch have explicit temporary pose mappings, and
+death uses a rotated standing pose. Sleep/wake frames occupy reserved cells but
+are not yet driven by presence transitions. The face remains a separate layer
+for the character studio. Floor tiles and room backgrounds are unchanged: the
+benchmark tiles require visual cleanup before they can replace the floor.

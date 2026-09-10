@@ -74,20 +74,8 @@ layers:
         fps: *fps
         repeat: false
       walk:
-        frames:
-          - idx: 14
-            offset: [0, 0]
-          - idx: 15
-            offset: [0, -1]
-          - idx: 16
-            offset: [0, -2]
-          - idx: 17
-            offset: [0, 0]
-          - idx: 18
-            offset: [0, -1]
-          - idx: 19
-            offset: [0, -2]
-        fps: *fps
+        frames: [{idx: 14}, {idx: 15}, {idx: 16}, {idx: 17}]
+        fps: 9
         repeat: true
       crouch:
         frames:
@@ -215,7 +203,7 @@ layers:
           - 30
   face:
     atlas: ./sharky-face.atlas.yaml
-    offset: [1, 8]
+    offset: [5, 5]
     animations:
       idle:
         fps: *fps

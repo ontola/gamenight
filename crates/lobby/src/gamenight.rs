@@ -3680,6 +3680,7 @@ fn sync_next_game_tv_system(
     mut commands: bevy::prelude::Commands,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
+    mut tv_texture: bevy::prelude::Local<Option<bevy::prelude::Handle<bevy::prelude::Image>>>,
     mut existing: bevy::prelude::Query<(
         bevy::prelude::Entity,
         &LobbyTv,
@@ -3784,6 +3785,10 @@ fn sync_next_game_tv_system(
 
     let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
     let cabinet = size + Vec2::splat(SCREEN_FRAME * 2.0);
+    // Keep the image alive while status changes replace the TV entity.
+    let texture = tv_texture.get_or_insert_with(||
+        asset_server.load("elements/environment/next_game/pixellab-tv.png")
+    ).clone();
 
     commands
         .spawn((
@@ -3796,7 +3801,15 @@ fn sync_next_game_tv_system(
             },
         ))
         .with_children(|parent| {
-            spawn_screen_slab(parent, cabinet, Color::rgb(0.071, 0.082, 0.235));
+            parent.spawn(SpriteBundle {
+                texture,
+                sprite: Sprite {
+                    custom_size: Some(cabinet + Vec2::new(12.0, 16.0)),
+                    ..default()
+                },
+                transform: Transform::from_xyz(0.0, -3.0, 0.0),
+                ..default()
+            });
             // State line: UP NEXT when ready, LOADING… while on its way.
             parent.spawn(Text2dBundle {
                 text: Text::from_section(
