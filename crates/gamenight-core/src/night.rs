@@ -202,6 +202,7 @@ pub struct GameNight {
     /// they have gone stale — the party keeps changing while a game warms,
     /// and a session prepared for one player must not be started for two.
     warm_seats: Vec<Seat>,
+    active_seats: Vec<Seat>,
     // Bounded tombstones for replies already in flight when Dispose is sent.
     retired_sessions: VecDeque<SessionId>,
     history: Vec<GameId>,
@@ -261,6 +262,7 @@ impl GameNight {
             active: None,
             warm: None,
             warm_seats: Vec::new(),
+            active_seats: Vec::new(),
             retired_sessions: VecDeque::new(),
             history: Vec::new(),
             vote: VoteBoard::default(),
@@ -652,6 +654,25 @@ impl GameNight {
     }
 
     fn on_overlay_closed(&mut self, fx: &mut Vec<Effect>) {
+        // Prepare is the roster boundary. Restart a paused round when seats
+        // changed, instead of resuming a game that cannot see the new player.
+        if let Some(active) = &self.active {
+            if self.overlay_open
+                && self.overlay_paused
+                && self.active_seats != self.seats_for(&active.game)
+            {
+                let index = active.playlist_index;
+                let fits = self.game_has_capacity(&active.game);
+                self.dispose_warm(fx);
+                self.dispose_active(fx);
+                self.next_up = fits.then_some(index);
+                self.pending_transition = true;
+                self.maybe_warm(fx);
+                self.try_transition(fx);
+                fx.push(Effect::StateChanged);
+                return;
+            }
+        }
         if self.overlay_open {
             self.overlay_open = false;
             // Only undo our own pause; an explicit pause stays paused.
@@ -804,6 +825,12 @@ impl GameNight {
     /// Make `game` the next one up. If it's already in the playlist, aim the
     /// warm slot at it; otherwise insert it right after the current entry.
     fn on_play_next(&mut self, game: GameId, fx: &mut Vec<Effect>) {
+        if !self.game_has_capacity(&game) {
+            fx.push(Effect::Reject {
+                reason: "this game cannot fit everyone in the party".into(),
+            });
+            return;
+        }
         let index = match self.playlist.position_of(&game) {
             Some(i) => i,
             None => {
@@ -1190,6 +1217,14 @@ impl GameNight {
     /// Whether `game`'s declared player range covers the current party.
     /// Games the shelf knows nothing about fit anything — see
     /// `GameMeta::fits_players`.
+    fn game_has_capacity(&self, game: &GameId) -> bool {
+        self.library
+            .iter()
+            .find(|m| &m.id == game)
+            .and_then(|m| m.max_players)
+            .is_none_or(|max| self.seated_count() <= max)
+    }
+
     fn game_fits_party(&self, game: &GameId) -> bool {
         let players = self.seated_count();
         self.library
@@ -1214,7 +1249,12 @@ impl GameNight {
     /// lobby game if rotation would otherwise land on it.
     fn warm_target(&self) -> Option<usize> {
         if let Some(index) = self.next_up {
-            if self.is_playable(index) {
+            if self.is_playable(index)
+                && self
+                    .playlist
+                    .get(index)
+                    .is_some_and(|e| self.game_has_capacity(&e.game))
+            {
                 return Some(index);
             }
             // An explicit pick somehow landed on the lobby game — fall
@@ -1224,7 +1264,13 @@ impl GameNight {
         let len = self.playlist.entries().len();
         let rotation: Vec<usize> = (0..len)
             .map(|offset| (start + offset) % len)
-            .filter(|&index| self.is_playable(index))
+            .filter(|&index| {
+                self.is_playable(index)
+                    && self
+                        .playlist
+                        .get(index)
+                        .is_some_and(|e| self.game_has_capacity(&e.game))
+            })
             .collect();
 
         // Prefer something the party can actually play. Rotation order still
@@ -1247,8 +1293,8 @@ impl GameNight {
                 .and_then(|e| self.library.iter().find(|m| m.id == e.game))
                 .map_or(0, |m| m.fit_distance(players))
         });
-        // Nothing fits: fall back to rotation rather than warming nothing at
-        // all. A slightly wrong game beats a lobby that can't start anything.
+        // Below the minimum, bots can fill missing seats. Above the maximum,
+        // entries were excluded: never leave a joined player out.
         fitting
             .first()
             .copied()
@@ -1272,6 +1318,12 @@ impl GameNight {
             self.maybe_warm(fx);
             return;
         };
+        if !self.game_has_capacity(&warm.game) {
+            self.dispose_warm(fx);
+            self.next_up = None;
+            self.maybe_warm(fx);
+            return;
+        }
         if self.warm_seats != self.seats_for(&warm.game) {
             // Same game, new seating: warm it again rather than hunt for a
             // better title. `maybe_warm` re-reads the seats.
@@ -1405,7 +1457,7 @@ impl GameNight {
             Some(w) if w.phase == SessionPhase::Ready => {
                 self.dispose_active(fx);
                 let mut next = self.warm.take().expect("checked");
-                self.warm_seats.clear();
+                self.active_seats = std::mem::take(&mut self.warm_seats);
                 next.advance(SessionPhase::Running)
                     .expect("ready -> running");
                 fx.push(Effect::ToGame {

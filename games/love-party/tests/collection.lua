@@ -130,3 +130,20 @@ do
 	input.bind({}, {})
 	print("PASS tank shoulder fire, independent aim, trigger deadzone and keyboard")
 end
+
+for count = 3, 4 do
+	local seats, identities, controls = {}, {}, {}
+	for i = 1, count do
+		identities[i] = { id = tostring(i), name = "Player " .. i }
+		seats[i] = { index = i - 1, occupant = { kind = "local", player_id = tostring(i) } }
+		controls[i] = { x = 0, y = 0, aimX = 1, aimY = 0, action = true }
+	end
+	local match = tank.new(U.players(seats, identities), U.rng(1))
+	assert(#match.players == count)
+	tank.update(match, 0.01, controls)
+	assert(#match.shots == count)
+	for i, shot in ipairs(match.shots) do
+		assert(shot.owner == match.players[i] and shot.owner.slot == i)
+	end
+end
+print("PASS all three/four managed tank seats fire independently")

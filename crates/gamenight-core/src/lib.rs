@@ -132,6 +132,63 @@ mod night_tests {
         }
     }
 
+    #[test]
+    fn three_players_never_warm_a_two_player_game() {
+        let mut night = GameNight::default();
+        let mut duo = meta("duo");
+        duo.max_players = Some(2);
+        let mut tank = meta("tank");
+        tank.max_players = Some(4);
+        night.set_library(vec![duo, tank]);
+        for name in ["one", "two", "three"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        for game in ["duo", "tank"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("duo"), entry("tank")],
+        });
+        let (game, session) = prepared_session(&fx).unwrap();
+        assert_eq!(game, GameId::new("tank"));
+        night.handle(Command::SessionReady { session });
+        let fx = night.handle(Command::PlayNext {
+            game: GameId::new("duo"),
+        });
+        assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("duo")],
+        });
+        assert!(prepared_session(&fx).is_none());
+        assert!(night.snapshot().warming.is_none());
+    }
+
+    #[test]
+    fn resume_reprepares_tanks_for_a_third_player() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("one", None, None));
+        night.handle(join_cmd("two", None, None));
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let (_, old) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: old });
+        night.handle(Command::OverlayOpened);
+        night.handle(join_cmd("three", None, None));
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(disposed_sessions(&fx).contains(&old));
+        let (_, fresh) = prepared_session(&fx).unwrap();
+        assert_ne!(fresh, old);
+        assert!(fx.iter().any(|effect| matches!(effect, Effect::ToGame { command: GameCommand::Prepare { seats, .. }, .. } if seats.iter().filter(|s| !s.occupant.is_empty()).count() == 3)));
+        night.handle(Command::SessionReady { session: fresh });
+        assert_eq!(night.snapshot().active_session.unwrap().id, fresh);
+    }
+
     /// The whole MVP evening: two games connect, playlist set, first game
     /// auto-starts, "Next" transitions instantly, the previous game is
     /// disposed and the following one warms.

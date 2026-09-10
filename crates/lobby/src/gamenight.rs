@@ -333,6 +333,8 @@ impl GameNightBridge {
                 **game != lobby
                     && Some(*game) != up_next.as_ref()
                     && Some(*game) != self.active_game()
+                    && self.latest_library.iter().find(|m| &m.id == *game)
+                        .is_none_or(|m| m.max_players.is_none_or(|max| self.latest_players.len() <= max as usize))
             })
             .cloned()
     }
