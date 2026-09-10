@@ -3662,7 +3662,7 @@ fn sync_next_game_tv_system(
             // the place the party looks when they wonder why nothing
             // happened, so it has to look disabled rather than broken.
             let (label, colour) = match button {
-                TvButton::Back => ("BACK", Color::rgb(0.26, 0.60, 0.44)),
+                TvButton::Back => ("RESUME", Color::rgb(0.26, 0.60, 0.44)),
                 TvButton::Start => ("START", Color::rgb(0.26, 0.60, 0.44)),
                 TvButton::Disabled => ("START", Color::rgb(0.24, 0.26, 0.30)),
             };
