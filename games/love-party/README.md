@@ -136,7 +136,7 @@ break before the next wave. Counts increase gradually (up to 32 main enemies);
 weavers unlock at wave 3, splitters at 5 and forts at 7. Enemy speed rises modestly
 with wave number, capped at +30%. Warnings stay harmless while a player is too close.
 Kills build a shared multiplier up to x5; damage or a 2.5-second gap resets it.
-Pickups grant spread, piercing or rapid fire for nine seconds, or repair one HP.
+Pickups permanently add spread, piercing or rapid fire for the current round, or repair one HP. Different upgrades combine; collecting the same type again does not multiply its effect. Upgrades survive revives and reset on a new round. Firing uses unlimited ammunition.
 
 Each player has three HP. Stay close to a fallen teammate for 1.2 seconds to
 revive them; they also return after six seconds if someone remains alive.

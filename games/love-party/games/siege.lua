@@ -110,7 +110,7 @@ function M.new(players, rng)
 		p.dashClock = 0
 		p.pulseClock = 0
 		p.aimX, p.aimY = 1, 0
-		p.power, p.powerTime = nil, 0
+		p.powers = {}
 		p.revive = 0
 		p.score = 0
 	end
@@ -237,7 +237,7 @@ function M.segmentHit(ax, ay, bx, by, cx, cy, r)
 	end
 end
 local function shoot(s, p, dx, dy)
-	local angles = p.power == "spread" and { -0.19, 0, 0.19 } or { 0 }
+	local angles = p.powers.spread and { -0.19, 0, 0.19 } or { 0 }
 	for _, a in ipairs(angles) do
 		if #s.shots >= M.limits.shots then
 			break
@@ -250,7 +250,7 @@ local function shoot(s, p, dx, dy)
 			vy = y * 860,
 			ttl = 1.35,
 			owner = p,
-			hits = p.power == "pierce" and 3 or 1,
+			hits = p.powers.pierce and 3 or 1,
 			hit = {},
 		}
 	end
@@ -260,10 +260,6 @@ local function playerStep(s, p, c, dt)
 	p.invul = math.max(0, p.invul - dt)
 	p.dashClock = math.max(0, p.dashClock - dt)
 	p.pulseClock = math.max(0, p.pulseClock - dt)
-	p.powerTime = math.max(0, p.powerTime - dt)
-	if p.powerTime == 0 then
-		p.power = nil
-	end
 	if not alive(p) then
 		p.downTime = p.downTime + dt
 		local helper = nearest(s, p.x, p.y)
@@ -331,7 +327,7 @@ local function playerStep(s, p, c, dt)
 	p.aimX, p.aimY = ax, ay
 	if p.fireClock <= 0 then
 		shoot(s, p, ax, ay)
-		p.fireClock = p.power == "rapid" and 0.045 or 0.095
+		p.fireClock = p.powers.rapid and 0.045 or 0.095
 	end
 end
 local function enemiesStep(s, dt)
@@ -472,8 +468,7 @@ local function effectsStep(s, dt)
 			if q.kind == "repair" then
 				p.hp = math.min(3, p.hp + 1)
 			else
-				p.power = q.kind
-				p.powerTime = 9
+				p.powers[q.kind] = true
 			end
 			q.ttl = 0
 			sound(s, "pickup")
@@ -527,7 +522,11 @@ function M.describe(p)
 	if p.hp == 0 then
 		return "DOWN / REVIVING"
 	end
-	return (p.power and p.power:upper() .. " " .. math.ceil(p.powerTime) .. "s" or "AUTO FIRE")
+	local active = {}
+	for _, kind in ipairs({ "spread", "pierce", "rapid" }) do
+		if p.powers[kind] then active[#active + 1] = kind:upper() end
+	end
+	return (#active > 0 and table.concat(active, " + ") or "UNLIMITED FIRE")
 		.. " / B "
 		.. (p.pulseClock == 0 and "READY" or math.ceil(p.pulseClock) .. "s")
 end

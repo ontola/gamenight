@@ -131,6 +131,16 @@ function M.draw(s, G, fonts, playerColor)
 				G.line(p.x, p.y, p.x - p.dashX * 48, p.y - p.dashY * 48)
 			end
 			tint(c)
+			local upgrades = {}
+			for _, kind in ipairs({ "spread", "pierce", "rapid" }) do
+				if p.powers[kind] then upgrades[#upgrades + 1] = kind:upper() end
+			end
+			if #upgrades > 0 then
+				G.setFont(fonts.small)
+				G.setColor(0.85, 1, 0.95)
+				G.printf(table.concat(upgrades, " + "), p.x - 110, p.y + 38, 220, "center")
+			end
+			tint(c)
 			for i = 1, p.hp do
 				G.circle("fill", p.x + (i - 2) * 7, p.y + 28, 2)
 			end

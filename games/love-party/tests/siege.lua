@@ -92,23 +92,33 @@ function tests.pulse_splitters_caps_and_cooldown()
 	end
 	assert(#s.enemies == M.limits.enemies)
 end
-function tests.powerups_expire_and_shots_do_not_hurt_friends()
+function tests.powerups_stack_for_round_and_shots_do_not_hurt_friends()
 	local s = fresh()
 	local p = s.players[1]
 	s.pickups = { { x = p.x, y = p.y, kind = "spread", ttl = 2 } }
 	tick(s)
-	assert(p.power == "spread")
+	assert(p.powers.spread)
 	s.shots = {}
 	p.fireClock = 0
 	M.update(s, 1 / 120, { { x = 0, y = 0, aimX = 1, aimY = 0 }, { x = 0, y = 0 } })
 	assert(#s.shots == 3)
-	p.powerTime = 0.001
-	tick(s)
-	assert(p.power == nil)
+	for _, kind in ipairs({ "pierce", "rapid", "spread" }) do
+		s.pickups = { { x = p.x, y = p.y, kind = kind, ttl = 2 } }
+		tick(s)
+	end
+	assert(p.powers.spread and p.powers.pierce and p.powers.rapid)
+	-- More than the former nine-second expiry; keep the arena empty for isolation.
+	for _ = 1, 1200 do s.enemies = {}; s.hostile = {}; tick(s) end
+	assert(p.powers.spread and p.powers.pierce and p.powers.rapid)
+	s.shots = {}; p.fireClock = 0
+	M.update(s, 1 / 120, { { x = 0, y = 0, aimX = 1, aimY = 0 }, { x = 0, y = 0 } })
+	assert(#s.shots == 3 and s.shots[1].hits == 3 and p.fireClock == 0.045)
 	p.invul = 0
 	s.shots = { { x = p.x - 25, y = p.y, vx = 6000, vy = 0, ttl = 1, hits = 1, hit = {}, owner = s.players[2] } }
 	tick(s)
 	assert(p.hp == 3)
+	M.new(s.players, U.rng(42))
+	assert(next(p.powers) == nil)
 end
 function tests.right_stick_is_independent_and_has_deadzone()
 	local input = require("shared.input")
