@@ -170,9 +170,10 @@ score below the arena and health indicators beside players.
 - **Paint Rush** (`paint-rush`): move to colour tiles and steal opponents' territory.
   A paints a diamond-shaped burst every four seconds. Your score is the number
   of tiles currently owned. Simultaneous claims leave a tile unchanged.
-- **Orbit Guard** (`orbit-guard`): cooperate to protect a five-hit core for 90
+- **Anticonception** (`orbit-guard`): cooperate to protect a five-hit egg for 90
   seconds. Left/right rotates your shield; A boosts rotation and B widens your
-  shield for one second (four-second cooldown). Interceptions earn 10 shared
+  shield for one second (four-second cooldown). Enemies spawn on the outer ring after a three-second grace period, with at least
+  two seconds to react before they reach the shields. Interceptions earn 10 shared
   points. Core destruction ends the match. Everyone shares the core's health.
 
 All three support 2–4 local players, shared keyboards, controllers and bots.

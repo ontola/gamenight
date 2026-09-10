@@ -60,8 +60,9 @@ function R.game(mode, s, remaining, finished, managed)
 	R.begin(mode.id == "neon-siege" and s.width or nil)
 	-- Keep world coordinates stable; enlarge the arena independently of the HUD.
 	G.push()
-	local zoom = mode.id == "blast-party" and 1.38
-		or (mode.id == "bumper-royale" or mode.id == "orbit-guard") and 1.23
+	local zoom = mode.id == "orbit-guard" and 1.0
+		or mode.id == "blast-party" and 1.38
+		or mode.id == "bumper-royale" and 1.23
 		or 1.065
 	if mode.id ~= "neon-siege" then
 		G.translate(640, 425)

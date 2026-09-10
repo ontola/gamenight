@@ -170,3 +170,20 @@ do
 	assert(#tank.new(roster(4), U.rng(1)).cover == 12, "fresh rounds rebuild cover")
 end
 print("PASS destructible tank cover blocks movement, absorbs shots and opens routes")
+
+do
+	local match = orbit.new(roster(3), U.rng(1))
+	local inputs = { idle[1], idle[2], idle[1] }
+	orbit.update(match, 3, inputs)
+	assert(#match.rocks == 0, "opening grace period")
+	for _ = 1, 150 do
+		orbit.update(match, 1 / 120, inputs)
+		if #match.rocks > 0 then
+			break
+		end
+	end
+	assert(#match.rocks == 1, "gentle first spawn")
+	assert(match.rocks[1].r > 295, "enemies spawn far outside the shield")
+	assert((300 - 187) / 55 > 2, "even the fastest enemy allows two seconds to react")
+end
+print("PASS Anticonception opening grace and distant spawns")

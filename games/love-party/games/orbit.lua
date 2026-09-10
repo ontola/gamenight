@@ -2,8 +2,8 @@ local U = require("shared.util")
 local A = require("shared.arena")
 local M = {
 	id = "orbit-guard",
-	title = "ORBIT GUARD",
-	tagline = "One core. Hold the circle.",
+	title = "ANTICONCEPTION",
+	tagline = "Protect the egg.",
 	controls = "ROTATE left / right   BOOST A   WIDE SHIELD B",
 	coop = true,
 	duration = 90,
@@ -18,7 +18,19 @@ function M.new(players, rng)
 		p.x = 640 + math.cos(p.angle) * 180
 		p.y = 417 + math.sin(p.angle) * 180
 	end
-	return { players = players, rng = rng, rocks = {}, time = 0, clock = 0, hp = 5, teamScore = 0, kills = 0, wave = 1, over = false, sfx = {} }
+	return {
+		players = players,
+		rng = rng,
+		rocks = {},
+		time = 0,
+		clock = -3,
+		hp = 5,
+		teamScore = 0,
+		kills = 0,
+		wave = 1,
+		over = false,
+		sfx = {},
+	}
 end
 local function difference(a, b)
 	return (a - b + math.pi) % (math.pi * 2) - math.pi
@@ -42,11 +54,11 @@ function M.update(s, dt, inputs)
 		p.x, p.y = 640 + math.cos(p.angle) * 180, 417 + math.sin(p.angle) * 180
 	end
 	s.clock = s.clock + dt
-	local interval = math.max(0.18, 0.85 - s.time * 0.006) / (1 + (#s.players - 2) * 0.2)
+	local interval = math.max(0.65, 1.2 - s.time * 0.004) / (1 + (#s.players - 2) * 0.1)
 	while s.clock >= interval do
 		s.clock = s.clock - interval
 		if #s.rocks < 80 then
-			s.rocks[#s.rocks + 1] = { angle = s.rng() * math.pi * 2, r = 245, speed = 55 + s.time * 0.55 }
+			s.rocks[#s.rocks + 1] = { angle = s.rng() * math.pi * 2, r = 300, speed = math.min(55, 38 + s.time * 0.18) }
 		end
 	end
 	for i = #s.rocks, 1, -1 do
@@ -56,7 +68,7 @@ function M.update(s, dt, inputs)
 		local blocked = false
 		if before >= 173 and rock.r <= 187 then
 			for _, p in ipairs(s.players) do
-				if math.abs(difference(rock.angle, p.angle)) < (p.wide > 0 and 0.48 or 0.19) then
+				if math.abs(difference(rock.angle, p.angle)) < (p.wide > 0 and 0.55 or 0.25) then
 					blocked = true
 					break
 				end
@@ -93,10 +105,12 @@ end
 function M.draw(s, g, fonts, color)
 	g.setLineWidth(1)
 	g.setColor(0.12, 0.18, 0.24)
-	g.circle("line", 640, 417, 245)
+	g.circle("line", 640, 417, 300)
 	g.circle("line", 640, 417, 180)
-	g.setColor(0.3, 0.85, 0.75)
-	g.circle("fill", 640, 417, 25)
+	g.setColor(0.98, 0.9, 0.74)
+	g.ellipse("fill", 640, 417, 25, 31)
+	g.setColor(1, 0.98, 0.9)
+	g.ellipse("fill", 634, 425, 8, 11)
 	for i = 1, s.hp do
 		local a = i * math.pi * 2 / 5
 		g.circle("fill", 640 + math.cos(a) * 38, 417 + math.sin(a) * 38, 3)
@@ -112,7 +126,7 @@ function M.draw(s, g, fonts, color)
 	for _, p in ipairs(s.players) do
 		g.setColor(color(p))
 		g.setLineWidth(9)
-		local width = p.wide > 0 and 0.48 or 0.19
+		local width = p.wide > 0 and 0.55 or 0.25
 		g.arc("line", "open", 640, 417, 180, p.angle - width, p.angle + width)
 	end
 end
