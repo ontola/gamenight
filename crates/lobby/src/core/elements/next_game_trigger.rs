@@ -221,6 +221,7 @@ fn update(
         for (_, (idx, body, transform)) in
             entities.iter_with((&player_indexes, &bodies, &transforms))
         {
+            if bridge.seat_sleeping(idx.0) { continue; }
             let x = transform.translation.x;
             let feet = body.bounding_box(*transform);
             if body.is_on_ground

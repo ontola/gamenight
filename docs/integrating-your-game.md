@@ -802,3 +802,10 @@ discovery will surface first.
 
 If your game boots into gameplay before anyone puts their drink down, you've
 nailed it.
+
+### AFK and instant join
+
+Opt into [player participation](protocol.md#player-activity-sleep-and-joining-during-play)
+after Prepare. Report real controller input and handle `party_updated` for warning,
+sleep, and wake states. Set `instant_join:true` only when you can insert players into
+a running round without resetting it. Player IDs and controller bindings survive sleep.

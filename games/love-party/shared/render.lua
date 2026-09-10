@@ -150,6 +150,10 @@ function R.game(mode, s, remaining, finished, managed)
 			name = name:sub(1, require("utf8").offset(name, -1) - 1)
 		end
 		G.print(name, x + 15, 22)
+		if p.presence == "sleeping" or p.presence == "warning" then
+			G.setColor(p.presence == "warning" and { 1, 0.75, 0.3 } or { 0.6, 0.65, 0.75 })
+			G.print(p.presence == "sleeping" and "zZz Sleeping" or "Move to stay awake", x + 15, 43)
+		end
 		G.setColor(0.7, 0.75, 0.8)
 		G.printf(
 			mode.coop and (p.hp == 0 and "down" or string.rep("·", p.hp)) or tostring(math.floor(p.score)),

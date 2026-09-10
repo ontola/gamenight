@@ -6,7 +6,7 @@
 //! [`Command`]s and executes the returned [`Effect`]s. That keeps every
 //! transition rule unit-testable.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use gamenight_protocol::{
     GameId, GameMeta, GameSettings, InstallState, InstallStatus, MediaAction, NowPlaying,
@@ -21,6 +21,20 @@ use crate::vote::VoteBoard;
 /// Everything that can happen to the night, from any source.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
+    Participation {
+        game: GameId,
+        session: SessionId,
+        instant_join: bool,
+    },
+    ControllerInput {
+        game: Option<GameId>,
+        session: Option<SessionId>,
+        controller: String,
+    },
+    PresenceTick {
+        elapsed: std::time::Duration,
+    },
+
     /// A game process for this title connected to the daemon.
     GameConnected {
         game: GameId,
@@ -148,6 +162,12 @@ pub enum Command {
 /// A lifecycle command the daemon must deliver to a game process.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameCommand {
+    PartyUpdated {
+        seats: Vec<Seat>,
+        players: Vec<Player>,
+        presence: Vec<gamenight_protocol::PlayerPresence>,
+    },
+
     Prepare {
         seats: Vec<Seat>,
         players: Vec<Player>,
@@ -198,6 +218,8 @@ pub enum Effect {
 #[derive(Debug)]
 pub struct GameNight {
     players: Vec<Player>,
+    presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
+    participation: HashMap<SessionId, bool>,
     seats: Vec<Seat>,
     playlist: Playlist,
     connected_games: HashSet<GameId>,
@@ -257,6 +279,8 @@ impl GameNight {
     pub fn new(seat_count: u8) -> Self {
         Self {
             players: Vec::new(),
+            presence: HashMap::new(),
+            participation: HashMap::new(),
             seats: (0..seat_count)
                 .map(|index| Seat {
                     index,
@@ -365,6 +389,31 @@ impl GameNight {
     pub fn handle(&mut self, command: Command) -> Vec<Effect> {
         let mut fx = Vec::new();
         match command {
+            Command::Participation {
+                game,
+                session,
+                instant_join,
+            } => {
+                if self
+                    .active
+                    .iter()
+                    .chain(self.warm.iter())
+                    .any(|s| s.id == session && s.game == game)
+                {
+                    self.participation.insert(session, instant_join);
+                    self.send_participation(&mut fx);
+                } else {
+                    fx.push(Effect::Reject {
+                        reason: "stale participation session".into(),
+                    });
+                }
+            }
+            Command::ControllerInput {
+                game,
+                session,
+                controller,
+            } => self.on_controller_input(game, session, controller, &mut fx),
+            Command::PresenceTick { elapsed } => self.tick_presence(elapsed, &mut fx),
             Command::GameConnected { game } => {
                 let is_lobby = self.lobby_game.as_ref() == Some(&game);
                 self.connected_games.insert(game);
@@ -412,6 +461,10 @@ impl GameNight {
                     .find(|s| s.occupant.player_id() == Some(player_id))
                 {
                     seat.controller = Some(controller);
+                    self.presence.entry(player_id).or_insert((
+                        std::time::Duration::ZERO,
+                        gamenight_protocol::PresenceState::Active,
+                    ));
                     self.rewarm_if_misfit(&mut fx);
                     fx.push(Effect::StateChanged);
                 } else {
@@ -500,8 +553,180 @@ impl GameNight {
                 self.on_set_setting(game, key, value, &mut fx)
             }
         }
+        if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
+            self.presence
+                .retain(|id, _| self.players.iter().any(|p| p.id == *id));
+            let sessions: HashSet<_> = self
+                .active
+                .iter()
+                .chain(self.warm.iter())
+                .map(|s| s.id)
+                .collect();
+            self.participation.retain(|id, _| sessions.contains(id));
+            self.send_participation(&mut fx);
+        }
         self.sync_lobby_focus(&mut fx);
         fx
+    }
+
+    fn presence_snapshot(&self) -> Vec<gamenight_protocol::PlayerPresence> {
+        self.players
+            .iter()
+            .filter_map(|p| {
+                self.presence
+                    .get(&p.id)
+                    .map(|(_, state)| gamenight_protocol::PlayerPresence {
+                        player_id: p.id,
+                        state: *state,
+                    })
+            })
+            .collect()
+    }
+
+    fn send_participation(&mut self, fx: &mut Vec<Effect>) {
+        for session in self.active.iter().chain(self.warm.iter()) {
+            if let Some(instant_join) = self.participation.get(&session.id) {
+                // Non-opted-in games keep their prepared roster until next round.
+                let live = *instant_join;
+                let active = self.active.as_ref().is_some_and(|s| s.id == session.id);
+                fx.push(Effect::ToGame {
+                    game: session.game.clone(),
+                    session: session.id,
+                    command: GameCommand::PartyUpdated {
+                        seats: if live {
+                            self.seats_for(&session.game)
+                        } else if active {
+                            self.active_seats.clone()
+                        } else {
+                            self.warm_seats.clone()
+                        },
+                        players: self.players.clone(),
+                        presence: self.presence_snapshot(),
+                    },
+                });
+            }
+        }
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|s| self.participation.get(&s.id) == Some(&true))
+        {
+            self.active_seats = self.seats_for(&self.active.as_ref().unwrap().game);
+            self.active_players = self.players.clone();
+        }
+    }
+
+    fn on_controller_input(
+        &mut self,
+        game: Option<GameId>,
+        session: Option<SessionId>,
+        controller: String,
+        fx: &mut Vec<Effect>,
+    ) {
+        // Only the foreground session may report input; warm games cannot wake
+        // or join players. Controller identifiers stay bounded and canonical.
+        let Some(ordinal) = controller
+            .strip_prefix("ordinal:")
+            .and_then(|v| v.parse::<u8>().ok())
+        else {
+            return;
+        };
+        let controller = format!("ordinal:{ordinal}");
+        if let Some(game) = game {
+            if !self.active.as_ref().is_some_and(|s| {
+                Some(s.id) == session
+                    && s.game == game
+                    && s.phase == SessionPhase::Running
+                    && !self.overlay_open
+                    && self.participation.contains_key(&s.id)
+            }) {
+                return;
+            }
+        } else if session.is_some() {
+            return;
+        }
+        let mut player = self
+            .seats
+            .iter()
+            .find(|s| s.controller.as_deref() == Some(&controller))
+            .and_then(|s| s.occupant.player_id());
+        if player.is_none() {
+            let can_join = self.active.as_ref().is_some_and(|s| {
+                s.phase == SessionPhase::Running
+                    && !self.overlay_open
+                    && (self.participation.get(&s.id) != Some(&true)
+                        || self
+                            .library
+                            .iter()
+                            .find(|m| m.id == s.game)
+                            .and_then(|m| m.max_players)
+                            .map_or(true, |max| self.seated_count() < max))
+            });
+            if !can_join {
+                return;
+            }
+            let Some(index) = self
+                .seats
+                .iter()
+                .find(|s| s.occupant.is_empty())
+                .map(|s| s.index)
+            else {
+                return;
+            };
+            self.on_join(
+                format!("Player {}", index + 1),
+                Some(index),
+                None,
+                None,
+                Vec::new(),
+                fx,
+            );
+            let seat = &mut self.seats[index as usize];
+            seat.controller = Some(controller);
+            player = seat.occupant.player_id();
+            self.rewarm_if_misfit(fx);
+        }
+        if let Some(id) = player {
+            use gamenight_protocol::PresenceState::Active;
+            let previous = self
+                .presence
+                .insert(id, (std::time::Duration::ZERO, Active));
+            if previous.is_none_or(|(_, state)| state != Active) {
+                fx.push(Effect::StateChanged);
+            }
+        }
+    }
+
+    fn tick_presence(&mut self, elapsed: std::time::Duration, fx: &mut Vec<Effect>) {
+        // Legacy games cannot report activity, so their matches do not age AFK
+        // clocks. Paused matches also leave the party's clocks alone.
+        if !self.overlay_open
+            && self.active.as_ref().is_some_and(|s| {
+                s.phase != SessionPhase::Running || !self.participation.contains_key(&s.id)
+            })
+        {
+            return;
+        }
+        use gamenight_protocol::PresenceState::*;
+        let mut changed = false;
+        for (idle, state) in self.presence.values_mut() {
+            *idle = idle.saturating_add(elapsed);
+            let next = if idle.as_secs() >= 75 {
+                Sleeping
+            } else if idle.as_secs() >= 60 {
+                Warning
+            } else {
+                Active
+            };
+            changed |= next != *state;
+            *state = next;
+        }
+        if changed {
+            fx.push(Effect::StateChanged);
+            if let Some(decision) = self.vote.reevaluate(&self.voters()) {
+                self.apply_vote_decision(decision, fx);
+            }
+        }
     }
 
     /// Notifies the lobby game whenever whether it has the couch's
@@ -532,6 +757,7 @@ impl GameNight {
 
     pub fn snapshot(&self) -> PartySnapshot {
         PartySnapshot {
+            presence: self.presence_snapshot(),
             players: self.players.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.snapshot(),
@@ -586,6 +812,12 @@ impl GameNight {
         self.seats
             .iter()
             .filter_map(|s| s.occupant.player_id())
+            .filter(|id| {
+                !self
+                    .presence
+                    .get(id)
+                    .is_some_and(|(_, state)| *state == gamenight_protocol::PresenceState::Sleeping)
+            })
             .collect()
     }
 

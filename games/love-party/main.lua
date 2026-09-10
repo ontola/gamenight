@@ -17,6 +17,7 @@ local Audio = require("shared.audio")
 local state, bridge, mode, remaining, finished, accumulator
 local selected, count, menu = 1, 2, true
 local managed = os.getenv("GAMENIGHT") == "1"
+local activityClock, activitySent = 0, {}
 local duration = tonumber(os.getenv("GNLOVE_MATCH_SECONDS"))
 if duration then
 	duration = U.clamp(duration, 1, 600)
@@ -93,6 +94,13 @@ function love.load(args)
 					Screen.show()
 				end,
 				prepare = prepare,
+				instantJoin = mode.join ~= nil,
+				party = function(seats, players, presence)
+					if state then
+						local roster = require("shared.participation").apply(mode, state, seats, players, presence)
+						Input.bind(roster, pads())
+					end
+				end,
 				dispose = function()
 					state = nil
 					Input.bind({}, {})
@@ -114,6 +122,15 @@ function love.update(dt)
 	end
 	if bridge then
 		bridge:update()
+		activityClock = activityClock + dt
+		if bridge.phase == "running" then
+			for i, pad in ipairs(pads()) do
+				if Input.meaningful(pad) and (not activitySent[i] or activityClock - activitySent[i] >= 1) then
+					bridge:activity("ordinal:" .. (i - 1))
+					activitySent[i] = activityClock
+				end
+			end
+		end
 	end
 	if not state or finished or (bridge and bridge.phase ~= "running") then
 		return
@@ -125,7 +142,8 @@ function love.update(dt)
 	while accumulator >= 1 / 120 and not finished do
 		local inputs = {}
 		for i, p in ipairs(state.players) do
-			inputs[i] = p.bot and mode.bot(state, p) or Input.sample(p.slot, mode.fireWithShoulder)
+			inputs[i] = (p.bot or p.presence == "sleeping") and mode.bot(state, p)
+				or Input.sample(p.slot, mode.fireWithShoulder)
 		end
 		local before = {}
 		for i, p in ipairs(state.players) do

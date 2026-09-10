@@ -17,9 +17,18 @@ function Lifecycle:receive(m)
 		self.session = m.session
 		self.hooks.prepare(m.seats or {}, m.players or {})
 		self.phase = "ready"
+		if self.hooks.party then
+			self.transport:send({
+				type = "participation",
+				session = self.session,
+				instant_join = self.hooks.instantJoin == true,
+			})
+		end
 		self.transport:send({ type = "ready", session = self.session })
 	elseif self.session and m.session == self.session then
-		if m.type == "start" and self.phase == "ready" then
+		if m.type == "party_updated" and self.hooks.party then
+			self.hooks.party(m.seats or {}, m.players or {}, m.presence or {})
+		elseif m.type == "start" and self.phase == "ready" then
 			self.phase = "running"
 			self.hooks.show()
 		elseif m.type == "pause" and (self.phase == "running" or self.phase == "finished") then
@@ -49,6 +58,11 @@ function Lifecycle:finish()
 		self.phase = "finished"
 		self.hooks.hide()
 		self.transport:send({ type = "finished", session = self.session })
+	end
+end
+function Lifecycle:activity(controller)
+	if self.phase == "running" and self.session then
+		self.transport:send({ type = "controller_input", session = self.session, controller = controller })
 	end
 end
 function Lifecycle:back()

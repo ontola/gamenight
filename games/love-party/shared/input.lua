@@ -106,4 +106,37 @@ function M.sample(slot, fireWithShoulder)
 		autoAim = M.keyboardOnly[slot] == true,
 	}
 end
+-- Read physical devices directly, including unassigned controllers. Stick drift
+-- and idle trigger values must not create players or keep them awake.
+function M.meaningful(pad)
+	if not pad:isConnected() or not pad:isGamepad() then
+		return false
+	end
+	for _, axis in ipairs({ "leftx", "lefty", "rightx", "righty" }) do
+		if math.abs(pad:getGamepadAxis(axis)) > 0.25 then
+			return true
+		end
+	end
+	for _, axis in ipairs({ "triggerleft", "triggerright" }) do
+		if pad:getGamepadAxis(axis) > 0.25 then
+			return true
+		end
+	end
+	return pad:isGamepadDown(
+		"a",
+		"b",
+		"x",
+		"y",
+		"start",
+		"back",
+		"leftshoulder",
+		"rightshoulder",
+		"leftstick",
+		"rightstick",
+		"dpup",
+		"dpdown",
+		"dpleft",
+		"dpright"
+	)
+end
 return M

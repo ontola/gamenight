@@ -162,6 +162,21 @@ pub struct Player {
     pub library: Vec<GameId>,
 }
 
+/// Presence is separate from identity: sleeping never releases a seat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceState {
+    Active,
+    Warning,
+    Sleeping,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerPresence {
+    pub player_id: PlayerId,
+    pub state: PresenceState,
+}
+
 /// Who (or what) fills a seat. Games receive seats, never raw controller ids.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -545,6 +560,8 @@ pub struct GameSettings {
 /// The one big object overlays render from. Sent whenever anything changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartySnapshot {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub presence: Vec<PlayerPresence>,
     pub players: Vec<Player>,
     pub seats: Vec<Seat>,
     pub playlist: PlaylistSnapshot,
@@ -643,6 +660,19 @@ pub enum Role {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
+    /// Opt into presence and live roster notifications for this prepared session.
+    Participation {
+        session: SessionId,
+        instant_join: bool,
+    },
+    /// Meaningful human input (deadzone filtered, at most once a second per device).
+    /// Games must supply their active session. Overlays omit it.
+    ControllerInput {
+        #[serde(default)]
+        session: Option<SessionId>,
+        controller: String,
+    },
+
     /// Must be the first message on every connection.
     Hello {
         role: Role,
@@ -805,6 +835,15 @@ pub enum ClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
+    /// Full authoritative roster/presence for an opted-in session. Apply without
+    /// resetting the match. Unknown fields/messages remain optional for old games.
+    PartyUpdated {
+        session: SessionId,
+        seats: Vec<Seat>,
+        players: Vec<Player>,
+        presence: Vec<PlayerPresence>,
+    },
+
     /// Reply to `hello`.
     Welcome {
         protocol_version: u32,

@@ -116,6 +116,12 @@ function M.new(players, rng)
 	end
 	return s
 end
+-- Instant join uses a fresh pilot only; the arena, wave and team score survive.
+function M.join(s, player)
+	local pilot = M.new({ player }, s.rng).players[1]
+	pilot.x, pilot.y = s.width / 2, s.height / 2
+	pilot.invul = 3
+end
 -- Keep world units uniform while using the actual display aspect ratio.
 function M.resize(s, width, height)
 	local newWidth = 800 * width / math.max(1, height)

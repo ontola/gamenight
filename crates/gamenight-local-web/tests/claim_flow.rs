@@ -950,3 +950,87 @@ async fn web_reorder_broadcasts_the_new_up_next_to_the_lobby() {
     .await
     .expect("playlist update must reach the lobby promptly");
 }
+
+#[tokio::test]
+async fn opted_in_game_receives_a_new_controller_without_a_new_session() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let addr = start_daemon().await;
+        let mut overlay = Watcher::connect(&addr).await;
+        let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .unwrap();
+        game.send(Message::Text(
+            ClientMessage::Hello {
+                role: Role::Game,
+                game: Some(GameId::new("arena")),
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        overlay.wait_for(|p| !p.connected_games.is_empty()).await;
+        overlay
+            .ws
+            .send(Message::Text(
+                ClientMessage::SetPlaylist {
+                    entries: vec![PlaylistEntry {
+                        game: GameId::new("arena"),
+                        title: "Arena".into(),
+                    }],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        let party = overlay.wait_for(|p| p.warm_session.is_some()).await;
+        let session = party.warm_session.unwrap().id;
+        game.send(Message::Text(
+            ClientMessage::Participation {
+                session,
+                instant_join: true,
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        game.send(Message::Text(ClientMessage::Ready { session }.to_json()))
+            .await
+            .unwrap();
+        overlay.wait_for(|p| p.active_session.is_some()).await;
+        game.send(Message::Text(
+            ClientMessage::ControllerInput {
+                session: Some(session),
+                controller: "ordinal:2".into(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        let party = overlay.wait_for(|p| p.players.len() == 1).await;
+        let player = party.players[0].id;
+        assert_eq!(party.active_session.unwrap().id, session);
+        assert_eq!(party.seats[0].controller.as_deref(), Some("ordinal:2"));
+        loop {
+            if let Message::Text(text) = game.next().await.unwrap().unwrap() {
+                if let ServerMessage::PartyUpdated {
+                    session: update,
+                    players,
+                    presence,
+                    ..
+                } = serde_json::from_str(&text).unwrap()
+                {
+                    if players.len() == 1 {
+                        assert_eq!(update, session);
+                        assert_eq!(players[0].id, player);
+                        assert_eq!(presence[0].player_id, player);
+                        break;
+                    }
+                }
+            }
+        }
+    })
+    .await
+    .expect("live join must reach the running game promptly");
+}

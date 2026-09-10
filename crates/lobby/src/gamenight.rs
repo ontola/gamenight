@@ -135,6 +135,7 @@ pub struct GameNightBridge {
     /// (sent by name) back to the pad that sent it. See
     /// `GlobalInput::reconcile_joins`.
     pub latest_players: Vec<Player>,
+    latest_presence: Vec<gamenight_protocol::PlayerPresence>,
     /// Which gilrs gamepad index actually joined each player — written by
     /// `global_input_system` once a join is confirmed, read by
     /// `match_plugin_for_seats` so a seated player is controlled by the pad
@@ -361,6 +362,11 @@ impl GameNightBridge {
     /// Three genuinely different situations, which the TV must not conflate:
     /// a game ready to go, a game on its way, and an empty shelf. Saying
     /// "Nothing queued" for the middle one is a lie that looks like a bug.
+    pub fn seat_sleeping(&self, index: u32) -> bool {
+        self.latest_seats.iter().find(|s| s.index as u32 == index).and_then(|s| s.occupant.player_id())
+            .is_some_and(|id| self.latest_presence.iter().any(|p| p.player_id == id && p.state == gamenight_protocol::PresenceState::Sleeping))
+    }
+
     pub fn next_game_status(&self) -> NextGameStatus {
         if let Some(active) = self.active_session.as_ref().filter(|s| matches!(s.phase, gamenight_protocol::SessionPhase::Running | gamenight_protocol::SessionPhase::Paused)) {
             return NextGameStatus::Live {
@@ -557,6 +563,7 @@ pub fn game_plugin(game: &mut Game) {
         lobby_rebuild_at: None,
         lobby_away: false,
         latest_players: Vec::new(),
+        latest_presence: Vec::new(),
         player_gamepad: default(),
         pads_connected: 0,
         latest_library: Vec::new(),
@@ -660,6 +667,7 @@ fn gamenight_bridge_system(
             bridge.latest_seats = party.seats;
             bridge.lobby_rebuild_at = Some(std::time::Instant::now() + LOBBY_REBUILD_DEBOUNCE);
         }
+        bridge.latest_presence = party.presence;
         bridge.latest_players = party.players;
         bridge.latest_library = party.library;
         bridge.latest_warm = party.warm_session;
@@ -753,6 +761,7 @@ fn gamenight_bridge_system(
             // jumpy doesn't declare any match settings (see `declare_settings`
             // in the SDK) — the daemon can't send changes for settings that
             // were never declared, so this never actually fires.
+            GameEvent::PartyUpdated { .. } => {}
             GameEvent::SettingChanged { .. } => {}
             GameEvent::LobbyFocus { active } => {
                 info!(active, "gamenight: lobby focus changed");
@@ -1650,6 +1659,9 @@ fn global_input_system(
     >,
     keys: bevy::prelude::Res<bevy::prelude::Input<bevy::prelude::KeyCode>>,
     gamepads: bevy::prelude::Res<bevy::input::gamepad::Gamepads>,
+    buttons: bevy::prelude::Res<bevy::prelude::Input<bevy::input::gamepad::GamepadButton>>,
+    axes: bevy::prelude::Res<bevy::prelude::Axis<bevy::input::gamepad::GamepadAxis>>,
+    mut activity_sent: bevy::prelude::Local<std::collections::HashMap<usize, std::time::Instant>>,
 ) {
     {
         // Bones has only per-frame gamepad *events*, no list of what is plugged
@@ -1661,6 +1673,35 @@ fn global_input_system(
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (bridge.latest_players.clone(), bridge.join_tx.clone())
     };
+    // Held input counts as activity; neutral sticks and connection events do not.
+    let mut connected: Vec<_> = gamepads.iter().collect();
+    connected.sort_by_key(|g| g.id);
+    for (ordinal, pad) in connected.iter().enumerate() {
+        use bevy::input::gamepad::{GamepadAxis, GamepadAxisType};
+        let held = buttons.get_pressed().any(|b| b.gamepad == *pad)
+            || [GamepadAxisType::LeftStickX, GamepadAxisType::LeftStickY,
+                GamepadAxisType::RightStickX, GamepadAxisType::RightStickY]
+                .iter().any(|axis| axes.get(GamepadAxis::new(*pad, *axis)).unwrap_or(0.0).abs() > 0.25);
+        if held && activity_sent.get(&pad.id).is_none_or(|at| at.elapsed().as_secs_f32() >= 1.0) {
+            let _ = join_tx.try_send(ClientMessage::ControllerInput { session: None, controller: format!("ordinal:{ordinal}") });
+            activity_sent.insert(pad.id, std::time::Instant::now());
+        }
+    }
+    // A game can have claimed a new controller while the lobby was hidden.
+    // Reconcile by controller identity, never a generated display name.
+    {
+        let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
+        for seat in bridge.latest_seats.clone() {
+            if let (Some(id), Some(ordinal)) = (seat.occupant.player_id(), seat.controller.as_deref()
+                .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
+                if let Some(pad) = connected.get(ordinal) {
+                    input.joined_pads.insert(pad.id as u32);
+                    input.pad_player.insert(pad.id as u32, id);
+                    bridge.player_gamepad.insert(id, pad.id as u32);
+                }
+            }
+        }
+    }
     input.reconcile_joins(&seated);
 
     // Show out anybody who walked into the exit doorway. Drained here rather
@@ -1824,8 +1865,9 @@ fn global_input_system(
         .filter(|ev| ev.value.abs() > AXIS_JOIN_DEADZONE)
         .map(|ev| ev.gamepad)
         .collect();
+    let lobby_available = !bones_game.0.shared_resource::<GameNightBridge>().lobby_away;
     for pad in axis_join_pads {
-        if !input.joined_pads.contains(&pad) {
+        if lobby_available && !input.joined_pads.contains(&pad) {
             input.join_pad(pad, &seated, &join_tx);
         }
     }
@@ -1856,7 +1898,7 @@ fn global_input_system(
                 }
             }
 
-            _ if !input.joined_pads.contains(&id) => input.join_pad(id, &seated, &join_tx),
+            _ if !input.joined_pads.contains(&id) => { if lobby_available { input.join_pad(id, &seated, &join_tx); } },
             GamepadButton::Start => {
                 // Start opens a player's lobby menu — but only Start, and
                 // only out here.
@@ -2639,9 +2681,18 @@ fn sync_name_tags_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (seats, seated) = {
+    let (seats, seated, presence) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
-        (bridge.latest_seats.clone(), bridge.latest_players.clone())
+        (bridge.latest_seats.clone(), bridge.latest_players.clone(), bridge.latest_presence.clone())
+    };
+
+    let label = |id| {
+        let name = name_of(&seated, id);
+        match presence.iter().find(|p| p.player_id == id).map(|p| p.state) {
+            Some(gamenight_protocol::PresenceState::Sleeping) => format!("{name}  zZz"),
+            Some(gamenight_protocol::PresenceState::Warning) => format!("{name}  — move to stay awake"),
+            _ => name,
+        }
     };
 
     // Drop tags whose player left, or whose name has since changed — the
@@ -2650,7 +2701,7 @@ fn sync_name_tags_system(
         let current = seats
             .iter()
             .any(|s| s.occupant.player_id() == Some(*player_id))
-            .then(|| name_of(&seated, *player_id));
+            .then(|| label(*player_id));
         if current.as_deref() != Some(shown.as_str()) {
             commands.entity(entity).despawn_recursive();
         }
@@ -2666,7 +2717,7 @@ fn sync_name_tags_system(
         let Some(player_id) = seat.occupant.player_id() else {
             continue;
         };
-        let name = name_of(&seated, player_id);
+        let name = label(player_id);
         if tags
             .iter()
             .any(|(_, tag)| tag.0 == player_id && tag.1 == name)
@@ -4132,6 +4183,7 @@ mod next_game_status_tests {
             lobby_rebuild_at: None,
         lobby_away: false,
             latest_players: Vec::new(),
+        latest_presence: Vec::new(),
             player_gamepad: default(),
             pads_connected: 0,
             latest_library: Vec::new(),

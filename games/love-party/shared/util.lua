@@ -28,6 +28,7 @@ function M.players(seats, identities)
 			end
 			out[#out + 1] = {
 				slot = seat.index + 1,
+				id = seat.occupant.player_id,
 				name = name,
 				bot = seat.occupant.kind == "ai",
 				color = color,

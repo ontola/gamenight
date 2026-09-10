@@ -10,6 +10,91 @@ local function equal(a, b)
 	assert(a == b, tostring(a) .. " ~= " .. tostring(b))
 end
 local tests = {}
+function tests.participation()
+	local mode = require("games.siege")
+	local seats = { { index = 0, occupant = { kind = "local", player_id = "one" }, controller = "ordinal:1" } }
+	local ids = { { id = "one", name = "One" }, { id = "two", name = "Two" } }
+	local state = mode.new(U.players(seats, ids), U.rng(1))
+	state.wave, state.teamScore = 7, 123
+	state.players[1].score = 42
+	local original = state.players[1]
+	seats[2] = { index = 1, occupant = { kind = "local", player_id = "two" }, controller = "ordinal:0" }
+	local apply = require("shared.participation").apply
+	apply(mode, state, seats, ids, { { player_id = "one", state = "sleeping" } })
+	equal(#state.players, 2)
+	equal(state.players[1], original)
+	equal(original.score, 42)
+	equal(original.presence, "sleeping")
+	equal(state.wave, 7)
+	equal(state.teamScore, 123)
+	equal(state.players[2].hp, 3)
+	equal(state.players[2].invul, 3)
+	apply(mode, state, seats, ids, { { player_id = "one", state = "active" } })
+	equal(#state.players, 2)
+	equal(original.presence, "active")
+	equal(original.score, 42)
+end
+function tests.activity_ignores_drift()
+	local input = require("shared.input")
+	local values, down = {}, false
+	local pad = {
+		isConnected = function()
+			return true
+		end,
+		isGamepad = function()
+			return true
+		end,
+		getGamepadAxis = function(_, axis)
+			return values[axis] or 0
+		end,
+		isGamepadDown = function()
+			return down
+		end,
+	}
+	equal(input.meaningful(pad), false)
+	values.leftx = 0.1
+	equal(input.meaningful(pad), false)
+	values.triggerleft = -1
+	equal(input.meaningful(pad), false)
+	values.rightx = 0.7
+	equal(input.meaningful(pad), true)
+	values.rightx = 0
+	down = true
+	equal(input.meaningful(pad), true)
+end
+function tests.participation_lifecycle()
+	local messages, updates = {}, 0
+	local lifecycle = require("shared.lifecycle").new({
+		send = function(_, m)
+			messages[#messages + 1] = m
+		end,
+	}, {
+		hide = function() end,
+		show = function() end,
+		dispose = function() end,
+		prepare = function() end,
+		instantJoin = true,
+		party = function()
+			updates = updates + 1
+		end,
+	}, "arena")
+	lifecycle:receive({ type = "prepare", game = "arena", session = "one" })
+	equal(messages[1].type, "participation")
+	equal(messages[1].instant_join, true)
+	equal(messages[2].type, "ready")
+	lifecycle:activity("ordinal:0")
+	equal(#messages, 2)
+	lifecycle:receive({ type = "party_updated", session = "stale" })
+	equal(updates, 0)
+	lifecycle:receive({ type = "party_updated", session = "one" })
+	equal(updates, 1)
+	lifecycle:receive({ type = "start", session = "one" })
+	lifecycle:activity("ordinal:0")
+	equal(messages[3].type, "controller_input")
+	lifecycle:receive({ type = "pause", session = "one" })
+	lifecycle:activity("ordinal:1")
+	equal(#messages, 3)
+end
 function tests.lifecycle()
 	local sent, events = {}, {}
 	local transport = {
