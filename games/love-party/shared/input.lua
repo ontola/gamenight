@@ -37,7 +37,7 @@ function M.detach(pad)
 		end
 	end
 end
-function M.sample(slot)
+function M.sample(slot, fireWithShoulder)
 	local x, y, action, secondary = 0, 0, false, false
 	local aimX, aimY = 0, 0
 	local pad = M.pads[slot]
@@ -66,7 +66,11 @@ function M.sample(slot)
 		elseif pad:isGamepadDown("dpdown") then
 			y = 1
 		end
-		action = pad:isGamepadDown("a")
+		if fireWithShoulder then
+			action = pad:isGamepadDown("rightshoulder") or pad:getGamepadAxis("triggerright") > 0.25
+		else
+			action = pad:isGamepadDown("a")
+		end
 		secondary = pad:isGamepadDown("b")
 	end
 	if love.keyboard and M.active[slot] then

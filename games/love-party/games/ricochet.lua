@@ -3,8 +3,9 @@ local A = require("shared.arena")
 local M = {
 	id = "ricochet-club",
 	title = "RICOCHET CLUB",
+	fireWithShoulder = true,
 	tagline = "Every wall is another angle.",
-	controls = "MOVE stick / keys   AIM right stick / movement   FIRE A   SHIELD B",
+	controls = "MOVE stick / keys   AIM right stick / movement   FIRE RB / RT   SHIELD B",
 }
 function M.new(players, rng)
 	A.roster(players)
@@ -41,8 +42,15 @@ function M.update(s, dt, inputs)
 		if c.action and p.cool == 0 and #s.shots < 80 then
 			p.cool = 0.45
 			A.event(s, "shot")
-			s.shots[#s.shots + 1] =
-				{ x = p.x + p.ax * 22, y = p.y + p.ay * 22, vx = p.ax * 430, vy = p.ay * 430, owner = p, ttl = 4, bounces = 0 }
+			s.shots[#s.shots + 1] = {
+				x = p.x + p.ax * 22,
+				y = p.y + p.ay * 22,
+				vx = p.ax * 430,
+				vy = p.ay * 430,
+				owner = p,
+				ttl = 4,
+				bounces = 0,
+			}
 		end
 	end
 	-- Small substeps keep collisions reliable at low frame rates as well as 120 Hz.

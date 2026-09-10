@@ -125,7 +125,7 @@ function love.update(dt)
 	while accumulator >= 1 / 120 and not finished do
 		local inputs = {}
 		for i, p in ipairs(state.players) do
-			inputs[i] = p.bot and mode.bot(state, p) or Input.sample(p.slot)
+			inputs[i] = p.bot and mode.bot(state, p) or Input.sample(p.slot, mode.fireWithShoulder)
 		end
 		local before = {}
 		for i, p in ipairs(state.players) do

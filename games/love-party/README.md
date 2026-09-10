@@ -164,7 +164,7 @@ score below the arena and health indicators beside players.
 ## More games
 
 - **Ricochet Club** (`ricochet-club`): move tanks, aim with the right stick (or
-  movement direction), hold A to fire. Shots bounce up to four times. A hit earns
+  movement direction), hold RB or RT to fire without taking your thumb off aim. Shots bounce up to four times. A hit earns
   +3 and costs the target 1; your own bounced shots cost you 1. B shields for
   0.6 seconds with a three-second cooldown. Hits grant brief invulnerability.
 - **Paint Rush** (`paint-rush`): move to colour tiles and steal opponents' territory.

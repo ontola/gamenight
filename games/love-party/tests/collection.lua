@@ -71,3 +71,62 @@ for _, m in ipairs({ tank, paint, orbit }) do
 	end
 	print("PASS " .. m.id .. " 2/3/4-player soak")
 end
+
+-- Tank fire leaves the aiming thumb free; other games keep their own controls.
+do
+	local input = require("shared.input")
+	local buttons, trigger = {}, 0
+	local pad = {
+		isConnected = function()
+			return true
+		end,
+		isGamepad = function()
+			return true
+		end,
+		isGamepadDown = function(_, button)
+			return buttons[button] or false
+		end,
+		getGamepadAxis = function(_, axis)
+			if axis == "righty" then
+				return -1
+			end
+			if axis == "triggerright" then
+				return trigger
+			end
+			return 0
+		end,
+	}
+	local keyboard = love.keyboard
+	love.keyboard = {
+		isDown = function()
+			return false
+		end,
+	}
+	input.bind({ { slot = 1 } }, { pad })
+	buttons.a = true
+	assert(not input.sample(1, tank.fireWithShoulder).action, "A is not tank fire")
+	assert(input.sample(1).action, "other games retain A")
+	buttons.a, buttons.rightshoulder = false, true
+	local controls = input.sample(1, tank.fireWithShoulder)
+	assert(controls.action and controls.aimY == -1, "RB fires while aiming")
+	assert(not input.sample(1).action, "shoulder mapping is tank-only")
+	local match = tank.new(roster(2), U.rng(1))
+	tank.update(match, 0.01, { controls, idle[2] })
+	assert(#match.shots == 1 and match.shots[1].vy < 0, "shot follows right-stick aim")
+	buttons.rightshoulder = false
+	trigger = 0.2
+	assert(not input.sample(1, true).action, "trigger noise does not fire")
+	trigger = 0.8
+	assert(input.sample(1, true).action, "RT fires")
+	trigger = 0
+	assert(not input.sample(1, true).action, "release stops firing")
+	love.keyboard = {
+		isDown = function(key)
+			return key == "space"
+		end,
+	}
+	assert(input.sample(1, true).action, "keyboard fire still works")
+	love.keyboard = keyboard
+	input.bind({}, {})
+	print("PASS tank shoulder fire, independent aim, trigger deadzone and keyboard")
+end
