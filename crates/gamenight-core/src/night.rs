@@ -1068,6 +1068,16 @@ impl GameNight {
                     self.try_transition(fx);
                 } else {
                     self.vote.open();
+                    self.overlay_open = true;
+                    // Finished games still own a window: pause tells the SDK
+                    // to hide it while the lobby takes over for the next pick.
+                    if let Some(active) = &self.active {
+                        fx.push(Effect::ToGame {
+                            game: active.game.clone(),
+                            session: active.id,
+                            command: GameCommand::Pause,
+                        });
+                    }
                 }
                 fx.push(Effect::StateChanged);
             }

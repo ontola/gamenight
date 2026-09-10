@@ -189,6 +189,42 @@ mod night_tests {
         assert_eq!(night.snapshot().active_session.unwrap().id, fresh);
     }
 
+    #[test]
+    fn finishing_hides_the_game_and_returns_focus_to_lobby() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        night.handle(join_cmd("one", None, None));
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let (_, session) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session });
+        night.handle(Command::Next);
+        let fx = night.handle(Command::SessionFinished { session });
+        assert!(night.snapshot().overlay_open);
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Pause,
+                ..
+            }
+        )));
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::LobbyFocus { active: true, .. })));
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(!fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Resume,
+                ..
+            }
+        )));
+    }
+
     /// The whole MVP evening: two games connect, playlist set, first game
     /// auto-starts, "Next" transitions instantly, the previous game is
     /// disposed and the following one warms.

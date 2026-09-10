@@ -361,7 +361,7 @@ impl GameNightBridge {
     /// a game ready to go, a game on its way, and an empty shelf. Saying
     /// "Nothing queued" for the middle one is a lie that looks like a bug.
     pub fn next_game_status(&self) -> NextGameStatus {
-        if let Some(active) = &self.active_session {
+        if let Some(active) = self.active_session.as_ref().filter(|s| matches!(s.phase, gamenight_protocol::SessionPhase::Running | gamenight_protocol::SessionPhase::Paused)) {
             return NextGameStatus::Live {
                 title: self.title_of(&active.game),
                 paused: active.phase == gamenight_protocol::SessionPhase::Paused,
