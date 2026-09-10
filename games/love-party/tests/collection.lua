@@ -147,3 +147,26 @@ for count = 3, 4 do
 	end
 end
 print("PASS all three/four managed tank seats fire independently")
+
+do
+	local match = tank.new(roster(2), U.rng(1))
+	match.cover = { { x = 400, y = 400, size = 44, hp = 3, flash = 0 } }
+	local shooter, target = match.players[1], match.players[2]
+	shooter.x, shooter.y = 330, 400
+	target.x, target.y, target.invul = 450, 400, 0
+	tank.update(match, 0.5, { { x = 1, y = 0 }, idle[2] })
+	assert(shooter.x <= 360, "cover blocks tanks even at low frame rates")
+	for hit = 1, 3 do
+		match.shots = { { x = 350, y = 400, vx = 430, vy = 0, owner = shooter, ttl = 4, bounces = 0 } }
+		tank.update(match, 0.3, idle)
+		assert(#match.shots == 0 and target.score == 0, "cover absorbs the entire shot")
+		if hit < 3 then
+			assert(match.cover[1].hp == 3 - hit)
+		end
+	end
+	assert(#match.cover == 0 and #match.debris > 0, "third hit destroys cover")
+	tank.update(match, 0.5, { { x = 1, y = 0 }, idle[2] })
+	assert(shooter.x > 400, "destroyed cover opens a route")
+	assert(#tank.new(roster(4), U.rng(1)).cover == 12, "fresh rounds rebuild cover")
+end
+print("PASS destructible tank cover blocks movement, absorbs shots and opens routes")
