@@ -567,6 +567,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "futures-util",
+ "gamenight-core",
  "gamenight-daemon",
  "gamenight-protocol",
  "qrcode",

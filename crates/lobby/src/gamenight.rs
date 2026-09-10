@@ -43,7 +43,10 @@ pub enum NextGameStatus {
     /// A game is *open*: running, or paused because the party stepped out to
     /// the lobby. Outranks everything below, because while there is a game to
     /// go back to, "what's up next" is not the question being asked.
-    Live { title: String, paused: bool },
+    Live {
+        title: String,
+        paused: bool,
+    },
     /// Warm and ready to start.
     Ready(String),
     /// On its way: the process is launching, or the session is preparing.
@@ -65,12 +68,9 @@ pub enum NextGameStatus {
     Voting,
 }
 
-/// The TV's left-hand button, which is not always the same button: with a
-/// game open it takes you back into it, otherwise it starts the warm one —
-/// and while that one is still loading there is nothing for it to do.
+/// Resume the active game from the TV; disabled until a game is open.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TvButton {
-    Start,
     Back,
     Disabled,
 }
@@ -130,10 +130,12 @@ pub struct GameNightBridge {
     /// "Frame took too long" warnings), so a frame-counted debounce could
     /// take far longer than intended to actually fire.
     lobby_rebuild_at: Option<std::time::Instant>,
+    lobby_away: bool,
     /// Latest player list — just for matching a pending controller join
     /// (sent by name) back to the pad that sent it. See
     /// `GlobalInput::reconcile_joins`.
     pub latest_players: Vec<Player>,
+    latest_presence: Vec<gamenight_protocol::PlayerPresence>,
     /// Which gilrs gamepad index actually joined each player — written by
     /// `global_input_system` once a join is confirmed, read by
     /// `match_plugin_for_seats` so a seated player is controlled by the pad
@@ -259,7 +261,7 @@ impl GameNightBridge {
     pub fn tv_button(&self) -> TvButton {
         match self.next_game_status() {
             NextGameStatus::Live { .. } => TvButton::Back,
-            NextGameStatus::Ready(_) => TvButton::Start,
+
             _ => TvButton::Disabled,
         }
     }
@@ -274,9 +276,6 @@ impl GameNightBridge {
             TvButton::Back => {
                 let _ = self.join_tx.try_send(ClientMessage::CloseOverlay);
             }
-            TvButton::Start => {
-                let _ = self.join_tx.try_send(ClientMessage::Next);
-            }
             TvButton::Disabled => {}
         }
     }
@@ -288,7 +287,7 @@ impl GameNightBridge {
     /// transition until it's ready anyway — it just hands the party a frozen
     /// lobby and no explanation, which reads as a crash.
     pub fn next_game_is_ready(&self) -> bool {
-        matches!(self.next_game_status(), NextGameStatus::Ready(_))
+        matches!(self.upcoming_game_status(), NextGameStatus::Ready(_))
     }
 
     /// Put a different game on the TV: the entry after whatever is up next.
@@ -302,14 +301,6 @@ impl GameNightBridge {
     /// that knows what "the one after this" means, and this is the side
     /// holding it.
     pub fn skip_next_game(&self) {
-        // With a game open, "skip" is the party leaving it: done with this
-        // one, on to the next. It is the only thing that closes a session —
-        // stepping out to the lobby merely pauses it, so a game you walked
-        // out of is still there to walk back into until somebody skips it.
-        if self.active_session.is_some() {
-            let _ = self.join_tx.try_send(ClientMessage::Next);
-            return;
-        }
         let Some(game) = self.game_after_next() else {
             return;
         };
@@ -344,6 +335,8 @@ impl GameNightBridge {
                 **game != lobby
                     && Some(*game) != up_next.as_ref()
                     && Some(*game) != self.active_game()
+                    && self.latest_library.iter().find(|m| &m.id == *game)
+                        .is_none_or(|m| m.max_players.is_none_or(|max| self.latest_players.len() <= max as usize))
             })
             .cloned()
     }
@@ -359,7 +352,9 @@ impl GameNightBridge {
     /// the pad. Goes over the overlay-role connection like every other party
     /// command; the daemon is what actually knows how to talk to Spotify.
     pub fn control_music(&self, action: gamenight_protocol::MediaAction) {
-        let _ = self.join_tx.try_send(ClientMessage::MediaControl { action });
+        let _ = self
+            .join_tx
+            .try_send(ClientMessage::MediaControl { action });
     }
 
     /// What to say about the next game.
@@ -367,13 +362,32 @@ impl GameNightBridge {
     /// Three genuinely different situations, which the TV must not conflate:
     /// a game ready to go, a game on its way, and an empty shelf. Saying
     /// "Nothing queued" for the middle one is a lie that looks like a bug.
+    pub fn seat_sleeping(&self, index: u32) -> bool {
+        self.latest_seats.iter().find(|s| s.index as u32 == index).and_then(|s| s.occupant.player_id())
+            .is_some_and(|id| self.latest_presence.iter().any(|p| p.player_id == id && p.state == gamenight_protocol::PresenceState::Sleeping))
+    }
+
     pub fn next_game_status(&self) -> NextGameStatus {
-        if let Some(active) = &self.active_session {
+        if let Some(active) = self.active_session.as_ref().filter(|s| matches!(s.phase, gamenight_protocol::SessionPhase::Running | gamenight_protocol::SessionPhase::Paused)) {
             return NextGameStatus::Live {
                 title: self.title_of(&active.game),
                 paused: active.phase == gamenight_protocol::SessionPhase::Paused,
             };
         }
+        self.upcoming_game_status()
+    }
+
+    pub fn play_next_game(&self) {
+        if self.next_game_is_ready() {
+            let _ = self.join_tx.try_send(ClientMessage::Next);
+        }
+    }
+
+    pub fn can_skip_next_game(&self) -> bool {
+        self.game_after_next().is_some()
+    }
+
+    pub fn upcoming_game_status(&self) -> NextGameStatus {
         if let Some(warm) = &self.latest_warm {
             let title = self
                 .latest_library
@@ -547,7 +561,9 @@ pub fn game_plugin(game: &mut Game) {
         notified_finished: false,
         latest_seats: Vec::new(),
         lobby_rebuild_at: None,
+        lobby_away: false,
         latest_players: Vec::new(),
+        latest_presence: Vec::new(),
         player_gamepad: default(),
         pads_connected: 0,
         latest_library: Vec::new(),
@@ -651,6 +667,7 @@ fn gamenight_bridge_system(
             bridge.latest_seats = party.seats;
             bridge.lobby_rebuild_at = Some(std::time::Instant::now() + LOBBY_REBUILD_DEBOUNCE);
         }
+        bridge.latest_presence = party.presence;
         bridge.latest_players = party.players;
         bridge.latest_library = party.library;
         bridge.latest_warm = party.warm_session;
@@ -665,9 +682,7 @@ fn gamenight_bridge_system(
 
     while let Ok(event) = bridge.incoming.try_recv() {
         match event {
-            GameEvent::Prepare {
-                session, seats, ..
-            } => {
+            GameEvent::Prepare { session, seats, .. } => {
                 info!("gamenight: prepare {session:?}");
                 bridge.current_session = Some(session);
                 bridge.notified_finished = false;
@@ -746,9 +761,19 @@ fn gamenight_bridge_system(
             // jumpy doesn't declare any match settings (see `declare_settings`
             // in the SDK) — the daemon can't send changes for settings that
             // were never declared, so this never actually fires.
+            GameEvent::PartyUpdated { .. } => {}
             GameEvent::SettingChanged { .. } => {}
             GameEvent::LobbyFocus { active } => {
                 info!(active, "gamenight: lobby focus changed");
+                if bridge.current_session.is_none() {
+                    if active && bridge.lobby_away {
+                        // Reset characters, velocities and pad countdowns together.
+                        // The lobby spawner deals out distinct random safe points.
+                        rebuild_lobby(&bridge, &mut sessions, &meta, &assets);
+                        bridge.lobby_rebuild_at = None;
+                    }
+                    bridge.lobby_away = !active;
+                }
                 #[cfg(target_os = "macos")]
                 if active {
                     crate::gamenight_macos::bring_self_to_front();
@@ -818,12 +843,20 @@ fn ensure_lobby_running(
             rebuild_lobby(bridge, sessions, meta, assets);
             bridge.lobby_rebuild_at = None;
         } else {
-            debug!(remaining_ms = (at - now).as_millis(), "gamenight: lobby rebuild pending");
+            debug!(
+                remaining_ms = (at - now).as_millis(),
+                "gamenight: lobby rebuild pending"
+            );
         }
     }
 }
 
-fn rebuild_lobby(bridge: &GameNightBridge, sessions: &mut Sessions, meta: &GameMeta, assets: &AssetServer) {
+fn rebuild_lobby(
+    bridge: &GameNightBridge,
+    sessions: &mut Sessions,
+    meta: &GameMeta,
+    assets: &AssetServer,
+) {
     info!(seats = ?bridge.latest_seats, "gamenight: rebuilding lobby session");
 
     // Carry the camera's exact position/zoom across the rebuild. A fresh
@@ -862,8 +895,9 @@ fn rebuild_lobby(bridge: &GameNightBridge, sessions: &mut Sessions, meta: &GameM
             let entities = world.resource::<Entities>();
             let mut cameras = world.components.get::<Camera>().borrow_mut();
             let mut camera_shakes = world.components.get::<CameraShake>().borrow_mut();
-            if let Some((_, (camera, shake_mut))) =
-                entities.iter_with((&mut cameras, &mut camera_shakes)).next()
+            if let Some((_, (camera, shake_mut))) = entities
+                .iter_with((&mut cameras, &mut camera_shakes))
+                .next()
             {
                 camera.size = size;
                 *shake_mut = shake;
@@ -1178,8 +1212,6 @@ struct GlobalInput {
     /// by `sync_player_menus_system` — deliberately not a bones session, so it
     /// never touches `Session::active` and the match keeps running under it.
     open_menus: std::collections::HashMap<PlayerId, PlayerMenuState>,
-    /// Whether GameNight is the thing currently in front.
-    open: bool,
     /// Every gamepad button event bones saw this frame, snapshotted by
     /// `gate_gamepad_input_system` (`PreUpdate`) before it strips the
     /// events of any pad whose player has an open menu from the live
@@ -1309,7 +1341,10 @@ impl GlobalInput {
         let name = random_unused_name(&taken_names)
             .map(|n| n.to_string())
             .unwrap_or_else(|| {
-                format!("Player {}", self.joined_pads.len() + self.pending_joins.len() + 1)
+                format!(
+                    "Player {}",
+                    self.joined_pads.len() + self.pending_joins.len() + 1
+                )
             });
 
         // A random color from the same palette the menu offers, avoiding
@@ -1327,7 +1362,11 @@ impl GlobalInput {
             .copied()
             .filter(|hex| !taken_colors.contains(hex))
             .collect();
-        let pool = if available.is_empty() { &all_colors } else { &available };
+        let pool = if available.is_empty() {
+            &all_colors
+        } else {
+            &available
+        };
         let color = {
             use turborand::prelude::*;
             Rng::new().sample(pool).copied().unwrap_or(MENU_COLORS[0].1)
@@ -1365,7 +1404,8 @@ impl GlobalInput {
     /// (or the menu's own Close/Leave) closes it.
     fn toggle_menu(&mut self, player_id: PlayerId) {
         if self.open_menus.remove(&player_id).is_none() {
-            self.open_menus.insert(player_id, PlayerMenuState { highlight: 0 });
+            self.open_menus
+                .insert(player_id, PlayerMenuState { highlight: 0 });
         }
     }
 
@@ -1409,7 +1449,6 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         pad_player: default(),
         pressed_buttons: default(),
         open_menus: default(),
-        open: true, // jumpy starts as the lobby, already frontmost
         frame_button_events: default(),
         frame_axis_events: default(),
         prune_countdown: None,
@@ -1614,9 +1653,15 @@ fn gate_gamepad_input_system(
 fn global_input_system(
     mut input: bevy::prelude::ResMut<GlobalInput>,
     bones_game: bevy::prelude::ResMut<bones_bevy_renderer::BonesGame>,
-    mut windows: bevy::prelude::Query<&mut bevy::prelude::Window, bevy::prelude::With<bevy::window::PrimaryWindow>>,
+    mut windows: bevy::prelude::Query<
+        &mut bevy::prelude::Window,
+        bevy::prelude::With<bevy::window::PrimaryWindow>,
+    >,
     keys: bevy::prelude::Res<bevy::prelude::Input<bevy::prelude::KeyCode>>,
     gamepads: bevy::prelude::Res<bevy::input::gamepad::Gamepads>,
+    buttons: bevy::prelude::Res<bevy::prelude::Input<bevy::input::gamepad::GamepadButton>>,
+    axes: bevy::prelude::Res<bevy::prelude::Axis<bevy::input::gamepad::GamepadAxis>>,
+    mut activity_sent: bevy::prelude::Local<std::collections::HashMap<usize, std::time::Instant>>,
 ) {
     {
         // Bones has only per-frame gamepad *events*, no list of what is plugged
@@ -1628,6 +1673,35 @@ fn global_input_system(
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (bridge.latest_players.clone(), bridge.join_tx.clone())
     };
+    // Held input counts as activity; neutral sticks and connection events do not.
+    let mut connected: Vec<_> = gamepads.iter().collect();
+    connected.sort_by_key(|g| g.id);
+    for (ordinal, pad) in connected.iter().enumerate() {
+        use bevy::input::gamepad::{GamepadAxis, GamepadAxisType};
+        let held = buttons.get_pressed().any(|b| b.gamepad == *pad)
+            || [GamepadAxisType::LeftStickX, GamepadAxisType::LeftStickY,
+                GamepadAxisType::RightStickX, GamepadAxisType::RightStickY]
+                .iter().any(|axis| axes.get(GamepadAxis::new(*pad, *axis)).unwrap_or(0.0).abs() > 0.25);
+        if held && activity_sent.get(&pad.id).is_none_or(|at| at.elapsed().as_secs_f32() >= 1.0) {
+            let _ = join_tx.try_send(ClientMessage::ControllerInput { session: None, controller: format!("ordinal:{ordinal}") });
+            activity_sent.insert(pad.id, std::time::Instant::now());
+        }
+    }
+    // A game can have claimed a new controller while the lobby was hidden.
+    // Reconcile by controller identity, never a generated display name.
+    {
+        let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
+        for seat in bridge.latest_seats.clone() {
+            if let (Some(id), Some(ordinal)) = (seat.occupant.player_id(), seat.controller.as_deref()
+                .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
+                if let Some(pad) = connected.get(ordinal) {
+                    input.joined_pads.insert(pad.id as u32);
+                    input.pad_player.insert(pad.id as u32, id);
+                    bridge.player_gamepad.insert(id, pad.id as u32);
+                }
+            }
+        }
+    }
     input.reconcile_joins(&seated);
 
     // Show out anybody who walked into the exit doorway. Drained here rather
@@ -1638,7 +1712,11 @@ fn global_input_system(
         std::mem::take(&mut bridge.exit_requests)
     };
     if !exits.is_empty() {
-        let seats = bones_game.0.shared_resource::<GameNightBridge>().latest_seats.clone();
+        let seats = bones_game
+            .0
+            .shared_resource::<GameNightBridge>()
+            .latest_seats
+            .clone();
         for (seat, block_secs) in exits {
             let Some(player_id) = seats
                 .iter()
@@ -1650,13 +1728,22 @@ fn global_input_system(
             // Bar the pad *before* the leave goes out. `forget_player` drops it
             // from `joined_pads`, and the very next frame's stick reading would
             // otherwise be taken as a fresh join.
-            if let Some(pad) = input.pad_player.iter().find(|(_, p)| **p == player_id).map(|(pad, _)| *pad) {
+            if let Some(pad) = input
+                .pad_player
+                .iter()
+                .find(|(_, p)| **p == player_id)
+                .map(|(pad, _)| *pad)
+            {
                 input.rejoin_blocked.insert(
                     pad,
                     std::time::Instant::now() + Duration::from_secs_f32(block_secs.max(0.0)),
                 );
             }
-            info!(?seat, ?player_id, "gamenight: player walked out through the exit");
+            info!(
+                ?seat,
+                ?player_id,
+                "gamenight: player walked out through the exit"
+            );
             let _ = join_tx.try_send(ClientMessage::LeaveParty { player_id });
             input.forget_player(player_id);
         }
@@ -1667,9 +1754,15 @@ fn global_input_system(
     // checked unconditionally every frame rather than from inside the input
     // match below.
     if let Some(pc) = input.prune_countdown.take() {
-        let remaining = pc.deadline.saturating_duration_since(std::time::Instant::now());
+        let remaining = pc
+            .deadline
+            .saturating_duration_since(std::time::Instant::now());
         if remaining.is_zero() {
-            let seats = bones_game.0.shared_resource::<GameNightBridge>().latest_seats.clone();
+            let seats = bones_game
+                .0
+                .shared_resource::<GameNightBridge>()
+                .latest_seats
+                .clone();
             let mut kicked = 0;
             for (player_id, start_pos) in pc.start_positions {
                 let Some(seat_index) = seats
@@ -1701,6 +1794,13 @@ fn global_input_system(
         let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
         for (pad, player_id) in input.newly_confirmed.drain(..) {
             bridge.player_gamepad.insert(player_id, pad);
+            let mut connected: Vec<_> = gamepads.iter().map(|g| g.id).collect();
+            connected.sort_unstable();
+            if let Some(index) = connected.iter().position(|id| *id == pad as usize) {
+                let _ = join_tx.try_send(ClientMessage::BindController {
+                    player_id, controller: format!("ordinal:{index}"),
+                });
+            }
         }
         bridge.lobby_rebuild_at = Some(std::time::Instant::now() + LOBBY_REBUILD_DEBOUNCE);
     }
@@ -1765,8 +1865,9 @@ fn global_input_system(
         .filter(|ev| ev.value.abs() > AXIS_JOIN_DEADZONE)
         .map(|ev| ev.gamepad)
         .collect();
+    let lobby_available = !bones_game.0.shared_resource::<GameNightBridge>().lobby_away;
     for pad in axis_join_pads {
-        if !input.joined_pads.contains(&pad) {
+        if lobby_available && !input.joined_pads.contains(&pad) {
             input.join_pad(pad, &seated, &join_tx);
         }
     }
@@ -1776,36 +1877,28 @@ fn global_input_system(
     // see the lobby as already frontmost when it plainly wasn't.
     let lobby_was_focused = windows.get_single().map(|w| w.focused).unwrap_or(false);
 
-    for GamepadButtonEvent { gamepad: id, button, .. } in just_pressed {
+    for GamepadButtonEvent {
+        gamepad: id,
+        button,
+        ..
+    } in just_pressed
+    {
         match button {
             GamepadButton::Select => {
-                input.open = !input.open;
-                // Tell the daemon, which is what makes this the way *out* of a
-                // running game: the party overlay coming up pauses whatever is
-                // playing and hands the screen back to the lobby (see
-                // `sync_lobby_focus` in gamenight-core). Closing it again
-                // resumes the game, which raises itself on `Resume`.
-                let _ = join_tx.try_send(if input.open {
-                    ClientMessage::OpenOverlay
-                } else {
-                    ClientMessage::CloseOverlay
-                });
-                if input.open {
-                    #[cfg(target_os = "macos")]
-                    {
-                        input.previous_app = crate::gamenight_macos::capture_frontmost_app();
-                    }
-                    for mut window in &mut windows {
-                        window.focused = true;
-                    }
-                } else {
-                    #[cfg(target_os = "macos")]
-                    if let Some(app) = input.previous_app.take() {
-                        app.reactivate();
-                    }
+                // Back is an idempotent request, not a local toggle. The game
+                // may send RequestOverlay for this same physical press, and
+                // game transitions change focus without a local button event.
+                let _ = join_tx.try_send(ClientMessage::OpenOverlay);
+                #[cfg(target_os = "macos")]
+                if !lobby_was_focused {
+                    input.previous_app = crate::gamenight_macos::capture_frontmost_app();
+                }
+                for mut window in &mut windows {
+                    window.focused = true;
                 }
             }
-            _ if !input.joined_pads.contains(&id) => input.join_pad(id, &seated, &join_tx),
+
+            _ if !input.joined_pads.contains(&id) => { if lobby_available { input.join_pad(id, &seated, &join_tx); } },
             GamepadButton::Start => {
                 // Start opens a player's lobby menu — but only Start, and
                 // only out here.
@@ -1816,9 +1909,7 @@ fn global_input_system(
                 // value that combination also opened a lobby menu behind the
                 // scenes, and the party arrived back at the couch with a menu
                 // already up that nobody asked for.
-                let select_held = input
-                    .pressed_buttons
-                    .contains(&(id, GamepadButton::Select));
+                let select_held = input.pressed_buttons.contains(&(id, GamepadButton::Select));
                 if !lobby_was_focused || select_held {
                     continue;
                 }
@@ -1895,7 +1986,6 @@ fn global_input_system(
         }
     }
 }
-
 
 /// Spawns/despawns/rebuilds each open player's start-menu content. Touches
 /// nothing about session/pause state — the match keeps running underneath
@@ -2078,7 +2168,12 @@ fn bones_hex_color(hex: &str) -> Color {
     let red = u8::from_str_radix(&hex[0..2], 16).unwrap_or(255) as f32 / 255.0;
     let green = u8::from_str_radix(&hex[2..4], 16).unwrap_or(255) as f32 / 255.0;
     let blue = u8::from_str_radix(&hex[4..6], 16).unwrap_or(255) as f32 / 255.0;
-    Color::Rgba { red, green, blue, alpha: 1.0 }
+    Color::Rgba {
+        red,
+        green,
+        blue,
+        alpha: 1.0,
+    }
 }
 
 /// Tints each seated player's sprite to their chosen `Player.color` (set via
@@ -2116,7 +2211,12 @@ fn apply_player_colors_system(bones_game: bevy::prelude::Res<bones_bevy_renderer
     for (seat_index, color) in seat_colors {
         let tint = match color {
             Some(hex) => bones_hex_color(&hex),
-            None => Color::Rgba { red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0 },
+            None => Color::Rgba {
+                red: 1.0,
+                green: 1.0,
+                blue: 1.0,
+                alpha: 1.0,
+            },
         };
         if let Some((entity, _)) = entities
             .iter_with(&player_indices)
@@ -2283,7 +2383,9 @@ fn swap_player_faces_system(
     let mut atlas_sprites = world.components.get::<AtlasSprite>().borrow_mut();
 
     for seat in &seats {
-        let Some(player_id) = seat.occupant.player_id() else { continue };
+        let Some(player_id) = seat.occupant.player_id() else {
+            continue;
+        };
         let has_avatar = players
             .iter()
             .find(|p| p.id == player_id)
@@ -2304,13 +2406,7 @@ fn swap_player_faces_system(
                 atlas_sprites.remove(layer.face_ent);
             }
         } else if let Some(atlas) = stashed.0.remove(&player_id) {
-            atlas_sprites.insert(
-                layer.face_ent,
-                AtlasSprite {
-                    atlas,
-                    ..default()
-                },
-            );
+            atlas_sprites.insert(layer.face_ent, AtlasSprite { atlas, ..default() });
         }
     }
 }
@@ -2420,7 +2516,9 @@ fn sync_player_avatar_system(
         {
             continue;
         }
-        let Some(image) = avatar_image(&avatar) else { continue };
+        let Some(image) = avatar_image(&avatar) else {
+            continue;
+        };
         let handle = images.add(image);
         commands.spawn((
             PlayerAvatarPortrait(player_id, avatar),
@@ -2583,9 +2681,18 @@ fn sync_name_tags_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (seats, seated) = {
+    let (seats, seated, presence) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
-        (bridge.latest_seats.clone(), bridge.latest_players.clone())
+        (bridge.latest_seats.clone(), bridge.latest_players.clone(), bridge.latest_presence.clone())
+    };
+
+    let label = |id| {
+        let name = name_of(&seated, id);
+        match presence.iter().find(|p| p.player_id == id).map(|p| p.state) {
+            Some(gamenight_protocol::PresenceState::Sleeping) => format!("{name}  zZz"),
+            Some(gamenight_protocol::PresenceState::Warning) => format!("{name}  — move to stay awake"),
+            _ => name,
+        }
     };
 
     // Drop tags whose player left, or whose name has since changed — the
@@ -2594,7 +2701,7 @@ fn sync_name_tags_system(
         let current = seats
             .iter()
             .any(|s| s.occupant.player_id() == Some(*player_id))
-            .then(|| name_of(&seated, *player_id));
+            .then(|| label(*player_id));
         if current.as_deref() != Some(shown.as_str()) {
             commands.entity(entity).despawn_recursive();
         }
@@ -2607,8 +2714,10 @@ fn sync_name_tags_system(
     const NAME_TAG_OUTLINE: f32 = 2.0;
     let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
     for seat in &seats {
-        let Some(player_id) = seat.occupant.player_id() else { continue };
-        let name = name_of(&seated, player_id);
+        let Some(player_id) = seat.occupant.player_id() else {
+            continue;
+        };
+        let name = label(player_id);
         if tags
             .iter()
             .any(|(_, tag)| tag.0 == player_id && tag.1 == name)
@@ -2642,14 +2751,22 @@ fn sync_name_tags_system(
                         },
                         text: Text::from_section(
                             name.clone(),
-                            TextStyle { font: font.clone(), font_size: NAME_TAG_FONT_SIZE, color: Color::BLACK },
+                            TextStyle {
+                                font: font.clone(),
+                                font_size: NAME_TAG_FONT_SIZE,
+                                color: Color::BLACK,
+                            },
                         ),
                         ..default()
                     });
                 }
                 parent.spawn(TextBundle::from_section(
                     name.clone(),
-                    TextStyle { font: font.clone(), font_size: NAME_TAG_FONT_SIZE, color: Color::WHITE },
+                    TextStyle {
+                        font: font.clone(),
+                        font_size: NAME_TAG_FONT_SIZE,
+                        color: Color::WHITE,
+                    },
                 ));
             });
     }
@@ -2704,7 +2821,10 @@ fn lobby_exit_door(game: &Game) -> Option<(bevy::prelude::Vec3, bevy::prelude::V
     let session = game.sessions.get(SessionNames::GAME)?;
     let world = &session.world;
     let entities = world.resource::<Entities>();
-    let doors = world.components.get::<crate::core::elements::exit_door::ExitDoor>().borrow();
+    let doors = world
+        .components
+        .get::<crate::core::elements::exit_door::ExitDoor>()
+        .borrow();
     let transforms = world.components.get::<Transform>().borrow();
     let (entity, door) = entities.iter_with(&doors).next()?;
     let t = transforms.get(entity)?;
@@ -2739,7 +2859,11 @@ fn sync_exit_door_system(
         &mut bevy::prelude::Transform,
     )>,
     mut bars: bevy::prelude::Query<
-        (&mut LobbyExitBar, &mut bevy::prelude::Sprite, &mut bevy::prelude::Transform),
+        (
+            &mut LobbyExitBar,
+            &mut bevy::prelude::Sprite,
+            &mut bevy::prelude::Transform,
+        ),
         bevy::prelude::Without<LobbyExitDoor>,
     >,
 ) {
@@ -2874,7 +2998,11 @@ fn sync_prune_countdown_system(
         .with_children(|parent| {
             parent.spawn(TextBundle::from_section(
                 label,
-                TextStyle { font, font_size: 28.0, color: Color::rgb(1.0, 0.4, 0.4) },
+                TextStyle {
+                    font,
+                    font_size: 28.0,
+                    color: Color::rgb(1.0, 0.4, 0.4),
+                },
             ));
         });
 }
@@ -3169,10 +3297,13 @@ fn lobby_music_screen(
 #[derive(bevy::prelude::Component, Clone, Copy, PartialEq)]
 enum PadButton {
     SignIn,
-    /// The TV's own pad. `skips` picks the half: START on the left, SKIP on
-    /// the right (see `next_game_trigger::pad_halves`).
-    NextGame { skips: bool },
-    Music { skips: bool },
+    /// TV landing zones: resume, play next, and skip upcoming, left to right.
+    NextGame {
+        index: usize,
+    },
+    Music {
+        skips: bool,
+    },
 }
 
 /// The moving part of a drawn button: everything that sinks when it's hit,
@@ -3182,6 +3313,9 @@ struct PadFace {
     home_y: f32,
     pad: PadButton,
 }
+
+#[derive(bevy::prelude::Component)]
+struct PadHoldLabel { pad: PadButton, label: String }
 
 /// How far into its housing a button sinks when fully pressed, in world
 /// units. Deep enough to read across a living room, shallow enough that a
@@ -3247,12 +3381,12 @@ fn spawn_pad_button(
                 transform: Transform::from_xyz(0.0, size.y / 2.0 - 4.0, 0.1),
                 ..default()
             });
-            face.spawn(Text2dBundle {
+            let mut label_entity = face.spawn(Text2dBundle {
                 text: Text::from_section(
-                    label,
+                    if matches!(pad, PadButton::NextGame { .. }) { format!("{label}\nHOLD 2s") } else { label.to_string() },
                     TextStyle {
                         font,
-                        font_size: 13.0,
+                        font_size: if matches!(pad, PadButton::NextGame { .. }) { 10.0 } else { 13.0 },
                         color: Color::rgba(1.0, 1.0, 1.0, 0.92),
                     },
                 )
@@ -3260,6 +3394,10 @@ fn spawn_pad_button(
                 transform: Transform::from_xyz(0.0, size.y / 2.0 + 11.0, 0.2),
                 ..default()
             });
+            if matches!(pad, PadButton::NextGame { .. }) {
+                label_entity.insert(PadHoldLabel { pad, label: label.to_string() });
+            }
+
         });
 }
 
@@ -3282,6 +3420,7 @@ struct PadPresses {
     sign_in: f32,
     next_game: f32,
     next_game_skip: f32,
+    next_game_play: f32,
     music_pause: f32,
     music_skip: f32,
 }
@@ -3290,8 +3429,10 @@ impl PadPresses {
     fn of(&self, pad: PadButton) -> f32 {
         match pad {
             PadButton::SignIn => self.sign_in,
-            PadButton::NextGame { skips: false } => self.next_game,
-            PadButton::NextGame { skips: true } => self.next_game_skip,
+            PadButton::NextGame { index: 0 } => self.next_game,
+            PadButton::NextGame { index: 2 } => self.next_game_skip,
+            PadButton::NextGame { index: 1 } => self.next_game_play,
+            PadButton::NextGame { .. } => 0.0,
             PadButton::Music { skips: false } => self.music_pause,
             PadButton::Music { skips: true } => self.music_skip,
         }
@@ -3314,6 +3455,7 @@ fn lobby_pad_presses(game: &Game) -> PadPresses {
     if let Some((_, trigger)) = entities.iter_with(&triggers).next() {
         presses.next_game = trigger.press;
         presses.next_game_skip = trigger.skip_press;
+        presses.next_game_play = trigger.play_press;
     }
     let music = world.components.get::<MusicPad>().borrow();
     for (_, pad) in entities.iter_with(&music) {
@@ -3335,6 +3477,7 @@ fn lobby_pad_presses(game: &Game) -> PadPresses {
 fn press_pads_system(
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     mut faces: bevy::prelude::Query<(&PadFace, &mut bevy::prelude::Transform)>,
+    mut labels: bevy::prelude::Query<(&PadHoldLabel, &mut bevy::prelude::Text)>,
 ) {
     if faces.is_empty() {
         return;
@@ -3343,6 +3486,13 @@ fn press_pads_system(
     for (face, mut transform) in &mut faces {
         transform.translation.y = face.home_y - presses.of(face.pad) * PAD_PRESS_DEPTH;
     }
+    for (label, mut text) in &mut labels {
+        let progress = presses.of(label.pad);
+        text.sections[0].value = if progress > 0.0 {
+            format!("{}\n{:.1}s", label.label, (1.0 - progress) * crate::core::elements::next_game_trigger::HOLD_SECONDS)
+        } else { format!("{}\nHOLD 2s", label.label) };
+    }
+
 }
 
 /// Marks the drawn jukebox. Carries a fingerprint of what it was drawn from,
@@ -3539,9 +3689,15 @@ fn sync_next_game_tv_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (status, button) = {
+    let (status, button, upcoming, next_ready, can_skip) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
-        (bridge.next_game_status(), bridge.tv_button())
+        (
+            bridge.next_game_status(),
+            bridge.tv_button(),
+            bridge.upcoming_game_status(),
+            bridge.next_game_is_ready(),
+            bridge.can_skip_next_game(),
+        )
     };
 
     let Some((pos, size, pad_pos, pad_size)) = lobby_tv(&bones_game.0) else {
@@ -3611,9 +3767,16 @@ fn sync_next_game_tv_system(
         ),
     };
 
+    let next_line = match upcoming {
+        NextGameStatus::Ready(t) => format!("UP NEXT  {t}"),
+        NextGameStatus::Loading(t, _) => format!("UP NEXT  {t} · LOADING"),
+        NextGameStatus::Downloading(t, _) => format!("UP NEXT  {t} · DOWNLOADING"),
+        NextGameStatus::DownloadFailed(t) => format!("UP NEXT  {t} · DOWNLOAD FAILED"),
+        _ => "UP NEXT  Nothing ready yet".to_string(),
+    };
     if let Some((entity, tv, mut transform)) = existing.iter_mut().next() {
         transform.translation = Vec3::new(pos.x, pos.y, LOBBY_PROP_Z);
-        if tv.0 == format!("{kicker}|{title}|{button:?}") {
+        if tv.0 == format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}") {
             return;
         }
         commands.entity(entity).despawn_recursive();
@@ -3624,7 +3787,9 @@ fn sync_next_game_tv_system(
 
     commands
         .spawn((
-            LobbyTv(format!("{kicker}|{title}|{button:?}")),
+            LobbyTv(format!(
+                "{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}"
+            )),
             SpatialBundle {
                 transform: Transform::from_xyz(pos.x, pos.y, LOBBY_PROP_Z),
                 ..default()
@@ -3659,16 +3824,24 @@ fn sync_next_game_tv_system(
                 text_2d_bounds: bevy::text::Text2dBounds {
                     size: Vec2::new(size.x - 12.0, size.y - 18.0),
                 },
-                transform: Transform::from_xyz(0.0, -5.0, 0.1),
+                transform: Transform::from_xyz(0.0, 7.0, 0.1),
                 ..default()
             });
-            // And the two buttons on the slab below it: start the thing the
-            // screen is advertising, or put something else on.
-            //
-            // Laid out from the same split the collider uses, so the face you
-            // aim for is the one you press.
-            let ((play_pos, play_size), (skip_pos, skip_size)) =
-                crate::core::elements::next_game_trigger::pad_halves(
+            parent.spawn(Text2dBundle {
+                text: Text::from_section(
+                    ellipsize(&next_line, 46),
+                    TextStyle {
+                        font: font.clone(),
+                        font_size: 10.0,
+                        color: Color::rgb(0.6, 0.75, 1.0),
+                    },
+                )
+                .with_alignment(TextAlignment::Center),
+                transform: Transform::from_xyz(0.0, -size.y / 2.0 + 15.0, 0.1),
+                ..default()
+            });
+            let [(play_pos, play_size), (next_pos, next_size), (skip_pos, skip_size)] =
+                crate::core::elements::next_game_trigger::pad_thirds(
                     bevy::math::Vec2::new(pad_pos.x, pad_pos.y),
                     pad_size,
                 );
@@ -3678,13 +3851,12 @@ fn sync_next_game_tv_system(
             // the place the party looks when they wonder why nothing
             // happened, so it has to look disabled rather than broken.
             let (label, colour) = match button {
-                TvButton::Back => ("BACK", Color::rgb(0.26, 0.60, 0.44)),
-                TvButton::Start => ("START", Color::rgb(0.26, 0.60, 0.44)),
-                TvButton::Disabled => ("START", Color::rgb(0.24, 0.26, 0.30)),
+                TvButton::Back => ("RESUME", Color::rgb(0.26, 0.60, 0.44)),
+                TvButton::Disabled => ("RESUME", Color::rgb(0.24, 0.26, 0.30)),
             };
             spawn_pad_button(
                 parent,
-                PadButton::NextGame { skips: false },
+                PadButton::NextGame { index: 0 },
                 Vec3::new(play_pos.x - pos.x, play_pos.y - pos.y, -1.0),
                 play_size,
                 label,
@@ -3693,19 +3865,36 @@ fn sync_next_game_tv_system(
             );
             spawn_pad_button(
                 parent,
-                PadButton::NextGame { skips: true },
+                PadButton::NextGame { index: 1 },
+                Vec3::new(next_pos.x - pos.x, next_pos.y - pos.y, -1.0),
+                next_size,
+                "PLAY NEXT",
+                if next_ready {
+                    Color::rgb(0.26, 0.60, 0.44)
+                } else {
+                    Color::rgb(0.24, 0.26, 0.30)
+                },
+                font.clone(),
+            );
+            spawn_pad_button(
+                parent,
+                PadButton::NextGame { index: 2 },
                 Vec3::new(skip_pos.x - pos.x, skip_pos.y - pos.y, -1.0),
                 skip_size,
                 "SKIP",
-                Color::rgb(0.42, 0.36, 0.62),
+                if can_skip {
+                    Color::rgb(0.42, 0.36, 0.62)
+                } else {
+                    Color::rgb(0.24, 0.26, 0.30)
+                },
                 font,
             );
         });
 }
 
 fn generate_qr_bevy_image(url: &str) -> Option<bevy::render::texture::Image> {
-    use qrcode::QrCode;
     use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    use qrcode::QrCode;
 
     let code = QrCode::new(url.as_bytes()).ok()?;
     let image_colors = code.to_colors();
@@ -3757,8 +3946,6 @@ fn generate_qr_bevy_image(url: &str) -> Option<bevy::render::texture::Image> {
     ))
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3781,7 +3968,11 @@ mod tests {
     /// Names already in use are never handed out again.
     #[test]
     fn random_unused_name_skips_taken() {
-        let taken: HashSet<&str> = FUN_NAMES.iter().copied().take(FUN_NAMES.len() - 1).collect();
+        let taken: HashSet<&str> = FUN_NAMES
+            .iter()
+            .copied()
+            .take(FUN_NAMES.len() - 1)
+            .collect();
         let last = FUN_NAMES[FUN_NAMES.len() - 1];
         for _ in 0..50 {
             assert_eq!(random_unused_name(&taken), Some(last));
@@ -3829,8 +4020,16 @@ mod tests {
         use gamenight_protocol::{Seat, SeatOccupant};
         let alice = PlayerId::new();
         let seats = vec![
-            Seat { index: 0, occupant: SeatOccupant::Empty, controller: None },
-            Seat { index: 1, occupant: SeatOccupant::Local { player_id: alice }, controller: None },
+            Seat {
+                index: 0,
+                occupant: SeatOccupant::Empty,
+                controller: None,
+            },
+            Seat {
+                index: 1,
+                occupant: SeatOccupant::Local { player_id: alice },
+                controller: None,
+            },
         ];
         let find = |idx: u32| {
             seats
@@ -3838,7 +4037,11 @@ mod tests {
                 .find(|s| s.index as u32 == idx)
                 .and_then(|s| s.occupant.player_id())
         };
-        assert_eq!(find(1), Some(alice), "an occupied seat resolves to its player");
+        assert_eq!(
+            find(1),
+            Some(alice),
+            "an occupied seat resolves to its player"
+        );
         assert_eq!(find(0), None, "an empty seat resolves to nobody");
         assert_eq!(find(9), None, "an unknown seat resolves to nobody");
     }
@@ -3850,7 +4053,6 @@ mod tests {
             assert!(avatar_image(bad).is_none(), "should reject {bad:?}");
         }
     }
-
 }
 
 #[cfg(test)]
@@ -3962,6 +4164,79 @@ mod next_game_status_tests {
             game: GameId::new(game),
             title: title.into(),
         }
+    }
+
+    #[test]
+    fn tv_skip_changes_upcoming_while_play_next_transitions() {
+        let (_, incoming_rx) = async_channel::unbounded();
+        let (outgoing_tx, _) = async_channel::unbounded();
+        let (_, party_rx) = async_channel::unbounded();
+        let (join_tx, commands) = async_channel::unbounded();
+        let mut bridge = GameNightBridge {
+            incoming: incoming_rx,
+            outgoing: outgoing_tx,
+            party_updates: party_rx,
+            join_tx,
+            current_session: None,
+            notified_finished: false,
+            latest_seats: Vec::new(),
+            lobby_rebuild_at: None,
+        lobby_away: false,
+            latest_players: Vec::new(),
+        latest_presence: Vec::new(),
+            player_gamepad: default(),
+            pads_connected: 0,
+            latest_library: Vec::new(),
+            latest_warm: None,
+            latest_warming: None,
+            latest_playlist: Vec::new(),
+            vote_open: false,
+            latest_installs: Vec::new(),
+            active_session: None,
+            hide_while_warm: false,
+            now_playing: None,
+            claim_seat: None,
+            claim_mark: None,
+            exit_requests: Vec::new(),
+        };
+        bridge.active_session = Some(session("duo", SessionPhase::Paused));
+        bridge.latest_warm = Some(session("quad", SessionPhase::Ready));
+        bridge.latest_playlist = vec![
+            entry("duo", "Duo"),
+            entry("quad", "Quad"),
+            entry("third", "Third"),
+        ];
+        assert!(matches!(
+            bridge.next_game_status(),
+            NextGameStatus::Live { paused: true, .. }
+        ));
+        assert!(matches!(
+            bridge.upcoming_game_status(),
+            NextGameStatus::Ready(_)
+        ));
+        bridge.skip_next_game();
+        assert!(
+            matches!(commands.try_recv().unwrap(), ClientMessage::PlayNext { game } if game == GameId::new("third"))
+        );
+        bridge.play_next_game();
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
+        bridge.press_tv_button();
+        assert!(matches!(
+            commands.try_recv().unwrap(),
+            ClientMessage::CloseOverlay
+        ));
+        bridge.latest_warm = Some(session("quad", SessionPhase::Preparing));
+        bridge.play_next_game();
+        assert!(
+            commands.try_recv().is_err(),
+            "loading games cannot be started"
+        );
+        bridge.latest_playlist.pop();
+        bridge.skip_next_game();
+        assert!(
+            commands.try_recv().is_err(),
+            "skip must not replay the current game"
+        );
     }
 
     /// Mirrors `next_game_status` without a live bridge (which owns channels):

@@ -48,6 +48,10 @@ python scripts/run-local.py --shelf /path/to/games.json
 
 The optional local character studio is enabled with `--studio`. It serves QR
 pairing and temporary avatars on your LAN, for trusted local networks only.
+Its Playlist tab shows the live game order and what is playing or up next.
+Drag entries or use the up/down buttons to reorder them without interrupting
+play. Changes appear on other devices automatically; conflicting edits ask
+for a refresh. The host still chooses games that fit the current party.
 No store, payments, cloud accounts or ownership database are included.
 
 ## Build a GameNight game
@@ -107,3 +111,11 @@ to adopt our engine or use our hosted services to contribute. Read
 GameNight's original code is MIT-licensed; see [LICENSE](LICENSE).
 The lobby and vendored Bones retain their own upstream notices. See
 [THIRD_PARTY.md](THIRD_PARTY.md) for source revisions, modifications and media credits.
+
+### LÖVE party games
+
+The [LÖVE Party Pack](games/love-party/README.md) contains eight original local
+multiplayer games for 2–4 players: Bumper Royale, Neon Trails, Meteor Dash, Blast Party Neon Siege, Ricochet Club, Paint Rush and Orbit Guard.
+Run `love games/love-party` or build individual `.love` files with
+`scripts/package-love-party.py`. The pack shares one GameNight adapter and
+includes simulation tests plus native Windows protocol certification in CI.

@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+mod playlist;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -79,6 +80,10 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/studio", get(serve_studio))
         .route("/mobile", get(serve_studio))
         .route("/session/:session_id", get(serve_studio))
+        .route(
+            "/api/playlist",
+            get(playlist::get).post(playlist::move_entry),
+        )
         .route("/api/profiles", post(save_profile))
         .route("/api/profiles/:id", get(get_profile))
         .route("/api/profiles/:id/join", post(join_session))

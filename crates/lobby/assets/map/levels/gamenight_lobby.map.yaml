@@ -929,8 +929,8 @@ layers:
   tiles: []
   elements:
   - pos:
-    - 168.0
-    - 368.0
+    - 352.0
+    - 124.0
     element: /elements/environment/qr_sign/qr_sign.element.yaml
   - pos:
     - 1120.0
@@ -942,7 +942,7 @@ layers:
     element: /elements/environment/music/music_screen.element.yaml
   - pos:
     - 560.0
-    - 135.0
+    - 163.0
     element: /elements/environment/next_game/next_game.element.yaml
   - pos:
     - 352.0

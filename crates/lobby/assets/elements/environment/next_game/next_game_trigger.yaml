@@ -1,12 +1,12 @@
-# The slab a player jumps onto: START at its left end, SKIP at its right,
-# with a gap between them (see `pad_halves`). It sits on top of the cabinet,
-# so this element's position is up there with it...
-#
-# As wide as the screen below it, because it carries two buttons now — at the
-# old 72 they were a player's width apart, which is no distance at all when
-# one of them leaves the game you're in.
-body_size: [144, 14]
-# ...and the screen is the cabinet's own face, below the button.
-screen_size: [144, 48]
-# From the button down to the centre of the screen it belongs to.
-screen_offset: [0, -43]
+# Three landing zones: resume the current game, play next, skip upcoming.
+body_size: [240, 14]
+screen_size: [240, 76]
+screen_offset: [0, -57]
+# Original synthesized rising ticks, then confirmation.
+hold_sounds:
+  - ./hold-0.wav
+  - ./hold-1.wav
+  - ./hold-2.wav
+  - ./hold-3.wav
+  - ./hold-4.wav
+  - ./hold-5.wav

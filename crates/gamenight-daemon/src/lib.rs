@@ -255,6 +255,16 @@ impl Shared {
             return;
         };
         let msg = match command {
+            GameCommand::PartyUpdated {
+                seats,
+                players,
+                presence,
+            } => ServerMessage::PartyUpdated {
+                session,
+                seats,
+                players,
+                presence,
+            },
             GameCommand::Prepare { seats, players } => ServerMessage::Prepare {
                 session,
                 game: game.clone(),
@@ -785,10 +795,21 @@ async fn run_inner(
         }
         s.apply_effects(fx, None);
     }
+    let mut presence_tick = tokio::time::interval(std::time::Duration::from_secs(1));
+    let mut presence_at = std::time::Instant::now();
     let mut lifetime_tick = tokio::time::interval(std::time::Duration::from_millis(200));
     loop {
         let accepted = tokio::select! {
             accepted = listener.accept() => accepted,
+            _ = presence_tick.tick() => {
+                let now = std::time::Instant::now();
+                let elapsed = now.duration_since(presence_at);
+                presence_at = now;
+                let mut s = shared.lock().await;
+                let fx = s.night.handle(Command::PresenceTick { elapsed });
+                s.apply_effects(fx, None);
+                continue;
+            },
             _ = lifetime_tick.tick(), if watched_lobby.is_some() => {
                 let mut s = shared.lock().await;
                 let lobby = watched_lobby.as_ref().expect("guarded");
@@ -1098,6 +1119,28 @@ fn message_to_command(
     let is_game = matches!(registration, Registration::Game(_));
     let command = match msg {
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
+        ClientMessage::Participation {
+            session,
+            instant_join,
+        } => match registration {
+            Registration::Game(game) => Command::Participation {
+                game: game.clone(),
+                session,
+                instant_join,
+            },
+            _ => return Err("only games declare participation".into()),
+        },
+        ClientMessage::ControllerInput {
+            session,
+            controller,
+        } => Command::ControllerInput {
+            game: match registration {
+                Registration::Game(game) => Some(game.clone()),
+                _ => None,
+            },
+            session,
+            controller,
+        },
 
         // Game messages.
         ClientMessage::Ready { session } if is_game => Command::SessionReady { session },
@@ -1168,7 +1211,17 @@ fn message_to_command(
         }
         ClientMessage::AssignSeat { seat, occupant } => Command::AssignSeat { seat, occupant },
         ClientMessage::SwapSeats { a, b } => Command::SwapSeats { a, b },
+        ClientMessage::BindController {
+            player_id,
+            controller,
+        } => Command::BindController {
+            player_id,
+            controller,
+        },
         ClientMessage::SetPlaylist { entries } => Command::SetPlaylist { entries },
+        ClientMessage::MovePlaylistEntry { expected, from, to } => {
+            Command::MovePlaylistEntry { expected, from, to }
+        }
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
         ClientMessage::Pause => Command::Pause,

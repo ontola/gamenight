@@ -499,3 +499,60 @@ A host may replace a preparing session when seats change. A `ready` reply for
 a recently disposed session can already be in flight. GameNight ignores these
 late replies for the 64 most recent disposals; it never applies them to the
 replacement session. Unknown session IDs still produce a protocol error.
+
+## Player activity, sleep and joining during play
+
+Presence is host-authoritative and separate from player identity. A controller-bound
+player warns after 60 seconds without meaningful input and sleeps after 75 seconds.
+Input wakes the same player immediately; their ID, name, controller binding and seat
+remain intact. Sleeping players do not block votes and cannot activate lobby TV pads.
+The lobby shows `zZz`, or a warning to move before sleep.
+
+After `prepare`, games opt in before replying `ready`:
+
+```json
+{"type":"participation","session":"<session UUID>","instant_join":true}
+```
+
+Use `instant_join:false` when a round has a fixed roster. Both values enable presence
+notifications. Legacy games need no changes: their active matches do not advance AFK
+clocks, and they receive no new lifecycle messages.
+
+Report real human activity from **all** controllers, including unassigned devices:
+
+```json
+{"type":"controller_input","session":"<active session UUID>","controller":"ordinal:0"}
+```
+
+`ordinal:N` is the zero-based physical controller index used by `seats[].controller`.
+Use the same enumeration when binding gameplay input. Apply a 0.25 stick/trigger
+deadzone, ignore device-connect events, and throttle held input to once per second
+per controller. Bots, animation, repeated network heartbeats and simulated input must
+never report activity. A game may report only while its own session is running and
+foreground; reports from stale sessions, warm games and other game IDs are ignored.
+The persistent lobby can report through its overlay connection without `session`.
+
+A previously unseen controller joins the party once, up to the seat limit. Games
+with `instant_join:true` receive the new player in their current match, subject to
+the game's maximum player count. Other games keep their prepared roster; the new
+player joins on the next preparation. Repeated input never creates duplicate players.
+
+Opted-in games receive a full snapshot on declaration and subsequent changes:
+
+```json
+{"type":"party_updated","session":"<session UUID>","seats":[],"players":[],"presence":[{"player_id":"<player UUID>","state":"warning"}]}
+```
+
+The actual message contains the full seat/player arrays. Presence states are `active`,
+`warning`, and `sleeping`; absent presence means active/untracked. Overlays receive
+these records in `party_state.party.presence`. Preserve match state and scores when
+applying updates. Show the warning, then visually distinguish sleeping players.
+Games choose how sleeping characters behave (neutral input, safe removal, or AI).
+Sleep is not a `leave_party`: never reassign the sleeping player's controller.
+
+Rust games use `GameNight::participation`, `GameNight::controller_input`, and
+`GameEvent::PartyUpdated`. The LOVE party pack implements these messages in its
+shared lifecycle module; sleeping players use AI until they wake. Neon Siege is the
+first instant-join implementation: a new pilot spawns centrally with three seconds
+of protection, preserving the current wave and team score. Other pack games retain
+fixed round rosters. Custom clients can send the JSON directly.

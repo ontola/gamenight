@@ -16,7 +16,8 @@ Failed downloads appear in the lobby and are retried the next time GameNight sta
 
 Connect two controllers and press a button on each to join the lobby. Pinpals
 is the first game. Walk onto Start and jump to play. Back/Select returns to
-the lobby. The game should remain hidden and silent while preparing.
+the lobby. Back always opens the lobby; repeated presses do not resume the game.
+Use the lobby Start interaction to return to play. The game should remain hidden and silent while preparing.
 
 Installed builds check the public GitHub releases for updates in the background.
 A downloaded update is applied only after the lobby and all game processes have

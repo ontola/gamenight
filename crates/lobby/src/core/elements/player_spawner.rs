@@ -28,6 +28,21 @@ pub struct PlayerSpawner;
 #[derive(Clone, Debug, HasSchema, Default)]
 pub struct CurrentSpawner(pub usize);
 
+#[derive(Clone, Debug, HasSchema, Default)]
+pub struct LobbySpawnOrder(pub Vec<usize>);
+
+fn shuffled_spawn_order(count: usize) -> Vec<usize> {
+    use turborand::prelude::*;
+    let rng = Rng::new();
+    let mut remaining: Vec<_> = (0..count).collect();
+    let mut order = Vec::with_capacity(count);
+    while let Some(&chosen) = rng.sample(&remaining) {
+        order.push(chosen);
+        remaining.retain(|&index| index != chosen);
+    }
+    order
+}
+
 fn hydrate(
     entities: Res<Entities>,
     mut hydrated: CompMut<MapElementHydrated>,
@@ -56,6 +71,8 @@ fn hydrate(
 fn update(
     mut entities: ResMutInit<Entities>,
     mut current_spawner: ResMutInit<CurrentSpawner>,
+    mut lobby_order: ResMutInit<LobbySpawnOrder>,
+    lobby: ResMutInit<crate::core::scoring::LobbyMode>,
     player_spawners: Comp<PlayerSpawner>,
     mut player_indexes: CompMut<PlayerIdx>,
     mut transforms: CompMut<Transform>,
@@ -71,6 +88,10 @@ fn update(
         .map(|(_ent, (_spawner, transform))| transform.translation)
         .collect::<Vec<_>>();
 
+    if lobby.0 && lobby_order.0.len() != spawn_points.len() {
+        lobby_order.0 = shuffled_spawn_order(spawn_points.len());
+    }
+
     // For every player
     for i in 0..MAX_PLAYERS {
         let player = &player_inputs.players[i as usize];
@@ -81,7 +102,10 @@ fn update(
             current_spawner.0 += 1;
             current_spawner.0 %= spawn_points.len().max(1);
 
-            let Some(mut spawn_point) = spawn_points.get(current_spawner.0).copied() else {
+            let index = if lobby.0 {
+                lobby_order.0.get(i as usize % lobby_order.0.len().max(1)).copied().unwrap_or(0)
+            } else { current_spawner.0 };
+            let Some(mut spawn_point) = spawn_points.get(index).copied() else {
                 return;
             };
 
@@ -99,5 +123,23 @@ fn update(
                 &entities,
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn lobby_spawns_are_distinct_safe_points_and_vary() {
+        let mut seen = std::collections::HashSet::new();
+        for _ in 0..64 {
+            let order = shuffled_spawn_order(4);
+            seen.insert(order.clone());
+            let mut sorted = order;
+            sorted.sort_unstable();
+            assert_eq!(sorted, vec![0, 1, 2, 3]);
+        }
+        assert!(seen.len() > 1);
+        assert!(shuffled_spawn_order(0).is_empty());
     }
 }

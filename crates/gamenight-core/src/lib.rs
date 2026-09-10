@@ -91,6 +91,314 @@ mod night_tests {
             .collect()
     }
 
+    fn activity(controller: &str) -> Command {
+        Command::ControllerInput {
+            game: None,
+            session: None,
+            controller: controller.into(),
+        }
+    }
+    fn idle(seconds: u64) -> Command {
+        Command::PresenceTick {
+            elapsed: std::time::Duration::from_secs(seconds),
+        }
+    }
+
+    #[test]
+    fn inactivity_warns_then_sleeps_and_input_wakes_the_same_identity() {
+        use gamenight_protocol::PresenceState::*;
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Joep", None, None));
+        let player = night.snapshot().players[0].clone();
+        night.handle(Command::BindController {
+            player_id: player.id,
+            controller: "ordinal:2".into(),
+        });
+        night.handle(idle(59));
+        assert_eq!(night.snapshot().presence[0].state, Active);
+        night.handle(idle(1));
+        assert_eq!(night.snapshot().presence[0].state, Warning);
+        night.handle(idle(15));
+        assert_eq!(night.snapshot().presence[0].state, Sleeping);
+        night.handle(activity("ordinal:2"));
+        assert_eq!(night.snapshot().presence[0].state, Active);
+        assert_eq!(night.snapshot().players, vec![player]);
+        night.handle(idle(59));
+        assert_eq!(night.snapshot().presence[0].state, Active);
+    }
+
+    #[test]
+    fn instant_join_is_opt_in_idempotent_and_session_scoped() {
+        let mut night = GameNight::default();
+        let mut game = meta("arena");
+        game.max_players = Some(2);
+        night.set_library(vec![game]);
+        night.handle(join_cmd("First", None, None));
+        let first = night.snapshot().players[0].id;
+        night.handle(Command::BindController {
+            player_id: first,
+            controller: "ordinal:0".into(),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("arena"),
+        });
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("arena")],
+        });
+        let session = night.snapshot().warm_session.unwrap().id;
+        night.handle(Command::SessionReady { session });
+        assert_eq!(night.snapshot().players.len(), 1);
+        night.handle(idle(100)); // legacy game cannot report activity
+        assert_eq!(
+            night.snapshot().presence[0].state,
+            gamenight_protocol::PresenceState::Active
+        );
+        night.handle(Command::Participation {
+            game: GameId::new("arena"),
+            session,
+            instant_join: true,
+        });
+        night.handle(Command::ControllerInput {
+            game: Some(GameId::new("impostor")),
+            session: Some(session),
+            controller: "ordinal:1".into(),
+        });
+        assert_eq!(night.snapshot().players.len(), 1);
+        let fx = night.handle(activity("ordinal:1"));
+        assert_eq!(night.snapshot().players.len(), 2);
+        assert_eq!(night.snapshot().active_session.unwrap().id, session);
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::PartyUpdated { seats, .. }, .. } if seats.iter().filter(|s| s.occupant.player_id().is_some()).count() == 2)));
+        night.handle(activity("ordinal:1"));
+        night.handle(activity("ordinal:2"));
+        assert_eq!(night.snapshot().players.len(), 2);
+        night.handle(Command::OverlayOpened);
+        night.handle(Command::ControllerInput {
+            game: Some(GameId::new("arena")),
+            session: Some(session),
+            controller: "ordinal:3".into(),
+        });
+        assert_eq!(night.snapshot().players.len(), 2);
+    }
+
+    #[test]
+    fn games_without_instant_join_keep_their_roster_until_next_round() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("First", None, None));
+        night.handle(Command::GameConnected {
+            game: GameId::new("arena"),
+        });
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("arena")],
+        });
+        let session = night.snapshot().warm_session.unwrap().id;
+        night.handle(Command::Participation {
+            game: GameId::new("arena"),
+            session,
+            instant_join: false,
+        });
+        night.handle(Command::SessionReady { session });
+        let fx = night.handle(activity("ordinal:1"));
+        assert_eq!(night.snapshot().players.len(), 2);
+        assert_eq!(night.snapshot().active_session.unwrap().id, session);
+        assert!(fx.iter().any(
+            |e| matches!(e, Effect::ToGame { command: GameCommand::PartyUpdated { seats, .. }, .. }
+            if seats.iter().filter(|s| s.occupant.player_id().is_some()).count() == 1)
+        ));
+    }
+
+    #[test]
+    fn playlist_move_preserves_play_and_rewarms_only_when_next_changes() {
+        let mut night = GameNight::default();
+        for game in ["a", "b", "c", "d"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c"), entry("d")],
+        });
+        let (_, active) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: active });
+        let before = night.snapshot();
+        let warm = before.warm_session.unwrap().id;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: before.playlist,
+            from: 3,
+            to: 2,
+        });
+        assert!(disposed_sessions(&fx).is_empty());
+        assert_eq!(night.snapshot().warm_session.unwrap().id, warm);
+        let expected = night.snapshot().playlist;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: expected.clone(),
+            from: 0,
+            to: 2,
+        });
+        assert_eq!(disposed_sessions(&fx), vec![warm]);
+        let after = night.snapshot();
+        assert_eq!(after.active_session.unwrap().id, active);
+        assert_eq!(after.playlist.current, Some(2));
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
+        let snapshot = night.snapshot();
+        for (expected, from, to) in [(expected, 1, 0), (snapshot.playlist.clone(), 99, 0)] {
+            let fx = night.handle(Command::MovePlaylistEntry { expected, from, to });
+            assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
+            assert_eq!(night.snapshot(), snapshot);
+        }
+    }
+
+    #[test]
+    fn reordered_next_game_wins_over_player_count_recommendation() {
+        let mut night = GameNight::default();
+        let mut recommended = meta("b");
+        recommended.best_players = Some(2);
+        let mut moved = meta("c");
+        moved.best_players = Some(4);
+        night.set_library(vec![meta("a"), recommended, moved]);
+        for name in ["one", "two"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        for game in ["a", "b", "c"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c")],
+        });
+        let first = night.snapshot().warm_session.unwrap().id;
+        night.handle(Command::SessionReady { session: first });
+        night.handle(Command::Next);
+        let before = night.snapshot();
+        assert_eq!(
+            before.active_session.as_ref().unwrap().game,
+            GameId::new("a")
+        );
+        let old_warm = before.warm_session.unwrap().id;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: before.playlist,
+            from: 2,
+            to: 1,
+        });
+        assert_eq!(disposed_sessions(&fx), vec![old_warm]);
+        let after = night.snapshot();
+        assert_eq!(after.active_session.unwrap().id, first);
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
+        assert!(fx.iter().any(|e| matches!(e, Effect::StateChanged)));
+    }
+
+    #[test]
+    fn three_players_never_warm_a_two_player_game() {
+        let mut night = GameNight::default();
+        let mut duo = meta("duo");
+        duo.max_players = Some(2);
+        let mut tank = meta("tank");
+        tank.max_players = Some(4);
+        night.set_library(vec![duo, tank]);
+        for name in ["one", "two", "three"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        for game in ["duo", "tank"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("duo"), entry("tank")],
+        });
+        let (game, session) = prepared_session(&fx).unwrap();
+        assert_eq!(game, GameId::new("tank"));
+        night.handle(Command::SessionReady { session });
+        let fx = night.handle(Command::PlayNext {
+            game: GameId::new("duo"),
+        });
+        assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("duo")],
+        });
+        assert!(prepared_session(&fx).is_none());
+        assert!(night.snapshot().warming.is_none());
+    }
+
+    #[test]
+    fn resume_reprepares_tanks_for_a_third_player() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("one", None, None));
+        night.handle(join_cmd("two", None, None));
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let (_, old) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: old });
+        night.handle(Command::OverlayOpened);
+        night.handle(join_cmd("three", None, None));
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(disposed_sessions(&fx).contains(&old));
+        let (_, fresh) = prepared_session(&fx).unwrap();
+        assert_ne!(fresh, old);
+        assert!(fx.iter().any(|effect| matches!(effect, Effect::ToGame { command: GameCommand::Prepare { seats, .. }, .. } if seats.iter().filter(|s| !s.occupant.is_empty()).count() == 3)));
+        night.handle(Command::SessionReady { session: fresh });
+        assert_eq!(night.snapshot().active_session.unwrap().id, fresh);
+    }
+
+    #[test]
+    fn finishing_hides_the_game_and_returns_focus_to_lobby() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        night.handle(join_cmd("one", None, None));
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let (_, session) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session });
+        night.handle(Command::Next);
+        let fx = night.handle(Command::SessionFinished { session });
+        assert!(night.snapshot().overlay_open);
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Pause,
+                ..
+            }
+        )));
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::LobbyFocus { active: true, .. })));
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(!fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Resume,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn controller_binding_is_sent_with_the_named_player_to_the_game() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ada", Some(0), None));
+        let player_id = night.snapshot().players[0].id;
+        night.handle(Command::GameConnected {
+            game: GameId::new("tank"),
+        });
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("tank")],
+        });
+        let fx = night.handle(Command::BindController {
+            player_id,
+            controller: "ordinal:2".into(),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { seats, players }, .. }
+            if seats[0].controller.as_deref() == Some("ordinal:2") && seats[0].occupant.player_id() == Some(player_id) && players[0].name == "Ada")));
+    }
+
     /// The whole MVP evening: two games connect, playlist set, first game
     /// auto-starts, "Next" transitions instantly, the previous game is
     /// disposed and the following one warms.
@@ -1762,11 +2070,9 @@ mod player_count_fit_tests {
             .any(|effect| matches!(effect, Effect::Reject { .. })));
     }
 
-    /// Re-warming throws away a loaded process, so only seating does it.
-    /// Everything else about a player — their name, their avatar — leaves the
-    /// warm session exactly where it is.
+    /// Prepare carries profiles, so a changed name must reach the warm game.
     #[test]
-    fn a_rename_leaves_the_warm_session_alone() {
+    fn a_rename_refreshes_the_warm_profile() {
         let mut night = GameNight::default();
         night.set_library(vec![game("wide", 1, 4, None)]);
         night.handle(join("a"));
@@ -1777,15 +2083,12 @@ mod player_count_fit_tests {
         assert!(before.is_some());
 
         let player_id = night.snapshot().players[0].id;
-        night.handle(Command::RenamePlayer {
+        let fx = night.handle(Command::RenamePlayer {
             player_id,
             name: "Ada".into(),
         });
-        assert_eq!(
-            night.snapshot().warm_session.map(|s| s.id),
-            before,
-            "a rename is not a seating change"
-        );
+        assert_ne!(night.snapshot().warm_session.map(|s| s.id), before);
+        assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { players, .. }, .. } if players.iter().any(|p| p.name == "Ada"))));
     }
 
     /// Nothing fits: warm something anyway. A lobby that can't start a game

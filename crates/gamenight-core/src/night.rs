@@ -6,7 +6,7 @@
 //! [`Command`]s and executes the returned [`Effect`]s. That keeps every
 //! transition rule unit-testable.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use gamenight_protocol::{
     GameId, GameMeta, GameSettings, InstallState, InstallStatus, MediaAction, NowPlaying,
@@ -21,6 +21,20 @@ use crate::vote::VoteBoard;
 /// Everything that can happen to the night, from any source.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
+    Participation {
+        game: GameId,
+        session: SessionId,
+        instant_join: bool,
+    },
+    ControllerInput {
+        game: Option<GameId>,
+        session: Option<SessionId>,
+        controller: String,
+    },
+    PresenceTick {
+        elapsed: std::time::Duration,
+    },
+
     /// A game process for this title connected to the daemon.
     GameConnected {
         game: GameId,
@@ -61,8 +75,19 @@ pub enum Command {
         a: u8,
         b: u8,
     },
+    /// Physical gamepad's ordinal in the host's connected-controller list.
+    BindController {
+        player_id: PlayerId,
+        controller: String,
+    },
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
+    },
+    /// Move an existing entry without interrupting play. Reject stale snapshots.
+    MovePlaylistEntry {
+        expected: gamenight_protocol::PlaylistSnapshot,
+        from: usize,
+        to: usize,
     },
     /// Skip to the next game immediately, no vote.
     Next,
@@ -137,6 +162,12 @@ pub enum Command {
 /// A lifecycle command the daemon must deliver to a game process.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameCommand {
+    PartyUpdated {
+        seats: Vec<Seat>,
+        players: Vec<Player>,
+        presence: Vec<gamenight_protocol::PlayerPresence>,
+    },
+
     Prepare {
         seats: Vec<Seat>,
         players: Vec<Player>,
@@ -187,6 +218,8 @@ pub enum Effect {
 #[derive(Debug)]
 pub struct GameNight {
     players: Vec<Player>,
+    presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
+    participation: HashMap<SessionId, bool>,
     seats: Vec<Seat>,
     playlist: Playlist,
     connected_games: HashSet<GameId>,
@@ -196,6 +229,9 @@ pub struct GameNight {
     /// they have gone stale — the party keeps changing while a game warms,
     /// and a session prepared for one player must not be started for two.
     warm_seats: Vec<Seat>,
+    active_seats: Vec<Seat>,
+    warm_players: Vec<Player>,
+    active_players: Vec<Player>,
     // Bounded tombstones for replies already in flight when Dispose is sent.
     retired_sessions: VecDeque<SessionId>,
     history: Vec<GameId>,
@@ -243,6 +279,8 @@ impl GameNight {
     pub fn new(seat_count: u8) -> Self {
         Self {
             players: Vec::new(),
+            presence: HashMap::new(),
+            participation: HashMap::new(),
             seats: (0..seat_count)
                 .map(|index| Seat {
                     index,
@@ -255,6 +293,9 @@ impl GameNight {
             active: None,
             warm: None,
             warm_seats: Vec::new(),
+            active_seats: Vec::new(),
+            warm_players: Vec::new(),
+            active_players: Vec::new(),
             retired_sessions: VecDeque::new(),
             history: Vec::new(),
             vote: VoteBoard::default(),
@@ -348,6 +389,31 @@ impl GameNight {
     pub fn handle(&mut self, command: Command) -> Vec<Effect> {
         let mut fx = Vec::new();
         match command {
+            Command::Participation {
+                game,
+                session,
+                instant_join,
+            } => {
+                if self
+                    .active
+                    .iter()
+                    .chain(self.warm.iter())
+                    .any(|s| s.id == session && s.game == game)
+                {
+                    self.participation.insert(session, instant_join);
+                    self.send_participation(&mut fx);
+                } else {
+                    fx.push(Effect::Reject {
+                        reason: "stale participation session".into(),
+                    });
+                }
+            }
+            Command::ControllerInput {
+                game,
+                session,
+                controller,
+            } => self.on_controller_input(game, session, controller, &mut fx),
+            Command::PresenceTick { elapsed } => self.tick_presence(elapsed, &mut fx),
             Command::GameConnected { game } => {
                 let is_lobby = self.lobby_game.as_ref() == Some(&game);
                 self.connected_games.insert(game);
@@ -385,8 +451,79 @@ impl GameNight {
                 self.on_set_player_avatar(player_id, avatar, &mut fx)
             }
             Command::AssignSeat { seat, occupant } => self.on_assign_seat(seat, occupant, &mut fx),
+            Command::BindController {
+                player_id,
+                controller,
+            } => {
+                if let Some(seat) = self
+                    .seats
+                    .iter_mut()
+                    .find(|s| s.occupant.player_id() == Some(player_id))
+                {
+                    seat.controller = Some(controller);
+                    self.presence.entry(player_id).or_insert((
+                        std::time::Duration::ZERO,
+                        gamenight_protocol::PresenceState::Active,
+                    ));
+                    self.rewarm_if_misfit(&mut fx);
+                    fx.push(Effect::StateChanged);
+                } else {
+                    fx.push(Effect::Reject {
+                        reason: "unknown seated player".into(),
+                    });
+                }
+            }
             Command::SwapSeats { a, b } => self.on_swap_seats(a, b, &mut fx),
             Command::SetPlaylist { entries } => self.on_set_playlist(entries, &mut fx),
+            Command::MovePlaylistEntry { expected, from, to } => {
+                if self.playlist.snapshot() != expected
+                    || from >= expected.entries.len()
+                    || to >= expected.entries.len()
+                {
+                    fx.push(Effect::Reject {
+                        reason: "playlist changed or invalid position; refresh and try again"
+                            .into(),
+                    });
+                } else if from == to {
+                    fx.push(Effect::StateChanged);
+                } else {
+                    let mut entries = expected.entries;
+                    let entry = entries.remove(from);
+                    entries.insert(to, entry);
+                    // Track entries by their old index, including repeated games.
+                    let remap = |index: usize| {
+                        if index == from {
+                            to
+                        } else if from < to && index > from && index <= to {
+                            index - 1
+                        } else if to < from && index >= to && index < from {
+                            index + 1
+                        } else {
+                            index
+                        }
+                    };
+                    self.playlist.set_entries(entries);
+                    if let Some(current) = expected.current {
+                        self.playlist.set_current(remap(current));
+                    }
+                    if let Some(active) = &mut self.active {
+                        active.playlist_index = remap(active.playlist_index);
+                    }
+                    if let Some(warm) = &mut self.warm {
+                        warm.playlist_index = remap(warm.playlist_index);
+                    }
+                    self.next_up = None;
+                    if self
+                        .warm
+                        .as_ref()
+                        .is_some_and(|warm| Some(warm.playlist_index) != self.warm_target())
+                    {
+                        self.dispose_warm(&mut fx);
+                    }
+                    self.maybe_warm(&mut fx);
+                    fx.push(Effect::StateChanged);
+                }
+            }
             Command::Next => {
                 self.pending_transition = true;
                 self.try_transition(&mut fx);
@@ -416,8 +553,180 @@ impl GameNight {
                 self.on_set_setting(game, key, value, &mut fx)
             }
         }
+        if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
+            self.presence
+                .retain(|id, _| self.players.iter().any(|p| p.id == *id));
+            let sessions: HashSet<_> = self
+                .active
+                .iter()
+                .chain(self.warm.iter())
+                .map(|s| s.id)
+                .collect();
+            self.participation.retain(|id, _| sessions.contains(id));
+            self.send_participation(&mut fx);
+        }
         self.sync_lobby_focus(&mut fx);
         fx
+    }
+
+    fn presence_snapshot(&self) -> Vec<gamenight_protocol::PlayerPresence> {
+        self.players
+            .iter()
+            .filter_map(|p| {
+                self.presence
+                    .get(&p.id)
+                    .map(|(_, state)| gamenight_protocol::PlayerPresence {
+                        player_id: p.id,
+                        state: *state,
+                    })
+            })
+            .collect()
+    }
+
+    fn send_participation(&mut self, fx: &mut Vec<Effect>) {
+        for session in self.active.iter().chain(self.warm.iter()) {
+            if let Some(instant_join) = self.participation.get(&session.id) {
+                // Non-opted-in games keep their prepared roster until next round.
+                let live = *instant_join;
+                let active = self.active.as_ref().is_some_and(|s| s.id == session.id);
+                fx.push(Effect::ToGame {
+                    game: session.game.clone(),
+                    session: session.id,
+                    command: GameCommand::PartyUpdated {
+                        seats: if live {
+                            self.seats_for(&session.game)
+                        } else if active {
+                            self.active_seats.clone()
+                        } else {
+                            self.warm_seats.clone()
+                        },
+                        players: self.players.clone(),
+                        presence: self.presence_snapshot(),
+                    },
+                });
+            }
+        }
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|s| self.participation.get(&s.id) == Some(&true))
+        {
+            self.active_seats = self.seats_for(&self.active.as_ref().unwrap().game);
+            self.active_players = self.players.clone();
+        }
+    }
+
+    fn on_controller_input(
+        &mut self,
+        game: Option<GameId>,
+        session: Option<SessionId>,
+        controller: String,
+        fx: &mut Vec<Effect>,
+    ) {
+        // Only the foreground session may report input; warm games cannot wake
+        // or join players. Controller identifiers stay bounded and canonical.
+        let Some(ordinal) = controller
+            .strip_prefix("ordinal:")
+            .and_then(|v| v.parse::<u8>().ok())
+        else {
+            return;
+        };
+        let controller = format!("ordinal:{ordinal}");
+        if let Some(game) = game {
+            if !self.active.as_ref().is_some_and(|s| {
+                Some(s.id) == session
+                    && s.game == game
+                    && s.phase == SessionPhase::Running
+                    && !self.overlay_open
+                    && self.participation.contains_key(&s.id)
+            }) {
+                return;
+            }
+        } else if session.is_some() {
+            return;
+        }
+        let mut player = self
+            .seats
+            .iter()
+            .find(|s| s.controller.as_deref() == Some(&controller))
+            .and_then(|s| s.occupant.player_id());
+        if player.is_none() {
+            let can_join = self.active.as_ref().is_some_and(|s| {
+                s.phase == SessionPhase::Running
+                    && !self.overlay_open
+                    && (self.participation.get(&s.id) != Some(&true)
+                        || self
+                            .library
+                            .iter()
+                            .find(|m| m.id == s.game)
+                            .and_then(|m| m.max_players)
+                            .map_or(true, |max| self.seated_count() < max))
+            });
+            if !can_join {
+                return;
+            }
+            let Some(index) = self
+                .seats
+                .iter()
+                .find(|s| s.occupant.is_empty())
+                .map(|s| s.index)
+            else {
+                return;
+            };
+            self.on_join(
+                format!("Player {}", index + 1),
+                Some(index),
+                None,
+                None,
+                Vec::new(),
+                fx,
+            );
+            let seat = &mut self.seats[index as usize];
+            seat.controller = Some(controller);
+            player = seat.occupant.player_id();
+            self.rewarm_if_misfit(fx);
+        }
+        if let Some(id) = player {
+            use gamenight_protocol::PresenceState::Active;
+            let previous = self
+                .presence
+                .insert(id, (std::time::Duration::ZERO, Active));
+            if previous.is_none_or(|(_, state)| state != Active) {
+                fx.push(Effect::StateChanged);
+            }
+        }
+    }
+
+    fn tick_presence(&mut self, elapsed: std::time::Duration, fx: &mut Vec<Effect>) {
+        // Legacy games cannot report activity, so their matches do not age AFK
+        // clocks. Paused matches also leave the party's clocks alone.
+        if !self.overlay_open
+            && self.active.as_ref().is_some_and(|s| {
+                s.phase != SessionPhase::Running || !self.participation.contains_key(&s.id)
+            })
+        {
+            return;
+        }
+        use gamenight_protocol::PresenceState::*;
+        let mut changed = false;
+        for (idle, state) in self.presence.values_mut() {
+            *idle = idle.saturating_add(elapsed);
+            let next = if idle.as_secs() >= 75 {
+                Sleeping
+            } else if idle.as_secs() >= 60 {
+                Warning
+            } else {
+                Active
+            };
+            changed |= next != *state;
+            *state = next;
+        }
+        if changed {
+            fx.push(Effect::StateChanged);
+            if let Some(decision) = self.vote.reevaluate(&self.voters()) {
+                self.apply_vote_decision(decision, fx);
+            }
+        }
     }
 
     /// Notifies the lobby game whenever whether it has the couch's
@@ -448,6 +757,7 @@ impl GameNight {
 
     pub fn snapshot(&self) -> PartySnapshot {
         PartySnapshot {
+            presence: self.presence_snapshot(),
             players: self.players.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.snapshot(),
@@ -502,6 +812,12 @@ impl GameNight {
         self.seats
             .iter()
             .filter_map(|s| s.occupant.player_id())
+            .filter(|id| {
+                !self
+                    .presence
+                    .get(id)
+                    .is_some_and(|(_, state)| *state == gamenight_protocol::PresenceState::Sleeping)
+            })
             .collect()
     }
 
@@ -556,6 +872,7 @@ impl GameNight {
                 reason: format!("no such player: {:?}", player_id.0),
             });
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_swap_seats(&mut self, a: u8, b: u8, fx: &mut Vec<Effect>) {
@@ -597,6 +914,26 @@ impl GameNight {
     }
 
     fn on_overlay_closed(&mut self, fx: &mut Vec<Effect>) {
+        // Prepare is the roster boundary. Restart a paused round when seats
+        // changed, instead of resuming a game that cannot see the new player.
+        if let Some(active) = &self.active {
+            if self.overlay_open
+                && self.overlay_paused
+                && (self.active_seats != self.seats_for(&active.game)
+                    || self.active_players != self.players)
+            {
+                let index = active.playlist_index;
+                let fits = self.game_has_capacity(&active.game);
+                self.dispose_warm(fx);
+                self.dispose_active(fx);
+                self.next_up = fits.then_some(index);
+                self.pending_transition = true;
+                self.maybe_warm(fx);
+                self.try_transition(fx);
+                fx.push(Effect::StateChanged);
+                return;
+            }
+        }
         if self.overlay_open {
             self.overlay_open = false;
             // Only undo our own pause; an explicit pause stays paused.
@@ -685,6 +1022,7 @@ impl GameNight {
                 reason: "unknown player".into(),
             }),
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_set_player_color(&mut self, player_id: PlayerId, color: String, fx: &mut Vec<Effect>) {
@@ -697,6 +1035,7 @@ impl GameNight {
                 reason: "unknown player".into(),
             }),
         }
+        self.rewarm_if_misfit(fx);
     }
 
     fn on_assign_seat(&mut self, seat: u8, occupant: SeatOccupant, fx: &mut Vec<Effect>) {
@@ -749,6 +1088,12 @@ impl GameNight {
     /// Make `game` the next one up. If it's already in the playlist, aim the
     /// warm slot at it; otherwise insert it right after the current entry.
     fn on_play_next(&mut self, game: GameId, fx: &mut Vec<Effect>) {
+        if !self.game_has_capacity(&game) {
+            fx.push(Effect::Reject {
+                reason: "this game cannot fit everyone in the party".into(),
+            });
+            return;
+        }
         let index = match self.playlist.position_of(&game) {
             Some(i) => i,
             None => {
@@ -986,6 +1331,16 @@ impl GameNight {
                     self.try_transition(fx);
                 } else {
                     self.vote.open();
+                    self.overlay_open = true;
+                    // Finished games still own a window: pause tells the SDK
+                    // to hide it while the lobby takes over for the next pick.
+                    if let Some(active) = &self.active {
+                        fx.push(Effect::ToGame {
+                            game: active.game.clone(),
+                            session: active.id,
+                            command: GameCommand::Pause,
+                        });
+                    }
                 }
                 fx.push(Effect::StateChanged);
             }
@@ -1135,6 +1490,14 @@ impl GameNight {
     /// Whether `game`'s declared player range covers the current party.
     /// Games the shelf knows nothing about fit anything — see
     /// `GameMeta::fits_players`.
+    fn game_has_capacity(&self, game: &GameId) -> bool {
+        self.library
+            .iter()
+            .find(|m| &m.id == game)
+            .and_then(|m| m.max_players)
+            .is_none_or(|max| self.seated_count() <= max)
+    }
+
     fn game_fits_party(&self, game: &GameId) -> bool {
         let players = self.seated_count();
         self.library
@@ -1159,7 +1522,12 @@ impl GameNight {
     /// lobby game if rotation would otherwise land on it.
     fn warm_target(&self) -> Option<usize> {
         if let Some(index) = self.next_up {
-            if self.is_playable(index) {
+            if self.is_playable(index)
+                && self
+                    .playlist
+                    .get(index)
+                    .is_some_and(|e| self.game_has_capacity(&e.game))
+            {
                 return Some(index);
             }
             // An explicit pick somehow landed on the lobby game — fall
@@ -1169,35 +1537,25 @@ impl GameNight {
         let len = self.playlist.entries().len();
         let rotation: Vec<usize> = (0..len)
             .map(|offset| (start + offset) % len)
-            .filter(|&index| self.is_playable(index))
-            .collect();
-
-        // Prefer something the party can actually play. Rotation order still
-        // decides between equally good fits, so the shelf keeps cycling
-        // instead of parking on one title — but a game that needs four
-        // players is not offered to two people just because it is next.
-        let players = self.seated_count();
-        let mut fitting: Vec<usize> = rotation
-            .iter()
-            .copied()
             .filter(|&index| {
-                self.playlist
-                    .get(index)
-                    .is_some_and(|e| self.game_fits_party(&e.game))
+                self.is_playable(index)
+                    && self
+                        .playlist
+                        .get(index)
+                        .is_some_and(|e| self.game_has_capacity(&e.game))
             })
             .collect();
-        fitting.sort_by_key(|&index| {
+
+        // Respect the party's playlist order among playable games. A preferred
+        // player count is a recommendation, not permission to undo a reorder.
+        let fitting = rotation.iter().copied().find(|&index| {
             self.playlist
                 .get(index)
-                .and_then(|e| self.library.iter().find(|m| m.id == e.game))
-                .map_or(0, |m| m.fit_distance(players))
+                .is_some_and(|e| self.game_fits_party(&e.game))
         });
-        // Nothing fits: fall back to rotation rather than warming nothing at
-        // all. A slightly wrong game beats a lobby that can't start anything.
-        fitting
-            .first()
-            .copied()
-            .or_else(|| rotation.first().copied())
+        // Below the minimum, bots can fill missing seats. Above the maximum,
+        // entries were excluded: never leave a joined player out.
+        fitting.or_else(|| rotation.first().copied())
     }
 
     /// Called whenever the seating changes: re-prepare or replace the warm
@@ -1217,7 +1575,13 @@ impl GameNight {
             self.maybe_warm(fx);
             return;
         };
-        if self.warm_seats != self.seats_for(&warm.game) {
+        if !self.game_has_capacity(&warm.game) {
+            self.dispose_warm(fx);
+            self.next_up = None;
+            self.maybe_warm(fx);
+            return;
+        }
+        if self.warm_seats != self.seats_for(&warm.game) || self.warm_players != self.players {
             // Same game, new seating: warm it again rather than hunt for a
             // better title. `maybe_warm` re-reads the seats.
             self.dispose_warm(fx);
@@ -1295,6 +1659,7 @@ impl GameNight {
             .expect("new session");
         let seats = self.seats_for(&game);
         self.warm_seats = seats.clone();
+        self.warm_players = self.players.clone();
         fx.push(Effect::ToGame {
             game,
             session: session.id,
@@ -1350,7 +1715,8 @@ impl GameNight {
             Some(w) if w.phase == SessionPhase::Ready => {
                 self.dispose_active(fx);
                 let mut next = self.warm.take().expect("checked");
-                self.warm_seats.clear();
+                self.active_seats = std::mem::take(&mut self.warm_seats);
+                self.active_players = std::mem::take(&mut self.warm_players);
                 next.advance(SessionPhase::Running)
                     .expect("ready -> running");
                 fx.push(Effect::ToGame {

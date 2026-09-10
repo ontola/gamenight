@@ -13,6 +13,7 @@ use bones_bevy_renderer::BonesBevyRenderer;
 use bones_framework::prelude::*;
 
 pub mod audio;
+mod branding;
 pub mod core;
 pub mod debug;
 pub mod fullscreen;
@@ -251,6 +252,7 @@ fn main() {
     .app();
 
     app.insert_resource(bevy::winit::WinitSettings::game());
+    app.add_systems(bevy::prelude::Update, branding::apply);
     gamenight::install_global_input(&mut app);
     shot::install(&mut app);
 
