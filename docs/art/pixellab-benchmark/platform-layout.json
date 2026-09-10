@@ -1,0 +1,1080 @@
+{
+  "order": [
+    "wang_13",
+    "wang_10",
+    "wang_4",
+    "wang_12",
+    "wang_6",
+    "wang_8",
+    "wang_0",
+    "wang_1",
+    "wang_11",
+    "wang_3",
+    "wang_2",
+    "wang_5",
+    "wang_15",
+    "wang_14",
+    "wang_9",
+    "wang_7"
+  ],
+  "columns": 4,
+  "tile_size": 32,
+  "tiles": [
+    {
+      "id": "85ce7a4f-7af8-45eb-9c3e-907383fc5ac7",
+      "name": "wang_13",
+      "corners": {
+        "NW": "upper",
+        "NE": "upper",
+        "SW": "lower",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 4,
+        "col": 2
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_13",
+      "connections": {
+        "north": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "924f0013-e1a3-4963-a52b-0952e9025133"
+        ],
+        "south": [
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "east": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "46c064e3-d328-42e8-8da4-d096c65c1911"
+        ],
+        "west": [
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ]
+      }
+    },
+    {
+      "id": "52cd4379-f0dc-4eb5-a0c8-f25d103dc551",
+      "name": "wang_10",
+      "corners": {
+        "NW": "upper",
+        "NE": "lower",
+        "SW": "upper",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 2,
+        "col": 6
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_10",
+      "connections": {
+        "north": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "924f0013-e1a3-4963-a52b-0952e9025133"
+        ],
+        "south": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7"
+        ],
+        "east": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "west": [
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ]
+      }
+    },
+    {
+      "id": "00c4117c-e08d-4e8f-baa5-d4015c3ccf9c",
+      "name": "wang_4",
+      "corners": {
+        "NW": "lower",
+        "NE": "upper",
+        "SW": "lower",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 4,
+        "col": 1
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_4",
+      "connections": {
+        "north": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83"
+        ],
+        "south": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ],
+        "east": [
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "west": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ]
+      }
+    },
+    {
+      "id": "98144cbc-9e02-4fbd-a4cc-5fb6f0f62017",
+      "name": "wang_12",
+      "corners": {
+        "NW": "upper",
+        "NE": "upper",
+        "SW": "lower",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 3,
+        "col": 5
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_12",
+      "connections": {
+        "north": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "south": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ],
+        "east": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "46c064e3-d328-42e8-8da4-d096c65c1911"
+        ],
+        "west": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ]
+      }
+    },
+    {
+      "id": "f761ed64-903f-4044-912d-c4f879c4091a",
+      "name": "wang_6",
+      "corners": {
+        "NW": "lower",
+        "NE": "upper",
+        "SW": "upper",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 5,
+        "col": 2
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_6",
+      "connections": {
+        "north": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "south": [
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "east": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "46c064e3-d328-42e8-8da4-d096c65c1911"
+        ],
+        "west": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30"
+        ]
+      }
+    },
+    {
+      "id": "2ccbeee7-306d-4fca-94fc-7446f53624a4",
+      "name": "wang_8",
+      "corners": {
+        "NW": "upper",
+        "NE": "lower",
+        "SW": "lower",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 3,
+        "col": 6
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_8",
+      "connections": {
+        "north": [
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "south": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "east": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb"
+        ],
+        "west": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ]
+      }
+    },
+    {
+      "id": "be146da0-a4c7-410b-814c-7e2083d9e411",
+      "name": "wang_0",
+      "corners": {
+        "NW": "lower",
+        "NE": "lower",
+        "SW": "lower",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 6,
+        "col": 3
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_0",
+      "connections": {
+        "north": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83"
+        ],
+        "south": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7"
+        ],
+        "east": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb"
+        ],
+        "west": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30"
+        ]
+      }
+    },
+    {
+      "id": "1e26943d-c19e-49cc-92d2-1ed68f22afa5",
+      "name": "wang_1",
+      "corners": {
+        "NW": "lower",
+        "NE": "lower",
+        "SW": "lower",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 1,
+        "col": 1
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_1",
+      "connections": {
+        "north": [
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "924f0013-e1a3-4963-a52b-0952e9025133"
+        ],
+        "south": [
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ],
+        "east": [
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "46c064e3-d328-42e8-8da4-d096c65c1911"
+        ],
+        "west": [
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ]
+      }
+    },
+    {
+      "id": "bae45973-ee1c-4a2d-a54a-c44ed1c8e129",
+      "name": "wang_11",
+      "corners": {
+        "NW": "upper",
+        "NE": "lower",
+        "SW": "upper",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 2,
+        "col": 3
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_11",
+      "connections": {
+        "north": [
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "south": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ],
+        "east": [
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "west": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ]
+      }
+    },
+    {
+      "id": "416ba812-5eb7-462f-bb79-0a1b0133479f",
+      "name": "wang_3",
+      "corners": {
+        "NW": "lower",
+        "NE": "lower",
+        "SW": "upper",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 1,
+        "col": 2
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_3",
+      "connections": {
+        "north": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83"
+        ],
+        "south": [
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "east": [
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "west": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30"
+        ]
+      }
+    },
+    {
+      "id": "7f3ce0a5-c075-40f4-bcc3-80739c93736f",
+      "name": "wang_2",
+      "corners": {
+        "NW": "lower",
+        "NE": "lower",
+        "SW": "upper",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 1,
+        "col": 3
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_2",
+      "connections": {
+        "north": [
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "south": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7"
+        ],
+        "east": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb"
+        ],
+        "west": [
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ]
+      }
+    },
+    {
+      "id": "6c1ac8b8-7fb9-4405-9f29-76d47c684a1e",
+      "name": "wang_5",
+      "corners": {
+        "NW": "lower",
+        "NE": "upper",
+        "SW": "lower",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 2,
+        "col": 1
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_5",
+      "connections": {
+        "north": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83"
+        ],
+        "south": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "east": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb"
+        ],
+        "west": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ]
+      }
+    },
+    {
+      "id": "691b955e-0ba0-4674-bc3e-07d92e2bdeef",
+      "name": "wang_15",
+      "corners": {
+        "NW": "upper",
+        "NE": "upper",
+        "SW": "upper",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 2,
+        "col": 2
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_15",
+      "connections": {
+        "north": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "south": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "east": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "west": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ]
+      }
+    },
+    {
+      "id": "22cfac7d-8f24-42fb-be67-4c4793067e28",
+      "name": "wang_14",
+      "corners": {
+        "NW": "upper",
+        "NE": "upper",
+        "SW": "upper",
+        "SE": "lower"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 3,
+        "col": 4
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_14",
+      "connections": {
+        "north": [
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "south": [
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "east": [
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ],
+        "west": [
+          "dc395fd1-f724-483b-a266-0eb0b01b83cb",
+          "efc46ae3-ae33-4779-889d-d4cdf1a1bdb1",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "be498bed-0c00-413a-bb05-f5dc9d99a5d5"
+        ]
+      }
+    },
+    {
+      "id": "3592680f-f98c-4fb3-af1a-bfc6967f205b",
+      "name": "wang_9",
+      "corners": {
+        "NW": "upper",
+        "NE": "lower",
+        "SW": "lower",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          1,
+          0,
+          255
+        ],
+        "row_2": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 4,
+        "col": 4
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_9",
+      "connections": {
+        "north": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "924f0013-e1a3-4963-a52b-0952e9025133"
+        ],
+        "south": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30",
+          "46c064e3-d328-42e8-8da4-d096c65c1911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "east": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "west": [
+          "60217a7c-6a2d-4726-91ed-11b814375a05",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "924f0013-e1a3-4963-a52b-0952e9025133",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911"
+        ]
+      }
+    },
+    {
+      "id": "c06c750c-92ed-46e8-b79e-b58bf994fa98",
+      "name": "wang_7",
+      "corners": {
+        "NW": "lower",
+        "NE": "upper",
+        "SW": "upper",
+        "SE": "upper"
+      },
+      "pattern_4x4": {
+        "row_0": [
+          255,
+          255,
+          255,
+          255
+        ],
+        "row_1": [
+          255,
+          0,
+          1,
+          255
+        ],
+        "row_2": [
+          255,
+          1,
+          1,
+          255
+        ],
+        "row_3": [
+          255,
+          255,
+          255,
+          255
+        ]
+      },
+      "original_position": {
+        "row": 2,
+        "col": 4
+      },
+      "description": "transparent background and Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects. - wang_7",
+      "connections": {
+        "north": [
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "af2138ec-d58a-43a8-b6d9-c5f7b281efdd",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "south": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "6f618cde-6ab0-4d54-9ccf-5db6acd5b48a",
+          "ed19637f-9530-4151-85ae-38c79dfc3f77",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7"
+        ],
+        "east": [
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "b783c3fc-917a-4c59-9997-3993cbebaf83",
+          "90d8cdc5-22ae-48bd-8203-9fd02774f911",
+          "7b56d0dc-d867-4a3c-a757-24405cbea907"
+        ],
+        "west": [
+          "be146da0-a4c7-410b-814c-7e2083d9e411",
+          "e068cd15-9090-44a8-a260-34e9a88a8d47",
+          "1a58e471-bec8-4df5-949c-fc666be1d7d7",
+          "f4356a1e-eff8-47ab-969d-11a4de3a3e30"
+        ]
+      }
+    }
+  ]
+}

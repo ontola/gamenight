@@ -1,0 +1,92 @@
+{
+  "provider": "PixelLab",
+  "reference": "../lobby-concepts/03-living-room.png",
+  "seed": 231,
+  "requests": [
+    {
+      "name": "character",
+      "endpoint": "/v2/generate-with-style-v2",
+      "reference_crop": [
+        505,
+        565,
+        625,
+        700
+      ],
+      "max_reference_dimension": 96,
+      "description": "One full-body friendly mint hooded little GameNight player mascot, standing facing right, side-view platformer sprite. Simple cream face, dark expressive eyes, mint outfit, tiny sprout on hood, dark shoes. Match reference character proportions. Isolated character only; no floor, no props, no shadows on ground. Crisp deliberate pixel clusters. Maintain a clearly separated face region for custom avatars.",
+      "no_background": true
+    },
+    {
+      "name": "tv",
+      "endpoint": "/v2/generate-with-style-v2",
+      "reference_crop": [
+        615,
+        150,
+        1100,
+        495
+      ],
+      "max_reference_dimension": 128,
+      "description": "One front-facing large flat-screen television on two little feet, cozy dark navy bezel and blank charcoal screen. Isolated game prop, straight-on side-scroller elevation, no perspective, no cabinet, no room, no characters, no text, no background. Match the cozy living-room pixel style of the reference.",
+      "no_background": true
+    },
+    {
+      "name": "platform",
+      "endpoint": "/v2/create-tileset-sidescroller",
+      "reference_crop": [
+        735,
+        710,
+        900,
+        775
+      ],
+      "reference_size": [
+        32,
+        32
+      ],
+      "tile_size": [
+        32,
+        32
+      ],
+      "description": "Warm honey oak wooden platform for a cozy living-room side-scroller. Straight strong golden top edge, dark brown underside, simple broad pixel clusters, sparse wood grain, clear left and right end caps, no plants or objects.",
+      "transition_size": 0
+    },
+    {
+      "name": "walk",
+      "endpoint": "/v2/animate-with-text-v2",
+      "reference": "character-1.png",
+      "size": [
+        96,
+        96
+      ],
+      "action": "Walk cycle in place facing right, friendly energetic little steps, same body size, no camera movement, feet at a stable baseline.",
+      "view": "side",
+      "direction": "east",
+      "no_background": true
+    },
+    {
+      "name": "sleep",
+      "endpoint": "/v2/animate-with-text-v2",
+      "reference": "character-1.png",
+      "size": [
+        96,
+        96
+      ],
+      "action": "Fall asleep: slowly crouch and sit down, close eyes, head gently droops. Keep the same mint hooded character and sprout. No props or text.",
+      "view": "side",
+      "direction": "east",
+      "no_background": true
+    },
+    {
+      "name": "wake",
+      "endpoint": "/v2/animate-with-text-v2",
+      "reference": "character-1.png",
+      "size": [
+        96,
+        96
+      ],
+      "action": "Wake up from sitting asleep on the floor: open eyes, stretch arms and stand upright, facing right. Preserve mint hood and sprout. No text or props.",
+      "view": "side",
+      "direction": "east",
+      "no_background": true
+    }
+  ]
+}
