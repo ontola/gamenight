@@ -2,3 +2,11 @@
 body_size: [240, 14]
 screen_size: [240, 76]
 screen_offset: [0, -57]
+# Original synthesized rising ticks, then confirmation.
+hold_sounds:
+  - ./hold-0.wav
+  - ./hold-1.wav
+  - ./hold-2.wav
+  - ./hold-3.wav
+  - ./hold-4.wav
+  - ./hold-5.wav

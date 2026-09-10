@@ -13,6 +13,7 @@ pub struct NextGameTriggerMeta {
     pub screen_size: Vec2,
     /// Offset from the zone's center to the center of the screen.
     pub screen_offset: Vec2,
+    pub hold_sounds: SVec<Handle<AudioSource>>,
 }
 
 pub fn game_plugin(game: &mut Game) {
@@ -31,6 +32,7 @@ pub fn session_plugin(session: &mut SessionBuilder) {
 pub struct NextGameTrigger {
     /// Each button owns a continuous hold and a release-to-rearm latch.
     holds: [PadHold; 3],
+    hold_sounds: SVec<Handle<AudioSource>>,
     /// Confirmation progress, also used for the button depression and timer.
     pub press: f32,
     pub skip_press: f32,
@@ -74,6 +76,7 @@ struct PadHold {
     owner: Option<u32>,
     elapsed: f32,
     fired: bool,
+    last_cue: Option<u32>,
 }
 impl PadHold {
     fn update(&mut self, owner: Option<u32>, enabled: bool, dt: f32) -> bool {
@@ -81,14 +84,18 @@ impl PadHold {
             *self = Self::default();
             return false;
         }
-        if self.fired { return false; }
+        if self.fired {
+            return false;
+        }
         if !enabled {
             self.elapsed = 0.0;
+            self.last_cue = None;
             self.owner = owner;
             return false;
         }
         if self.owner != owner {
             self.elapsed = 0.0;
+            self.last_cue = None;
             self.owner = owner;
         }
         self.elapsed = (self.elapsed + dt).min(HOLD_SECONDS);
@@ -98,7 +105,25 @@ impl PadHold {
         }
         false
     }
-    fn progress(&self) -> f32 { self.elapsed / HOLD_SECONDS }
+    /// One short cue per countdown step; never replay missed ticks in a burst.
+    fn take_cue(&mut self, enabled: bool) -> Option<usize> {
+        if !enabled || self.owner.is_none() || self.elapsed <= 0.0 {
+            return None;
+        }
+        let cue = if self.fired {
+            5
+        } else {
+            (self.elapsed / 0.4).floor() as u32
+        };
+        if self.last_cue == Some(cue) {
+            return None;
+        }
+        self.last_cue = Some(cue);
+        Some(cue as usize)
+    }
+    fn progress(&self) -> f32 {
+        self.elapsed / HOLD_SECONDS
+    }
 }
 
 fn hydrate(
@@ -123,6 +148,7 @@ fn hydrate(
             body_size,
             screen_size,
             screen_offset,
+            hold_sounds,
         }) = assets.get(element_meta.data).try_cast_ref()
         {
             hydrated.insert(entity, MapElementHydrated);
@@ -160,6 +186,7 @@ fn hydrate(
                 entity,
                 NextGameTrigger {
                     holds: Default::default(),
+                    hold_sounds: hold_sounds.clone(),
                     press: 0.0,
                     skip_press: 0.0,
                     play_press: 0.0,
@@ -180,6 +207,7 @@ fn update(
     bodies: Comp<KinematicBody>,
     transforms: Comp<Transform>,
     time: Res<Time>,
+    mut audio_center: ResMut<AudioCenter>,
     bridge: Option<Res<crate::gamenight::GameNightBridge>>,
 ) {
     let Some(bridge) = bridge else {
@@ -190,30 +218,45 @@ fn update(
     let button = bridge.tv_button();
     for (_, (trigger, solid)) in entities.iter_with((&mut triggers, &solids)) {
         let mut occupants = [None; 3];
-        for (_, (idx, body, transform)) in entities.iter_with((&player_indexes, &bodies, &transforms)) {
+        for (_, (idx, body, transform)) in
+            entities.iter_with((&player_indexes, &bodies, &transforms))
+        {
             let x = transform.translation.x;
             let feet = body.bounding_box(*transform);
             if body.is_on_ground
                 && (feet.min.y - (solid.pos.y + solid.size.y / 2.0)).abs() <= 4.0
                 && x >= solid.pos.x - solid.size.x / 2.0
-                && x <= solid.pos.x + solid.size.x / 2.0 {
+                && x <= solid.pos.x + solid.size.x / 2.0
+            {
                 let index = button_at(x, solid.pos.x, solid.size.x);
                 // Deterministic ownership when two players share a pad.
                 occupants[index] = Some(occupants[index].map_or(idx.0, |old: u32| old.min(idx.0)));
             }
         }
-        let enabled = [button != crate::gamenight::TvButton::Disabled,
-            bridge.next_game_is_ready(), bridge.can_skip_next_game()];
+        let enabled = [
+            button != crate::gamenight::TvButton::Disabled,
+            bridge.next_game_is_ready(),
+            bridge.can_skip_next_game(),
+        ];
         // At most one party action in a frame. Reset competing countdowns.
         for index in 0..3 {
-            if trigger.holds[index].update(occupants[index], enabled[index], dt) {
+            let fired = trigger.holds[index].update(occupants[index], enabled[index], dt);
+            if let Some(cue) = trigger.holds[index].take_cue(enabled[index]) {
+                if let Some(sound) = trigger.hold_sounds.get(cue) {
+                    audio_center.play_sound(*sound, 0.35);
+                }
+            }
+            if fired {
                 match index {
                     0 => bridge.press_tv_button(),
                     1 => bridge.play_next_game(),
                     _ => bridge.skip_next_game(),
                 }
                 for other in 0..3 {
-                    if other != index { trigger.holds[other].elapsed = 0.0; }
+                    if other != index {
+                        trigger.holds[other].elapsed = 0.0;
+                        trigger.holds[other].last_cue = None;
+                    }
                 }
                 break;
             }
@@ -242,6 +285,29 @@ mod tests {
         assert!(!hold.update(Some(1), true, 1.0));
         assert!(hold.update(Some(1), true, 1.0));
     }
+    #[test]
+    fn countdown_cues_rise_once_and_cancel_on_release() {
+        let mut hold = PadHold::default();
+        hold.update(Some(0), true, 0.01);
+        assert_eq!(hold.take_cue(true), Some(0));
+        assert_eq!(hold.take_cue(true), None);
+        for step in 1..=5 {
+            hold.update(Some(0), true, 0.4);
+            assert_eq!(hold.take_cue(true), Some(step));
+            assert_eq!(hold.take_cue(true), None);
+        }
+        hold.update(Some(0), true, 10.0);
+        assert_eq!(hold.take_cue(true), None);
+        hold.update(None, true, 0.01);
+        assert_eq!(hold.take_cue(true), None);
+        hold.update(Some(0), false, 1.0);
+        assert_eq!(hold.take_cue(false), None);
+        hold.update(Some(0), true, 0.01);
+        assert_eq!(hold.take_cue(true), Some(0));
+        hold.update(Some(1), true, 0.01);
+        assert_eq!(hold.take_cue(true), Some(0));
+    }
+
     #[test]
     fn button_faces_match_landing_regions() {
         let pos = Vec2::new(560.0, 160.0);
