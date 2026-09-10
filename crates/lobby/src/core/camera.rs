@@ -57,6 +57,7 @@ fn camera_controller(
     transforms: Comp<Transform>,
     bodies: Comp<KinematicBody>,
     window: Res<Window>,
+    lobby_mode: ResMutInit<crate::core::scoring::LobbyMode>,
 ) {
     let meta = &meta.core.camera;
 
@@ -67,6 +68,19 @@ fn camera_controller(
         return;
     };
     if camera_state.disable_controller {
+        return;
+    }
+
+    // The hangout is a room, not a camera target formed by its occupants.
+    // Seat changes rebuild subjects; using map bounds prevents join/leave zooms
+    // and also keeps the empty lobby framed exactly like the occupied lobby.
+    if lobby_mode.0 {
+        let viewport = camera.viewport.option().map(|v| v.size.as_vec2()).unwrap_or(window.size);
+        let map_size = map.grid_size.as_vec2() * map.tile_size;
+        let (center, height) = lobby_frame(map_size, viewport);
+        camera.size = CameraSize::FixedHeight(height);
+        camera_shake.center.x = center.x;
+        camera_shake.center.y = center.y;
         return;
     }
 
@@ -175,6 +189,35 @@ fn camera_controller(
     let dist = delta * meta.move_lerp_factor;
     camera.size = CameraSize::FixedHeight(scale * default_height);
     *camera_pos -= dist.extend(0.0);
+}
+
+/// Fit the whole room with a small border, preserving geometry on any display.
+fn lobby_frame(map_size: Vec2, viewport: Vec2) -> (Vec2, f32) {
+    let aspect = viewport.x.max(1.0) / viewport.y.max(1.0);
+    let padded = map_size + Vec2::splat(24.0);
+    (map_size * 0.5, padded.y.max(padded.x / aspect))
+}
+
+#[cfg(test)]
+mod lobby_camera_tests {
+    use super::*;
+
+    #[test]
+    fn room_fits_wide_and_tall_windows_without_changing_its_center() {
+        let room = Vec2::new(1200.0, 700.0);
+        for viewport in [Vec2::new(1920.0, 1080.0), Vec2::new(800.0, 1200.0)] {
+            let (center, height) = lobby_frame(room, viewport);
+            assert_eq!(center, room * 0.5);
+            assert!(height >= room.y + 24.0);
+            assert!(height * viewport.x / viewport.y >= room.x + 23.99);
+        }
+    }
+
+    #[test]
+    fn minimized_window_has_a_finite_frame() {
+        let (_, height) = lobby_frame(Vec2::new(1200.0, 700.0), Vec2::ZERO);
+        assert!(height.is_finite() && height > 0.0);
+    }
 }
 
 /// Implements the background layer parallax.
