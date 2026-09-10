@@ -141,8 +141,8 @@ fn update(
         let (bottom, top) = (door_pos.y - half.y, door_pos.y + half.y);
         let inside = entities
             .iter_with((&player_indexes, &bodies, &transforms))
-            .find(|(_, (_, body, transform))| {
-                if !body.is_on_ground {
+            .find(|(_, (idx, body, transform))| {
+                if bridge.seat_player(idx.0).is_none() || !body.is_on_ground {
                     return false;
                 }
                 let b = body.bounding_box(**transform);

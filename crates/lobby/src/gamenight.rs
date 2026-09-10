@@ -800,7 +800,7 @@ fn gamenight_bridge_system(
 /// happening — generous enough that a join's two triggers (seat appears,
 /// then moments later `player_gamepad` resolves) collapse into a single
 /// rebuild instead of two back to back.
-const LOBBY_REBUILD_DEBOUNCE: Duration = Duration::from_millis(500);
+const LOBBY_REBUILD_DEBOUNCE: Duration = Duration::from_millis(50);
 
 /// How long "remove inactive players" waits before actually removing anyone
 /// — long enough to glance over and nudge a stick if you're still there.
@@ -1689,7 +1689,12 @@ fn global_input_system(
             || [GamepadAxisType::LeftStickX, GamepadAxisType::LeftStickY,
                 GamepadAxisType::RightStickX, GamepadAxisType::RightStickY]
                 .iter().any(|axis| axes.get(GamepadAxis::new(*pad, *axis)).unwrap_or(0.0).abs() > 0.25);
-        if held && activity_sent.get(&pad.id).is_none_or(|at| at.elapsed().as_secs_f32() >= 1.0) {
+        if !held { input.rejoin_blocked.remove(&(pad.id as u32)); }
+        // Unknown pads join through deliberate input below, never through the
+        // held-activity heartbeat: that would undo Leave immediately.
+        if held && input.joined_pads.contains(&(pad.id as u32))
+            && !input.rejoin_blocked.contains_key(&(pad.id as u32))
+            && activity_sent.get(&pad.id).is_none_or(|at| at.elapsed().as_secs_f32() >= 1.0) {
             let _ = join_tx.try_send(ClientMessage::ControllerInput { session: None, controller: format!("ordinal:{ordinal}") });
             activity_sent.insert(pad.id, std::time::Instant::now());
         }
@@ -1906,7 +1911,14 @@ fn global_input_system(
                 }
             }
 
-            _ if !input.joined_pads.contains(&id) => { if lobby_available { input.join_pad(id, &seated, &join_tx); } },
+            _ if !input.joined_pads.contains(&id) => {
+                if lobby_available {
+                    // A fresh button press is intentional; only lingering stick
+                    // movement should wait after walking through the exit.
+                    input.rejoin_blocked.remove(&id);
+                    input.join_pad(id, &seated, &join_tx);
+                }
+            },
             GamepadButton::Start => {
                 // Start opens a player's lobby menu — but only Start, and
                 // only out here.
