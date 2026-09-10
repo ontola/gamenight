@@ -1,0 +1,103 @@
+//! Local party controls; only public playlist metadata crosses HTTP.
+use crate::{
+    daemon::{read_welcome, REPLY_TIMEOUT},
+    SharedState,
+};
+use axum::{extract::State, http::StatusCode, Json};
+use futures_util::{SinkExt, StreamExt};
+use gamenight_protocol::{ClientMessage, PartySnapshot, PlaylistSnapshot, Role, ServerMessage};
+use serde::{Deserialize, Serialize};
+use tokio_tungstenite::tungstenite::Message;
+
+#[derive(Deserialize)]
+pub(crate) struct MoveRequest {
+    expected: PlaylistSnapshot,
+    from: usize,
+    to: usize,
+}
+#[derive(Serialize)]
+pub(crate) struct View {
+    playlist: PlaylistSnapshot,
+    playing: Option<gamenight_protocol::GameId>,
+    next: Option<gamenight_protocol::GameId>,
+}
+impl From<PartySnapshot> for View {
+    fn from(party: PartySnapshot) -> Self {
+        Self {
+            playlist: party.playlist,
+            playing: party.active_session.map(|s| s.game),
+            next: party.warming.map(|e| e.game),
+        }
+    }
+}
+pub(crate) async fn get(State(state): State<SharedState>) -> Result<Json<View>, StatusCode> {
+    exchange(state, None).await
+}
+pub(crate) async fn move_entry(
+    State(state): State<SharedState>,
+    Json(request): Json<MoveRequest>,
+) -> Result<Json<View>, StatusCode> {
+    exchange(state, Some(request)).await
+}
+async fn exchange(
+    state: SharedState,
+    request: Option<MoveRequest>,
+) -> Result<Json<View>, StatusCode> {
+    let addr = state.lock().unwrap().daemon_addr.clone();
+    tokio::time::timeout(REPLY_TIMEOUT * 3, async {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        ws.send(Message::Text(
+            ClientMessage::Hello {
+                role: Role::Overlay,
+                game: None,
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        let party = read_welcome(&mut ws).await.map_err(StatusCode::from)?;
+        let Some(request) = request else {
+            return Ok(Json(party.into()));
+        };
+        if party.playlist != request.expected {
+            return Err(StatusCode::CONFLICT);
+        }
+        if request.from >= request.expected.entries.len()
+            || request.to >= request.expected.entries.len()
+        {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+        let mut target = request.expected.entries.clone();
+        let moved = target.remove(request.from);
+        target.insert(request.to, moved);
+        ws.send(Message::Text(
+            ClientMessage::MovePlaylistEntry {
+                expected: request.expected,
+                from: request.from,
+                to: request.to,
+            }
+            .to_json(),
+        ))
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        while let Some(message) = ws.next().await {
+            if let Message::Text(text) = message.map_err(|_| StatusCode::BAD_GATEWAY)? {
+                match serde_json::from_str::<ServerMessage>(&text)
+                    .map_err(|_| StatusCode::BAD_GATEWAY)?
+                {
+                    ServerMessage::PartyState { party } if party.playlist.entries == target => {
+                        return Ok(Json(party.into()))
+                    }
+                    ServerMessage::Error { .. } => return Err(StatusCode::CONFLICT),
+                    _ => {}
+                }
+            }
+        }
+        Err(StatusCode::BAD_GATEWAY)
+    })
+    .await
+    .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
+}

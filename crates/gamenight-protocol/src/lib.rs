@@ -701,6 +701,12 @@ pub enum ClientMessage {
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
     },
+    /// Move an existing entry without interrupting play. Reject stale snapshots.
+    MovePlaylistEntry {
+        expected: PlaylistSnapshot,
+        from: usize,
+        to: usize,
+    },
     /// Skip to the warm session right now, no vote.
     Next,
     /// Make this game the next one up: it starts warming immediately

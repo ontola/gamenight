@@ -64,6 +64,12 @@ pub enum Command {
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
     },
+    /// Move an existing entry without interrupting play. Reject stale snapshots.
+    MovePlaylistEntry {
+        expected: gamenight_protocol::PlaylistSnapshot,
+        from: usize,
+        to: usize,
+    },
     /// Skip to the next game immediately, no vote.
     Next,
     /// Make this game the next one up: warm it now, transition later.
@@ -387,6 +393,55 @@ impl GameNight {
             Command::AssignSeat { seat, occupant } => self.on_assign_seat(seat, occupant, &mut fx),
             Command::SwapSeats { a, b } => self.on_swap_seats(a, b, &mut fx),
             Command::SetPlaylist { entries } => self.on_set_playlist(entries, &mut fx),
+            Command::MovePlaylistEntry { expected, from, to } => {
+                if self.playlist.snapshot() != expected
+                    || from >= expected.entries.len()
+                    || to >= expected.entries.len()
+                {
+                    fx.push(Effect::Reject {
+                        reason: "playlist changed or invalid position; refresh and try again"
+                            .into(),
+                    });
+                } else if from == to {
+                    fx.push(Effect::StateChanged);
+                } else {
+                    let mut entries = expected.entries;
+                    let entry = entries.remove(from);
+                    entries.insert(to, entry);
+                    // Track entries by their old index, including repeated games.
+                    let remap = |index: usize| {
+                        if index == from {
+                            to
+                        } else if from < to && index > from && index <= to {
+                            index - 1
+                        } else if to < from && index >= to && index < from {
+                            index + 1
+                        } else {
+                            index
+                        }
+                    };
+                    self.playlist.set_entries(entries);
+                    if let Some(current) = expected.current {
+                        self.playlist.set_current(remap(current));
+                    }
+                    if let Some(active) = &mut self.active {
+                        active.playlist_index = remap(active.playlist_index);
+                    }
+                    if let Some(warm) = &mut self.warm {
+                        warm.playlist_index = remap(warm.playlist_index);
+                    }
+                    self.next_up = None;
+                    if self
+                        .warm
+                        .as_ref()
+                        .is_some_and(|warm| Some(warm.playlist_index) != self.warm_target())
+                    {
+                        self.dispose_warm(&mut fx);
+                    }
+                    self.maybe_warm(&mut fx);
+                    fx.push(Effect::StateChanged);
+                }
+            }
             Command::Next => {
                 self.pending_transition = true;
                 self.try_transition(&mut fx);

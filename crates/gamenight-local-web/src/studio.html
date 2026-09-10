@@ -217,6 +217,14 @@
       .nav-btn { flex: none; padding: 0.5rem 1rem; font-size: 1rem; }
     }
 
+    #playlist-list { list-style: none; padding: 0; display: grid; gap: .65rem; }
+    .playlist-row { display: flex; align-items: center; gap: .6rem; padding: .7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
+    .playlist-row.drag-over { border-color: var(--accent); }
+    .playlist-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    .playlist-title small { display: block; color: var(--muted); margin-top: .25rem; }
+    .playlist-row button { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); cursor: pointer; }
+    .playlist-row button:disabled { opacity: .35; cursor: default; }
+    .playlist-row[draggable="true"] { cursor: grab; }
     .nav-btn.active {
       background: var(--accent);
       color: #fff;
@@ -421,6 +429,7 @@
     <div class="nav-tabs">
       <button class="nav-btn active" onclick="switchTab('character')">Character</button>
       <button class="nav-btn" onclick="switchTab('session')">Session</button>
+      <button class="nav-btn" onclick="switchTab('playlist')">Playlist</button>
     </div>
   </header>
 
@@ -429,6 +438,15 @@
   </div>
 
   <main>
+    <div id="tab-playlist" class="tab-content">
+      <div class="card">
+        <h2>Tonight’s playlist</h2>
+        <p>Drag games or use the arrows to change the order. The current game keeps playing. GameNight picks the next game that fits your party.</p>
+        <p id="playlist-status" role="status" aria-live="polite"></p>
+        <ol id="playlist-list" aria-label="Game playlist"></ol>
+        <button class="nav-btn" type="button" onclick="loadPlaylist()">Refresh playlist</button>
+      </div>
+    </div>
     <!-- TAB 1: CHARACTER EDITOR -->
     <div id="tab-character" class="tab-content active">
       <!-- Identity: the first thing you see, and the first thing you change. -->
@@ -1062,12 +1080,99 @@
       loadProfileData();
     }
 
+    let playlistView = null;
+    let playlistBusy = false;
+    let playlistLoading = false;
+    let draggedEntry = null;
+
     function switchTab(tab) {
-      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-      document.getElementById('tab-' + tab).classList.add('active');
-      event.target.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + tab));
+      document.querySelectorAll('.nav-tabs .nav-btn').forEach(el => el.classList.toggle('active', el.textContent.toLowerCase() === tab));
+      if (tab === 'playlist') loadPlaylist();
     }
+
+    async function loadPlaylist() {
+      if (playlistBusy || playlistLoading || draggedEntry !== null) return;
+      playlistLoading = true;
+      try {
+        const response = await fetch('/api/playlist', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        if (!response.ok) throw new Error('Playlist unavailable. Check that GameNight is running, then refresh.');
+        const view = await response.json();
+        if (JSON.stringify(view) !== JSON.stringify(playlistView)) {
+          playlistView = view;
+          renderPlaylist();
+        }
+        document.getElementById('playlist-status').textContent = view.playlist.entries.length ? '' : 'No games queued yet.';
+      } catch (error) {
+        document.getElementById('playlist-status').textContent = error.message;
+      } finally { playlistLoading = false; }
+    }
+
+    function renderPlaylist(focusIndex) {
+      const list = document.getElementById('playlist-list');
+      list.replaceChildren();
+      playlistView.playlist.entries.forEach((entry, index, entries) => {
+        const row = document.createElement('li');
+        row.className = 'playlist-row';
+        row.draggable = !playlistBusy;
+        const title = document.createElement('div');
+        title.className = 'playlist-title';
+        title.textContent = entry.title;
+        const badge = document.createElement('small');
+        badge.textContent = [playlistView.playlist.current === index ? 'Playing' : '', playlistView.next === entry.game ? 'Up next' : ''].filter(Boolean).join(' · ');
+        title.append(badge);
+        row.append(title);
+        [-1, 1].forEach(direction => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = direction < 0 ? '↑' : '↓';
+          button.setAttribute('aria-label', `Move ${entry.title} ${direction < 0 ? 'up' : 'down'}`);
+          button.disabled = playlistBusy || index + direction < 0 || index + direction >= entries.length;
+          button.onclick = () => movePlaylistEntry(index, index + direction);
+          row.append(button);
+        });
+        row.ondragstart = event => {
+          if (playlistBusy || playlistLoading) { event.preventDefault(); return; }
+          draggedEntry = index;
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', String(index));
+        };
+        row.ondragover = event => { if (draggedEntry !== null) { event.preventDefault(); row.classList.add('drag-over'); } };
+        row.ondragleave = () => row.classList.remove('drag-over');
+        row.ondrop = event => {
+          event.preventDefault();
+          row.classList.remove('drag-over');
+          const from = draggedEntry;
+          draggedEntry = null;
+          if (from !== null) movePlaylistEntry(from, index);
+        };
+        row.ondragend = () => { draggedEntry = null; document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); };
+        list.append(row);
+      });
+      if (focusIndex !== undefined) list.children[focusIndex]?.querySelector('button:not(:disabled)')?.focus();
+    }
+
+    async function movePlaylistEntry(from, to) {
+      if (playlistBusy || playlistLoading || from === to) return;
+      playlistBusy = true;
+      renderPlaylist();
+      const status = document.getElementById('playlist-status');
+      status.textContent = 'Saving order…';
+      try {
+        const response = await fetch('/api/playlist', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000),
+          body: JSON.stringify({ expected: playlistView.playlist, from, to })
+        });
+        if (!response.ok) throw new Error(response.status === 409 ? 'The playlist changed on another screen. Refresh and try again.' : 'Could not save the order. Refresh and try again.');
+        playlistView = await response.json();
+        status.textContent = 'Playlist updated.';
+      } catch (error) { status.textContent = error.message; }
+      finally { playlistBusy = false; renderPlaylist(to); }
+    }
+    setInterval(() => {
+      if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();
+    }, 4000);
+
 
     async function loadProfileData() {
       let savedAvatar = null;

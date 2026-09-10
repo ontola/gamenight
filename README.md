@@ -48,6 +48,10 @@ python scripts/run-local.py --shelf /path/to/games.json
 
 The optional local character studio is enabled with `--studio`. It serves QR
 pairing and temporary avatars on your LAN, for trusted local networks only.
+Its Playlist tab shows the live game order and what is playing or up next.
+Drag entries or use the up/down buttons to reorder them without interrupting
+play. Changes appear on other devices automatically; conflicting edits ask
+for a refresh. The host still chooses games that fit the current party.
 No store, payments, cloud accounts or ownership database are included.
 
 ## Build a GameNight game

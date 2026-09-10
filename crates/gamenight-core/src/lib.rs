@@ -91,6 +91,47 @@ mod night_tests {
             .collect()
     }
 
+    #[test]
+    fn playlist_move_preserves_play_and_rewarms_only_when_next_changes() {
+        let mut night = GameNight::default();
+        for game in ["a", "b", "c", "d"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c"), entry("d")],
+        });
+        let (_, active) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: active });
+        let before = night.snapshot();
+        let warm = before.warm_session.unwrap().id;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: before.playlist,
+            from: 3,
+            to: 2,
+        });
+        assert!(disposed_sessions(&fx).is_empty());
+        assert_eq!(night.snapshot().warm_session.unwrap().id, warm);
+        let expected = night.snapshot().playlist;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: expected.clone(),
+            from: 0,
+            to: 2,
+        });
+        assert_eq!(disposed_sessions(&fx), vec![warm]);
+        let after = night.snapshot();
+        assert_eq!(after.active_session.unwrap().id, active);
+        assert_eq!(after.playlist.current, Some(2));
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
+        let snapshot = night.snapshot();
+        for (expected, from, to) in [(expected, 1, 0), (snapshot.playlist.clone(), 99, 0)] {
+            let fx = night.handle(Command::MovePlaylistEntry { expected, from, to });
+            assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
+            assert_eq!(night.snapshot(), snapshot);
+        }
+    }
+
     /// The whole MVP evening: two games connect, playlist set, first game
     /// auto-starts, "Next" transitions instantly, the previous game is
     /// disposed and the following one warms.

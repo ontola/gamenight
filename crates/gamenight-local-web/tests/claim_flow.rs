@@ -41,9 +41,13 @@ async fn start_server(daemon: &str) -> String {
 /// Minimal HTTP POST — keeps this a genuine over-the-wire test without
 /// dragging an HTTP client into the dependency tree.
 async fn post(addr: &str, path: &str, body: &str) -> (u16, String) {
+    http(addr, "POST", path, body).await
+}
+
+async fn http(addr: &str, method: &str, path: &str, body: &str) -> (u16, String) {
     let mut stream = TcpStream::connect(addr).await.unwrap();
     let req = format!(
-        "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+        "{method} {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
          Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
@@ -808,4 +812,49 @@ async fn browser_cannot_override_the_host_daemon_address() {
     assert_eq!(status, 200);
     let party = watcher.wait_for(|party| !party.players.is_empty()).await;
     assert_eq!(party.players[0].name, "Ada");
+}
+
+#[tokio::test]
+async fn playlist_move_is_live_and_rejects_stale_or_invalid_positions() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    watcher
+        .ws
+        .send(Message::Text(
+            ClientMessage::SetPlaylist {
+                entries: ["a", "b", "c"]
+                    .into_iter()
+                    .map(|id| PlaylistEntry {
+                        game: GameId::new(id),
+                        title: id.into(),
+                    })
+                    .collect(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+    let party = watcher.wait_for(|p| p.playlist.entries.len() == 3).await;
+    let (status, body) = http(&server, "GET", "/api/playlist", "").await;
+    assert_eq!(status, 200);
+    let initial: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        initial["playlist"],
+        serde_json::to_value(&party.playlist).unwrap()
+    );
+    let request = serde_json::json!({ "expected": party.playlist, "from": 2, "to": 0 }).to_string();
+    let (status, body) = post(&server, "/api/playlist", &request).await;
+    assert_eq!(status, 200, "{body}");
+    let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(view["playlist"]["entries"][0]["game"], "c");
+    assert!(view.get("library").is_none());
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 409);
+    let request =
+        serde_json::json!({ "expected": view["playlist"], "from": 99, "to": 0 }).to_string();
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 400);
+    watcher
+        .wait_for(|p| p.playlist.entries[0].game == GameId::new("c"))
+        .await;
 }
