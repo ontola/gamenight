@@ -17,6 +17,23 @@ local function tick(s, dt)
 	M.update(s, dt or 1 / 120, inputs)
 end
 local tests = {}
+function tests.releasing_aim_stops_fire_even_while_moving()
+	local s = fresh(1)
+	local function step(aimX, aimY)
+		M.update(s, 0.1, { { x = 1, y = 0, aimX = aimX, aimY = aimY } })
+	end
+	step(0, 0)
+	assert((s.sfx.shot or 0) == 0, "movement alone must not fire")
+	step(0, -1)
+	local count = s.sfx.shot
+	assert(count == 1 and s.shots[1].vy < 0, "aim fires in stick direction")
+	step(0, 0)
+	step(0.1, 0.1)
+	assert(s.sfx.shot == count, "release and stick drift must not fire")
+	step(1, 0)
+	assert(s.sfx.shot == count + 1, "aiming again resumes fire")
+end
+
 function tests.swept_hits_and_piercing()
 	assert(M.segmentHit(0, 0, 100, 0, 50, 0, 2) == 0.48)
 	assert(not M.segmentHit(0, 0, 100, 0, 50, 10, 2))
@@ -83,7 +100,7 @@ function tests.powerups_expire_and_shots_do_not_hurt_friends()
 	assert(p.power == "spread")
 	s.shots = {}
 	p.fireClock = 0
-	tick(s)
+	M.update(s, 1 / 120, { { x = 0, y = 0, aimX = 1, aimY = 0 }, { x = 0, y = 0 } })
 	assert(#s.shots == 3)
 	p.powerTime = 0.001
 	tick(s)
@@ -112,7 +129,7 @@ function tests.right_stick_is_independent_and_has_deadzone()
 	}
 	input.bind({ { slot = 1 } }, { pad })
 	local c = input.sample(1)
-	assert(c.x == 0 and c.aimX == 0.7)
+	assert(c.x == 0 and c.aimX == 0.7 and not c.autoAim)
 	right = 0.1
 	assert(input.sample(1).aimX == 0)
 	input.bind({}, {})

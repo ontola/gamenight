@@ -6,7 +6,7 @@ local M = {
 	tagline = "One swarm. One team. Keep moving.",
 	coop = true,
 	duration = 90,
-	controls = "MOVE left stick / keys   AIM right stick / auto   DASH A / action   PULSE B / secondary",
+	controls = "MOVE left stick / keys   AIM + FIRE right stick / keyboard auto   DASH A / action   PULSE B / secondary",
 	limits = { enemies = 64, shots = 600, hostile = 160, particles = 650, pickups = 36 },
 }
 local specs = {
@@ -299,9 +299,10 @@ local function playerStep(s, p, c, dt)
 	end
 	local ax, ay = c.aimX or 0, c.aimY or 0
 	local aim = U.length(ax, ay)
+	p.fireClock = math.max(0, p.fireClock - dt)
 	if aim > 0.2 then
 		ax, ay = ax / aim, ay / aim
-	else
+	elseif c.autoAim then
 		local best, d = nil, math.huge
 		for _, e in ipairs(s.enemies) do
 			if not e.dead and e.warm <= 0 then
@@ -318,9 +319,10 @@ local function playerStep(s, p, c, dt)
 		else
 			ax, ay = p.aimX, p.aimY
 		end
+	else
+		return
 	end
 	p.aimX, p.aimY = ax, ay
-	p.fireClock = p.fireClock - dt
 	if p.fireClock <= 0 then
 		shoot(s, p, ax, ay)
 		p.fireClock = p.power == "rapid" and 0.045 or 0.095
@@ -538,6 +540,6 @@ function M.bot(s, p)
 		end
 	end
 	local n = math.max(1, U.length(dx, dy))
-	return { x = dx / n, y = dy / n, action = nearby > 5, secondary = nearby > 8 }
+	return { x = dx / n, y = dy / n, action = nearby > 5, secondary = nearby > 8, autoAim = true }
 end
 return M

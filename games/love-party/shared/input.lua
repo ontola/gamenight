@@ -1,6 +1,7 @@
 local M = {
 	pads = {},
 	active = {},
+	keyboardOnly = {},
 	keys = {
 		{ "a", "d", "w", "s", "space", "lshift" },
 		{ "left", "right", "up", "down", "rctrl", "rshift" },
@@ -9,11 +10,12 @@ local M = {
 	},
 }
 function M.bind(players, pads)
-	M.pads, M.active = {}, {}
+	M.pads, M.active, M.keyboardOnly = {}, {}, {}
 	for _, p in ipairs(players) do
 		M.active[p.slot] = not p.bot
 		if not p.bot then
 			M.pads[p.slot] = pads[p.slot]
+			M.keyboardOnly[p.slot] = pads[p.slot] == nil
 		end
 	end
 end
@@ -26,6 +28,7 @@ function M.attach(pad)
 	for slot = 1, 4 do
 		if M.active[slot] and not M.pads[slot] then
 			M.pads[slot] = pad
+			M.keyboardOnly[slot] = false
 			return
 		end
 	end
@@ -92,6 +95,14 @@ function M.sample(slot, fireWithShoulder)
 	if n > 1 then
 		x, y = x / n, y / n
 	end
-	return { x = x, y = y, action = action, secondary = secondary, aimX = aimX, aimY = aimY }
+	return {
+		x = x,
+		y = y,
+		action = action,
+		secondary = secondary,
+		aimX = aimX,
+		aimY = aimY,
+		autoAim = M.keyboardOnly[slot] == true,
+	}
 end
 return M

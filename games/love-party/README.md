@@ -124,8 +124,7 @@ exercise all four games with 2, 3 and 4 players.
 
 ## Neon Siege
 
-A fast geometric co-op arena shooter for 2–4 local players. Weapons fire
-continuously. Aim with the right stick; releasing it auto-targets the nearest
+A fast geometric co-op arena shooter for 2–4 local players. Aim and fire with the right stick; release it to stop shooting. Keyboard players auto-target the nearest
 active enemy, so shared keyboard players can focus on moving and dodging.
 A/action dashes through danger with brief immunity (1.2-second cooldown).
 B/secondary clears nearby enemies and bullets (10-second cooldown).
