@@ -1178,8 +1178,6 @@ struct GlobalInput {
     /// by `sync_player_menus_system` — deliberately not a bones session, so it
     /// never touches `Session::active` and the match keeps running under it.
     open_menus: std::collections::HashMap<PlayerId, PlayerMenuState>,
-    /// Whether GameNight is the thing currently in front.
-    open: bool,
     /// Every gamepad button event bones saw this frame, snapshotted by
     /// `gate_gamepad_input_system` (`PreUpdate`) before it strips the
     /// events of any pad whose player has an open menu from the live
@@ -1409,7 +1407,6 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         pad_player: default(),
         pressed_buttons: default(),
         open_menus: default(),
-        open: true, // jumpy starts as the lobby, already frontmost
         frame_button_events: default(),
         frame_axis_events: default(),
         prune_countdown: None,
@@ -1779,32 +1776,19 @@ fn global_input_system(
     for GamepadButtonEvent { gamepad: id, button, .. } in just_pressed {
         match button {
             GamepadButton::Select => {
-                input.open = !input.open;
-                // Tell the daemon, which is what makes this the way *out* of a
-                // running game: the party overlay coming up pauses whatever is
-                // playing and hands the screen back to the lobby (see
-                // `sync_lobby_focus` in gamenight-core). Closing it again
-                // resumes the game, which raises itself on `Resume`.
-                let _ = join_tx.try_send(if input.open {
-                    ClientMessage::OpenOverlay
-                } else {
-                    ClientMessage::CloseOverlay
-                });
-                if input.open {
-                    #[cfg(target_os = "macos")]
-                    {
-                        input.previous_app = crate::gamenight_macos::capture_frontmost_app();
-                    }
-                    for mut window in &mut windows {
-                        window.focused = true;
-                    }
-                } else {
-                    #[cfg(target_os = "macos")]
-                    if let Some(app) = input.previous_app.take() {
-                        app.reactivate();
-                    }
+                // Back is an idempotent request, not a local toggle. The game
+                // may send RequestOverlay for this same physical press, and
+                // game transitions change focus without a local button event.
+                let _ = join_tx.try_send(ClientMessage::OpenOverlay);
+                #[cfg(target_os = "macos")]
+                if !lobby_was_focused {
+                    input.previous_app = crate::gamenight_macos::capture_frontmost_app();
+                }
+                for mut window in &mut windows {
+                    window.focused = true;
                 }
             }
+
             _ if !input.joined_pads.contains(&id) => input.join_pad(id, &seated, &join_tx),
             GamepadButton::Start => {
                 // Start opens a player's lobby menu — but only Start, and
