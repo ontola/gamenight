@@ -1178,12 +1178,12 @@
       let savedAvatar = null;
       let cachedProfile = null;
       try { cachedProfile = JSON.parse(localStorage.getItem('gamenight_saved_profile')); } catch (_) {}
-      document.getElementById('player-name').value = cachedProfile?.username || randomName();
+      document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || randomName();
       try {
         const res = await fetch('/api/profiles/' + profileId);
         if (res.ok) {
           const prof = await res.json();
-          document.getElementById('player-name').value = prof.username || randomName();
+          document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || prof.username || randomName();
           if (prof.color) {
             characterColor = prof.color;
             localStorage.setItem('gamenight_character_color', prof.color);
@@ -1193,7 +1193,7 @@
         } else {
           // Not signed in / no profile yet: give them an identity rather
           // than an empty field to stare at.
-          document.getElementById('player-name').value = cachedProfile?.username || randomName();
+          document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || randomName();
         }
       } catch (e) {
       }
@@ -1254,6 +1254,9 @@
     }
 
     function scheduleSave() {
+      const name = document.getElementById('player-name').value;
+      if (name.trim()) localStorage.setItem('gamenight_player_name', name);
+
       clearTimeout(saveTimer);
       status('Saving…', '#94a3b8');
       saveTimer = setTimeout(() => { pushProfile(); }, 400);
