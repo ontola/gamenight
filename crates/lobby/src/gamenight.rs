@@ -130,6 +130,7 @@ pub struct GameNightBridge {
     /// "Frame took too long" warnings), so a frame-counted debounce could
     /// take far longer than intended to actually fire.
     lobby_rebuild_at: Option<std::time::Instant>,
+    lobby_away: bool,
     /// Latest player list — just for matching a pending controller join
     /// (sent by name) back to the pad that sent it. See
     /// `GlobalInput::reconcile_joins`.
@@ -554,6 +555,7 @@ pub fn game_plugin(game: &mut Game) {
         notified_finished: false,
         latest_seats: Vec::new(),
         lobby_rebuild_at: None,
+        lobby_away: false,
         latest_players: Vec::new(),
         player_gamepad: default(),
         pads_connected: 0,
@@ -754,6 +756,15 @@ fn gamenight_bridge_system(
             GameEvent::SettingChanged { .. } => {}
             GameEvent::LobbyFocus { active } => {
                 info!(active, "gamenight: lobby focus changed");
+                if bridge.current_session.is_none() {
+                    if active && bridge.lobby_away {
+                        // Reset characters, velocities and pad countdowns together.
+                        // The lobby spawner deals out distinct random safe points.
+                        rebuild_lobby(&bridge, &mut sessions, &meta, &assets);
+                        bridge.lobby_rebuild_at = None;
+                    }
+                    bridge.lobby_away = !active;
+                }
                 #[cfg(target_os = "macos")]
                 if active {
                     crate::gamenight_macos::bring_self_to_front();
@@ -4119,6 +4130,7 @@ mod next_game_status_tests {
             notified_finished: false,
             latest_seats: Vec::new(),
             lobby_rebuild_at: None,
+        lobby_away: false,
             latest_players: Vec::new(),
             player_gamepad: default(),
             pads_connected: 0,
