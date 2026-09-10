@@ -1262,35 +1262,33 @@ struct PlayerMenuState {
 /// (there's no reasonable way to type a name with a d-pad).
 #[derive(Clone)]
 enum MenuAction {
-    /// Reroll to a fresh unused name from `FUN_NAMES`.
-    NewName,
+    /// Detach the phone profile while keeping the controller seated.
+    Unlink,
     Leave,
     /// Party-wide, not personal (like `Quit`): starts `PRUNE_HOLD_SECONDS`
     /// ticking down for every *other* seated player. Whoever hasn't moved by
     /// the time it elapses gets left — a couch's answer to a stale
     /// controller nobody picked back up.
     PruneInactive,
-    Close,
     Quit,
 }
 
-fn menu_actions() -> Vec<MenuAction> {
-    vec![
-        MenuAction::NewName,
+fn menu_actions(linked: bool) -> Vec<MenuAction> {
+    let mut actions = vec![
         MenuAction::Leave,
         MenuAction::PruneInactive,
-        MenuAction::Close,
         MenuAction::Quit,
-    ]
+    ];
+    if linked { actions.insert(0, MenuAction::Unlink); }
+    actions
 }
 
 impl MenuAction {
     fn label(&self) -> String {
         match self {
-            MenuAction::NewName => "New name".to_string(),
+            MenuAction::Unlink => "Unlink".to_string(),
             MenuAction::Leave => "Leave".to_string(),
             MenuAction::PruneInactive => "Remove inactive players".to_string(),
-            MenuAction::Close => "Close".to_string(),
             MenuAction::Quit => "Quit GameNight".to_string(),
         }
     }
@@ -1401,7 +1399,7 @@ impl GlobalInput {
     }
 
     /// Toggle the given player's start menu — Start opens it, Start again
-    /// (or the menu's own Close/Leave) closes it.
+    /// closes it; Leave also dismisses the menu.
     fn toggle_menu(&mut self, player_id: PlayerId) {
         if self.open_menus.remove(&player_id).is_none() {
             self.open_menus
@@ -1409,9 +1407,9 @@ impl GlobalInput {
         }
     }
 
-    fn move_highlight(&mut self, player_id: PlayerId, delta: isize) {
+    fn move_highlight(&mut self, player_id: PlayerId, delta: isize, linked: bool) {
         if let Some(state) = self.open_menus.get_mut(&player_id) {
-            let len = menu_actions().len() as isize;
+            let len = menu_actions(linked).len() as isize;
             state.highlight = (((state.highlight as isize) + delta).rem_euclid(len)) as usize;
         }
     }
@@ -1442,6 +1440,7 @@ pub fn is_lobby() -> bool {
 /// to reach a real winit `Window`.
 pub fn install_global_input(app: &mut bevy::app::App) {
     app.init_resource::<StashedFaceAtlases>();
+    app.init_resource::<crate::player_links::PlayerLinks>();
     app.insert_resource(GlobalInput {
         pending_joins: default(),
         joined_pads: default(),
@@ -1651,6 +1650,7 @@ fn gate_gamepad_input_system(
 }
 
 fn global_input_system(
+    links: bevy::prelude::Res<crate::player_links::PlayerLinks>,
     mut input: bevy::prelude::ResMut<GlobalInput>,
     bones_game: bevy::prelude::ResMut<bones_bevy_renderer::BonesGame>,
     mut windows: bevy::prelude::Query<
@@ -1919,29 +1919,24 @@ fn global_input_system(
             }
             GamepadButton::DPadUp => {
                 if let Some(&player_id) = input.pad_player.get(&id) {
-                    input.move_highlight(player_id, -1);
+                    input.move_highlight(player_id, -1, links.snapshot().is_some_and(|s| s.linked.contains(&player_id)));
                 }
             }
             GamepadButton::DPadDown => {
                 if let Some(&player_id) = input.pad_player.get(&id) {
-                    input.move_highlight(player_id, 1);
+                    input.move_highlight(player_id, 1, links.snapshot().is_some_and(|s| s.linked.contains(&player_id)));
                 }
             }
             GamepadButton::South => {
                 if let Some(&player_id) = input.pad_player.get(&id) {
                     let highlight = input.open_menus.get(&player_id).map(|s| s.highlight);
                     if let Some(highlight) = highlight {
-                        if let Some(action) = menu_actions().get(highlight).cloned() {
+                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)));
+                        if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
-                                MenuAction::NewName => {
-                                    let taken: HashSet<&str> =
-                                        seated.iter().map(|p| p.name.as_str()).collect();
-                                    if let Some(name) = random_unused_name(&taken) {
-                                        let _ = join_tx.try_send(ClientMessage::RenamePlayer {
-                                            player_id,
-                                            name: name.to_string(),
-                                        });
-                                    }
+                                MenuAction::Unlink => {
+                                    links.unlink(player_id);
+                                    if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.highlight = 0; }
                                 }
                                 MenuAction::Leave => {
                                     let _ =
@@ -1970,9 +1965,6 @@ fn global_input_system(
                                     });
                                     input.open_menus.remove(&player_id);
                                 }
-                                MenuAction::Close => {
-                                    input.open_menus.remove(&player_id);
-                                }
                                 MenuAction::Quit => {
                                     info!("gamenight: quitting from the player menu");
                                     std::process::exit(0);
@@ -1991,6 +1983,9 @@ fn global_input_system(
 /// nothing about session/pause state — the match keeps running underneath
 /// exactly as it was; this only ever adds UI nodes on top of it.
 fn sync_player_menus_system(
+    links: bevy::prelude::Res<crate::player_links::PlayerLinks>,
+    mut images: bevy::prelude::ResMut<bevy::prelude::Assets<bevy::prelude::Image>>,
+    mut qr_cache: bevy::prelude::Local<std::collections::HashMap<String, bevy::prelude::Handle<bevy::prelude::Image>>>,
     mut commands: bevy::prelude::Commands,
     input: bevy::prelude::Res<GlobalInput>,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
@@ -2029,6 +2024,16 @@ fn sync_player_menus_system(
             .map(|p| p.name.as_str())
             .unwrap_or("???");
 
+        let link_state = links.snapshot();
+        let linked = link_state.as_ref().is_some_and(|s| s.linked.contains(&player_id));
+        let code = if !linked && link_state.is_some() {
+            let revision = link_state.as_ref().and_then(|s| s.revisions.get(&player_id)).copied().unwrap_or(0);
+            let url = format!("{}?claim={}&link_revision={revision}", lobby_join_url(), player_id.0);
+            if !qr_cache.contains_key(&url) {
+                if let Some(image) = generate_qr_bevy_image(&url) { qr_cache.insert(url.clone(), images.add(image)); }
+            }
+            qr_cache.get(&url).cloned()
+        } else { None };
         let root_entity = roots
             .iter()
             .find(|(_, r)| r.0 == player_id)
@@ -2062,8 +2067,16 @@ fn sync_player_menus_system(
                     color: Color::WHITE,
                 },
             ));
-            for (i, action) in menu_actions().iter().enumerate() {
-                let highlighted = i == state.highlight;
+            if linked {
+                parent.spawn(TextBundle::from_section(format!("Signed in as {name}"), TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
+            } else if let Some(code) = code {
+                parent.spawn(ImageBundle { image: code.into(), style: Style { width: Val::Px(176.0), height: Val::Px(176.0), margin: UiRect::all(Val::Px(8.0)), ..default() }, ..default() });
+                parent.spawn(TextBundle::from_section("Scan to sign in", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
+            } else {
+                parent.spawn(TextBundle::from_section("Connecting to sign-in…", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
+            }
+            for (i, action) in menu_actions(linked).iter().enumerate() {
+                let highlighted = i == state.highlight.min(menu_actions(linked).len() - 1);
                 // Every row is an action now, so every row looks alike; the
                 // highlight is the only thing that distinguishes them.
                 let base = Color::rgb(0.25, 0.25, 0.25);
@@ -2090,6 +2103,7 @@ fn sync_player_menus_system(
                         ));
                     });
             }
+            parent.spawn(TextBundle::from_section("Start to close", TextStyle { font: font.clone(), font_size: 14.0, color: Color::GRAY }));
         });
     }
 }
@@ -2142,8 +2156,8 @@ fn position_player_menus_system(
         // screen space, so the menu sits over their head rather than on it.
         let anchor = world_pos + bevy::prelude::Vec3::new(0.0, 40.0, 0.0);
         if let Some(screen_pos) = camera.world_to_viewport(camera_transform, anchor) {
-            style.left = bevy::prelude::Val::Px(screen_pos.x);
-            style.top = bevy::prelude::Val::Px(screen_pos.y);
+            style.left = bevy::prelude::Val::Px(screen_pos.x.clamp(8.0, camera.logical_viewport_size().map(|s| (s.x - 250.0).max(8.0)).unwrap_or(screen_pos.x)));
+            style.top = bevy::prelude::Val::Px(screen_pos.y.clamp(8.0, camera.logical_viewport_size().map(|s| (s.y - 390.0).max(8.0)).unwrap_or(screen_pos.y)));
         }
     }
 }
@@ -3099,6 +3113,7 @@ struct LobbyQrSign(String);
 /// element. Bones owns *where* the sign is; this owns what's on its face,
 /// because the code encodes a session URL bones never sees.
 fn sync_lobby_qr_system(
+    links: bevy::prelude::Res<crate::player_links::PlayerLinks>,
     mut commands: bevy::prelude::Commands,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
@@ -3132,7 +3147,11 @@ fn sync_lobby_qr_system(
         .0
         .shared_resource::<GameNightBridge>()
         .claim_seat();
-    let url = seat.map(|seat| format!("{}?seat={}", lobby_join_url(), seat));
+    let url = seat.map(|seat| {
+        let id = bones_game.0.shared_resource::<GameNightBridge>().seat_player(seat as u32);
+        let revision = links.snapshot().and_then(|s| id.and_then(|id| s.revisions.get(&id).copied())).unwrap_or(0);
+        format!("{}?seat={seat}&link_revision={revision}", lobby_join_url())
+    });
     let name = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         seat.and_then(|seat| bridge.seat_player(seat as u32))
@@ -3693,6 +3712,8 @@ fn sync_jukebox_system(
 #[derive(bevy::prelude::Component)]
 struct LobbyTv(String);
 
+mod game_cases;
+
 /// Draws the lobby TV: a cabinet, a screen showing whatever the daemon has
 /// warmed up next, and the prompt on the pad below it.
 fn sync_next_game_tv_system(
@@ -3700,6 +3721,8 @@ fn sync_next_game_tv_system(
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
     mut tv_texture: bevy::prelude::Local<Option<bevy::prelude::Handle<bevy::prelude::Image>>>,
+    time: bevy::prelude::Res<bevy::prelude::Time>,
+    mut case_motion: bevy::prelude::Local<game_cases::ShelfMotion>,
     mut existing: bevy::prelude::Query<(
         bevy::prelude::Entity,
         &LobbyTv,
@@ -3709,7 +3732,7 @@ fn sync_next_game_tv_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (status, button, upcoming, next_ready, can_skip) = {
+    let (status, button, upcoming, next_ready, can_skip, cases) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (
             bridge.next_game_status(),
@@ -3717,6 +3740,7 @@ fn sync_next_game_tv_system(
             bridge.upcoming_game_status(),
             bridge.next_game_is_ready(),
             bridge.can_skip_next_game(),
+            game_cases::queue(&bridge),
         )
     };
 
@@ -3727,6 +3751,7 @@ fn sync_next_game_tv_system(
         return;
     };
 
+    let animation = case_motion.update(&cases, time.delta_seconds());
     // The screen's two lines: what state we're in, and what it's about.
     let (kicker, kicker_color, title) = match &status {
         // A game the party can walk straight back into. Says PAUSED rather
@@ -3794,16 +3819,19 @@ fn sync_next_game_tv_system(
         NextGameStatus::DownloadFailed(t) => format!("UP NEXT  {t} · DOWNLOAD FAILED"),
         _ => "UP NEXT  Nothing ready yet".to_string(),
     };
+    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{cases:?}|{animation:.3}");
     if let Some((entity, tv, mut transform)) = existing.iter_mut().next() {
         transform.translation = Vec3::new(pos.x, pos.y, LOBBY_PROP_Z);
-        if tv.0 == format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}") {
+        if tv.0 == fingerprint {
             return;
         }
         commands.entity(entity).despawn_recursive();
     }
 
     let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
-    let cabinet = size + Vec2::splat(SCREEN_FRAME * 2.0);
+    let screen = Vec2::new(size.x / 3.0 - 8.0, size.y);
+    let tv_x = -size.x / 3.0;
+    let cabinet = screen + Vec2::splat(SCREEN_FRAME * 2.0);
     // Keep the image alive while status changes replace the TV entity.
     let texture = tv_texture.get_or_insert_with(||
         asset_server.load("elements/environment/next_game/pixellab-tv.png")
@@ -3811,9 +3839,7 @@ fn sync_next_game_tv_system(
 
     commands
         .spawn((
-            LobbyTv(format!(
-                "{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}"
-            )),
+            LobbyTv(fingerprint),
             SpatialBundle {
                 transform: Transform::from_xyz(pos.x, pos.y, LOBBY_PROP_Z),
                 ..default()
@@ -3826,7 +3852,7 @@ fn sync_next_game_tv_system(
                     custom_size: Some(cabinet + Vec2::new(12.0, 16.0)),
                     ..default()
                 },
-                transform: Transform::from_xyz(0.0, -3.0, 0.0),
+                transform: Transform::from_xyz(tv_x, -3.0, 0.0),
                 ..default()
             });
             // State line: UP NEXT when ready, LOADING… while on its way.
@@ -3839,39 +3865,27 @@ fn sync_next_game_tv_system(
                         color: kicker_color,
                     },
                 ),
-                transform: Transform::from_xyz(0.0, size.y / 2.0 - 9.0, 0.1),
+                transform: Transform::from_xyz(tv_x, size.y / 2.0 - 9.0, 0.1),
                 ..default()
             });
             // The game itself
             parent.spawn(Text2dBundle {
                 text: Text::from_section(
-                    ellipsize(&title, 46),
+                    ellipsize(&title, 32),
                     TextStyle {
                         font: font.clone(),
-                        font_size: 15.0,
+                        font_size: 12.0,
                         color: Color::WHITE,
                     },
                 )
                 .with_alignment(TextAlignment::Center),
                 text_2d_bounds: bevy::text::Text2dBounds {
-                    size: Vec2::new(size.x - 12.0, size.y - 18.0),
+                    size: Vec2::new(screen.x - 8.0, screen.y - 22.0),
                 },
-                transform: Transform::from_xyz(0.0, 7.0, 0.1),
+                transform: Transform::from_xyz(tv_x, -2.0, 0.1),
                 ..default()
             });
-            parent.spawn(Text2dBundle {
-                text: Text::from_section(
-                    ellipsize(&next_line, 46),
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 10.0,
-                        color: Color::rgb(0.6, 0.75, 1.0),
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
-                transform: Transform::from_xyz(0.0, -size.y / 2.0 + 15.0, 0.1),
-                ..default()
-            });
+            game_cases::spawn_shelf(parent, &cases, &next_line, animation, font.clone());
             let [(play_pos, play_size), (next_pos, next_size), (skip_pos, skip_size)] =
                 crate::core::elements::next_game_trigger::pad_thirds(
                     bevy::math::Vec2::new(pad_pos.x, pad_pos.y),

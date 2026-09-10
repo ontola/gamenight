@@ -1292,11 +1292,17 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             claim: target,
-            seat: claimSeat === null ? null : Number(claimSeat)
+            seat: claimSeat === null ? null : Number(claimSeat),
+            link_revision: Number(params.get('link_revision') || 0)
           })
         });
         if (join.ok) {
           const data = await join.json();
+          if (data.status === 'unlinked') {
+            showBlocked("Controller unlinked", data.message, "Your saved character is still on this phone.");
+            status("Saved on your phone", "#94a3b8");
+            return;
+          }
           if (data.status === 'no_such_seat') {
             status('⚠️ ' + data.message, '#fbbf24');
             return;

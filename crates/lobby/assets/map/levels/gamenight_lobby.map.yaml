@@ -941,7 +941,7 @@ layers:
     - 116.0
     element: /elements/environment/music/music_screen.element.yaml
   - pos:
-    - 560.0
+    - 620.0
     - 163.0
     element: /elements/environment/next_game/next_game.element.yaml
   - pos:

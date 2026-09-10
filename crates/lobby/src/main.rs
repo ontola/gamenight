@@ -21,6 +21,7 @@ pub mod fullscreen;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod dev_pads;
 pub mod gamenight;
+mod player_links;
 #[cfg(target_os = "macos")]
 pub mod gamenight_macos;
 pub mod input;

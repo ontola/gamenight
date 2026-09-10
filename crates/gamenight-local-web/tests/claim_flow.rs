@@ -1034,3 +1034,33 @@ async fn opted_in_game_receives_a_new_controller_without_a_new_session() {
     .await
     .expect("live join must reach the running game promptly");
 }
+
+#[tokio::test]
+async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    post(&server, "/api/profiles", &profile_json("phone", "Disco", "blue", "face")).await;
+    let (_, joined) = post(&server, "/api/profiles/phone/join", "{}").await;
+    let joined: serde_json::Value = serde_json::from_str(&joined).unwrap();
+    let id = joined["player_id"].as_str().unwrap();
+    let before = Watcher::connect(&daemon).await.party;
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    let links: serde_json::Value = serde_json::from_str(&links).unwrap();
+    assert_eq!(links["linked"][0], id);
+    assert_eq!(post(&server, &format!("/api/player-links/{id}/unlink"), "").await.0, 204);
+    let after = Watcher::connect(&daemon).await.party;
+    assert_eq!(before.players, after.players);
+    assert_eq!(before.seats, after.seats);
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    let links: serde_json::Value = serde_json::from_str(&links).unwrap();
+    assert_eq!(links["linked"].as_array().unwrap().len(), 0);
+    assert_eq!(links["revisions"][id], 1);
+    post(&server, "/api/profiles", &profile_json("phone", "Changed", "red", "other")).await;
+    let (_, stale) = post(&server, "/api/profiles/phone/join", &format!(r#"{{"claim":"{id}"}}"#)).await;
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&stale).unwrap()["status"], "unlinked");
+    assert_eq!(Watcher::connect(&daemon).await.party.players, before.players);
+    let (_, fresh) = post(&server, "/api/profiles/phone/join", &format!(r#"{{"claim":"{id}","link_revision":1}}"#)).await;
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&fresh).unwrap()["status"], "claimed");
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&links).unwrap()["linked"][0], id);
+}

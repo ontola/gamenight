@@ -25,6 +25,8 @@ pub struct Profile {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinSessionRequest {
+    #[serde(default)]
+    pub link_revision: u64,
     /// The player to apply this profile to, instead of adding a new one.
     ///
     /// Comes from the `?claim=<player_id>` on the QR floating above a
@@ -61,6 +63,7 @@ pub struct ServerState {
     /// to hold even if someone clears their browser or opens a second tab.
     #[doc(hidden)]
     pub bindings: HashMap<String, PlayerId>,
+    pub link_revisions: HashMap<PlayerId, u64>,
 }
 
 impl ServerState {
@@ -69,6 +72,7 @@ impl ServerState {
             profiles: HashMap::new(),
             daemon_addr,
             bindings: HashMap::new(),
+            link_revisions: HashMap::new(),
         }
     }
 }
@@ -84,6 +88,8 @@ pub fn create_router(state: SharedState) -> Router {
             "/api/playlist",
             get(playlist::get).post(playlist::move_entry),
         )
+        .route("/api/player-links", get(player_links))
+        .route("/api/player-links/:id/unlink", post(unlink_player))
         .route("/api/profiles", post(save_profile))
         .route("/api/profiles/:id", get(get_profile))
         .route("/api/profiles/:id/join", post(join_session))
@@ -107,6 +113,18 @@ pub async fn run_server(
     );
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {
+    let state = state.lock().unwrap();
+    Json(serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions}))
+}
+
+async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState>) -> StatusCode {
+    let mut state = state.lock().unwrap();
+    state.bindings.retain(|_, player| *player != id);
+    *state.link_revisions.entry(id).or_default() += 1;
+    StatusCode::NO_CONTENT
 }
 
 async fn get_profile(
@@ -224,6 +242,12 @@ async fn join_session_inner(
                 _ => None,
             };
             let mut target = seat_target.or(req.claim);
+            if let Some(target) = target {
+                let revision = state.lock().unwrap().link_revisions.get(&target).copied().unwrap_or(0);
+                if req.link_revision != revision {
+                    return Ok(Json(serde_json::json!({"status": "unlinked", "message": "This controller was unlinked. Scan its new QR code to sign in again."})));
+                }
+            }
 
             // One device, one seat. If this profile is already signed in as
             // somebody who is *still in the party*, a claim on a different

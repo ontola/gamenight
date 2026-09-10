@@ -1,6 +1,6 @@
 # Three landing zones: resume the current game, play next, skip upcoming.
-body_size: [240, 14]
-screen_size: [240, 76]
+body_size: [360, 14]
+screen_size: [360, 76]
 screen_offset: [0, -57]
 # Original synthesized rising ticks, then confirmation.
 hold_sounds:
