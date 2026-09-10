@@ -224,7 +224,11 @@
     .playlist-title small { display: block; color: var(--muted); margin-top: .25rem; }
     .playlist-row button { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); cursor: pointer; }
     .playlist-row button:disabled { opacity: .35; cursor: default; }
-    .playlist-row[draggable="true"] { cursor: grab; }
+    .playlist-row .drag-handle { touch-action: none; cursor: grab; user-select: none; }
+    .playlist-row.dragging { opacity: .55; }
+    .playlist-row.drag-over { outline: 2px solid var(--accent); }
+    .playlist-row .remove-entry { color: #f87171; }
+    @media (max-width: 480px) { .playlist-row { gap: .3rem; padding: .4rem; } .playlist-row button { min-width: 40px; } }
     .nav-btn.active {
       background: var(--accent);
       color: #fff;
@@ -1114,7 +1118,14 @@
       playlistView.playlist.entries.forEach((entry, index, entries) => {
         const row = document.createElement('li');
         row.className = 'playlist-row';
-        row.draggable = !playlistBusy;
+        row.dataset.index = index;
+        const handle = document.createElement('button');
+        handle.type = 'button';
+        handle.className = 'drag-handle';
+        handle.textContent = '⠿';
+        handle.setAttribute('aria-label', `Drag ${entry.title} to reorder`);
+        handle.disabled = playlistBusy;
+        row.append(handle);
         const title = document.createElement('div');
         title.className = 'playlist-title';
         title.textContent = entry.title;
@@ -1131,43 +1142,75 @@
           button.onclick = () => movePlaylistEntry(index, index + direction);
           row.append(button);
         });
-        row.ondragstart = event => {
-          if (playlistBusy || playlistLoading) { event.preventDefault(); return; }
-          draggedEntry = index;
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', String(index));
-        };
-        row.ondragover = event => { if (draggedEntry !== null) { event.preventDefault(); row.classList.add('drag-over'); } };
-        row.ondragleave = () => row.classList.remove('drag-over');
-        row.ondrop = event => {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'remove-entry';
+        remove.textContent = '×';
+        remove.setAttribute('aria-label', `Remove ${entry.title} from playlist`);
+        remove.disabled = playlistBusy;
+        remove.onclick = () => updatePlaylist({ from: index, remove: true }, index);
+        row.append(remove);
+        handle.onpointerdown = event => {
+          if (playlistBusy || playlistLoading || draggedEntry !== null || event.button !== 0) return;
           event.preventDefault();
-          row.classList.remove('drag-over');
-          const from = draggedEntry;
-          draggedEntry = null;
-          if (from !== null) movePlaylistEntry(from, index);
+          draggedEntry = index;
+          let target = index;
+          let lastY = event.clientY;
+          row.classList.add('dragging');
+          handle.setPointerCapture(event.pointerId);
+          const locate = y => {
+            const rows = [...list.children];
+            target = rows.findIndex(el => y < el.getBoundingClientRect().bottom);
+            if (target < 0) target = rows.length - 1;
+            rows.forEach((el, i) => el.classList.toggle('drag-over', i === target && target !== index));
+          };
+          // Keep long queues movable beyond the visible phone viewport.
+          const scrolling = setInterval(() => {
+            const delta = lastY < 80 ? -12 : lastY > innerHeight - 80 ? 12 : 0;
+            if (delta) { window.scrollBy(0, delta); locate(lastY); }
+          }, 30);
+          handle.onpointermove = event => { lastY = event.clientY; locate(lastY); };
+          const finish = cancelled => {
+            clearInterval(scrolling);
+            handle.onpointermove = null;
+            handle.onpointerup = null;
+            handle.onpointercancel = null;
+            handle.onlostpointercapture = null;
+            draggedEntry = null;
+            row.classList.remove('dragging');
+            [...list.children].forEach(el => el.classList.remove('drag-over'));
+            if (!cancelled && target !== index) movePlaylistEntry(index, target);
+          };
+          handle.onpointerup = () => finish(false);
+          handle.onpointercancel = () => finish(true);
+          handle.onlostpointercapture = () => finish(true);
         };
-        row.ondragend = () => { draggedEntry = null; document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over')); };
         list.append(row);
       });
       if (focusIndex !== undefined) list.children[focusIndex]?.querySelector('button:not(:disabled)')?.focus();
     }
 
     async function movePlaylistEntry(from, to) {
-      if (playlistBusy || playlistLoading || from === to) return;
+      if (from === to) return;
+      return updatePlaylist({ from, to }, to);
+    }
+
+    async function updatePlaylist(change, focusIndex) {
+      if (playlistBusy || playlistLoading || draggedEntry !== null) return;
       playlistBusy = true;
       renderPlaylist();
       const status = document.getElementById('playlist-status');
-      status.textContent = 'Saving order…';
+      status.textContent = change.remove ? 'Removing game…' : 'Saving order…';
       try {
         const response = await fetch('/api/playlist', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000),
-          body: JSON.stringify({ expected: playlistView.playlist, from, to })
+          body: JSON.stringify({ expected: playlistView.playlist, ...change })
         });
         if (!response.ok) throw new Error(response.status === 409 ? 'The playlist changed on another screen. Refresh and try again.' : 'Could not save the order. Refresh and try again.');
         playlistView = await response.json();
         status.textContent = 'Playlist updated.';
       } catch (error) { status.textContent = error.message; }
-      finally { playlistBusy = false; renderPlaylist(to); }
+      finally { playlistBusy = false; renderPlaylist(focusIndex); }
     }
     setInterval(() => {
       if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();

@@ -13,7 +13,10 @@ use tokio_tungstenite::tungstenite::Message;
 pub(crate) struct MoveRequest {
     expected: PlaylistSnapshot,
     from: usize,
-    to: usize,
+    #[serde(default)]
+    to: Option<usize>,
+    #[serde(default)]
+    remove: bool,
 }
 #[derive(Serialize)]
 pub(crate) struct View {
@@ -68,22 +71,21 @@ async fn exchange(
         if party.playlist != request.expected {
             return Err(StatusCode::CONFLICT);
         }
-        if request.from >= request.expected.entries.len()
-            || request.to >= request.expected.entries.len()
+        if request.remove == request.to.is_some()
+            || request.from >= request.expected.entries.len()
+            || request.to.is_some_and(|to| to >= request.expected.entries.len())
         {
             return Err(StatusCode::BAD_REQUEST);
         }
         let mut target = request.expected.entries.clone();
         let moved = target.remove(request.from);
-        target.insert(request.to, moved);
-        ws.send(Message::Text(
-            ClientMessage::MovePlaylistEntry {
-                expected: request.expected,
-                from: request.from,
-                to: request.to,
-            }
-            .to_json(),
-        ))
+        let command = if let Some(to) = request.to {
+            target.insert(to, moved);
+            ClientMessage::MovePlaylistEntry { expected: request.expected, from: request.from, to }
+        } else {
+            ClientMessage::RemovePlaylistEntry { expected: request.expected, index: request.from }
+        };
+        ws.send(Message::Text(command.to_json()))
         .await
         .map_err(|_| StatusCode::BAD_GATEWAY)?;
         while let Some(message) = ws.next().await {

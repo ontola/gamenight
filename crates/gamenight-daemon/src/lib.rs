@@ -1222,6 +1222,7 @@ fn message_to_command(
         ClientMessage::MovePlaylistEntry { expected, from, to } => {
             Command::MovePlaylistEntry { expected, from, to }
         }
+        ClientMessage::RemovePlaylistEntry { expected, index } => Command::RemovePlaylistEntry { expected, index },
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
         ClientMessage::Pause => Command::Pause,

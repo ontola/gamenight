@@ -742,6 +742,11 @@ pub enum ClientMessage {
         from: usize,
         to: usize,
     },
+    /// Remove one occurrence only, guarded against concurrent playlist edits.
+    RemovePlaylistEntry {
+        expected: PlaylistSnapshot,
+        index: usize,
+    },
     /// Skip to the warm session right now, no vote.
     Next,
     /// Make this game the next one up: it starts warming immediately

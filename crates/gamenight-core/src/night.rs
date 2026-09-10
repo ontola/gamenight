@@ -89,6 +89,11 @@ pub enum Command {
         from: usize,
         to: usize,
     },
+    /// Remove one occurrence only, guarded against concurrent playlist edits.
+    RemovePlaylistEntry {
+        expected: gamenight_protocol::PlaylistSnapshot,
+        index: usize,
+    },
     /// Skip to the next game immediately, no vote.
     Next,
     /// Make this game the next one up: warm it now, transition later.
@@ -524,6 +529,30 @@ impl GameNight {
                     fx.push(Effect::StateChanged);
                 }
             }
+            Command::RemovePlaylistEntry { expected, index } => {
+                if self.playlist.snapshot() != expected || index >= expected.entries.len() {
+                    fx.push(Effect::Reject { reason: "playlist changed or invalid position; refresh and try again".into() });
+                } else {
+                    let mut entries = expected.entries;
+                    entries.remove(index);
+                    self.dispose_warm(&mut fx);
+                    self.next_up = None;
+                    self.playlist.set_entries(entries);
+                    if let Some(current) = expected.current.filter(|current| *current != index) {
+                        let current = current - usize::from(current > index);
+                        self.playlist.set_current(current);
+                        if let Some(active) = &mut self.active { active.playlist_index = current; }
+                    }
+                    // Keep its successor up next even when the current case
+                    // itself is removed from the middle of the shelf.
+                    if expected.current == Some(index) && !self.playlist.is_empty() {
+                        self.next_up = Some(index % self.playlist.entries().len());
+                    }
+                    // Removing the current case never interrupts its live game.
+                    self.maybe_warm(&mut fx);
+                    fx.push(Effect::StateChanged);
+                }
+            }
             Command::Next => {
                 self.pending_transition = true;
                 self.try_transition(&mut fx);
@@ -922,11 +951,11 @@ impl GameNight {
                 && (self.active_seats != self.seats_for(&active.game)
                     || self.active_players != self.players)
             {
-                let index = active.playlist_index;
+                let game = active.game.clone();
                 let fits = self.game_has_capacity(&active.game);
                 self.dispose_warm(fx);
                 self.dispose_active(fx);
-                self.next_up = fits.then_some(index);
+                if fits { self.on_play_next(game, fx); }
                 self.pending_transition = true;
                 self.maybe_warm(fx);
                 self.try_transition(fx);
@@ -1179,8 +1208,8 @@ impl GameNight {
         match decision {
             VoteOption::Replay => {
                 // A replay is a brand-new session of the game we just played.
-                if let Some(index) = self.active.as_ref().map(|a| a.playlist_index) {
-                    self.set_next_up(index, fx);
+                if let Some(game) = self.active.as_ref().map(|a| a.game.clone()) {
+                    self.on_play_next(game, fx);
                 }
                 self.pending_transition = true;
                 self.try_transition(fx);

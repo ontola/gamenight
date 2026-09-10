@@ -248,6 +248,53 @@ mod night_tests {
     }
 
     #[test]
+    fn playlist_remove_keeps_active_and_updates_next_with_stale_guard() {
+        let mut night = GameNight::default();
+        for game in ["a", "b", "c"] {
+            night.handle(Command::GameConnected { game: GameId::new(game) });
+        }
+        let fx = night.handle(Command::SetPlaylist { entries: vec![entry("a"), entry("b"), entry("c")] });
+        let (_, active) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: active });
+        let original = night.snapshot().playlist;
+        let fx = night.handle(Command::RemovePlaylistEntry { expected: original.clone(), index: 1 });
+        assert!(fx.iter().any(|e| matches!(e, Effect::StateChanged)));
+        let after = night.snapshot();
+        assert_eq!(after.active_session.as_ref().unwrap().id, active);
+        assert_eq!(after.warm_session.as_ref().unwrap().game, GameId::new("c"));
+        assert_eq!(after.playlist.current, Some(0));
+        let fx = night.handle(Command::RemovePlaylistEntry { expected: original, index: 0 });
+        assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
+        assert_eq!(night.snapshot(), after);
+        night.handle(Command::RemovePlaylistEntry { expected: after.playlist, index: 0 });
+        assert_eq!(night.snapshot().active_session.unwrap().id, active);
+        assert_eq!(night.snapshot().playlist.current, None);
+        night.handle(Command::RemovePlaylistEntry { expected: night.snapshot().playlist, index: 0 });
+        assert!(night.snapshot().playlist.entries.is_empty());
+        assert!(night.snapshot().warm_session.is_none());
+        assert_eq!(night.snapshot().active_session.unwrap().id, active);
+    }
+
+    #[test]
+    fn removing_current_from_middle_keeps_its_successor_next() {
+        let mut night = GameNight::default();
+        for game in ["a", "b", "c"] { night.handle(Command::GameConnected { game: GameId::new(game) }); }
+        let fx = night.handle(Command::SetPlaylist { entries: vec![entry("a"), entry("b"), entry("c")] });
+        let (_, active) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: active });
+        night.handle(Command::MovePlaylistEntry { expected: night.snapshot().playlist, from: 0, to: 1 });
+        let before = night.snapshot();
+        let invalid = night.handle(Command::RemovePlaylistEntry { expected: before.playlist.clone(), index: 99 });
+        assert!(matches!(invalid.as_slice(), [Effect::Reject { .. }]));
+        assert_eq!(night.snapshot(), before);
+        night.handle(Command::RemovePlaylistEntry { expected: before.playlist, index: 1 });
+        let after = night.snapshot();
+        assert_eq!(after.playlist.entries, vec![entry("b"), entry("c")]);
+        assert_eq!(after.active_session.unwrap().id, active);
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
+    }
+
+    #[test]
     fn reordered_next_game_wins_over_player_count_recommendation() {
         let mut night = GameNight::default();
         let mut recommended = meta("b");

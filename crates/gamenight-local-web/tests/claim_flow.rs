@@ -860,6 +860,31 @@ async fn playlist_move_is_live_and_rejects_stale_or_invalid_positions() {
 }
 
 #[tokio::test]
+async fn playlist_removal_is_broadcast_and_guarded() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    watcher.ws.send(Message::Text(ClientMessage::SetPlaylist {
+        entries: ["a", "b", "a"].into_iter().map(|id| PlaylistEntry { game: GameId::new(id), title: id.into() }).collect()
+    }.to_json())).await.unwrap();
+    let before = watcher.wait_for(|p| p.playlist.entries.len() == 3).await;
+    let request = serde_json::json!({"expected": before.playlist, "from": 0, "remove": true}).to_string();
+    let (code, body) = post(&server, "/api/playlist", &request).await;
+    assert_eq!(code, 200, "{body}");
+    let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(view["playlist"]["entries"][0]["game"], "b");
+    assert_eq!(view["playlist"]["entries"][1]["game"], "a");
+    watcher.wait_for(|p| p.playlist.entries.len() == 2).await;
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 409);
+    for change in [serde_json::json!({"from":99,"remove":true}), serde_json::json!({"from":0}), serde_json::json!({"from":0,"to":1,"remove":true})] {
+        let mut req = change;
+        req["expected"] = view["playlist"].clone();
+        assert_eq!(post(&server, "/api/playlist", &req.to_string()).await.0, 400);
+    }
+}
+
+#[tokio::test]
 async fn web_reorder_broadcasts_the_new_up_next_to_the_lobby() {
     use gamenight_protocol::{GameId, PlaylistEntry, SessionPhase};
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
