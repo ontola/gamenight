@@ -648,12 +648,26 @@ pub fn demo_library() -> Vec<GameMeta> {
 /// Load the shelf from a JSON file (an array of `GameMeta`).
 pub fn load_library(path: &str) -> std::io::Result<Vec<GameMeta>> {
     let text = std::fs::read_to_string(path)?;
-    serde_json::from_str(&text).map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("bad library file {path}: {e}"),
-        )
-    })
+    let mut library: Vec<GameMeta> = serde_json::from_str(&text).map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, format!("bad library file {path}: {e}"))
+    })?;
+    let root = std::path::Path::new(path).parent().unwrap_or(std::path::Path::new("."));
+    for game in &mut library {
+        if let Some(cover) = game.cover.clone().filter(|cover| !cover.contains("://") && !cover.starts_with("data:")) {
+            let relative = std::path::Path::new(&cover);
+            let safe = !relative.is_absolute() && relative.components().all(|part| matches!(part, std::path::Component::Normal(_) | std::path::Component::CurDir));
+            game.cover = if safe {
+                std::fs::File::open(root.join(relative)).ok().and_then(|file| {
+                    use std::io::Read;
+                    let mut bytes = Vec::new();
+                    file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64).read_to_end(&mut bytes).ok()?;
+                    gamenight_protocol::artwork::png_data_uri(&bytes)
+                })
+            } else { None };
+            if game.cover.is_none() { tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback"); }
+        }
+    }
+    Ok(library)
 }
 
 /// Run the daemon on an already-bound listener until the process is stopped.
@@ -1278,5 +1292,27 @@ mod desktop_lifetime_tests {
         )
         .await
         .is_err());
+    }
+}
+
+#[cfg(test)]
+mod local_artwork_tests {
+    #[test]
+    fn shelf_resolves_packaged_png_and_falls_back_for_missing_art() {
+        let root = std::env::temp_dir().join(format!("gamenight-art-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut png = vec![0; 33];
+        png[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+        png[12..16].copy_from_slice(b"IHDR");
+        png[16..20].copy_from_slice(&128u32.to_be_bytes());
+        png[20..24].copy_from_slice(&128u32.to_be_bytes());
+        std::fs::write(root.join("icon.png"), &png).unwrap();
+        std::fs::write(root.join("shelf.json"), r##"[{"id":"one","title":"One","cover":"icon.png","color":"#44CCAA"},{"id":"two","title":"Two","cover":"missing.png"},{"id":"three","title":"Three","cover":"../icon.png"}]"##).unwrap();
+        let games = super::load_library(root.join("shelf.json").to_str().unwrap()).unwrap();
+        assert_eq!(gamenight_protocol::artwork::decode_png_data_uri(games[0].cover.as_ref().unwrap()), Some(png));
+        assert_eq!(games[0].color.as_deref(), Some("#44CCAA"));
+        assert!(games[1].cover.is_none());
+        assert!(games[2].cover.is_none());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

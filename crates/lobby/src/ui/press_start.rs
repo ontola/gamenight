@@ -162,7 +162,7 @@ fn press_start_system(meta: Root<GameMeta>, ctx: Res<EguiCtx>, game: Res<GameNig
     let title_sz = measure(&ctx, "GAMENIGHT", title_font.clone());
     let sub_sz = measure(&ctx, "the couch is warm", sub_font.clone());
     let prompt_sz = measure(&ctx, headline, prompt_font.clone());
-    let hint_sz = measure(&ctx, "or scan the code on the wall", hint_font.clone());
+    let hint_sz = measure(&ctx, "then press Start to link your phone", hint_font.clone());
 
     // The plate. Text over patterned wallpaper and fairy lights was unreadable
     // wherever it happened to land; a marquee gives it its own ground and makes
@@ -334,7 +334,7 @@ fn press_start_system(meta: Root<GameMeta>, ctx: Res<EguiCtx>, game: Res<GameNig
     painter.text(
         egui::pos2(cx, y),
         egui::Align2::CENTER_CENTER,
-        "or scan the code on the wall",
+        "then press Start to link your phone",
         hint_font,
         egui::Color32::from_rgb(186, 156, 132),
     );

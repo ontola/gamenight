@@ -24,7 +24,7 @@
       ]
     },
     "cover": {
-      "description": "Real cover art URL. `emoji` + `color` are the generated-poster fallback.",
+      "description": "Single cover/icon: HTTPS URL or small embedded PNG data URI.\n`emoji` + `color` are the generated-poster fallback.",
       "type": [
         "string",
         "null"

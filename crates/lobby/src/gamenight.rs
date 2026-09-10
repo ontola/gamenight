@@ -1191,6 +1191,8 @@ struct GlobalInput {
     pending_joins: std::collections::HashMap<u32, (String, String)>,
     /// Pads that are done joining — no further action needed for them here.
     joined_pads: HashSet<u32>,
+    /// Ignore pre-Leave snapshots until the host acknowledges departure.
+    departing_players: HashSet<PlayerId>,
     /// Confirmed pad -> player mappings not yet written into
     /// `GameNightBridge::player_gamepad` (drained every frame by
     /// `global_input_system`, which is the only thing with a path to that
@@ -1382,17 +1384,26 @@ impl GlobalInput {
         self.pending_joins.insert(pad, (name, color));
     }
 
+    fn adopt_controller_binding(&mut self, pad: u32, player: PlayerId) -> bool {
+        if self.departing_players.contains(&player) { return false; }
+        self.pending_joins.remove(&pad);
+        self.joined_pads.insert(pad);
+        self.pad_player.insert(pad, player);
+        true
+    }
+
     fn reconcile_joins(&mut self, seated: &[Player]) {
         // A stale host snapshot can restore a mapping just after Leave. Once
         // the departure is acknowledged, release the pad for a fresh join.
         let present: HashSet<_> = seated.iter().map(|player| player.id).collect();
-        self.pad_player.retain(|_, player| present.contains(player));
+        self.departing_players.retain(|player| present.contains(player));
+        self.pad_player.retain(|_, player| present.contains(player) && !self.departing_players.contains(player));
         self.joined_pads.retain(|pad| self.pad_player.contains_key(pad));
         self.open_menus.retain(|player, _| present.contains(player));
         self.newly_confirmed.retain(|(_, player)| present.contains(player));
         let pending = std::mem::take(&mut self.pending_joins);
         for (pad, (name, color)) in pending {
-            match seated.iter().find(|p| p.name == name) {
+            match seated.iter().find(|p| p.name == name && !self.departing_players.contains(&p.id)) {
                 Some(player) => {
                     self.joined_pads.insert(pad);
                     self.pad_player.insert(pad, player.id);
@@ -1424,6 +1435,8 @@ impl GlobalInput {
     /// After a Leave: forget this player entirely so their pad can join
     /// fresh (as a new player) later.
     fn forget_player(&mut self, player_id: PlayerId) {
+        self.departing_players.insert(player_id);
+        self.newly_confirmed.retain(|(_, player)| *player != player_id);
         self.open_menus.remove(&player_id);
         self.pad_player.retain(|_, p| *p != player_id);
         self.joined_pads
@@ -1451,6 +1464,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.insert_resource(GlobalInput {
         pending_joins: default(),
         joined_pads: default(),
+        departing_players: default(),
         newly_confirmed: default(),
         pad_player: default(),
         pressed_buttons: default(),
@@ -1707,10 +1721,9 @@ fn global_input_system(
             if let (Some(id), Some(ordinal)) = (seat.occupant.player_id(), seat.controller.as_deref()
                 .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
                 if let Some(pad) = connected.get(ordinal) {
-                    input.pending_joins.remove(&(pad.id as u32));
-                    input.joined_pads.insert(pad.id as u32);
-                    input.pad_player.insert(pad.id as u32, id);
-                    bridge.player_gamepad.insert(id, pad.id as u32);
+                    if input.adopt_controller_binding(pad.id as u32, id) {
+                        bridge.player_gamepad.insert(id, pad.id as u32);
+                    }
                 }
             }
         }
@@ -2644,6 +2657,8 @@ fn player_fingerprint(players: &[Player], id: PlayerId) -> Option<String> {
 /// range z ∈ (-1000, 0] — anything at positive z is *behind* the camera and
 /// silently never drawn.
 const LOBBY_PROP_Z: f32 = -100.0;
+// Behind every map/player layer, in front of the parallax background.
+const LOBBY_FURNITURE_Z: f32 = -920.0;
 /// The URL players scan to join.
 ///
 /// Defaults to this machine's LAN address, because the whole point is that
@@ -3178,6 +3193,14 @@ fn sync_lobby_qr_system(
             .and_then(|id| bridge.latest_players.iter().find(|player| player.id == id))
             .map(|player| player.name.clone())
     };
+    // The personal menu is the primary sign-in UI. Do not leave an empty
+    // black panel in the room while nobody is using the sign-in station.
+    if url.is_none() {
+        for (entity, _, _) in existing.iter_mut() {
+            commands.entity(entity).despawn_recursive();
+        }
+        return;
+    }
     let fingerprint = format!("{:?}|{:?}", url, name);
 
     // Already up and still encoding the right thing: just track the element.
@@ -3398,15 +3421,16 @@ fn spawn_pad_button(
     use bevy::hierarchy::BuildChildren;
     use bevy::prelude::*;
 
+    let floor_zone = matches!(pad, PadButton::NextGame { .. });
     // Housing: sits still, and is as tall as the face's full travel plus a
     // little, so a pressed button still has something under it.
     parent.spawn(SpriteBundle {
         sprite: Sprite {
-            custom_size: Some(size + Vec2::new(10.0, 4.0)),
+            custom_size: Some(size + if floor_zone { Vec2::new(4.0, 0.0) } else { Vec2::new(10.0, 4.0) }),
             color: Color::rgb(0.07, 0.06, 0.10),
             ..default()
         },
-        transform: Transform::from_xyz(offset.x, offset.y - PAD_PRESS_DEPTH, offset.z - 0.2),
+        transform: Transform::from_xyz(offset.x, offset.y - if floor_zone { 0.0 } else { PAD_PRESS_DEPTH }, offset.z - 0.2),
         ..default()
     });
 
@@ -3432,11 +3456,11 @@ fn spawn_pad_button(
             // rather than a flat rectangle painted on the floor.
             face.spawn(SpriteBundle {
                 sprite: Sprite {
-                    custom_size: Some(Vec2::new(size.x - 8.0, 5.0)),
+                    custom_size: Some(Vec2::new(size.x - 8.0, if floor_zone { 1.0 } else { 5.0 })),
                     color: Color::rgba(1.0, 1.0, 1.0, 0.28),
                     ..default()
                 },
-                transform: Transform::from_xyz(0.0, size.y / 2.0 - 4.0, 0.1),
+                transform: Transform::from_xyz(0.0, size.y / 2.0 - if floor_zone { 1.0 } else { 4.0 }, 0.1),
                 ..default()
             });
             let mut label_entity = face.spawn(Text2dBundle {
@@ -3542,7 +3566,7 @@ fn press_pads_system(
     }
     let presses = lobby_pad_presses(&bones_game.0);
     for (face, mut transform) in &mut faces {
-        transform.translation.y = face.home_y - presses.of(face.pad) * PAD_PRESS_DEPTH;
+        transform.translation.y = face.home_y - presses.of(face.pad) * if matches!(face.pad, PadButton::NextGame { .. }) { 0.0 } else { PAD_PRESS_DEPTH };
     }
     for (label, mut text) in &mut labels {
         let progress = presses.of(label.pad);
@@ -3743,6 +3767,8 @@ fn sync_next_game_tv_system(
     mut tv_texture: bevy::prelude::Local<Option<bevy::prelude::Handle<bevy::prelude::Image>>>,
     time: bevy::prelude::Res<bevy::prelude::Time>,
     mut case_motion: bevy::prelude::Local<game_cases::ShelfMotion>,
+    mut cover_cache: bevy::prelude::Local<game_cases::CoverCache>,
+    mut cover_images: bevy::prelude::ResMut<bevy::prelude::Assets<bevy::prelude::Image>>,
     mut existing: bevy::prelude::Query<(
         bevy::prelude::Entity,
         &LobbyTv,
@@ -3839,9 +3865,10 @@ fn sync_next_game_tv_system(
         NextGameStatus::DownloadFailed(t) => format!("UP NEXT  {t} · DOWNLOAD FAILED"),
         _ => "UP NEXT  Nothing ready yet".to_string(),
     };
-    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{cases:?}|{animation:.3}");
+    let case_fingerprint = game_cases::fingerprint(&cases);
+    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}");
     if let Some((entity, tv, mut transform)) = existing.iter_mut().next() {
-        transform.translation = Vec3::new(pos.x, pos.y, LOBBY_PROP_Z);
+        transform.translation = Vec3::new(pos.x, pos.y, LOBBY_FURNITURE_Z);
         if tv.0 == fingerprint {
             return;
         }
@@ -3861,7 +3888,7 @@ fn sync_next_game_tv_system(
         .spawn((
             LobbyTv(fingerprint),
             SpatialBundle {
-                transform: Transform::from_xyz(pos.x, pos.y, LOBBY_PROP_Z),
+                transform: Transform::from_xyz(pos.x, pos.y, LOBBY_FURNITURE_Z),
                 ..default()
             },
         ))
@@ -3905,7 +3932,7 @@ fn sync_next_game_tv_system(
                 transform: Transform::from_xyz(tv_x, -2.0, 0.1),
                 ..default()
             });
-            game_cases::spawn_shelf(parent, &cases, &next_line, animation, font.clone());
+            game_cases::spawn_shelf(parent, &cases, &next_line, animation, font.clone(), &mut cover_cache, &mut cover_images);
             let [(play_pos, play_size), (next_pos, next_size), (skip_pos, skip_size)] =
                 crate::core::elements::next_game_trigger::pad_thirds(
                     bevy::math::Vec2::new(pad_pos.x, pad_pos.y),
@@ -3923,7 +3950,7 @@ fn sync_next_game_tv_system(
             spawn_pad_button(
                 parent,
                 PadButton::NextGame { index: 0 },
-                Vec3::new(play_pos.x - pos.x, play_pos.y - pos.y, -1.0),
+                Vec3::new(play_pos.x - pos.x, play_pos.y - pos.y, 21.0),
                 play_size,
                 label,
                 colour,
@@ -3932,7 +3959,7 @@ fn sync_next_game_tv_system(
             spawn_pad_button(
                 parent,
                 PadButton::NextGame { index: 1 },
-                Vec3::new(next_pos.x - pos.x, next_pos.y - pos.y, -1.0),
+                Vec3::new(next_pos.x - pos.x, next_pos.y - pos.y, 21.0),
                 next_size,
                 "PLAY NEXT",
                 if next_ready {
@@ -3945,7 +3972,7 @@ fn sync_next_game_tv_system(
             spawn_pad_button(
                 parent,
                 PadButton::NextGame { index: 2 },
-                Vec3::new(skip_pos.x - pos.x, skip_pos.y - pos.y, -1.0),
+                Vec3::new(skip_pos.x - pos.x, skip_pos.y - pos.y, 21.0),
                 skip_size,
                 "SKIP",
                 if can_skip {
@@ -4417,6 +4444,31 @@ mod jukebox_tests {
 #[cfg(test)]
 mod rejoin_regression_tests {
     use super::*;
+
+    #[test]
+    fn leave_then_fresh_join_survives_delayed_departure_acknowledgement() {
+        let mut input = GlobalInput::default();
+        let old = Player { id: PlayerId::new(), name: "Disco".into(), color: None, avatar: None, library: vec![] };
+        input.adopt_controller_binding(0, old.id);
+        input.forget_player(old.id);
+        // The user releases the stick and presses A before the host's echo.
+        let (tx, rx) = async_channel::unbounded();
+        input.join_pad(0, &[old.clone()], &tx);
+        assert!(matches!(rx.try_recv(), Ok(ClientMessage::JoinParty { .. })));
+        let pending = input.pending_joins[&0].clone();
+        for _ in 0..3 {
+            assert!(!input.adopt_controller_binding(0, old.id));
+            input.reconcile_joins(&[old.clone()]);
+            assert!(!input.joined_pads.contains(&0));
+            assert_eq!(input.pending_joins[&0], pending);
+        }
+        input.reconcile_joins(&[]);
+        let new = Player { id: PlayerId::new(), name: pending.0, color: Some(pending.1), avatar: None, library: vec![] };
+        input.reconcile_joins(&[new.clone()]);
+        assert_eq!(input.pad_player.get(&0), Some(&new.id));
+        assert!(input.pending_joins.is_empty());
+        assert!(rx.try_recv().is_err());
+    }
 
     #[test]
     fn departed_player_restored_by_stale_snapshot_does_not_block_rejoin() {

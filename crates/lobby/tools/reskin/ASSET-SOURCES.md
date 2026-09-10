@@ -99,3 +99,7 @@ death uses a rotated standing pose. Sleep/wake frames occupy reserved cells but
 are not yet driven by presence transitions. The face remains a separate layer
 for the character studio. Floor tiles and room backgrounds are unchanged: the
 benchmark tiles require visual cleanup before they can replace the floor.
+
+## Living-room redesign (2026-09-10)
+
+The current rear wall and six ranged weapons are generated assets, not Kenney CC0 exports. See `docs/art/lobby-redesign/README.md` and `prompts.json` for OpenAI/PixelLab provenance. Rebuild their runtime mapping with `build_room.py` after any older reskin builder.

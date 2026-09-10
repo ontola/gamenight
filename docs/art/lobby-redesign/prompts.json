@@ -1,0 +1,19 @@
+{
+  "generator": "OpenAI image generation",
+  "date": "2026-09-10",
+  "room": {
+    "prompt": "Create a production-ready background texture for a 2D side-view pixel-art couch multiplayer game lobby, matching the warm cream, terracotta, honey oak and muted teal palette of the reference. Reference is style inspiration only. Render ONLY the rear wall/environment, no characters, no television, no game boxes, no user interface, no lettering, no QR codes, no floating platforms, no floor, no foreground plants. Wide 5:3 composition designed as a 640x384 pixel-art background, crisp nearest-neighbor style clusters with no blur. Warm cream plaster wall with restrained subtle shading. One tall sunset window on the far left and one on far right, a few small framed abstract pictures and trailing plants in upper corners. Broad calm empty central 70% of wall and entire lower half for runtime furniture and readable action. Cozy soft amber indirect light, no dramatic spotlights. Flat orthographic elevation viewed straight on, not perspective, no side walls. Deliver one complete background image.",
+    "reference": "../lobby-concepts/03-living-room.png",
+    "source": "room-source.png",
+    "runtime": "../../../crates/lobby/assets/map/resources/bg_room.png",
+    "processing": "Nearest-neighbor resampling to 640x384; wall is decorative, without physics."
+  },
+  "weapons": {
+    "generator": "OpenAI image generation concept, PixelLab generate-with-style-v2 runtime exports",
+    "concept": "weapons-concept.png",
+    "prompt": "Production game asset sprite sheet on transparent background, crisp chunky pixel art, warm playful couch multiplayer style, restrained navy outlines, honey wood, cream metal and muted teal accents. Exactly SIX isolated side-view weapons, all pointing RIGHT, arranged in a precise 2-column by 3-row grid with wide transparent margins between each. Row 1: left a short wide-barrel wooden blunderbuss shotgun, right a wheeled little brass cannon pointing horizontally right. Row 2: left a compact teal submachine gun with short barrel, right a long wooden flintlock musket with a narrow barrel. Row 3: left a whimsical teal periscope-shaped gun with a right-facing nozzle at top, right a long scoped navy-and-wood sniper rifle. Each object entirely within its grid cell, centered, no contact between sprites. True transparent alpha background, no labels, no text, no lighting glow, no shadows outside sprites, no UI, no hands, no bullets, no effects. Pixel art with flat readable shapes and small palette, no photoreal texture. These are actual inventory sprites and must have clearly distinct silhouettes.",
+    "runtime_briefs": "weapons-brief.json",
+    "seed": 231,
+    "processing": "PixelLab no_background=true exports, selected variant1. build_room.py crops alpha bounds, uniformly resizes and builds original atlas grids; firing frames translate the same sprite for recoil."
+  }
+}

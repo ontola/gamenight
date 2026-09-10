@@ -6,8 +6,8 @@ use crate::prelude::*;
 #[type_data(metadata_asset("next_game_trigger"))]
 #[repr(C)]
 pub struct NextGameTriggerMeta {
-    /// The button itself: a solid block on the floor you land on top of to
-    /// start the next game. The element's position is its centre.
+    /// Width of the station and height of its painted, non-solid floor zones.
+    /// The element position is the centre of the floor markings.
     pub body_size: Vec2,
     /// Size of the TV screen drawn above the zone.
     pub screen_size: Vec2,
@@ -54,19 +54,20 @@ pub fn pad_thirds(pos: Vec2, size: Vec2) -> [(Vec2, Vec2); 3] {
     [0, 1, 2].map(|index| {
         (
             Vec2::new(pos.x + (index as f32 - 1.0) * width, pos.y),
-            Vec2::new(width * 0.82, size.y),
+            Vec2::new((width * 0.55).min(68.0), size.y),
         )
     })
 }
 
-fn button_at(x: f32, center: f32, width: f32) -> usize {
-    if x < center - width / 6.0 {
-        0
-    } else if x > center + width / 6.0 {
-        2
-    } else {
-        1
+/// Gaps between markings do not belong to either action. A player must be
+/// grounded with feet at floor level; merely jumping past a sign is harmless.
+fn dwell_zone(x: f32, feet_y: f32, grounded: bool, pos: Vec2, size: Vec2) -> Option<usize> {
+    if !grounded || (feet_y - pos.y).abs() > 6.0 {
+        return None;
     }
+    pad_thirds(pos, size)
+        .iter()
+        .position(|(center, face)| (x - center.x).abs() <= face.x / 2.0)
 }
 
 pub const HOLD_SECONDS: f32 = 2.0;
@@ -127,13 +128,11 @@ impl PadHold {
 }
 
 fn hydrate(
-    mut entities: ResMutInit<Entities>,
+    entities: ResMutInit<Entities>,
     mut hydrated: CompMut<MapElementHydrated>,
     element_handles: Comp<ElementHandle>,
     assets: Res<AssetServer>,
     mut triggers: CompMut<NextGameTrigger>,
-    mut solids: CompMut<Solid>,
-    transforms: Comp<Transform>,
 ) {
     let mut not_hydrated_bitset = hydrated.bitset().clone();
     not_hydrated_bitset.bit_not();
@@ -152,36 +151,7 @@ fn hydrate(
         }) = assets.get(element_meta.data).try_cast_ref()
         {
             hydrated.insert(entity, MapElementHydrated);
-            // A solid, not a trigger: you bump into this one and you stand on
-            // top of it.
-            let pos = transforms
-                .get(entity)
-                .map(|t| t.translation.truncate())
-                .unwrap_or_default();
-            solids.insert(
-                entity,
-                Solid {
-                    disabled: false,
-                    pos,
-                    size: *body_size,
-                    ..default()
-                },
-            );
-            // The TV above it is a platform in its own right, and an entity
-            // carries only one solid — so the screen gets its own, holding
-            // nothing but the shape you land on. The bevy side works out
-            // where to draw from the trigger's screen geometry, so this
-            // never needs finding again.
-            let screen = entities.create();
-            solids.insert(
-                screen,
-                Solid {
-                    disabled: false,
-                    pos: pos + *screen_offset,
-                    size: *screen_size + Vec2::splat(SCREEN_FRAME * 2.0),
-                    ..default()
-                },
-            );
+            // Furniture and floor markings are visual only: never add collision.
             triggers.insert(
                 entity,
                 NextGameTrigger {
@@ -202,7 +172,6 @@ fn hydrate(
 fn update(
     entities: Res<Entities>,
     mut triggers: CompMut<NextGameTrigger>,
-    solids: Comp<Solid>,
     player_indexes: Comp<PlayerIdx>,
     bodies: Comp<KinematicBody>,
     transforms: Comp<Transform>,
@@ -216,20 +185,23 @@ fn update(
     };
     let dt = time.delta_seconds();
     let button = bridge.tv_button();
-    for (_, (trigger, solid)) in entities.iter_with((&mut triggers, &solids)) {
+    for (_, (trigger, station_transform)) in entities.iter_with((&mut triggers, &transforms)) {
         let mut occupants = [None; 3];
         for (_, (idx, body, transform)) in
             entities.iter_with((&player_indexes, &bodies, &transforms))
         {
-            if bridge.seat_sleeping(idx.0) { continue; }
+            if bridge.seat_sleeping(idx.0) {
+                continue;
+            }
             let x = transform.translation.x;
             let feet = body.bounding_box(*transform);
-            if body.is_on_ground
-                && (feet.min.y - (solid.pos.y + solid.size.y / 2.0)).abs() <= 4.0
-                && x >= solid.pos.x - solid.size.x / 2.0
-                && x <= solid.pos.x + solid.size.x / 2.0
-            {
-                let index = button_at(x, solid.pos.x, solid.size.x);
+            if let Some(index) = dwell_zone(
+                x,
+                feet.min.y,
+                body.is_on_ground,
+                station_transform.translation.truncate(),
+                trigger.body_size,
+            ) {
                 // Deterministic ownership when two players share a pad.
                 occupants[index] = Some(occupants[index].map_or(idx.0, |old: u32| old.min(idx.0)));
             }
@@ -310,13 +282,15 @@ mod tests {
     }
 
     #[test]
-    fn button_faces_match_landing_regions() {
-        let pos = Vec2::new(560.0, 160.0);
-        let size = Vec2::new(240.0, 14.0);
-        for (index, (center, face)) in pad_thirds(pos, size).into_iter().enumerate() {
-            for x in [center.x - face.x / 2.0, center.x, center.x + face.x / 2.0] {
-                assert_eq!(button_at(x, pos.x, size.x), index);
-            }
+    fn floor_markings_are_reachable_without_jumping_and_gaps_cancel() {
+        let pos = Vec2::new(620.0, 98.0);
+        let size = Vec2::new(360.0, 4.0);
+        for (index, (center, _)) in pad_thirds(pos, size).into_iter().enumerate() {
+            assert_eq!(dwell_zone(center.x, 96.0, true, pos, size), Some(index));
+            assert_eq!(dwell_zone(center.x, 96.0, false, pos, size), None);
+            assert_eq!(dwell_zone(center.x, 160.0, true, pos, size), None);
         }
+        assert_eq!(dwell_zone(560.0, 96.0, true, pos, size), None);
+        assert_eq!(dwell_zone(680.0, 96.0, true, pos, size), None);
     }
 }

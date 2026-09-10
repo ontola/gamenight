@@ -29,6 +29,14 @@ layers:
   body:
     atlas: ./orcy-body.atlas.yaml
     animations: &default_anims
+      sleep:
+        frames: [{idx: 20}, {idx: 21}, {idx: 22}, {idx: 23, head_offset: [0, -3]}]
+        fps: 9
+        repeat: false
+      wake:
+        frames: [{idx: 24}, {idx: 25}, {idx: 26}, {idx: 27}]
+        fps: 9
+        repeat: false
       idle:
         frames:
           - idx: 0
@@ -132,6 +140,14 @@ layers:
     atlas: ./orcy-fin.atlas.yaml
     offset: [-14, 3]
     animations:
+      sleep:
+        frames: [0, 0, 0, 0]
+        fps: 9
+        repeat: false
+      wake:
+        frames: [0, 0, 0, 0]
+        fps: 9
+        repeat: false
       idle:
         fps: *fps
         frames:
@@ -204,6 +220,14 @@ layers:
     atlas: ./orcy-face.atlas.yaml
     offset: [5, 5]
     animations:
+      sleep:
+        frames: [0, 4, 5, 5]
+        fps: 9
+        repeat: false
+      wake:
+        frames: [5, 4, 0, 0]
+        fps: 9
+        repeat: false
       idle:
         fps: *fps
         frames:

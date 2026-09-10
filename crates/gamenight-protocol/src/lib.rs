@@ -8,6 +8,7 @@
 //! tagged enum (`"type"` field, snake_case). Unknown fields must be ignored by
 //! receivers so the protocol can grow without breaking old SDKs.
 
+pub mod artwork;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -377,7 +378,8 @@ pub struct GameMeta {
     /// One-line pitch shown under the title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tagline: Option<String>,
-    /// Cover art: a URL or data URI. Absent = overlays generate a cover from
+    /// Single PNG icon/cover: HTTPS URL, PNG data URI, or (in shelf files)
+    /// relative PNG path resolved by the daemon. Absent = overlays generate a cover from
     /// `color` + `emoji`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,

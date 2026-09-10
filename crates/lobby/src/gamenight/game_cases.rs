@@ -8,6 +8,7 @@ pub(super) struct Case {
     id: GameId,
     title: String,
     color: String,
+    cover: Option<String>,
 }
 
 pub(super) fn queue(bridge: &GameNightBridge) -> Vec<Case> {
@@ -51,6 +52,7 @@ fn ordered_cases(
         cases.push(Case {
             id: entry.game.clone(),
             title: entry.title.clone(),
+            cover: meta.and_then(|m| m.cover.clone()),
             color: meta
                 .and_then(|m| m.color.clone())
                 .unwrap_or_else(|| "#5fb8ad".into()),
@@ -117,31 +119,81 @@ fn label(
     });
 }
 
+/// Cache both valid and rejected artwork; decoding never happens each animation frame.
+#[derive(Default)]
+pub(super) struct CoverCache(std::collections::HashMap<String, Option<Handle<Image>>>);
+impl CoverCache {
+    fn image(&mut self, cover: Option<&str>, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+        let cover = cover?;
+        self.0
+            .entry(cover.to_string())
+            .or_insert_with(|| decode_cover(cover).map(|image| images.add(image)))
+            .clone()
+    }
+}
+fn decode_cover(cover: &str) -> Option<Image> {
+    use bevy::render::texture::{CompressedImageFormats, ImageSampler, ImageType};
+    let bytes = gamenight_protocol::artwork::decode_png_data_uri(cover)?;
+    let mut image = Image::from_buffer(
+        &bytes,
+        ImageType::Extension("png"),
+        CompressedImageFormats::NONE,
+        true,
+    )
+    .ok()?;
+    image.sampler_descriptor = ImageSampler::nearest();
+    Some(image)
+}
+
+pub(super) fn fingerprint(cases: &[Case]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    for c in cases {
+        c.id.hash(&mut h);
+        c.title.hash(&mut h);
+        c.color.hash(&mut h);
+        c.cover.hash(&mut h);
+    }
+    h.finish()
+}
+
 pub(super) fn spawn_shelf(
     parent: &mut ChildBuilder,
     cases: &[Case],
     status: &str,
     motion: f32,
     font: Handle<Font>,
+    cache: &mut CoverCache,
+    images: &mut Assets<Image>,
 ) {
     let wood = Color::rgb(0.46, 0.26, 0.16);
-    block(parent, 60.0, -39.0, 0.0, 224.0, 8.0, wood);
+    // Backboard, upright ends and a low shelf: all scenery behind the players.
     block(
         parent,
         60.0,
-        -34.0,
+        -7.0,
+        -0.2,
+        224.0,
+        76.0,
+        Color::rgb(0.20, 0.14, 0.13),
+    );
+    block(parent, 60.0, -47.0, 0.0, 224.0, 8.0, wood);
+    block(
+        parent,
+        60.0,
+        -42.0,
         0.1,
         224.0,
         3.0,
         Color::rgb(0.82, 0.57, 0.32),
     );
-    block(parent, -44.0, -45.0, 0.0, 8.0, 8.0, wood);
-    block(parent, 164.0, -45.0, 0.0, 8.0, 8.0, wood);
+    block(parent, -48.0, -9.0, 0.1, 8.0, 76.0, wood);
+    block(parent, 168.0, -9.0, 0.1, 8.0, 76.0, wood);
     label(
         parent,
         "UP NEXT",
-        3.0,
-        43.0,
+        -2.0,
+        57.0,
         100.0,
         11.0,
         &font,
@@ -153,59 +205,116 @@ pub(super) fn spawn_shelf(
             "Nothing queued",
             60.0,
             0.0,
-            210.0,
+            200.0,
             12.0,
             &font,
             Color::WHITE,
         );
         return;
     }
-    for (index, case) in cases.iter().take(4).enumerate().rev() {
-        let x = -19.0 + index as f32 * 56.0 + motion * 32.0;
-        let y = -1.0 + motion * 3.0;
+    // Later games are narrow book spines. First is presented face-on and taller.
+    for (index, case) in cases.iter().take(6).enumerate().skip(1).rev() {
+        let x = 48.0 + (index - 1) as f32 * 23.0 + motion * 22.0;
         let accent =
             Color::hex(case.color.trim_start_matches('#')).unwrap_or(Color::rgb(0.37, 0.72, 0.68));
-        // Thick dark case, coloured spine, paper cover and a tiny pixel motif.
         block(
             parent,
-            x + 2.0,
-            y - 1.0,
+            x,
+            -11.0,
             0.1,
-            52.0,
-            68.0,
+            21.0,
+            60.0,
             Color::rgb(0.055, 0.07, 0.12),
         );
-        block(parent, x, y, 0.2, 48.0, 66.0, Color::rgb(0.10, 0.13, 0.19));
-        block(parent, x - 20.0, y, 0.3, 4.0, 62.0, accent);
-        block(parent, x + 2.0, y + 7.0, 0.3, 38.0, 44.0, accent);
-        let motif = motif(&case.id.0);
-        for (row, pixels) in motif.iter().enumerate() {
+        block(parent, x, -11.0, 0.2, 17.0, 58.0, accent);
+        block(
+            parent,
+            x - 6.0,
+            -11.0,
+            0.3,
+            2.0,
+            54.0,
+            Color::rgba(1.0, 1.0, 1.0, 0.25),
+        );
+        let title = super::ellipsize(&case.title, 15);
+        parent.spawn(Text2dBundle {
+            text: Text::from_section(
+                title,
+                TextStyle {
+                    font: font.clone(),
+                    font_size: 8.0,
+                    color: Color::WHITE,
+                },
+            ),
+            transform: Transform {
+                translation: Vec3::new(x, -10.0, 0.6),
+                rotation: Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+                ..default()
+            },
+            ..default()
+        });
+    }
+    let case = &cases[0];
+    let x = -3.0 + motion * 22.0;
+    let accent =
+        Color::hex(case.color.trim_start_matches('#')).unwrap_or(Color::rgb(0.37, 0.72, 0.68));
+    block(
+        parent,
+        x + 2.0,
+        2.0,
+        0.2,
+        72.0,
+        90.0,
+        Color::rgb(0.055, 0.07, 0.12),
+    );
+    block(
+        parent,
+        x,
+        3.0,
+        0.3,
+        68.0,
+        88.0,
+        Color::rgb(0.10, 0.13, 0.19),
+    );
+    block(parent, x - 29.0, 3.0, 0.4, 4.0, 84.0, accent);
+    block(parent, x + 2.0, 12.0, 0.4, 54.0, 62.0, accent);
+    if let Some(texture) = cache.image(case.cover.as_deref(), images) {
+        parent.spawn(SpriteBundle {
+            texture,
+            sprite: Sprite {
+                custom_size: Some(Vec2::new(54.0, 62.0)),
+                ..default()
+            },
+            transform: Transform::from_xyz(x + 2.0, 12.0, 0.5),
+            ..default()
+        });
+    } else {
+        for (row, pixels) in motif(&case.id.0).iter().enumerate() {
             for (col, pixel) in pixels.bytes().enumerate() {
                 if pixel == b'#' {
                     block(
                         parent,
-                        x - 12.0 + col as f32 * 4.0,
-                        y + 18.0 - row as f32 * 4.0,
-                        0.4,
-                        4.0,
-                        4.0,
+                        x - 16.0 + col as f32 * 6.0,
+                        29.0 - row as f32 * 6.0,
+                        0.5,
+                        6.0,
+                        6.0,
                         Color::rgb(0.98, 0.92, 0.74),
                     );
                 }
             }
         }
-        label(
-            parent,
-            &case.title,
-            x + 2.0,
-            y - 21.0,
-            42.0,
-            8.0,
-            &font,
-            Color::WHITE,
-        );
     }
-    // Loading belongs to the first case, not to the current game's TV.
+    label(
+        parent,
+        &case.title,
+        x + 2.0,
+        -29.0,
+        58.0,
+        10.0,
+        &font,
+        Color::WHITE,
+    );
     let hint = if status.contains("DOWNLOAD FAILED") {
         "DOWNLOAD FAILED"
     } else if status.contains("DOWNLOADING") {
@@ -219,21 +328,21 @@ pub(super) fn spawn_shelf(
         label(
             parent,
             hint,
-            80.0,
-            43.0,
-            120.0,
+            108.0,
+            39.0,
+            112.0,
             9.0,
             &font,
             Color::rgb(1.0, 0.83, 0.48),
         );
     }
-    if cases.len() > 4 {
+    if cases.len() > 6 {
         label(
             parent,
-            &format!("+{}", cases.len() - 4),
-            171.0,
-            25.0,
-            25.0,
+            &format!("+{}", cases.len() - 6),
+            172.0,
+            49.0,
+            28.0,
             9.0,
             &font,
             Color::WHITE,
@@ -277,6 +386,17 @@ mod tests {
             game: GameId::new(id),
             title: id.into(),
         }
+    }
+    #[test]
+    fn invalid_image_payload_falls_back_even_with_valid_png_header() {
+        let mut png = vec![0; 33];
+        png[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+        png[12..16].copy_from_slice(b"IHDR");
+        png[16..20].copy_from_slice(&32u32.to_be_bytes());
+        png[20..24].copy_from_slice(&32u32.to_be_bytes());
+        let uri = gamenight_protocol::artwork::png_data_uri(&png).unwrap();
+        assert!(decode_cover(&uri).is_none());
+        assert!(decode_cover("https://example.com/cover.png").is_none());
     }
     #[test]
     fn queue_starts_at_warm_and_excludes_current_and_lobby() {

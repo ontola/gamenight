@@ -58,6 +58,43 @@ Two invariants you can build on:
 
 ---
 
+## Your game box: a name, one image, and a color
+
+The same small image is reused on the lobby's game case and current-game TV.
+Supply metadata in your shelf entry; there is no extra runtime message or
+second logo/banner format to implement:
+
+```json
+{
+  "id": "space-party",
+  "title": "Space Party",
+  "cover": "art/icon.png",
+  "color": "#44CCAA"
+}
+```
+
+`title` is your display name. `color` is an optional `#rrggbb` accent. `cover`
+is an optional **single PNG image**: an icon, illustration, or cover. A square
+128×128 or 256×256 image works well; keep text out of it because GameNight
+renders the title separately. Transparency is supported. Limits are 256 KiB
+encoded PNG bytes and 1024×1024 pixels.
+
+In a local shelf JSON, a PNG path is relative to that JSON file. Ship both in
+your game package. The daemon loads the image once and sends it as a PNG data
+URI, so the lobby and phone do not need access to your filesystem. Absolute
+paths and parent-directory traversal are not supported. Missing or invalid
+local art falls back to the title and accent color rather than preventing play.
+
+For an entry in the shared download catalog, use `cover` with a
+`data:image/png;base64,...` value to embed this same small PNG. That image
+travels with the installed game's metadata and works offline. Existing HTTPS
+cover URLs remain valid metadata, but consumers that do not fetch remote art
+use the fallback. No `cover` is required: older entries and games with only a
+title still work. The optional existing `emoji` field remains a fallback hint;
+developers do not need to supply both an emoji and an image.
+
+---
+
 ## Step 0 — How your game gets launched
 
 You don't add CLI flags. The daemon launches your binary from its library

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "buss",
+    "description": "Short wide-barrel wooden blunderbuss shotgun. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  },
+  {
+    "name": "cannon",
+    "description": "Small brass cannon on wooden wheels. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  },
+  {
+    "name": "machine_gun",
+    "description": "Compact teal submachine gun. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  },
+  {
+    "name": "musket",
+    "description": "Long wooden flintlock musket. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  },
+  {
+    "name": "periscope",
+    "description": "Whimsical teal periscope shaped gun with right-facing nozzle. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  },
+  {
+    "name": "sniper_rifle",
+    "description": "Long scoped navy and wood sniper rifle. One isolated side-view game weapon pointing right. Keep the silhouette recognizable at small size. No hands, no effects, no shadows, no background, no checkerboard, no text."
+  }
+]

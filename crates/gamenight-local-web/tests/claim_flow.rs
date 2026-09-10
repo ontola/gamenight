@@ -1089,3 +1089,27 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
     let (_, links) = http(&server, "GET", "/api/player-links", "").await;
     assert_eq!(serde_json::from_str::<serde_json::Value>(&links).unwrap()["linked"][0], id);
 }
+
+#[tokio::test]
+async fn session_tab_tracks_link_unlink_and_does_not_show_a_phone_qr() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let (_, page) = http(&server, "GET", "/mobile", "").await;
+    assert!(!page.contains("Scan QR Code with Phone"));
+    assert!(page.contains("session-link-status"));
+    post(&server, "/api/profiles", &profile_json("session-phone", "Disco", "blue", "face")).await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&status).unwrap()["linked"], false);
+    post(&server, "/api/profiles/session-phone/join", "{}").await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    let status: serde_json::Value = serde_json::from_str(&status).unwrap();
+    assert_eq!(status["linked"], true);
+    assert_eq!(status["player_name"], "Disco");
+    assert_eq!(status["players"], 1);
+    let party = Watcher::connect(&daemon).await.party;
+    post(&server, &format!("/api/player-links/{}/unlink", party.players[0].id.0), "").await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    let status: serde_json::Value = serde_json::from_str(&status).unwrap();
+    assert_eq!(status["linked"], false);
+    assert_eq!(status["players"], 1);
+}

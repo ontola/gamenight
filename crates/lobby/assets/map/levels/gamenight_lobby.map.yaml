@@ -1,18 +1,9 @@
 name: GameNight Lobby
 background:
   speed:
-  - 0.12
-  - 0.05
+  - 0.0
+  - 0.0
   layers:
-  - image: /map/resources/bg_city.png
-    size:
-    - 640
-    - 384
-    depth: 6.0
-    scale: 3.0
-    offset:
-    - 0.0
-    - 0.0
   - image: /map/resources/bg_room.png
     size:
     - 640
@@ -20,7 +11,7 @@ background:
     depth: 1.0
     scale: 2.0
     offset:
-    - 0.0
+    - 640.0
     - 0.0
 background_color: rgba(91, 87, 114, 255)
 grid_size:
@@ -679,56 +670,6 @@ layers:
     idx: 12
     collision: Solid
   - pos:
-    - 16
-    - 3
-    idx: 13
-    collision: Solid
-  - pos:
-    - 17
-    - 3
-    idx: 14
-    collision: Solid
-  - pos:
-    - 18
-    - 3
-    idx: 15
-    collision: Solid
-  - pos:
-    - 22
-    - 3
-    idx: 16
-    collision: Solid
-  - pos:
-    - 23
-    - 3
-    idx: 17
-    collision: Solid
-  - pos:
-    - 22
-    - 4
-    idx: 18
-    collision: Solid
-  - pos:
-    - 23
-    - 4
-    idx: 19
-    collision: Solid
-  - pos:
-    - 24
-    - 3
-    idx: 20
-    collision: Solid
-  - pos:
-    - 24
-    - 4
-    idx: 21
-    collision: Solid
-  - pos:
-    - 25
-    - 3
-    idx: 22
-    collision: Solid
-  - pos:
     - 26
     - 3
     idx: 23
@@ -747,11 +688,6 @@ layers:
     - 29
     - 3
     idx: 26
-    collision: Solid
-  - pos:
-    - 25
-    - 4
-    idx: 27
     collision: Solid
   - pos:
     - 26
@@ -942,7 +878,7 @@ layers:
     element: /elements/environment/music/music_screen.element.yaml
   - pos:
     - 620.0
-    - 163.0
+    - 98.0
     element: /elements/environment/next_game/next_game.element.yaml
   - pos:
     - 352.0

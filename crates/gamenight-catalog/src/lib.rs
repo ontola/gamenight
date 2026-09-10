@@ -35,7 +35,8 @@ pub struct CatalogEntry {
     pub integration: Integration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requirements: Option<Requirements>,
-    /// Real cover art URL. `emoji` + `color` are the generated-poster fallback.
+    /// Single cover/icon: HTTPS URL or small embedded PNG data URI.
+    /// `emoji` + `color` are the generated-poster fallback.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -355,8 +356,8 @@ pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
     }
     if let Some(cover) = &entry.cover {
         check(
-            cover.starts_with("https://"),
-            "cover must be an https URL (emoji/color are the local fallback)",
+            cover.starts_with("https://") || gamenight_protocol::artwork::decode_png_data_uri(cover).is_some(),
+            "cover must be an https URL or PNG data URI (up to 256 KiB and 1024×1024)",
         );
     }
     problems
@@ -483,6 +484,15 @@ mod tests {
             "integration": { "level": "planned" }
         }))
         .unwrap()
+    }
+
+    #[test]
+    fn small_embedded_png_is_a_valid_offline_cover() {
+        let mut entry = minimal("art-test");
+        entry.cover = Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jL1kAAAAASUVORK5CYII=".into());
+        assert!(validate(&entry, "art-test.json").is_empty());
+        entry.cover = Some("data:image/png;base64,broken".into());
+        assert!(!validate(&entry, "art-test.json").is_empty());
     }
 
     #[test]

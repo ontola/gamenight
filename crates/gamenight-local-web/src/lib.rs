@@ -93,6 +93,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/profiles", post(save_profile))
         .route("/api/profiles/:id", get(get_profile))
         .route("/api/profiles/:id/join", post(join_session))
+        .route("/api/profiles/:id/session", get(profile_session))
         .route("/qr", get(serve_qr))
         .route("/qr/:session_id", get(serve_session_qr))
         .route("/", get(serve_studio))
@@ -113,6 +114,24 @@ pub async fn run_server(
     );
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+async fn profile_session(Path(id): Path<String>, State(state): State<SharedState>) -> Result<Json<serde_json::Value>, StatusCode> {
+    use futures_util::SinkExt;
+    use gamenight_protocol::Role;
+    let addr = state.lock().unwrap().daemon_addr.clone();
+    tokio::time::timeout(daemon::REPLY_TIMEOUT * 2, async {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}")).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+        ws.send(tokio_tungstenite::tungstenite::Message::Text(ClientMessage::Hello { role: Role::Overlay, game: None, token: None }.to_json())).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+        let party = daemon::read_welcome(&mut ws).await.map_err(StatusCode::from)?;
+        let bound = state.lock().unwrap().bindings.get(&id).copied();
+        let player = bound.and_then(|id| party.players.iter().find(|player| player.id == id));
+        let seat = player.and_then(|player| party.seats.iter().find(|seat| seat.occupant.player_id() == Some(player.id))).map(|seat| seat.index);
+        let title = |game: &gamenight_protocol::GameId| party.library.iter().find(|meta| &meta.id == game).map(|meta| meta.title.clone()).unwrap_or_else(|| game.0.clone());
+        let current = party.active_session.as_ref().map(|session| serde_json::json!({"title": title(&session.game), "phase": session.phase}));
+        let next = party.warm_session.as_ref().map(|session| title(&session.game)).or_else(|| party.warming.as_ref().map(|entry| entry.title.clone()));
+        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
+    }).await.map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
 }
 
 async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {

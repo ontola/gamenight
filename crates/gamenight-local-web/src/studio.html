@@ -437,11 +437,7 @@
     </div>
   </header>
 
-  <div id="session-banner" style="display:none; background: linear-gradient(90deg, #6366f1, #a855f7); color: #fff; padding: 0.8rem 1.5rem; text-align: center; font-weight: 700; font-size: 0.95rem; border-bottom: 1px solid rgba(255,255,255,0.2);">
-    📱 Scanned Game Session Code: <span id="session-id-display">gn-8f92a1</span> — Customize your character below and join the game!
-  </div>
-
-  <main>
+<main>
     <div id="tab-playlist" class="tab-content">
       <div class="card">
         <h2>Tonight’s playlist</h2>
@@ -512,16 +508,18 @@
       <div id="status-msg" class="status"></div>
     </div>
 
-    <!-- TAB 3: SESSION & QR -->
+    <!-- TAB 3: YOUR PARTY -->
     <div id="tab-session" class="tab-content">
-      <div class="card qr-card">
-        <div class="card-title">Scan QR Code with Phone</div>
-        <p style="color: var(--muted);">Scan to edit your character on mobile and load directly into the couch party!</p>
-        <img src="/qr" alt="QR Code" style="border-radius: 8px; border: 4px solid var(--accent); padding: 8px; background: #0f172a;" />
-        <div style="font-size: 0.85rem; color: var(--muted)">http://127.0.0.1:7913/mobile</div>
+      <div class="card">
+        <div class="card-title">Your session</div>
+        <p id="session-link-status" aria-live="polite">Checking your connection…</p>
+        <p id="session-link-help" style="color:var(--muted)"></p>
+        <dl>
+          <dt>Players in the party</dt><dd id="session-player-count">—</dd>
+          <dt>Current game</dt><dd id="session-current-game">—</dd>
+          <dt>Up next</dt><dd id="session-next-game">—</dd>
+        </dl>
       </div>
-
-
     </div>
   </main>
 
@@ -1054,16 +1052,6 @@
     }
 
     function init() {
-      const parts = window.location.pathname.split('/');
-      const idx = parts.indexOf('session');
-      if (idx !== -1 && parts[idx + 1]) {
-        const banner = document.getElementById('session-banner');
-        if (banner) {
-          banner.style.display = 'block';
-          document.getElementById('session-id-display').innerText = parts[idx + 1];
-        }
-      }
-
       renderCharacterColors();
       renderGrid();
       renderPalette();
@@ -1093,8 +1081,28 @@
       document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + tab));
       document.querySelectorAll('.nav-tabs .nav-btn').forEach(el => el.classList.toggle('active', el.textContent.toLowerCase() === tab));
       if (tab === 'playlist') loadPlaylist();
+      if (tab === 'session') loadSession();
     }
 
+    let sessionLoading = false;
+    async function loadSession() {
+      if (sessionLoading) return;
+      sessionLoading = true;
+      try {
+        const response = await fetch('/api/profiles/' + encodeURIComponent(profileId) + '/session', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+        if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
+        const session = await response.json();
+        document.getElementById('session-link-status').textContent = session.linked ? `Signed in as ${session.player_name}` : 'Not linked to a controller';
+        document.getElementById('session-link-help').textContent = session.linked ? `${session.seat === null ? "Your profile is linked to this party." : "Player " + (session.seat + 1) + "."} Edit your name and character in the Character tab. To disconnect, choose Unlink in your controller’s Start menu.` : 'Press Start on your controller in the lobby, then scan the QR shown in your player menu.';
+        document.getElementById('session-player-count').textContent = session.players;
+        document.getElementById('session-current-game').textContent = session.current ? `${session.current.title} · ${session.current.phase}` : 'In the lobby';
+        document.getElementById('session-next-game').textContent = session.next || 'No game queued';
+      } catch (error) {
+        document.getElementById('session-link-status').textContent = error.message;
+        document.getElementById('session-link-help').textContent = 'Reconnect to the same network as GameNight and try again.';
+        ['session-player-count', 'session-current-game', 'session-next-game'].forEach(id => document.getElementById(id).textContent = '—');
+      } finally { sessionLoading = false; }
+    }
     async function loadPlaylist() {
       if (playlistBusy || playlistLoading || draggedEntry !== null) return;
       playlistLoading = true;
@@ -1214,6 +1222,7 @@
     }
     setInterval(() => {
       if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();
+      if (!document.hidden && document.getElementById('tab-session').classList.contains('active')) loadSession();
     }, 4000);
 
 
