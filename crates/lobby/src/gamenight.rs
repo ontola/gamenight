@@ -1181,7 +1181,7 @@ async fn overlay_connection_loop(
 /// Plain Bevy resource — deliberately not a bones one, since its whole job
 /// (polling gamepads regardless of focus, raising a real OS window) lives on
 /// the Bevy/winit side of the fence.
-#[derive(bevy::prelude::Resource)]
+#[derive(bevy::prelude::Resource, Default)]
 struct GlobalInput {
     /// Name + color sent for a pad, awaiting the daemon's echo before we know
     /// its real [`PlayerId`] — matched by name against
@@ -1383,6 +1383,13 @@ impl GlobalInput {
     }
 
     fn reconcile_joins(&mut self, seated: &[Player]) {
+        // A stale host snapshot can restore a mapping just after Leave. Once
+        // the departure is acknowledged, release the pad for a fresh join.
+        let present: HashSet<_> = seated.iter().map(|player| player.id).collect();
+        self.pad_player.retain(|_, player| present.contains(player));
+        self.joined_pads.retain(|pad| self.pad_player.contains_key(pad));
+        self.open_menus.retain(|player, _| present.contains(player));
+        self.newly_confirmed.retain(|(_, player)| present.contains(player));
         let pending = std::mem::take(&mut self.pending_joins);
         for (pad, (name, color)) in pending {
             match seated.iter().find(|p| p.name == name) {
@@ -1695,6 +1702,7 @@ fn global_input_system(
             if let (Some(id), Some(ordinal)) = (seat.occupant.player_id(), seat.controller.as_deref()
                 .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
                 if let Some(pad) = connected.get(ordinal) {
+                    input.pending_joins.remove(&(pad.id as u32));
                     input.joined_pads.insert(pad.id as u32);
                     input.pad_player.insert(pad.id as u32, id);
                     bridge.player_gamepad.insert(id, pad.id as u32);
@@ -4391,5 +4399,28 @@ mod jukebox_tests {
     fn cutting_a_title_never_splits_a_character() {
         assert_eq!(ellipsize("Fauré: Requiem", 6), "Fauré…");
         assert_eq!(ellipsize("君の名は", 3), "君の…");
+    }
+}
+
+#[cfg(test)]
+mod rejoin_regression_tests {
+    use super::*;
+
+    #[test]
+    fn departed_player_restored_by_stale_snapshot_does_not_block_rejoin() {
+        let mut input = GlobalInput::default();
+        let departed = PlayerId::new();
+        input.pad_player.insert(0, departed);
+        input.joined_pads.insert(0);
+        input.forget_player(departed);
+        // The last pre-leave snapshot arrives once more before confirmation.
+        input.pad_player.insert(0, departed);
+        input.joined_pads.insert(0);
+        input.reconcile_joins(&[]);
+        let (tx, rx) = async_channel::unbounded();
+        input.join_pad(0, &[], &tx);
+        assert!(matches!(rx.try_recv(), Ok(ClientMessage::JoinParty { .. })));
+        assert!(!input.joined_pads.contains(&0));
+        assert!(input.pending_joins.contains_key(&0));
     }
 }
