@@ -3245,6 +3245,9 @@ struct PadFace {
     pad: PadButton,
 }
 
+#[derive(bevy::prelude::Component)]
+struct PadHoldLabel { pad: PadButton, label: String }
+
 /// How far into its housing a button sinks when fully pressed, in world
 /// units. Deep enough to read across a living room, shallow enough that a
 /// button barely taller than this doesn't vanish into the floor.
@@ -3309,12 +3312,12 @@ fn spawn_pad_button(
                 transform: Transform::from_xyz(0.0, size.y / 2.0 - 4.0, 0.1),
                 ..default()
             });
-            face.spawn(Text2dBundle {
+            let mut label_entity = face.spawn(Text2dBundle {
                 text: Text::from_section(
-                    label,
+                    if matches!(pad, PadButton::NextGame { .. }) { format!("{label}\nHOLD 2s") } else { label.to_string() },
                     TextStyle {
                         font,
-                        font_size: 13.0,
+                        font_size: if matches!(pad, PadButton::NextGame { .. }) { 10.0 } else { 13.0 },
                         color: Color::rgba(1.0, 1.0, 1.0, 0.92),
                     },
                 )
@@ -3322,6 +3325,10 @@ fn spawn_pad_button(
                 transform: Transform::from_xyz(0.0, size.y / 2.0 + 11.0, 0.2),
                 ..default()
             });
+            if matches!(pad, PadButton::NextGame { .. }) {
+                label_entity.insert(PadHoldLabel { pad, label: label.to_string() });
+            }
+
         });
 }
 
@@ -3401,6 +3408,7 @@ fn lobby_pad_presses(game: &Game) -> PadPresses {
 fn press_pads_system(
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     mut faces: bevy::prelude::Query<(&PadFace, &mut bevy::prelude::Transform)>,
+    mut labels: bevy::prelude::Query<(&PadHoldLabel, &mut bevy::prelude::Text)>,
 ) {
     if faces.is_empty() {
         return;
@@ -3409,6 +3417,13 @@ fn press_pads_system(
     for (face, mut transform) in &mut faces {
         transform.translation.y = face.home_y - presses.of(face.pad) * PAD_PRESS_DEPTH;
     }
+    for (label, mut text) in &mut labels {
+        let progress = presses.of(label.pad);
+        text.sections[0].value = if progress > 0.0 {
+            format!("{}\n{:.1}s", label.label, (1.0 - progress) * crate::core::elements::next_game_trigger::HOLD_SECONDS)
+        } else { format!("{}\nHOLD 2s", label.label) };
+    }
+
 }
 
 /// Marks the drawn jukebox. Carries a fingerprint of what it was drawn from,

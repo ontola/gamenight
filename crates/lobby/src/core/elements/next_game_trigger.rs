@@ -1,22 +1,7 @@
 use crate::prelude::*;
 
-/// The lobby's TV: jump onto the pad in front of it and the next warm game
-/// starts — GameNight's "vote with your feet" mechanic. A no-op outside the
-/// GameNight lobby (standalone play never inserts `GameNightBridge`).
-///
-/// This used to be a three-second hold, which kept an idle bystander from
-/// starting a match by standing in the wrong place but made the party perform
-/// a countdown to do something they'd already decided on. A jump can't happen
-/// by accident either, and it happens the moment you mean it.
-///
-/// The element's own position is the *floor zone* a player lands in; the
-/// screen hangs above it at `screen_offset`. Keeping the entity on the floor
-/// means the existing actor-collision test does the right thing without a
-/// separate trigger volume, and the set dressing is purely visual.
-///
-/// The TV itself has no sprite here: it's drawn by the bevy layer
-/// (`gamenight::sync_next_game_tv_system`), which is the only side that can
-/// see the daemon's shelf metadata for the upcoming game's title.
+/// Stand on a TV button for two seconds to confirm. Stepping off cancels;
+/// staying on it after confirmation cannot trigger another action.
 #[derive(HasSchema, Default, Debug, Clone)]
 #[type_data(metadata_asset("next_game_trigger"))]
 #[repr(C)]
@@ -44,11 +29,9 @@ pub fn session_plugin(session: &mut SessionBuilder) {
 
 #[derive(Clone, Debug, HasSchema, Default)]
 pub struct NextGameTrigger {
-    /// Seconds left before this pad will fire again, so one landing starts
-    /// one game however many frames the physics takes to settle it.
-    cooling: f32,
-    /// How far each button is pushed in: 1 the moment somebody lands on it,
-    /// easing back to 0 over `PAD_PRESS_SECONDS`.
+    /// Each button owns a continuous hold and a release-to-rearm latch.
+    holds: [PadHold; 3],
+    /// Confirmation progress, also used for the button depression and timer.
     pub press: f32,
     pub skip_press: f32,
     pub play_press: f32,
@@ -84,7 +67,39 @@ fn button_at(x: f32, center: f32, width: f32) -> usize {
     }
 }
 
-const COOLDOWN_SECS: f32 = 0.5;
+pub const HOLD_SECONDS: f32 = 2.0;
+
+#[derive(Clone, Debug, HasSchema, Default)]
+struct PadHold {
+    owner: Option<u32>,
+    elapsed: f32,
+    fired: bool,
+}
+impl PadHold {
+    fn update(&mut self, owner: Option<u32>, enabled: bool, dt: f32) -> bool {
+        if owner.is_none() {
+            *self = Self::default();
+            return false;
+        }
+        if self.fired { return false; }
+        if !enabled {
+            self.elapsed = 0.0;
+            self.owner = owner;
+            return false;
+        }
+        if self.owner != owner {
+            self.elapsed = 0.0;
+            self.owner = owner;
+        }
+        self.elapsed = (self.elapsed + dt).min(HOLD_SECONDS);
+        if self.elapsed >= HOLD_SECONDS {
+            self.fired = true;
+            return true;
+        }
+        false
+    }
+    fn progress(&self) -> f32 { self.elapsed / HOLD_SECONDS }
+}
 
 fn hydrate(
     mut entities: ResMutInit<Entities>,
@@ -144,7 +159,7 @@ fn hydrate(
             triggers.insert(
                 entity,
                 NextGameTrigger {
-                    cooling: 0.0,
+                    holds: Default::default(),
                     press: 0.0,
                     skip_press: 0.0,
                     play_press: 0.0,
@@ -174,55 +189,59 @@ fn update(
     let dt = time.delta_seconds();
     let button = bridge.tv_button();
     for (_, (trigger, solid)) in entities.iter_with((&mut triggers, &solids)) {
-        trigger.cooling = (trigger.cooling - dt).max(0.0);
-        trigger.press = (trigger.press - dt / PAD_PRESS_SECONDS).max(0.0);
-        trigger.skip_press = (trigger.skip_press - dt / PAD_PRESS_SECONDS).max(0.0);
-        trigger.play_press = (trigger.play_press - dt / PAD_PRESS_SECONDS).max(0.0);
-        if trigger.cooling > 0.0 {
-            continue;
+        let mut occupants = [None; 3];
+        for (_, (idx, body, transform)) in entities.iter_with((&player_indexes, &bodies, &transforms)) {
+            let x = transform.translation.x;
+            let feet = body.bounding_box(*transform);
+            if body.is_on_ground
+                && (feet.min.y - (solid.pos.y + solid.size.y / 2.0)).abs() <= 4.0
+                && x >= solid.pos.x - solid.size.x / 2.0
+                && x <= solid.pos.x + solid.size.x / 2.0 {
+                let index = button_at(x, solid.pos.x, solid.size.x);
+                // Deterministic ownership when two players share a pad.
+                occupants[index] = Some(occupants[index].map_or(idx.0, |old: u32| old.min(idx.0)));
+            }
         }
-        let Some(idx) = player_landed_on(
-            solid.pos,
-            solid.size,
-            &entities,
-            &player_indexes,
-            &bodies,
-            &transforms,
-        ) else {
-            continue;
-        };
-        // Where they came down, not what they overlap: a player is wider
-        // than half this slab, so "did you touch the right half" would fire
-        // SKIP for somebody who landed squarely on START.
-        let Some(x) = entities
-            .iter_with((&player_indexes, &transforms))
-            .find(|(_, (i, _))| i.0 == idx)
-            .map(|(_, (_, transform))| transform.translation.x)
-        else {
-            continue;
-        };
-        match button_at(x, solid.pos.x, solid.size.x) {
-            0 if button != crate::gamenight::TvButton::Disabled => {
-                trigger.press = 1.0;
-                bridge.press_tv_button();
+        let enabled = [button != crate::gamenight::TvButton::Disabled,
+            bridge.next_game_is_ready(), bridge.can_skip_next_game()];
+        // At most one party action in a frame. Reset competing countdowns.
+        for index in 0..3 {
+            if trigger.holds[index].update(occupants[index], enabled[index], dt) {
+                match index {
+                    0 => bridge.press_tv_button(),
+                    1 => bridge.play_next_game(),
+                    _ => bridge.skip_next_game(),
+                }
+                for other in 0..3 {
+                    if other != index { trigger.holds[other].elapsed = 0.0; }
+                }
+                break;
             }
-            1 if bridge.next_game_is_ready() => {
-                trigger.play_press = 1.0;
-                bridge.play_next_game();
-            }
-            2 if bridge.can_skip_next_game() => {
-                trigger.skip_press = 1.0;
-                bridge.skip_next_game();
-            }
-            _ => continue,
         }
-        trigger.cooling = COOLDOWN_SECS;
+        trigger.press = trigger.holds[0].progress();
+        trigger.play_press = trigger.holds[1].progress();
+        trigger.skip_press = trigger.holds[2].progress();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn hold_requires_continuous_time_and_release_to_repeat() {
+        let mut hold = PadHold::default();
+        assert!(!hold.update(Some(0), true, 1.0));
+        assert!(!hold.update(None, true, 0.1));
+        assert_eq!(hold.progress(), 0.0);
+        assert!(!hold.update(Some(0), true, 1.0));
+        assert!(!hold.update(Some(1), true, 1.0));
+        assert!(hold.update(Some(1), true, 1.0));
+        assert!(!hold.update(Some(1), true, 10.0));
+        hold.update(None, true, 0.1);
+        assert!(!hold.update(Some(1), false, 10.0));
+        assert!(!hold.update(Some(1), true, 1.0));
+        assert!(hold.update(Some(1), true, 1.0));
+    }
     #[test]
     fn button_faces_match_landing_regions() {
         let pos = Vec2::new(560.0, 160.0);
