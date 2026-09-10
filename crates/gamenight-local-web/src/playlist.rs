@@ -26,7 +26,10 @@ impl From<PartySnapshot> for View {
         Self {
             playlist: party.playlist,
             playing: party.active_session.map(|s| s.game),
-            next: party.warming.map(|e| e.game),
+            next: party
+                .warm_session
+                .map(|s| s.game)
+                .or_else(|| party.warming.map(|e| e.game)),
         }
     }
 }
@@ -100,4 +103,24 @@ async fn exchange(
     })
     .await
     .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use gamenight_protocol::{GameId, SessionId, SessionInfo, SessionPhase};
+
+    #[test]
+    fn ready_game_stays_up_next_after_warming_metadata_disappears() {
+        let mut party = gamenight_core::GameNight::default().snapshot();
+        party.warm_session = Some(SessionInfo {
+            id: SessionId::new(),
+            game: GameId::new("tank"),
+            phase: SessionPhase::Ready,
+            progress: None,
+            progress_label: None,
+        });
+        assert!(party.warming.is_none());
+        assert_eq!(View::from(party).next, Some(GameId::new("tank")));
+    }
 }

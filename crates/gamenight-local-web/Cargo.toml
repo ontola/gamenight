@@ -18,4 +18,5 @@ axum = { version = "0.7", features = ["json"] }
 qrcode = "0.14"
 
 [dev-dependencies]
+gamenight-core = { path = "../gamenight-core" }
 gamenight-daemon = { path = "../gamenight-daemon" }

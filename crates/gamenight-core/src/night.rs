@@ -1314,32 +1314,16 @@ impl GameNight {
             })
             .collect();
 
-        // Prefer something the party can actually play. Rotation order still
-        // decides between equally good fits, so the shelf keeps cycling
-        // instead of parking on one title — but a game that needs four
-        // players is not offered to two people just because it is next.
-        let players = self.seated_count();
-        let mut fitting: Vec<usize> = rotation
-            .iter()
-            .copied()
-            .filter(|&index| {
-                self.playlist
-                    .get(index)
-                    .is_some_and(|e| self.game_fits_party(&e.game))
-            })
-            .collect();
-        fitting.sort_by_key(|&index| {
+        // Respect the party's playlist order among playable games. A preferred
+        // player count is a recommendation, not permission to undo a reorder.
+        let fitting = rotation.iter().copied().find(|&index| {
             self.playlist
                 .get(index)
-                .and_then(|e| self.library.iter().find(|m| m.id == e.game))
-                .map_or(0, |m| m.fit_distance(players))
+                .is_some_and(|e| self.game_fits_party(&e.game))
         });
         // Below the minimum, bots can fill missing seats. Above the maximum,
         // entries were excluded: never leave a joined player out.
-        fitting
-            .first()
-            .copied()
-            .or_else(|| rotation.first().copied())
+        fitting.or_else(|| rotation.first().copied())
     }
 
     /// Called whenever the seating changes: re-prepare or replace the warm

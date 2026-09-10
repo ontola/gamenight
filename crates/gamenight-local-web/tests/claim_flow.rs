@@ -858,3 +858,95 @@ async fn playlist_move_is_live_and_rejects_stale_or_invalid_positions() {
         .wait_for(|p| p.playlist.entries[0].game == GameId::new("c"))
         .await;
 }
+
+#[tokio::test]
+async fn web_reorder_broadcasts_the_new_up_next_to_the_lobby() {
+    use gamenight_protocol::{GameId, PlaylistEntry, SessionPhase};
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let daemon = start_daemon().await;
+        let server = start_server(&daemon).await;
+        let mut lobby = Watcher::connect(&daemon).await;
+        let mut games = Vec::new();
+        for id in ["a", "b", "c"] {
+            let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{daemon}"))
+                .await
+                .unwrap();
+            ws.send(Message::Text(
+                ClientMessage::Hello {
+                    role: Role::Game,
+                    game: Some(GameId::new(id)),
+                    token: None,
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+            games.push(ws);
+        }
+        lobby.wait_for(|p| p.connected_games.len() == 3).await;
+        lobby
+            .ws
+            .send(Message::Text(
+                ClientMessage::SetPlaylist {
+                    entries: ["a", "b", "c"]
+                        .into_iter()
+                        .map(|id| PlaylistEntry {
+                            game: GameId::new(id),
+                            title: id.into(),
+                        })
+                        .collect(),
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        let party = lobby.wait_for(|p| p.warm_session.is_some()).await;
+        let first = party.warm_session.unwrap().id;
+        games[0]
+            .send(Message::Text(
+                ClientMessage::Ready { session: first }.to_json(),
+            ))
+            .await
+            .unwrap();
+        let before = lobby
+            .wait_for(|p| p.active_session.is_some() && p.warm_session.is_some())
+            .await;
+        let request =
+            serde_json::json!({"expected": before.playlist, "from": 2, "to": 1}).to_string();
+        let (status, body) = post(&server, "/api/playlist", &request).await;
+        assert_eq!(status, 200, "{body}");
+        let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(view["next"], "c");
+        let updated = lobby
+            .wait_for(|p| {
+                p.warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.game == GameId::new("c"))
+            })
+            .await;
+        assert_eq!(updated.active_session.unwrap().id, first);
+        games[2]
+            .send(Message::Text(
+                ClientMessage::Ready {
+                    session: updated.warm_session.unwrap().id,
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        lobby
+            .wait_for(|p| {
+                p.warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.phase == SessionPhase::Ready)
+            })
+            .await;
+        let (status, body) = http(&server, "GET", "/api/playlist", "").await;
+        assert_eq!(status, 200);
+        let ready: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(ready["next"], "c");
+        assert_eq!(ready["playing"], "a");
+    })
+    .await
+    .expect("playlist update must reach the lobby promptly");
+}

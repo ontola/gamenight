@@ -133,6 +133,46 @@ mod night_tests {
     }
 
     #[test]
+    fn reordered_next_game_wins_over_player_count_recommendation() {
+        let mut night = GameNight::default();
+        let mut recommended = meta("b");
+        recommended.best_players = Some(2);
+        let mut moved = meta("c");
+        moved.best_players = Some(4);
+        night.set_library(vec![meta("a"), recommended, moved]);
+        for name in ["one", "two"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        for game in ["a", "b", "c"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c")],
+        });
+        let first = night.snapshot().warm_session.unwrap().id;
+        night.handle(Command::SessionReady { session: first });
+        night.handle(Command::Next);
+        let before = night.snapshot();
+        assert_eq!(
+            before.active_session.as_ref().unwrap().game,
+            GameId::new("a")
+        );
+        let old_warm = before.warm_session.unwrap().id;
+        let fx = night.handle(Command::MovePlaylistEntry {
+            expected: before.playlist,
+            from: 2,
+            to: 1,
+        });
+        assert_eq!(disposed_sessions(&fx), vec![old_warm]);
+        let after = night.snapshot();
+        assert_eq!(after.active_session.unwrap().id, first);
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
+        assert!(fx.iter().any(|e| matches!(e, Effect::StateChanged)));
+    }
+
+    #[test]
     fn three_players_never_warm_a_two_player_game() {
         let mut night = GameNight::default();
         let mut duo = meta("duo");
