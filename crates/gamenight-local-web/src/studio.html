@@ -480,6 +480,14 @@
       #character-colors .swatch:hover { border-color:#fff; box-shadow:0 0 0 3px rgba(165,180,252,.6); }
     }
     #character-colors .swatch:focus-visible { outline:2px solid #a5b4fc; outline-offset:3px; }
+    .drawing-preview-options #character-colors { display:grid;
+      grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+    .drawing-preview-options #character-colors .swatch { width:100%; min-width:0;
+      height:36px; padding:0; }
+    @media(min-width:600px) {
+      .drawing-preview-options #character-colors { grid-template-columns:repeat(6,minmax(0,1fr)); }
+      .drawing-preview-options #character-colors .swatch { height:44px; }
+    }
   </style>
 </head>
 <body>
@@ -523,6 +531,8 @@
         <div class="drawing-preview">
           <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
           <div class="drawing-preview-options">
+            <label>Character colour</label>
+            <div class="palette" id="character-colors" aria-label="Character colour"></div>
         <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit guide</button>
             <span id="preview-status" role="status"></span>
           </div>
@@ -551,10 +561,7 @@
           <button class="tool-btn" onclick="loadPreset()">🎲 Random</button>
         </div>
 
-        <details style="margin-top:1rem">
-          <summary>Character colour</summary>
-          <div class="palette" id="character-colors"></div>
-        </details>
+
       </div>
 
       <div class="card">
