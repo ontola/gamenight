@@ -487,6 +487,7 @@
             <span id="preview-status" role="status"></span>
           </div>
         </div>
+        <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit in grid</button>
         <div class="brush-sizes" role="group" aria-label="Brush size">
           <span>Brush size</span>
           <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
@@ -613,6 +614,26 @@
       });
     }
 
+    let showOutfitGuide = localStorage.getItem('gamenight_outfit_guide') === 'true';
+    let outfitGuidePixels = null, outfitGuideSprite = null, outfitGuideColor = null;
+    function gridBackground(idx) {
+      if (gridData[idx] !== EMPTY) return gridData[idx];
+      return showOutfitGuide && outfitGuidePixels ? outfitGuidePixels[idx] : characterColor;
+    }
+    function toggleOutfitGuide() {
+      showOutfitGuide = !showOutfitGuide;
+      localStorage.setItem('gamenight_outfit_guide', String(showOutfitGuide));
+      refreshOutfitGuide();
+    }
+    function refreshOutfitGuide() {
+      const button = document.getElementById('outfit-guide-toggle');
+      button.setAttribute('aria-pressed', String(showOutfitGuide));
+      button.classList.toggle('active', showOutfitGuide);
+      button.textContent = showOutfitGuide ? 'Hide outfit in grid' : 'Show outfit in grid';
+      const cells = document.getElementById('pixel-grid').children;
+      for (let i = 0; i < cells.length; i++) cells[i].style.background = gridBackground(i);
+    }
+
     function renderGrid() {
       const container = document.getElementById('pixel-grid');
       container.innerHTML = '';
@@ -623,7 +644,7 @@
         // the head you're drawing on rather than a checkerboard. "Empty" and
         // "painted the same colour" looking identical is correct: in game
         // both come out as skin.
-        div.style.background = color === EMPTY ? characterColor : color;
+        div.style.background = gridBackground(idx);
         div.dataset.idx = idx;
         container.appendChild(div);
       });
@@ -644,7 +665,7 @@
     }
     function refreshPaintedPixel(idx) {
       const cell = document.getElementById('pixel-grid').children[idx];
-      cell.style.background = gridData[idx] === EMPTY ? characterColor : gridData[idx];
+      cell.style.background = gridBackground(idx);
       cell.classList.toggle('empty', gridData[idx] === EMPTY);
     }
     function putPixel(x, y, color) {
@@ -1058,6 +1079,16 @@
         tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
         tint.globalCompositeOperation = 'source-over';
         ctx.drawImage(previewTint, 0, 0);
+        // Exactly the same 32×32 crop that receives the face drawing.
+        // Reference pixels are display-only and never copied into gridData.
+        if (outfitGuideSprite !== previewSprite || outfitGuideColor !== characterColor) {
+          const rgba = tint.getImageData(38, 19, GRID_SIZE, GRID_SIZE).data;
+          outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
+            `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
+          outfitGuideSprite = previewSprite;
+          outfitGuideColor = characterColor;
+          refreshOutfitGuide();
+        }
         // Face follows the right-facing opening of the hood.
         // Keep the face centre while leaving a larger area for accessories.
         drawPixelFace(ctx, 38, 19);
@@ -1102,6 +1133,7 @@
 
     function init() {
       loadPreviewSprite('living-room');
+      refreshOutfitGuide();
       renderCharacterColors();
       renderGrid();
       renderPalette();
