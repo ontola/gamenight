@@ -58,6 +58,10 @@ pub enum Command {
         player_id: PlayerId,
         name: String,
     },
+    SetPlayerSkinColor {
+        player_id: PlayerId,
+        skin_color: String,
+    },
     SetPlayerColor {
         player_id: PlayerId,
         color: String,
@@ -448,6 +452,17 @@ impl GameNight {
             Command::LeaveParty { player_id } => self.on_leave(player_id, &mut fx),
             Command::RenamePlayer { player_id, name } => {
                 self.on_rename_player(player_id, name, &mut fx)
+            }
+            Command::SetPlayerSkinColor { player_id, skin_color } => {
+                if skin_color.len() != 7 || !skin_color.starts_with('#') || !skin_color[1..].bytes().all(|b| b.is_ascii_hexdigit()) {
+                    fx.push(Effect::Reject { reason: "skin colour must be #rrggbb".into() });
+                } else if let Some(p) = self.players.iter_mut().find(|p| p.id == player_id) {
+                    p.skin_color = Some(skin_color);
+                    fx.push(Effect::StateChanged);
+                    self.rewarm_if_misfit(&mut fx);
+                } else {
+                    fx.push(Effect::Reject { reason: "unknown player".into() });
+                }
             }
             Command::SetPlayerColor { player_id, color } => {
                 self.on_set_player_color(player_id, color, &mut fx)
@@ -865,6 +880,7 @@ impl GameNight {
             id: PlayerId::new(),
             name,
             color,
+            skin_color: None,
             avatar,
             library,
         };

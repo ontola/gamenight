@@ -25,6 +25,20 @@ def build():
         # One hat-free base across all seats. Keep the prepared atlas in native
         # pixels; rebuilding must not restore the old hooded character.
         sheet = Image.open(ROOT / 'docs/art/bald-character/body.png').convert('RGBA')
+        mask = Image.new('RGBA', sheet.size)
+        for y in range(sheet.height):
+            for x in range(sheet.width):
+                r, g, b, a = sheet.getpixel((x, y))
+                if not a:
+                    continue
+                if r > 200 and g > 170 and b < g:
+                    v = round(r / 245 * 255)
+                    mask.putpixel((x, y), (v, v, v, a))
+                else:
+                    v = min(255, round(max(r, g, b) / 229 * 255))
+                    sheet.putpixel((x, y), (v, v, v, a))
+        if skin == 'fishy':
+            mask.save(ASSETS / 'player/skin-mask.png')
         frames = range(98)
         sheet.save(folder / f'{skin}-body.png')
         face = Image.new('RGBA', (46 * 11, 32 * 8))

@@ -211,7 +211,8 @@ players decide when they're done, from the overlay.
 | `join_party {name, seat?}` | new player; the requested seat if free, else the first empty one |
 | `leave_party {player_id}` | player leaves; their seat empties |
 | `rename_player {player_id, name}` | change a player's display name |
-| `set_player_color {player_id, color}` | change their accent-color hint (`#rrggbb`) |
+| `set_player_color {player_id, color}` | game-controlled clothing/team colour (`#rrggbb`); independent of skin |
+| `set_player_skin_color {player_id, skin_color}` | saved personal skin preference (`#rrggbb`); exposed as `Player.skin_color` |
 | `set_player_avatar {player_id, avatar}` | set their pixel-art face (opaque string — see [avatars](integrating-your-game.md#showing-player-avatars)) |
 | `assign_seat {seat, occupant}` | re-seat a player / add a bot / empty a seat |
 | `swap_seats {a, b}` | two people trade controllers: swap the occupants of two seats |
@@ -556,3 +557,7 @@ shared lifecycle module; sleeping players use AI until they wake. Neon Siege is 
 first instant-join implementation: a new pilot spawns centrally with three seconds
 of protection, preserving the current wave and team score. Other pack games retain
 fixed round rosters. Custom clients can send the JSON directly.
+
+The character studio saves `skin_color` with the player profile and never changes
+`Player.color` on sign-in. Games may assign clothing or team colours while retaining
+the skin preference. Avatar paint is composited above skin and is not recoloured.

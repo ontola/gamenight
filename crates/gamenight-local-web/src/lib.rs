@@ -19,9 +19,12 @@ use std::{
 pub struct Profile {
     pub id: String,
     pub username: String,
-    pub color: String,
+    #[serde(default = "default_skin_color")]
+    pub skin_color: String,
     pub avatar: String, // 16x16 pixel matrix serialized or data URI
 }
+
+fn default_skin_color() -> String { "#f5e9be".into() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinSessionRequest {
@@ -318,10 +321,6 @@ async fn join_session_inner(
                         player_id,
                         name: profile.username.clone(),
                     },
-                    ClientMessage::SetPlayerColor {
-                        player_id,
-                        color: profile.color.clone(),
-                    },
                     ClientMessage::SetPlayerAvatar {
                         player_id,
                         avatar: profile.avatar.clone(),
@@ -330,7 +329,7 @@ async fn join_session_inner(
                 None => vec![ClientMessage::JoinParty {
                     name: profile.username.clone(),
                     seat: None,
-                    color: Some(profile.color.clone()),
+                    color: None,
                     avatar: Some(profile.avatar.clone()),
                     library: Vec::new(),
                 }],
@@ -354,6 +353,12 @@ async fn join_session_inner(
 
             if let Some(pid) = player_id {
                 state.lock().unwrap().bindings.insert(id.clone(), pid);
+            }
+
+            if let Some(player_id) = player_id {
+                ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(
+                    ClientMessage::SetPlayerSkinColor { player_id, skin_color: profile.skin_color.clone() }.to_json()
+                )).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
             }
 
             // Close politely rather than dropping the socket mid-flight. The

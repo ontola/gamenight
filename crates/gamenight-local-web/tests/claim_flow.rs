@@ -59,7 +59,7 @@ async fn http(addr: &str, method: &str, path: &str, body: &str) -> (u16, String)
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("").to_string();
     (status, body)
 }
 
@@ -123,7 +123,7 @@ fn profile_json(id: &str, username: &str, color: &str, avatar: &str) -> String {
     serde_json::to_string(&Profile {
         id: id.into(),
         username: username.into(),
-        color: color.into(),
+        skin_color: color.into(),
         avatar: avatar.into(),
     })
     .unwrap()
@@ -154,10 +154,10 @@ async fn join_without_claim_adds_a_player() {
     assert_eq!(status, 200, "join failed: {body}");
     assert!(body.contains("\"joined\""), "expected joined, got {body}");
 
-    let party = watcher.wait_for(|p| !p.players.is_empty()).await;
+    let party = watcher.wait_for(|p| p.players.iter().any(|p| p.skin_color.is_some())).await;
     assert_eq!(party.players.len(), 1);
     assert_eq!(party.players[0].name, "Ada");
-    assert_eq!(party.players[0].color.as_deref(), Some("#ff0000"));
+    assert_eq!(party.players[0].skin_color.as_deref(), Some("#ff0000"));
     assert_eq!(party.players[0].avatar.as_deref(), Some("avatar-a"));
 }
 
@@ -222,7 +222,7 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
         .wait_for(|p| {
             p.players.iter().any(|pl| {
                 pl.name == "Grace"
-                    && pl.color.as_deref() == Some("#00ff00")
+                    && pl.skin_color.as_deref() == Some("#00ff00")
                     && pl.avatar.as_deref() == Some("avatar-g")
             })
         })
@@ -238,7 +238,8 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
     let claimed = &party.players[0];
     assert_eq!(claimed.id, target, "claim must rewrite the same player id");
     assert_eq!(claimed.name, "Grace");
-    assert_eq!(claimed.color.as_deref(), Some("#00ff00"));
+    assert_eq!(claimed.skin_color.as_deref(), Some("#00ff00"));
+    assert_eq!(claimed.color.as_deref(), Some("#5c9eff"), "profile must not overwrite game clothing colour");
     assert_eq!(
         claimed.avatar.as_deref(),
         Some("avatar-g"),
@@ -372,7 +373,7 @@ async fn get(addr: &str, path: &str) -> (u16, String) {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("").to_string();
     (status, body)
 }
 
@@ -465,7 +466,7 @@ async fn join_reports_the_player_it_created_and_repeats_dont_duplicate() {
         .wait_for(|p| {
             p.players.iter().any(|pl| {
                 pl.name == "Ada Lovelace"
-                    && pl.color.as_deref() == Some("#00ff00")
+                    && pl.skin_color.as_deref() == Some("#00ff00")
                     && pl.avatar.as_deref() == Some("avatar-b")
             })
         })

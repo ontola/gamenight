@@ -145,11 +145,13 @@ impl std::fmt::Display for GameId {
 pub struct Player {
     pub id: PlayerId,
     pub name: String,
-    /// Accent color (`#rrggbb`) the player picked for themselves. A hint for
-    /// games that color-code characters — not authoritative, games are free
-    /// to ignore it (e.g. team-based games override it).
+    /// Game-controlled clothing/team colour (`#rrggbb`). Games may override
+    /// it without changing the personal `skin_color` preference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    /// Personal skin colour (#rrggbb), independent of game/team clothing colours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skin_color: Option<String>,
     /// Pixel art the player drew for themselves in the studio.
     ///
     /// Opaque on the wire so the encoding can evolve without a protocol
@@ -712,6 +714,10 @@ pub enum ClientMessage {
         name: String,
     },
     /// Change a player's accent-color hint (see [`Player::color`]).
+    SetPlayerSkinColor {
+        player_id: PlayerId,
+        skin_color: String,
+    },
     SetPlayerColor {
         player_id: PlayerId,
         color: String,

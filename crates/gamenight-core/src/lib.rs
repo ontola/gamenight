@@ -2117,6 +2117,21 @@ mod player_count_fit_tests {
             .any(|effect| matches!(effect, Effect::Reject { .. })));
     }
 
+    #[test]
+    fn skin_preference_survives_game_colour_changes() {
+        let mut night = GameNight::default();
+        night.handle(join("Ada"));
+        let id = night.snapshot().players[0].id;
+        night.handle(Command::SetPlayerSkinColor { player_id: id, skin_color: "#925c3b".into() });
+        night.handle(Command::SetPlayerColor { player_id: id, color: "#ff0000".into() });
+        let player = &night.snapshot().players[0];
+        assert_eq!(player.skin_color.as_deref(), Some("#925c3b"));
+        assert_eq!(player.color.as_deref(), Some("#ff0000"));
+        let fx = night.handle(Command::SetPlayerSkinColor { player_id: id, skin_color: "invalid".into() });
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        assert_eq!(night.snapshot().players[0].skin_color.as_deref(), Some("#925c3b"));
+    }
+
     /// Prepare carries profiles, so a changed name must reach the warm game.
     #[test]
     fn a_rename_refreshes_the_warm_profile() {

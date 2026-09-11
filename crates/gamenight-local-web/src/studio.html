@@ -475,19 +475,21 @@
       .drawing-preview #preview-canvas { width:288px; height:240px; }
       .drawing-preview-options { width:100%; max-width:360px; }
     }
-    #character-colors .swatch { cursor:pointer; transition:box-shadow 100ms ease, border-color 100ms ease; }
+    :is(#character-colors, #skin-colors) .swatch { cursor:pointer; transition:box-shadow 100ms ease, border-color 100ms ease; }
     @media(hover:hover) {
-      #character-colors .swatch:hover { border-color:#fff; box-shadow:0 0 0 3px rgba(165,180,252,.6); }
+      :is(#character-colors, #skin-colors) .swatch:hover { border-color:#fff; box-shadow:0 0 0 3px rgba(165,180,252,.6); }
     }
-    #character-colors .swatch:focus-visible { outline:2px solid #a5b4fc; outline-offset:3px; }
-    .drawing-preview-options #character-colors { display:grid;
+    :is(#character-colors, #skin-colors) .swatch:focus-visible { outline:2px solid #a5b4fc; outline-offset:3px; }
+    .drawing-preview-options :is(#character-colors, #skin-colors) { display:grid;
       grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-    .drawing-preview-options #character-colors .swatch { width:100%; min-width:0;
+    .drawing-preview-options :is(#character-colors, #skin-colors) .swatch { width:100%; min-width:0;
       height:36px; padding:0; }
     @media(min-width:600px) {
-      .drawing-preview-options #character-colors { grid-template-columns:repeat(6,minmax(0,1fr)); }
-      .drawing-preview-options #character-colors .swatch { height:44px; }
+      .drawing-preview-options :is(#character-colors, #skin-colors) { grid-template-columns:repeat(6,minmax(0,1fr)); }
+      .drawing-preview-options :is(#character-colors, #skin-colors) .swatch { height:44px; }
     }
+    .clothing-preview summary { cursor:pointer; padding:8px 0; font-size:13px; }
+    .clothing-preview p { color:var(--muted); font-size:12px; margin:0 0 8px; }
   </style>
 </head>
 <body>
@@ -531,8 +533,13 @@
         <div class="drawing-preview">
           <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
           <div class="drawing-preview-options">
-            <label>Character colour</label>
-            <div class="palette" id="character-colors" aria-label="Character colour"></div>
+            <label>Skin colour · saved with your profile</label>
+            <div class="palette" id="skin-colors" aria-label="Skin colour"></div>
+            <details class="clothing-preview">
+              <summary>Preview clothing colour</summary>
+              <p>The game chooses your clothing colour.</p>
+              <div class="palette" id="character-colors" aria-label="Clothing colour preview"></div>
+            </details>
         <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit guide</button>
             <span id="preview-status" role="status"></span>
           </div>
@@ -688,7 +695,7 @@
     function gridBackground(idx) {
       if (gridData[idx] !== EMPTY) return gridData[idx];
       return showOutfitGuide && outfitGuidePixels ? outfitGuidePixels[idx]
-        : `linear-gradient(135deg, ${characterColor} 0 50%, #0f172a 50% 100%)`;
+        : `linear-gradient(135deg, ${skinColor} 0 50%, #0f172a 50% 100%)`;
     }
     function toggleOutfitGuide() {
       showOutfitGuide = !showOutfitGuide;
@@ -1118,14 +1125,48 @@
     let characterColor = localStorage.getItem('gamenight_character_color')
       || CHARACTER_COLORS[Math.floor(Math.random() * CHARACTER_COLORS.length)];
 
+    const SKIN_COLORS = ['#f5e9be', '#f2cfad', '#dfa67f', '#bc805b', '#925c3b', '#633d2b', '#ffb7c5', '#8dcdaa', '#9ebfee', '#bba2d9'];
+    let skinColor = localStorage.getItem('gamenight_skin_color') || '#f5e9be';
+    function setSkinColor(col) {
+      skinColor = col;
+      localStorage.setItem('gamenight_skin_color', col);
+      renderSkinColors();
+      updatePreview();
+      renderGrid();
+      scheduleSave();
+    }
+    function renderSkinColors() {
+      const el = document.getElementById('skin-colors');
+      el.replaceChildren();
+      SKIN_COLORS.forEach(col => {
+        const sw = document.createElement('button');
+        sw.type = 'button'; sw.setAttribute('aria-label', col);
+        sw.setAttribute('aria-pressed', String(col === skinColor));
+        sw.className = 'swatch' + (col === skinColor ? ' active' : '');
+        sw.style.background = col; sw.onclick = () => setSkinColor(col);
+        el.appendChild(sw);
+      });
+    }
+    // Semantic skin pixels are the two cream shades in the base atlas.
+    // Paint is composited afterwards and never recoloured.
+    function colourBodyPixels(rgba, clothing, skin) {
+      const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+      const clothes = rgb(clothing), flesh = rgb(skin);
+      for (let i = 0; i < rgba.length; i += 4) {
+        if (!rgba[i + 3]) continue;
+        const isSkin = rgba[i] > 200 && rgba[i + 1] > 170 && rgba[i + 2] < rgba[i + 1];
+        const shade = isSkin ? rgba[i] / 245 : Math.max(rgba[i], rgba[i + 1], rgba[i + 2]) / 255;
+        const colour = isSkin ? flesh : clothes;
+        for (let c = 0; c < 3; c++) rgba[i + c] = Math.min(255, Math.round(colour[c] * shade));
+      }
+      return rgba;
+    }
+
     function setCharacterColor(col) {
       characterColor = col;
       localStorage.setItem('gamenight_character_color', col);
       renderCharacterColors();
-      // The grid's empty cells *are* the character, so the canvas has to
-      // repaint too — that is the whole point of using it as the backdrop.
-      renderGrid();
-      scheduleSave();
+      updatePreview();
     }
 
     function renderCharacterColors() {
@@ -1141,10 +1182,6 @@
         sw.onclick = () => setCharacterColor(col);
         el.appendChild(sw);
       });
-    }
-
-    function accentColor() {
-      return characterColor;
     }
 
     // the lobby's face layer is a 46x32 tile, and the drawn avatar is rendered
@@ -1193,30 +1230,26 @@
       ctx.clearRect(0, 0, cvs.width, cvs.height);
       ctx.imageSmoothingEnabled = false;
       if (previewSprite) {
-        // First idle cell of the actual 96×80 lobby atlas. Multiply preserves
-        // the sprite's shading, matching the lobby's profile-colour tint.
+        // Recolour clothing and skin independently in the native-pixel idle cell.
         const tint = previewTint.getContext('2d');
         tint.globalCompositeOperation = 'source-over';
         tint.clearRect(0, 0, 96, 80);
         tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
-        tint.globalCompositeOperation = 'multiply';
-        tint.fillStyle = characterColor;
-        tint.fillRect(0, 0, 96, 80);
-        tint.globalCompositeOperation = 'destination-in';
-        tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
-        tint.globalCompositeOperation = 'source-over';
+        const bodyPixels = tint.getImageData(0, 0, 96, 80);
+        colourBodyPixels(bodyPixels.data, characterColor, skinColor);
+        tint.putImageData(bodyPixels, 0, 0);
         ctx.drawImage(previewTint, 0, 0);
         // Exactly the same 48×48 crop that receives the face drawing.
         // Reference pixels are display-only and never copied into gridData.
-        if (outfitGuideSprite !== previewSprite || outfitGuideColor !== characterColor) {
+        if (outfitGuideSprite !== previewSprite || outfitGuideColor !== characterColor + skinColor) {
           const rgba = tint.getImageData(24, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
           outfitGuideSprite = previewSprite;
-          outfitGuideColor = characterColor;
+          outfitGuideColor = characterColor + skinColor;
           refreshOutfitGuide();
         }
-        // Face follows the right-facing opening of the hood.
+        // Paint stays above the skin without being tinted.
         // Keep the face centre while leaving a larger area for accessories.
         drawPixelFace(ctx, 24, 4);
       }
@@ -1265,6 +1298,7 @@
       loadPreviewSprite();
       refreshOutfitGuide();
       renderCharacterColors();
+      renderSkinColors();
       renderGrid();
       renderPalette();
       bindCanvas();
@@ -1448,10 +1482,11 @@
         if (res.ok) {
           const prof = await res.json();
           document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || prof.username || randomName();
-          if (prof.color) {
-            characterColor = prof.color;
-            localStorage.setItem('gamenight_character_color', prof.color);
+          if (prof.skin_color) {
+            skinColor = prof.skin_color;
+            localStorage.setItem('gamenight_skin_color', prof.skin_color);
             renderCharacterColors();
+      renderSkinColors();
           }
           if (prof.avatar) savedAvatar = decodeAvatar(prof.avatar);
         } else {
@@ -1535,7 +1570,7 @@
         const prof = {
           id: profileId,
           username: document.getElementById('player-name').value,
-          color: accentColor(),
+          skin_color: skinColor,
           avatar: encodeAvatar(gridData),
         };
         localStorage.setItem('gamenight_saved_profile', JSON.stringify(prof));
@@ -1647,7 +1682,7 @@
       return JSON.stringify(encodeCompactBackup({format:'gamenight-character-backup',
         exportedAt:new Date().toISOString(), gridSize:GRID_SIZE,
         username:document.getElementById('player-name').value,
-        color:characterColor, activeArtworkId:currentArtworkId, artworks}));
+        skinColor, activeArtworkId:currentArtworkId, artworks}));
     }
     async function copyBackup() {
       const text = buildBackup();
@@ -1691,7 +1726,7 @@
           || value.gridSize !== GRID_SIZE || !Array.isArray(value.palette)
           || value.palette.length > 200 * GRID_SIZE ** 2 || !value.palette.every(color)
           || !Array.isArray(value.artworks) || !value.artworks.length || value.artworks.length > 200
-          || typeof value.username !== 'string' || value.username.length > 100 || !color(value.color))
+          || typeof value.username !== 'string' || value.username.length > 100 || !color(value.skinColor))
         throw Error('Please import a current compact GameNight backup.');
       const cells = GRID_SIZE ** 2, ids = new Set();
       const artworks = value.artworks.map(art => {
@@ -1734,7 +1769,7 @@
         }
         active = merged.some(a => a.id === active) ? active : merged[0].id;
         const values = {gamenight_artworks:JSON.stringify(merged), gamenight_current_artwork:active,
-          gamenight_player_name:backup.username, gamenight_character_color:backup.color};
+          gamenight_player_name:backup.username, gamenight_skin_color:backup.skinColor};
         const previous = Object.fromEntries(Object.keys(values).map(k => [k, localStorage.getItem(k)]));
         try { for (const [key,value] of Object.entries(values)) localStorage.setItem(key,value); }
         catch (error) {
@@ -1743,7 +1778,7 @@
           }
           throw Error('Not enough browser storage. Existing faces were kept.');
         }
-        characterColor = backup.color;
+        skinColor = backup.skinColor;
         document.getElementById('player-name').value = backup.username;
         undoStack = []; refreshUndoButton(); renderCharacterColors(); selectArtwork(active);
         backupMessage(`Imported ${added} face${added === 1 ? '' : 's'}. Existing faces were kept.`);

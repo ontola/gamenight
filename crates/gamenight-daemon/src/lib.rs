@@ -1217,6 +1217,9 @@ fn message_to_command(
         ClientMessage::RenamePlayer { player_id, name } => {
             Command::RenamePlayer { player_id, name }
         }
+        ClientMessage::SetPlayerSkinColor { player_id, skin_color } => {
+            Command::SetPlayerSkinColor { player_id, skin_color }
+        }
         ClientMessage::SetPlayerColor { player_id, color } => {
             Command::SetPlayerColor { player_id, color }
         }

@@ -1490,6 +1490,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             sync_player_menus_system,
             position_player_menus_system,
             apply_player_colors_system,
+            sync_player_skin_system,
             sync_name_tags_system,
             position_name_tags_system,
             sync_player_avatar_system,
@@ -2225,10 +2226,8 @@ fn bones_hex_color(hex: &str) -> Color {
     }
 }
 
-/// Tints each seated player's sprite to their chosen `Player.color` (set via
-/// the start menu's color swatches) — otherwise that choice has no visible
-/// effect at all, since jumpy's own character selection is a skin, not a
-/// color.
+/// Applies the game's clothing colour. The separate skin overlay and avatar
+/// paint preserve the player's personal appearance.
 fn apply_player_colors_system(bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>) {
     let seat_colors: Vec<(u8, Option<String>)> = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
@@ -2275,6 +2274,68 @@ fn apply_player_colors_system(bones_game: bevy::prelude::Res<bones_bevy_renderer
                 sprite.color = tint;
             }
         }
+    }
+}
+
+/// Skin follows the body's animation frame, independently of its clothing tint.
+#[derive(bevy::prelude::Component)]
+struct PlayerSkin(PlayerId);
+
+fn sync_player_skin_system(
+    mut commands: bevy::prelude::Commands,
+    bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
+    assets: bevy::prelude::Res<bevy::prelude::AssetServer>,
+    mut skins: bevy::prelude::Query<(bevy::prelude::Entity, &PlayerSkin,
+        &mut bevy::prelude::Transform, &mut bevy::prelude::Sprite,
+        &mut bevy::prelude::Visibility)>,
+) {
+    use bevy::prelude::{Sprite, SpriteBundle, Visibility};
+    let bridge = bones_game.0.shared_resource::<GameNightBridge>();
+    let seats = bridge.latest_seats.clone();
+    let players = bridge.latest_players.clone();
+    drop(bridge);
+    let mut wanted = Vec::new();
+    if let Some(session) = bones_game.0.sessions.get(SessionNames::GAME) {
+        let world = &session.world;
+        let entities = world.resource::<Entities>();
+        let indices = world.components.get::<PlayerIdx>().borrow();
+        let transforms = world.components.get::<Transform>().borrow();
+        let sprites = world.components.get::<AtlasSprite>().borrow();
+        for (_, (index, transform, sprite)) in entities.iter_with((&indices, &transforms, &sprites)) {
+            let Some(id) = seats.iter().find(|seat| seat.index as u32 == index.0)
+                .and_then(|seat| seat.occupant.player_id()) else { continue; };
+            let colour = players.iter().find(|p| p.id == id)
+                .and_then(|p| p.skin_color.as_deref()).unwrap_or("#f5e9be");
+            let colour = bevy::prelude::Color::hex(colour).unwrap_or(bevy::prelude::Color::rgb_u8(245, 233, 190));
+            let frame = sprite.index % 98;
+            let x = (frame % 14 * 96) as f32;
+            let y = (frame / 14 * 80) as f32;
+            let visual = Sprite {
+                color: colour,
+                rect: Some(bevy::prelude::Rect::new(x, y, x + 96.0, y + 80.0)),
+                custom_size: Some(bevy::prelude::Vec2::new(96.0, 80.0)),
+                flip_x: sprite.flip_x, flip_y: sprite.flip_y,
+                ..default()
+            };
+            let placement = bevy::prelude::Transform {
+                translation: transform.translation + bevy::prelude::Vec3::new(0.0, 0.0, 0.001),
+                rotation: transform.rotation, scale: transform.scale,
+            };
+            wanted.push((id, placement, visual));
+        }
+    }
+    for (entity, skin, mut transform, mut sprite, mut visibility) in &mut skins {
+        if let Some((_, placement, visual)) = wanted.iter().find(|(id, _, _)| *id == skin.0) {
+            *transform = *placement; *sprite = visual.clone(); *visibility = Visibility::Visible;
+        } else {
+            commands.entity(entity).despawn();
+        }
+    }
+    for (id, transform, sprite) in wanted {
+        if skins.iter().any(|(_, skin, _, _, _)| skin.0 == id) { continue; }
+        commands.spawn((PlayerSkin(id), SpriteBundle {
+            texture: assets.load("player/skin-mask.png"), transform, sprite, ..default()
+        }));
     }
 }
 
@@ -2637,8 +2698,9 @@ fn position_player_avatar_system(
 fn player_fingerprint(players: &[Player], id: PlayerId) -> Option<String> {
     let p = players.iter().find(|p| p.id == id)?;
     Some(format!(
-        "{}|{}|{}",
+        "{}|{}|{}|{}",
         p.name,
+        p.skin_color.as_deref().unwrap_or(""),
         p.color.as_deref().unwrap_or(""),
         p.avatar.as_deref().unwrap_or("")
     ))
@@ -4155,6 +4217,7 @@ mod claim_release_tests {
             id: PlayerId::new(),
             name: name.into(),
             color: color.map(Into::into),
+            skin_color: None,
             avatar: avatar.map(Into::into),
             library: Vec::new(),
         }
@@ -4445,7 +4508,7 @@ mod rejoin_regression_tests {
     #[test]
     fn leave_then_fresh_join_survives_delayed_departure_acknowledgement() {
         let mut input = GlobalInput::default();
-        let old = Player { id: PlayerId::new(), name: "Disco".into(), color: None, avatar: None, library: vec![] };
+        let old = Player { id: PlayerId::new(), name: "Disco".into(), color: None, skin_color: None, avatar: None, library: vec![] };
         input.adopt_controller_binding(0, old.id);
         input.forget_player(old.id);
         // The user releases the stick and presses A before the host's echo.
@@ -4460,7 +4523,7 @@ mod rejoin_regression_tests {
             assert_eq!(input.pending_joins[&0], pending);
         }
         input.reconcile_joins(&[]);
-        let new = Player { id: PlayerId::new(), name: pending.0, color: Some(pending.1), avatar: None, library: vec![] };
+        let new = Player { id: PlayerId::new(), name: pending.0, color: Some(pending.1), skin_color: None, avatar: None, library: vec![] };
         input.reconcile_joins(&[new.clone()]);
         assert_eq!(input.pad_player.get(&0), Some(&new.id));
         assert!(input.pending_joins.is_empty());
