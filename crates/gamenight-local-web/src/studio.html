@@ -427,6 +427,12 @@
       text-align: center;
       gap: 1rem;
     }
+    .drawing-preview { display:flex; align-items:center; gap:12px; min-height:88px;
+      position:sticky; top:0; z-index:5; background:var(--card-bg); }
+    .drawing-preview #preview-canvas { width:96px; height:80px; flex:none;
+      background:transparent; border-radius:0; }
+    .drawing-preview-options { display:flex; flex-direction:column; gap:6px; }
+    .drawing-preview-options select { min-height:40px; max-width:100%; }
   </style>
 </head>
 <body>
@@ -465,12 +471,12 @@
         <div class="identity-hint">This is the name above your character.</div>
       </div>
 
-      <!-- The character, not just the face: what you'll actually see on the TV. -->
       <div class="card">
-        <div class="card-title">Your character</div>
-        <div class="preview-box">
-          <canvas id="preview-canvas" width="96" height="80" aria-label="Your lobby character preview"></canvas>
-          <label for="preview-theme">Preview outfit</label>
+        <div class="card-title">Draw your face</div>
+        <div class="drawing-preview">
+          <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
+          <div class="drawing-preview-options">
+            <label for="preview-theme">Outfit</label>
           <select id="preview-theme" onchange="loadPreviewSprite(this.value)">
             <option value="living-room">Living room</option>
             <option value="underwater">Underwater</option>
@@ -478,24 +484,9 @@
             <option value="school">School</option>
             <option value="gameroom">Game room</option>
           </select>
-          <span id="preview-status" role="status"></span>
+            <span id="preview-status" role="status"></span>
+          </div>
         </div>
-
-        <label>Character colour</label>
-        <div class="palette" id="character-colors"></div>
-
-        <label style="margin-top:0.75rem;">Face texture, actual size in game</label>
-        <div class="face-tex-box">
-          <canvas id="face-texture-canvas" width="46" height="32"></canvas>
-        </div>
-        <div class="identity-hint">
-          Your 32×32 drawing uses evenly sized pixels, with room for glasses and beards. Anything outside
-          the marked square is skin, not paint.
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title">Draw your face</div>
         <div class="brush-sizes" role="group" aria-label="Brush size">
           <span>Brush size</span>
           <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
@@ -518,6 +509,10 @@
 
         <label>Face colours</label>
         <div class="palette" id="palette-swatches"></div>
+        <details style="margin-top:1rem">
+          <summary>Character colour</summary>
+          <div class="palette" id="character-colors"></div>
+        </details>
       </div>
 
       <div class="card">
@@ -1020,27 +1015,6 @@
       });
     }
 
-    function updateFaceTexture() {
-      const cvs = document.getElementById('face-texture-canvas');
-      if (!cvs) return;
-      const ctx = cvs.getContext('2d');
-      ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0, 0, FACE_TILE_W, FACE_TILE_H);
-
-      // Everything outside the drawing is the character showing through.
-      ctx.fillStyle = characterColor;
-      ctx.fillRect(0, 0, FACE_TILE_W, FACE_TILE_H);
-
-      const ox = (FACE_TILE_W - FACE_ART) / 2;
-      const oy = (FACE_TILE_H - FACE_ART) / 2;
-      drawPixelFace(ctx, ox, oy);
-
-      // Mark where the drawing ends.
-      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-      ctx.lineWidth = 0.5;
-      ctx.strokeRect(ox, oy, FACE_ART, FACE_ART);
-    }
-
     let previewSprite = null;
     let previewRequest = 0;
     const previewTint = document.createElement('canvas');
@@ -1088,7 +1062,7 @@
         // Keep the face centre while leaving a larger area for accessories.
         drawPixelFace(ctx, 38, 19);
       }
-      updateFaceTexture();
+
     }
 
     // ---- Names ---------------------------------------------------------
