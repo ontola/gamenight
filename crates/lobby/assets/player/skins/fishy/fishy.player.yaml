@@ -29,84 +29,96 @@ layers:
   body:
     atlas: ./fishy-body.atlas.yaml
     animations: &default_anims
-      sleep:
-        frames: [{idx: 20}, {idx: 21}, {idx: 22}, {idx: 23, head_offset: [0, -3]}]
-        fps: 9
-        repeat: false
-      wake:
-        frames: [{idx: 24}, {idx: 25}, {idx: 26}, {idx: 27}]
-        fps: 9
-        repeat: false
       idle:
-        frames: [{idx: 0, offset: [0, 0]}]
+        frames:
+          - idx: 0
+            offset: [0, 0]
         fps: &fps 9
         repeat: true
-      fall:
+      walk:
         frames:
-          - idx: 42
-            offset: [0, 3]
+          - idx: 1
+            offset: [0, 0]
+          - idx: 2
+            offset: [0, 0]
+          - idx: 3
+            offset: [0, 0]
+          - idx: 4
+            offset: [0, 0]
         fps: *fps
-        repeat: false
+        repeat: true
       rise:
         frames:
-          - idx: 28
-            offset: [0, 3]
+          - idx: 5
+            offset: [0, 0]
         fps: *fps
         repeat: false
-      walk:
-        frames: [{idx: 14}, {idx: 15}, {idx: 16}, {idx: 17}]
-        fps: 9
-        repeat: true
+      fall:
+        frames:
+          - idx: 5
+            offset: [0, 0]
+        fps: *fps
+        repeat: false
+      sleep:
+        frames:
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
+        fps: *fps
+        repeat: false
+      wake:
+        frames:
+          - idx: 0
+            offset: [0, 0]
+        fps: *fps
+        repeat: false
       crouch:
         frames:
-          - idx: 56
-            offset: [0, -4]
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
+        fps: *fps
+        repeat: false
+      slide:
+        frames:
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
         fps: *fps
         repeat: false
       ragdoll:
-        fps: *fps
         frames:
-          - idx: 28
-            offset: [0, 3]
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
+        fps: *fps
         repeat: false
       ragdoll_twitch:
-        fps: *fps
         frames:
-          - idx: 42
-            offset: [0, 3]
-      slide:
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
         fps: *fps
-        frames:
-          - idx: 58
-            offset: [1, -8]
-            head_offset: [9, -17]
         repeat: false
       death_spine:
         frames:
-          - idx: 70
-          - idx: 71
-          - idx: 72
-          - idx: 73
-          - idx: 74
-          - idx: 75
-          - idx: 76
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
         fps: *fps
         repeat: false
       death_belly:
         frames:
-          - idx: 84
-          - idx: 85
-          - idx: 86
-          - idx: 87
-          - idx: 88
-          - idx: 89
-          - idx: 90
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
         fps: *fps
         repeat: false
       death_ragdoll:
         frames:
-          - idx: 56
-            offset: [0, -4]
+          - idx: 6
+            offset: [0, 0]
+            head_offset: [0, -8]
         fps: *fps
         repeat: false
   fin:

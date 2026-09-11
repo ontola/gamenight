@@ -85,6 +85,8 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
         .route("/studio", get(serve_studio))
+        .route("/assets/jsQR.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/jsQR.js")) }))
+        .route("/assets/qr-scanner.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/qr-scanner.js")) }))
         .route("/assets/characters/:theme", get(serve_character))
         .route("/mobile", get(serve_studio))
         .route("/session/:session_id", get(serve_studio))

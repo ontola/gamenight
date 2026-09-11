@@ -2307,9 +2307,9 @@ fn sync_player_skin_system(
             let colour = players.iter().find(|p| p.id == id)
                 .and_then(|p| p.skin_color.as_deref()).unwrap_or("#f5e9be");
             let colour = bevy::prelude::Color::hex(colour).unwrap_or(bevy::prelude::Color::rgb_u8(245, 233, 190));
-            let frame = sprite.index % 98;
-            let x = (frame % 14 * 96) as f32;
-            let y = (frame / 14 * 80) as f32;
+            let frame = sprite.index % 7;
+            let x = (frame * 96) as f32;
+            let y = 0.0;
             let visual = Sprite {
                 color: colour,
                 rect: Some(bevy::prelude::Rect::new(x, y, x + 96.0, y + 80.0)),

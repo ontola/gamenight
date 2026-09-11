@@ -227,7 +227,9 @@
     .playlist-row.drag-over { border-color: var(--accent); }
     .playlist-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
     .playlist-title small { display: block; color: var(--muted); margin-top: .25rem; }
-    .playlist-row button { min-width: 44px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); cursor: pointer; }
+    .playlist-row button { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+    .playlist-editor { padding:0 4px; }
+    .playlist-row button:hover:not(:disabled), .playlist-row button:focus-visible { background:rgba(255,255,255,.07); color:var(--text); }
     .playlist-row button:disabled { opacity: .35; cursor: default; }
     .playlist-row .drag-handle { touch-action: none; cursor: grab; user-select: none; }
     .playlist-row.dragging { opacity: .55; }
@@ -490,6 +492,18 @@
     }
     .clothing-preview summary { cursor:pointer; padding:8px 0; font-size:13px; }
     .clothing-preview p { color:var(--muted); font-size:12px; margin:0 0 8px; }
+    #qr-open { background:var(--accent); color:white; font-weight:700; min-height:48px; margin-top:8px; width:100%; }
+    #qr-scanner { box-sizing:border-box; width:min(94vw,480px); max-height:90dvh; overflow:auto; background:var(--card-bg); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:20px; }
+    #qr-scanner::backdrop { background:rgba(0,0,0,.7); }
+    .scanner-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+    .scanner-heading h2 { margin:0; }
+    #qr-close { min-width:44px; min-height:44px; cursor:pointer; }
+    #qr-video { width:100%; max-height:45dvh; object-fit:cover; border-radius:10px; margin-top:16px; }
+    .scanner-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
+    .scanner-actions label { cursor:pointer; }
+    #qr-result:not([hidden]) { display:block; overflow-wrap:anywhere; }
+    #qr-scanner [hidden] { display:none !important; }
+    .scanner-privacy { font-size:12px; color:var(--muted); }
   </style>
 </head>
 <body>
@@ -503,17 +517,18 @@
       <button class="nav-btn" onclick="switchTab('session')">Session</button>
       <button class="nav-btn" onclick="switchTab('playlist')">Playlist</button>
     </div>
+  <button type="button" class="nav-btn" id="qr-open">Scan QR</button>
   </header>
 
 <main>
     <div id="tab-playlist" class="tab-content">
-      <div class="card">
+      <section class="playlist-editor">
         <h2>Tonight’s playlist</h2>
         <p>Drag games or use the arrows to change the order. The current game keeps playing. GameNight picks the next game that fits your party.</p>
         <p id="playlist-status" role="status" aria-live="polite"></p>
         <ol id="playlist-list" aria-label="Game playlist"></ol>
         <button class="nav-btn" type="button" onclick="loadPlaylist()">Refresh playlist</button>
-      </div>
+      </section>
     </div>
     <!-- TAB 1: CHARACTER EDITOR -->
     <div id="tab-character" class="tab-content active">
@@ -1399,6 +1414,18 @@
           button.onclick = () => movePlaylistEntry(index, index + direction);
           row.append(button);
         });
+        const next = document.createElement('button');
+        next.type = 'button'; next.textContent = '⇈';
+        next.title = 'Play this next';
+        next.setAttribute('aria-label', `Play ${entry.title} next`);
+        const current = playlistView.playlist.current;
+        const nextIndex = current == null ? 0 : (current + 1) % entries.length;
+        next.disabled = playlistBusy || index === current || index === nextIndex;
+        next.onclick = () => {
+          const target = current == null ? 0 : current + 1 - (index < current ? 1 : 0);
+          movePlaylistEntry(index, target);
+        };
+        row.append(next);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'remove-entry';
@@ -1905,5 +1932,18 @@
 
     window.onload = init;
   </script>
+
+<dialog id="qr-scanner" aria-labelledby="qr-title">
+  <div class="scanner-heading"><h2 id="qr-title">Scan lobby QR</h2><button type="button" id="qr-close" aria-label="Close scanner">✕</button></div>
+  <video id="qr-video" autoplay muted playsinline hidden></video>
+  <p id="qr-status" role="status" aria-live="polite"></p>
+  <a id="qr-result" class="tool-btn" hidden></a>
+  <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>
+  <label class="tool-btn" for="qr-photo">Scan a photo<input id="qr-photo" type="file" accept="image/*" capture="environment" hidden></label></div>
+  <p class="scanner-privacy">Images stay on your device.</p>
+</dialog>
+<script src="/assets/jsQR.js"></script>
+<script src="/assets/qr-scanner.js"></script>
+
 </body>
 </html>
