@@ -287,7 +287,7 @@
 
     #pixel-grid {
       display: grid;
-      grid-template-columns: repeat(16, 1fr);
+      grid-template-columns: repeat(32, 1fr);
       gap: 1px;
       background: var(--grid-border);
       width: 280px;
@@ -484,7 +484,7 @@
           <canvas id="face-texture-canvas" width="46" height="32"></canvas>
         </div>
         <div class="identity-hint">
-          Your 16×16 drawing uses evenly sized pixels, with room for glasses and beards. Anything outside
+          Your 32×32 drawing uses evenly sized pixels, with room for glasses and beards. Anything outside
           the marked square is skin, not paint.
         </div>
       </div>
@@ -553,7 +553,7 @@
     let boundPlayerId = localStorage.getItem('gamenight_bound_player') || null;
     let currentArtworkId = localStorage.getItem('gamenight_current_artwork') || null;
 
-    const GRID_SIZE = 16;
+    const GRID_SIZE = 32;
 
     // `null` means transparent. A face should be a *face* — filling the grid
     // with a background colour by default gives everyone an opaque tile with
@@ -562,7 +562,7 @@
     let gridData = Array(GRID_SIZE * GRID_SIZE).fill(null);
     const EMPTY = null;
 
-    // Undo history. Bounded — this is a 16x16 grid on a phone, not Photoshop.
+    // Undo history. Bounded — this is a 32x32 grid on a phone, not Photoshop.
     const UNDO_LIMIT = 40;
     let undoStack = [];
 
@@ -738,9 +738,9 @@
 
     // Small drawing helpers, so a face is a recipe rather than 256 literals.
     function facePad() {
-      const g = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
+      const g = Array(16 * 16).fill(EMPTY);
       const put = (r, c, col) => {
-        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) g[r * GRID_SIZE + c] = col;
+        if (r >= 0 && r < 16 && c >= 0 && c < 16) g[r * 16 + c] = col;
       };
       const box = (r0, r1, c0, c1, col) => {
         for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) put(r, c, col);
@@ -876,7 +876,7 @@
           put(row + 1, 4, col); put(row + 1, 11, col);
           return api;
         },
-        done() { return g; }
+        done() { return normalizeFace(g); }
       };
       return api;
     }
@@ -962,15 +962,15 @@
     // into a 32x32 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
     // shows that tile at actual proportions, so it's obvious how much of the
     // head is yours and how much is skin.
-    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = GRID_SIZE * 2;
+    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = GRID_SIZE;
 
-    // Every editor pixel is exactly 2×2 sprite pixels. This leaves room for
-    // glasses and beards without uneven 16-to-20 resampling.
+    // Every editor pixel maps to exactly one sprite pixel, with a larger grid
+    // for glasses and beards rather than enlarged pixels.
     function drawPixelFace(ctx, x, y) {
       gridData.forEach((col, i) => {
         if (col === EMPTY) return;
         ctx.fillStyle = col;
-        ctx.fillRect(x + (i % GRID_SIZE) * 2, y + Math.floor(i / GRID_SIZE) * 2, 2, 2);
+        ctx.fillRect(x + i % GRID_SIZE, y + Math.floor(i / GRID_SIZE), 1, 1);
       });
     }
 
@@ -1058,15 +1058,25 @@
       return JSON.stringify({ v: 1, w: GRID_SIZE, h: GRID_SIZE, px: grid });
     }
 
+    // Centre old drawings without stretching or losing any source pixels.
+    function normalizeFace(pixels, width = Math.sqrt(pixels?.length || 0), height = width) {
+      if (!Array.isArray(pixels) || !Number.isInteger(width) || !Number.isInteger(height)
+          || width < 1 || height < 1 || width > GRID_SIZE || height > GRID_SIZE
+          || pixels.length !== width * height) return null;
+      const result = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
+      const ox = Math.floor((GRID_SIZE - width) / 2), oy = Math.floor((GRID_SIZE - height) / 2);
+      pixels.forEach((color, i) => {
+        result[(oy + Math.floor(i / width)) * GRID_SIZE + ox + i % width] = color ?? EMPTY;
+      });
+      return result;
+    }
+
     function decodeAvatar(text) {
       try {
         const o = JSON.parse(text);
-        if (Array.isArray(o)) {
-          // Legacy: bare array with the old sentinel colour for "empty".
-          return o.map(c => (c === '#0f172a' ? EMPTY : c));
-        }
-        if (o && o.v === 1 && Array.isArray(o.px)) return o.px.map(c => c ?? EMPTY);
-      } catch (e) {}
+        if (Array.isArray(o)) return normalizeFace(o.map(c => c === '#0f172a' ? EMPTY : c));
+        if (o?.v === 1) return normalizeFace(o.px, o.w, o.h);
+      } catch (_) {}
       return null;
     }
 
@@ -1413,7 +1423,8 @@
     // A list of saved pieces, so experimenting never costs you the last one.
     function loadArtworks() {
       try {
-        return JSON.parse(localStorage.getItem('gamenight_artworks') || '[]');
+        const list = JSON.parse(localStorage.getItem('gamenight_artworks') || '[]');
+        return Array.isArray(list) ? list.map(a => ({...a, data: normalizeFace(a.data)})).filter(a => a.data) : [];
       } catch (e) { return []; }
     }
 
@@ -1490,10 +1501,10 @@
         row.className = 'artwork-row' + (art.id === currentArtworkId ? ' active' : '');
 
         const cvs = document.createElement('canvas');
-        cvs.width = 16; cvs.height = 16;
+        cvs.width = GRID_SIZE; cvs.height = GRID_SIZE;
         const ctx = cvs.getContext('2d');
         art.data.forEach((col, i) => {
-          if (col) { ctx.fillStyle = col; ctx.fillRect(i % 16, Math.floor(i / 16), 1, 1); }
+          if (col) { ctx.fillStyle = col; ctx.fillRect(i % GRID_SIZE, Math.floor(i / GRID_SIZE), 1, 1); }
         });
         row.appendChild(cvs);
 

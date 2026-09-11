@@ -2331,7 +2331,7 @@ fn avatar_image(data: &str) -> Option<bevy::render::texture::Image> {
     // renderer smoothing the pixels into mush.
     let (width, height, rgba) = art.to_rgba_scaled(4);
 
-    Some(bevy::render::texture::Image::new(
+    let mut image = bevy::render::texture::Image::new(
         Extent3d {
             width,
             height,
@@ -2340,7 +2340,9 @@ fn avatar_image(data: &str) -> Option<bevy::render::texture::Image> {
         TextureDimension::D2,
         rgba,
         TextureFormat::Rgba8UnormSrgb,
-    ))
+    );
+    image.sampler_descriptor = bevy::render::texture::ImageSampler::nearest();
+    Some(image)
 }
 
 /// Where a seated player's face sprite is, in world space.
@@ -2568,13 +2570,14 @@ fn sync_player_avatar_system(
         let Some(image) = avatar_image(&avatar) else {
             continue;
         };
+        let face_size = Vec2::new(image.texture_descriptor.size.width as f32 / 4.0, image.texture_descriptor.size.height as f32 / 4.0);
         let handle = images.add(image);
         commands.spawn((
             PlayerAvatarPortrait(player_id, avatar),
             SpriteBundle {
                 texture: handle,
                 sprite: Sprite {
-                    custom_size: Some(Vec2::splat(AVATAR_FACE_SIZE)),
+                    custom_size: Some(face_size),
                     ..default()
                 },
                 ..default()
@@ -2582,11 +2585,6 @@ fn sync_player_avatar_system(
         ));
     }
 }
-
-/// Every editor pixel spans exactly 2×2 world pixels. The 32-unit square
-/// allows glasses and beards to extend past the head; transparent cells keep
-/// the hood and body visible. Fractional scaling distorts equal-sized features.
-const AVATAR_FACE_SIZE: f32 = 32.0;
 
 /// Keeps each drawn face locked to its player's face layer, and out of sight
 /// when that player has no body on screen.
