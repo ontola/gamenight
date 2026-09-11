@@ -672,7 +672,8 @@
     let outfitGuidePixels = null, outfitGuideSprite = null, outfitGuideColor = null;
     function gridBackground(idx) {
       if (gridData[idx] !== EMPTY) return gridData[idx];
-      return showOutfitGuide && outfitGuidePixels ? outfitGuidePixels[idx] : characterColor;
+      return showOutfitGuide && outfitGuidePixels ? outfitGuidePixels[idx]
+        : `linear-gradient(135deg, ${characterColor} 0 50%, #0f172a 50% 100%)`;
     }
     function toggleOutfitGuide() {
       showOutfitGuide = !showOutfitGuide;
