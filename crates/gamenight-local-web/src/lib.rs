@@ -82,6 +82,7 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
         .route("/studio", get(serve_studio))
+        .route("/assets/characters/:theme", get(serve_character))
         .route("/mobile", get(serve_studio))
         .route("/session/:session_id", get(serve_studio))
         .route(
@@ -419,6 +420,19 @@ async fn serve_session_qr(Path(session_id): Path<String>) -> Response {
         svg_xml,
     )
         .into_response()
+}
+
+// Embed the lobby assets so installed/offline studios use the same artwork.
+async fn serve_character(Path(theme): Path<String>) -> Response {
+    let png: &'static [u8] = match theme.as_str() {
+        "living-room" => include_bytes!("../../lobby/assets/player/skins/fishy/fishy-body.png"),
+        "underwater" => include_bytes!("../../lobby/assets/themes/underwater/fishy/body.png"),
+        "sky" => include_bytes!("../../lobby/assets/themes/sky/fishy/body.png"),
+        "school" => include_bytes!("../../lobby/assets/themes/school/fishy/body.png"),
+        "gameroom" => include_bytes!("../../lobby/assets/themes/gameroom/fishy/body.png"),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    ([("content-type", "image/png"), ("cache-control", "no-cache")], png).into_response()
 }
 
 async fn serve_studio() -> Html<&'static str> {

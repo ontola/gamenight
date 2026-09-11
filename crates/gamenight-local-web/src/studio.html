@@ -91,7 +91,7 @@
     }
     .canvas-container { touch-action: none; }
     #preview-canvas {
-      width: 192px; height: 300px; image-rendering: pixelated;
+      width: 240px; height: 200px; image-rendering: pixelated;
       background: #1b2438; border-radius: 10px;
     }
     .status { font-size: 0.9rem; text-align: center; color: #34d399; min-height: 1.2rem; }
@@ -403,10 +403,10 @@
     }
 
     #preview-canvas {
-      width: 64px;
-      height: 64px;
+      width: 240px;
+      height: 200px;
       image-rendering: pixelated;
-      animation: idleBob 1.2s infinite ease-in-out;
+
     }
 
     @keyframes idleBob {
@@ -464,7 +464,16 @@
       <div class="card">
         <div class="card-title">Your character</div>
         <div class="preview-box">
-          <canvas id="preview-canvas" width="96" height="150"></canvas>
+          <canvas id="preview-canvas" width="96" height="80" aria-label="Your lobby character preview"></canvas>
+          <label for="preview-theme">Preview outfit</label>
+          <select id="preview-theme" onchange="loadPreviewSprite(this.value)">
+            <option value="living-room">Living room</option>
+            <option value="underwater">Underwater</option>
+            <option value="sky">Sky</option>
+            <option value="school">School</option>
+            <option value="gameroom">Game room</option>
+          </select>
+          <span id="preview-status" role="status"></span>
         </div>
 
         <label>Character colour</label>
@@ -909,9 +918,7 @@
     }
 
     // ---- Preview -------------------------------------------------------
-    // Shows the whole character, not a floating head. The body is drawn
-    // here rather than taken from the lobby: its old art was CC BY-NC, which a
-    // commercial product can't ship.
+    // Preview uses the same body atlas and profile tint as the lobby.
     // The character's own colour: skin, and therefore the backdrop your face
     // is drawn on. One deliberate choice rather than something inferred from
     // the art — deriving it meant recolouring your character by accident
@@ -952,10 +959,10 @@
     }
 
     // the lobby's face layer is a 46x32 tile, and the drawn avatar is rendered
-    // into a 30x30 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
+    // into a 20x20 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
     // shows that tile at actual proportions, so it's obvious how much of the
     // head is yours and how much is skin.
-    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = 30;
+    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = 20;
 
     function updateFaceTexture() {
       const cvs = document.getElementById('face-texture-canvas');
@@ -987,42 +994,58 @@
       ctx.strokeRect(ox, oy, FACE_ART, FACE_ART);
     }
 
+    let previewSprite = null;
+    let previewRequest = 0;
+    const previewTint = document.createElement('canvas');
+    previewTint.width = 96;
+    previewTint.height = 80;
+
+    function loadPreviewSprite(theme) {
+      const request = ++previewRequest;
+      const img = new Image();
+      const status = document.getElementById('preview-status');
+      status.textContent = 'Loading outfit…';
+      img.onload = () => {
+        if (request !== previewRequest) return;
+        previewSprite = img;
+        status.textContent = '';
+        updatePreview();
+      };
+      img.onerror = () => {
+        if (request === previewRequest) status.textContent = 'Could not load outfit. Try again.';
+      };
+      img.src = '/assets/characters/' + encodeURIComponent(theme);
+    }
+
     function updatePreview() {
       const cvs = document.getElementById('preview-canvas');
       if (!cvs) return;
       const ctx = cvs.getContext('2d');
       ctx.clearRect(0, 0, cvs.width, cvs.height);
       ctx.imageSmoothingEnabled = false;
-
-      const tint = accentColor();
-      const S = 5;                       // grid pixel -> canvas pixels
-      const headX = (cvs.width - GRID_SIZE * S) / 2;
-      const headY = 4;
-      const headBottom = headY + GRID_SIZE * S;
-
-      // Body, in the accent colour so the whole character reads as yours.
-      const bodyTop = headBottom - 6;
-      ctx.fillStyle = tint;
-      ctx.fillRect(headX + 16, bodyTop, 48, 38);          // torso
-      ctx.fillRect(headX + 4,  bodyTop + 6, 12, 24);      // left arm
-      ctx.fillRect(headX + 64, bodyTop + 6, 12, 24);      // right arm
-      ctx.fillRect(headX + 22, bodyTop + 38, 13, 16);     // left leg
-      ctx.fillRect(headX + 45, bodyTop + 38, 13, 16);     // right leg
-      ctx.fillStyle = 'rgba(0,0,0,0.28)';
-      ctx.fillRect(headX + 16, bodyTop + 27, 48, 9);      // belt shadow
-
-      // Head shape behind the face, so drawn features sit on a head rather
-      // than floating in space.
-      ctx.fillStyle = tint;
-      ctx.fillRect(headX + S, headY + S, (GRID_SIZE - 2) * S, (GRID_SIZE - 2) * S);
-
-      // The player's face on top.
-      gridData.forEach((col, i) => {
-        if (col === EMPTY) return;
-        ctx.fillStyle = col;
-        ctx.fillRect(headX + (i % GRID_SIZE) * S, headY + Math.floor(i / GRID_SIZE) * S, S, S);
-      });
-
+      if (previewSprite) {
+        // First idle cell of the actual 96×80 lobby atlas. Multiply preserves
+        // the sprite's shading, matching the lobby's profile-colour tint.
+        const tint = previewTint.getContext('2d');
+        tint.globalCompositeOperation = 'source-over';
+        tint.clearRect(0, 0, 96, 80);
+        tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
+        tint.globalCompositeOperation = 'multiply';
+        tint.fillStyle = characterColor;
+        tint.fillRect(0, 0, 96, 80);
+        tint.globalCompositeOperation = 'destination-in';
+        tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
+        tint.globalCompositeOperation = 'source-over';
+        ctx.drawImage(previewTint, 0, 0);
+        // 20px avatar, centred at body x+2 and face y+5, as in the lobby.
+        const scale = 20 / GRID_SIZE;
+        gridData.forEach((col, i) => {
+          if (col === EMPTY) return;
+          ctx.fillStyle = col;
+          ctx.fillRect(40 + (i % GRID_SIZE) * scale,
+            25 + Math.floor(i / GRID_SIZE) * scale, scale, scale);
+        });
+      }
       updateFaceTexture();
     }
 
@@ -1052,6 +1075,7 @@
     }
 
     function init() {
+      loadPreviewSprite('living-room');
       renderCharacterColors();
       renderGrid();
       renderPalette();
