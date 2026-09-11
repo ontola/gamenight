@@ -292,7 +292,7 @@
 
     #pixel-grid {
       display: grid;
-      grid-template-columns: repeat(32, 1fr);
+      grid-template-columns: repeat(48, 1fr);
       gap: 1px;
       background: var(--grid-border);
       width: 280px;
@@ -518,18 +518,11 @@
         <div class="drawing-preview">
           <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
           <div class="drawing-preview-options">
-            <label for="preview-theme">Outfit</label>
-          <select id="preview-theme" onchange="loadPreviewSprite(this.value)">
-            <option value="living-room">Living room</option>
-            <option value="underwater">Underwater</option>
-            <option value="sky">Sky</option>
-            <option value="school">School</option>
-            <option value="gameroom">Game room</option>
-          </select>
         <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit guide</button>
             <span id="preview-status" role="status"></span>
           </div>
         </div>
+        <p class="identity-hint head-guide-hint">Draw anywhere on the head—including hats. The face sits lower and to the right in this grid.</p>
         <div class="brush-sizes" role="group" aria-label="Brush size">
           <span>Brush size</span>
           <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
@@ -622,7 +615,7 @@
     let boundPlayerId = localStorage.getItem('gamenight_bound_player') || null;
     let currentArtworkId = localStorage.getItem('gamenight_current_artwork') || null;
 
-    const GRID_SIZE = 32;
+    const GRID_SIZE = 48;
 
     // `null` means transparent. A face should be a *face* — filling the grid
     // with a background colour by default gives everyone an opaque tile with
@@ -631,7 +624,7 @@
     let gridData = Array(GRID_SIZE * GRID_SIZE).fill(null);
     const EMPTY = null;
 
-    // Undo history. Bounded — this is a 32x32 grid on a phone, not Photoshop.
+    // Undo history. Bounded — this is a 48x48 grid on a phone, not Photoshop.
     const UNDO_LIMIT = 40;
     let undoStack = [];
 
@@ -1082,7 +1075,7 @@
     }
 
     // the lobby's face layer is a 46x32 tile, and the drawn avatar is rendered
-    // into a 32x32 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
+    // into a 48x48 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
     // shows that tile at actual proportions, so it's obvious how much of the
     // head is yours and how much is skin.
     const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = GRID_SIZE;
@@ -1103,7 +1096,7 @@
     previewTint.width = 96;
     previewTint.height = 80;
 
-    function loadPreviewSprite(theme) {
+    function loadPreviewSprite() {
       const request = ++previewRequest;
       const img = new Image();
       const status = document.getElementById('preview-status');
@@ -1117,7 +1110,7 @@
       img.onerror = () => {
         if (request === previewRequest) status.textContent = 'Could not load outfit. Try again.';
       };
-      img.src = '/assets/characters/' + encodeURIComponent(theme);
+      img.src = '/assets/characters/' + 'living-room';
     }
 
     function updatePreview() {
@@ -1140,10 +1133,10 @@
         tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
         tint.globalCompositeOperation = 'source-over';
         ctx.drawImage(previewTint, 0, 0);
-        // Exactly the same 32×32 crop that receives the face drawing.
+        // Exactly the same 48×48 crop that receives the face drawing.
         // Reference pixels are display-only and never copied into gridData.
         if (outfitGuideSprite !== previewSprite || outfitGuideColor !== characterColor) {
-          const rgba = tint.getImageData(38, 19, GRID_SIZE, GRID_SIZE).data;
+          const rgba = tint.getImageData(24, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
           outfitGuideSprite = previewSprite;
@@ -1152,7 +1145,7 @@
         }
         // Face follows the right-facing opening of the hood.
         // Keep the face centre while leaving a larger area for accessories.
-        drawPixelFace(ctx, 38, 19);
+        drawPixelFace(ctx, 24, 4);
       }
 
     }
@@ -1176,7 +1169,10 @@
           || width < 1 || height < 1 || width > GRID_SIZE || height > GRID_SIZE
           || pixels.length !== width * height) return null;
       const result = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
-      const ox = Math.floor((GRID_SIZE - width) / 2), oy = Math.floor((GRID_SIZE - height) / 2);
+      // Old 32px canvas began at atlas (38,19); the head canvas begins at (24,4).
+      // Preserve the drawing on the character, not at the centre of the new box.
+      const ox = width === 32 ? 14 : width === 16 ? 22 : Math.floor((GRID_SIZE - width) / 2);
+      const oy = height === 32 ? 15 : height === 16 ? 23 : Math.floor((GRID_SIZE - height) / 2);
       pixels.forEach((color, i) => {
         result[(oy + Math.floor(i / width)) * GRID_SIZE + ox + i % width] = color ?? EMPTY;
       });
@@ -1193,7 +1189,7 @@
     }
 
     function init() {
-      loadPreviewSprite('living-room');
+      loadPreviewSprite();
       refreshOutfitGuide();
       renderCharacterColors();
       renderGrid();

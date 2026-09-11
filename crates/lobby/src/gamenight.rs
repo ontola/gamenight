@@ -966,7 +966,7 @@ fn match_plugin_for_seats(
 
         player_info[idx] = PlayerInput {
             active,
-            selected_player: theme.and_then(|theme| theme.players.get(idx % theme.players.len().max(1))).copied().unwrap_or(default_player),
+            selected_player: default_player,
             selected_hat: None,
             control: default(),
             editor_input: default(),
@@ -2398,11 +2398,11 @@ fn player_face_placement(game: &Game, seat_index: u8) -> Option<(bevy::prelude::
 /// How far the drawn face leans toward the way the character is facing, in
 /// world units. Small on purpose: the full face-layer offset is 10, which is
 /// most of the way off the head.
-const AVATAR_FACE_LEAD: f32 = 2.0;
+const AVATAR_FACE_LEAD: f32 = 0.0;
 
 /// Vertical fine-tuning for the drawn face, in world units. The face layer's
 /// own y already puts it on the head; this is the knob for taste.
-const AVATAR_FACE_NUDGE_Y: f32 = 0.0;
+const AVATAR_FACE_NUDGE_Y: f32 = 7.0;
 
 /// Remembers the face atlas we took off a player, so it can be given back.
 #[derive(bevy::prelude::Resource, Default)]
