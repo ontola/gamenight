@@ -1029,6 +1029,61 @@
       { name: 'Robot',     build: () => facePad().antenna().eyesSquare(5).mouthGrid(11).done() },
     ];
 
+    // Hair and headwear use the full native-pixel head canvas, independently
+    // of the facial expression. Leave the eyes at their existing right offset.
+    function dressRandomFace(face) {
+      const pick = values => values[Math.floor(Math.random() * values.length)];
+      const hair = pick(['#30231d', '#6b3926', '#c07832', '#efd078', '#dce3ef', '#8b4dcc']);
+      const cloth = pick(['#d64c64', '#437bd1', '#7552b8', '#36a69a', '#e39a36']);
+      const box = (x, y, w, h, color) => {
+        for (let row = y; row < y + h; row++) for (let col = x; col < x + w; col++) {
+          if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) face[row * GRID_SIZE + col] = color;
+        }
+      };
+      const styles = [
+        () => { // Side part, with sideburns.
+          box(12, 15, 25, 5, hair); box(16, 12, 17, 3, hair);
+          box(12, 20, 5, 12, hair); box(17, 20, 9, 3, hair);
+        },
+        () => { // Curly hair: staggered little pixel curls.
+          for (let x = 12; x < 36; x += 5) {
+            box(x, 13 + (x % 2) * 2, 6, 6, hair); box(x + 1, 12 + (x % 2) * 2, 4, 8, hair);
+          }
+          box(11, 20, 5, 12, hair);
+        },
+        () => { // Mohawk.
+          box(22, 7, 5, 14, hair); box(24, 5, 4, 13, hair);
+          box(20, 17, 10, 4, hair);
+        },
+        () => { // Long hair, keeping the face open.
+          box(13, 14, 24, 6, hair); box(11, 20, 7, 20, hair);
+          box(18, 19, 7, 4, hair);
+        },
+        () => { // Beanie and pompom.
+          box(13, 13, 24, 8, cloth); box(17, 10, 16, 3, cloth);
+          box(23, 6, 6, 4, WHITE); box(11, 21, 28, 3, WHITE);
+        },
+        () => { // Baseball cap with a right-facing brim.
+          box(14, 14, 22, 7, cloth); box(18, 11, 14, 3, cloth);
+          box(12, 21, 31, 3, cloth); box(27, 15, 3, 4, WHITE);
+        },
+        () => { // Wizard hat.
+          for (let y = 5; y < 22; y++) {
+            const width = 3 + Math.floor((y - 5) / 2) * 2;
+            box(25 - Math.floor(width / 2), y, width, 1, cloth);
+          }
+          box(11, 22, 30, 3, cloth); box(24, 14, 2, 3, '#ffe066');
+        },
+        () => { // Crown.
+          box(13, 17, 25, 6, '#efc448');
+          for (const x of [13, 23, 34]) box(x, 11, 4, 6, '#efc448');
+          box(23, 19, 4, 3, cloth);
+        },
+      ];
+      pick(styles)();
+      return face;
+    }
+
     // Never hand out the same face twice running: pressing 🎲 and getting no
     // visible change reads as a broken button rather than bad luck.
     let lastFaceIdx = -1;
@@ -1039,7 +1094,7 @@
             % FACE_RECIPES.length;
       }
       lastFaceIdx = i;
-      return FACE_RECIPES[i].build();
+      return dressRandomFace(FACE_RECIPES[i].build());
     }
 
     function loadPreset() {
