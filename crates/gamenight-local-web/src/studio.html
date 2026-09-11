@@ -463,6 +463,9 @@
       .card { padding:16px; }
       main, .tab-content.active { gap:16px; }
     }
+    .backup-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+    .backup-actions button { justify-content:center; min-width:0; }
+    .backup-actions button:last-child { grid-column:1/-1; }
   </style>
 </head>
 <body>
@@ -550,6 +553,14 @@
         <div class="card-title">My faces</div>
         <div id="artwork-gallery" class="artwork-list"></div>
         <button class="btn-primary" onclick="newArtwork()">＋ New face</button>
+        <div class="backup-actions">
+          <button class="tool-btn" onclick="exportBackup()">Export backup</button>
+          <button class="tool-btn" onclick="document.getElementById('backup-file').click()">Import backup</button>
+          <button class="tool-btn" onclick="exportFacePng()">Export face PNG</button>
+        </div>
+        <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importBackup(this)">
+        <p class="identity-hint">Your faces stay on this device. Export a backup to keep them safe or move them to another device. Import adds faces without deleting existing ones.</p>
+        <div id="backup-status" role="status" aria-live="polite"></div>
       </div>
 
       <div id="status-msg" class="status"></div>
@@ -1499,6 +1510,92 @@
         savingNow = false;
         if (savePending) { savePending = false; pushProfile(); }
       }
+    }
+
+    // Portable backups contain artwork and preferences, never controller/session claims.
+    function backupMessage(message) { document.getElementById('backup-status').textContent = message; }
+    function downloadFile(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url; link.download = filename;
+      document.body.appendChild(link); link.click(); link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+    function exportBackup() {
+      const artworks = loadArtworks().map(a => ({...a, data: a.id === currentArtworkId ? gridData.slice() : a.data}));
+      const backup = {format:'gamenight-character-backup', version:1, exportedAt:new Date().toISOString(),
+        gridSize:GRID_SIZE, username:document.getElementById('player-name').value,
+        color:characterColor, activeArtworkId:currentArtworkId, artworks};
+      downloadFile(new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'}),
+        'gamenight-faces-' + new Date().toISOString().slice(0,10) + '.json');
+      backupMessage('Backup download started. Your saved faces are unchanged.');
+    }
+    function exportFacePng() {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = GRID_SIZE;
+      const ctx = canvas.getContext('2d');
+      gridData.forEach((color, i) => {
+        if (color === EMPTY) return;
+        ctx.fillStyle = color; ctx.fillRect(i % GRID_SIZE, Math.floor(i / GRID_SIZE), 1, 1);
+      });
+      canvas.toBlob(blob => {
+        if (!blob) { backupMessage('Could not create the PNG. Please try again.'); return; }
+        downloadFile(blob, 'gamenight-face.png');
+        backupMessage('32×32 PNG download started, with transparency.');
+      }, 'image/png');
+    }
+    function validateBackup(value) {
+      const color = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+      if (!value || value.format !== 'gamenight-character-backup' || value.version !== 1
+          || ![16,32].includes(value.gridSize) || !Array.isArray(value.artworks)
+          || !value.artworks.length || value.artworks.length > 200
+          || typeof value.username !== 'string' || value.username.length > 100 || !color(value.color))
+        throw Error('This is not a supported GameNight backup.');
+      const ids = new Set();
+      const artworks = value.artworks.map(a => {
+        if (!a || typeof a.id !== 'string' || a.id.length > 200 || ids.has(a.id)
+            || typeof a.name !== 'string' || a.name.length > 200 || !Array.isArray(a.data)
+            || a.data.length !== value.gridSize ** 2 || !a.data.every(c => c === null || color(c)))
+          throw Error('The backup contains invalid artwork. Nothing was imported.');
+        ids.add(a.id);
+        return {id:a.id, name:a.name, data:normalizeFace(a.data, value.gridSize)};
+      });
+      return {...value, artworks};
+    }
+    async function importBackup(input) {
+      const file = input.files?.[0];
+      if (!file) return;
+      try {
+        if (file.size > 5 * 1024 * 1024) throw Error('Backup is too large (maximum 5 MB).');
+        const backup = validateBackup(JSON.parse(await file.text()));
+        const merged = loadArtworks();
+        let active = currentArtworkId, added = 0;
+        for (const incoming of backup.artworks) {
+          const same = merged.find(a => a.name === incoming.name && JSON.stringify(a.data) === JSON.stringify(incoming.data));
+          let id = same?.id;
+          if (!same) {
+            id = 'art_' + (globalThis.crypto?.randomUUID?.() || (Date.now() + '_' + Math.random().toString(36).slice(2)));
+            merged.push({...incoming, id}); added++;
+          }
+          if (incoming.id === backup.activeArtworkId) active = id;
+        }
+        active = merged.some(a => a.id === active) ? active : merged[0].id;
+        const values = {gamenight_artworks:JSON.stringify(merged), gamenight_current_artwork:active,
+          gamenight_player_name:backup.username, gamenight_character_color:backup.color};
+        const previous = Object.fromEntries(Object.keys(values).map(k => [k, localStorage.getItem(k)]));
+        try { for (const [key,value] of Object.entries(values)) localStorage.setItem(key,value); }
+        catch (error) {
+          for (const [key,value] of Object.entries(previous)) {
+            if (value === null) localStorage.removeItem(key); else localStorage.setItem(key,value);
+          }
+          throw Error('Not enough browser storage. Existing faces were kept.');
+        }
+        characterColor = backup.color;
+        document.getElementById('player-name').value = backup.username;
+        undoStack = []; refreshUndoButton(); renderCharacterColors(); selectArtwork(active);
+        backupMessage(`Imported ${added} face${added === 1 ? '' : 's'}. Existing faces were kept.`);
+      } catch (error) { backupMessage(error instanceof SyntaxError ? 'Invalid JSON file. Nothing was imported.' : error.message); }
+      finally { input.value = ''; }
     }
 
     // ---- Artwork gallery ------------------------------------------------
