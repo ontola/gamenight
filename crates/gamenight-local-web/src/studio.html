@@ -675,7 +675,7 @@
       });
     }
 
-    let showOutfitGuide = localStorage.getItem('gamenight_outfit_guide') === 'true';
+    let showOutfitGuide = localStorage.getItem('gamenight_outfit_guide') !== 'false';
     let outfitGuidePixels = null, outfitGuideSprite = null, outfitGuideColor = null;
     function gridBackground(idx) {
       if (gridData[idx] !== EMPTY) return gridData[idx];
