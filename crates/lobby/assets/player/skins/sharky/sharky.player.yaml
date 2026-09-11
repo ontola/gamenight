@@ -38,35 +38,7 @@ layers:
         fps: 9
         repeat: false
       idle:
-        frames:
-          - idx: 0
-            offset: [0, 0]
-          - idx: 1
-            offset: [0, 0]
-          - idx: 2
-            offset: [0, -1]
-          - idx: 3
-            offset: [0, -2]
-          - idx: 4
-            offset: [0, -2]
-          - idx: 5
-            offset: [0, -1]
-          - idx: 6
-            offset: [0, 0]
-          - idx: 7
-            offset: [0, 0]
-          - idx: 8
-            offset: [0, 0]
-          - idx: 9
-            offset: [0, -1]
-          - idx: 10
-            offset: [0, -2]
-          - idx: 11
-            offset: [0, -2]
-          - idx: 12
-            offset: [0, -1]
-          - idx: 13
-            offset: [0, 0]
+        frames: [{idx: 0, offset: [0, 0]}]
         fps: &fps 9
         repeat: true
       fall:

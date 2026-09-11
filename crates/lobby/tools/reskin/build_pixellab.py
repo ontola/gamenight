@@ -53,6 +53,8 @@ def build():
         yaml = folder / f'{skin}.player.yaml'
         text = yaml.read_text()
         body, rest = text.split('  fin:', 1)
+        # Idle is intentionally still: generated frames drift in silhouette.
+        body = re.sub(r'      idle:\n.*?(?=      fall:)', '      idle:\n        frames: [{idx: 0, offset: [0, 0]}]\n        fps: &fps 9\n        repeat: true\n', body, count=1, flags=re.S)
         body = re.sub(r'      walk:\n.*?(?=      crouch:)', '      walk:\n        frames: [{idx: 14}, {idx: 15}, {idx: 16}, {idx: 17}]\n        fps: 9\n        repeat: true\n', body, flags=re.S)
         rest = re.sub(r'(  face:\n    atlas:.*?\n    offset:) \[[^\]]+\]', r'\1 [5, 5]', rest)
         yaml.write_text(body + '  fin:' + rest)
