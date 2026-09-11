@@ -558,9 +558,20 @@
           <button class="tool-btn" onclick="document.getElementById('backup-file').click()">Import backup</button>
           <button class="tool-btn" onclick="exportFacePng()">Export face PNG</button>
         </div>
-        <input type="file" id="backup-file" accept=".json,application/json" hidden onchange="importBackup(this)">
+        <input type="file" id="backup-file" accept=".json,.txt,application/json,text/plain" hidden onchange="importBackup(this)">
         <p class="identity-hint">Your faces stay on this device. Export a backup to keep them safe or move them to another device. Import adds faces without deleting existing ones.</p>
         <div id="backup-status" role="status" aria-live="polite"></div>
+        <details id="backup-text-panel">
+          <summary>Copy backup instead</summary>
+          <p class="identity-hint">If your phone blocks file saving, copy this text into a note. Keep the complete text to restore your faces.</p>
+          <button class="tool-btn" onclick="copyBackup()">Copy all backup data</button>
+          <textarea id="backup-text" aria-label="Complete backup data" readonly rows="5" style="width:100%;box-sizing:border-box;margin-top:8px"></textarea>
+        </details>
+        <details>
+          <summary>Restore from backup text</summary>
+          <textarea id="restore-text" aria-label="Paste backup data" rows="5" style="width:100%;box-sizing:border-box;margin-top:8px"></textarea>
+          <button class="tool-btn" onclick="importBackup({files:[new File([document.getElementById('restore-text').value], 'backup.json')],value:''})">Import pasted backup</button>
+        </details>
       </div>
 
       <div id="status-msg" class="status"></div>
@@ -1514,21 +1525,51 @@
 
     // Portable backups contain artwork and preferences, never controller/session claims.
     function backupMessage(message) { document.getElementById('backup-status').textContent = message; }
-    function downloadFile(blob, filename) {
+    async function downloadFile(blob, filename) {
+      const file = new File([blob], filename, {type:blob.type});
+      if (navigator.canShare?.({files:[file]})) {
+        try {
+          await navigator.share({files:[file], title:'GameNight backup'});
+          backupMessage('File shared. Keep the saved copy to restore your data.');
+          return;
+        } catch (error) {
+          if (error.name === 'AbortError') { backupMessage('Sharing cancelled. Your faces are still saved here.'); return; }
+        }
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url; link.download = filename;
       document.body.appendChild(link); link.click(); link.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
+      backupMessage('Download requested. If your phone blocks it, use “Copy backup instead” below.');
+    }
+    function buildBackup() {
+      const artworks = loadArtworks().map(a => ({...a, data:a.id === currentArtworkId ? gridData.slice() : a.data}));
+      return JSON.stringify({format:'gamenight-character-backup', version:1, exportedAt:new Date().toISOString(),
+        gridSize:GRID_SIZE, username:document.getElementById('player-name').value,
+        color:characterColor, activeArtworkId:currentArtworkId, artworks}, null, 2);
+    }
+    async function copyBackup() {
+      const text = buildBackup();
+      const field = document.getElementById('backup-text');
+      document.getElementById('backup-text-panel').open = true;
+      field.value = text;
+      try {
+        await navigator.clipboard.writeText(text);
+        backupMessage('Backup copied. Paste it into a note or document to keep it.');
+      } catch (_) {
+        field.focus(); field.select(); field.setSelectionRange(0, text.length);
+        backupMessage('Select and copy the complete text below, then save it in a note.');
+      }
     }
     function exportBackup() {
-      const artworks = loadArtworks().map(a => ({...a, data: a.id === currentArtworkId ? gridData.slice() : a.data}));
-      const backup = {format:'gamenight-character-backup', version:1, exportedAt:new Date().toISOString(),
-        gridSize:GRID_SIZE, username:document.getElementById('player-name').value,
-        color:characterColor, activeArtworkId:currentArtworkId, artworks};
-      downloadFile(new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'}),
-        'gamenight-faces-' + new Date().toISOString().slice(0,10) + '.json');
-      backupMessage('Backup download started. Your saved faces are unchanged.');
+      const text = buildBackup();
+      document.getElementById('backup-text').value = text;
+      document.getElementById('backup-text-panel').open = true;
+      // Plain text is supported by more Android share targets; its contents
+      // remain the same versioned JSON accepted by the restore flow.
+      downloadFile(new Blob([text], {type:'text/plain'}),
+        'gamenight-faces-' + new Date().toISOString().slice(0,10) + '.txt');
     }
     function exportFacePng() {
       const canvas = document.createElement('canvas');
@@ -1541,7 +1582,7 @@
       canvas.toBlob(blob => {
         if (!blob) { backupMessage('Could not create the PNG. Please try again.'); return; }
         downloadFile(blob, 'gamenight-face.png');
-        backupMessage('32×32 PNG download started, with transparency.');
+
       }, 'image/png');
     }
     function validateBackup(value) {
