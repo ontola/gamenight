@@ -433,6 +433,36 @@
       background:transparent; border-radius:0; }
     .drawing-preview-options { display:flex; flex-direction:column; gap:6px; }
     .drawing-preview-options select { min-height:40px; max-width:100%; }
+    /* The drawing tools share the same edges and spacing on narrow phones. */
+    .drawing-card { gap:16px; }
+    .drawing-preview { display:grid; grid-template-columns:96px minmax(0,1fr);
+      gap:12px; padding:4px 0 8px; align-items:center; }
+    .drawing-preview-options { min-width:0; gap:8px; }
+    .drawing-preview-options label { margin:0; font-size:13px; color:var(--muted); }
+    .drawing-preview-options select { width:100%; min-height:44px; padding:8px 10px;
+      border:1px solid var(--border); border-radius:8px; background:#1e293b;
+      color:var(--text); font:inherit; color-scheme:dark; }
+    #outfit-guide-toggle { width:100%; justify-content:center; padding:8px;
+      font-size:13px; line-height:1.25; }
+    #preview-status:empty { display:none; }
+    .brush-sizes { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
+      gap:8px; margin:0; }
+    .brush-sizes > span { grid-column:1/-1; font-size:13px; color:var(--muted); }
+    .brush-sizes .tool-btn { min-width:0; justify-content:center; padding:8px 4px; }
+    .drawing-card .canvas-container { padding:8px; width:100%; box-sizing:border-box; }
+    .drawing-card #pixel-grid { width:100%; height:auto; aspect-ratio:1; min-width:0; }
+    .drawing-card .toolbar { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .drawing-card .toolbar .tool-btn { justify-content:center; padding:8px 4px;
+      min-width:0; font-size:13px; white-space:nowrap; }
+    .drawing-card .palette { display:grid; grid-template-columns:repeat(auto-fit,minmax(44px,1fr));
+      gap:8px; margin:0; }
+    .drawing-card .swatch { width:100%; height:44px; box-sizing:border-box; }
+    .drawing-card label { margin-bottom:0; }
+    .tool-btn:focus-visible, select:focus-visible { outline:2px solid #a5b4fc; outline-offset:2px; }
+    @media(max-width:480px) {
+      .card { padding:16px; }
+      main, .tab-content.active { gap:16px; }
+    }
   </style>
 </head>
 <body>
@@ -471,7 +501,7 @@
         <div class="identity-hint">This is the name above your character.</div>
       </div>
 
-      <div class="card">
+      <div class="card drawing-card">
         <div class="card-title">Draw your face</div>
         <div class="drawing-preview">
           <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
@@ -484,10 +514,10 @@
             <option value="school">School</option>
             <option value="gameroom">Game room</option>
           </select>
+        <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit guide</button>
             <span id="preview-status" role="status"></span>
           </div>
         </div>
-        <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit in grid</button>
         <div class="brush-sizes" role="group" aria-label="Brush size">
           <span>Brush size</span>
           <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
@@ -629,7 +659,7 @@
       const button = document.getElementById('outfit-guide-toggle');
       button.setAttribute('aria-pressed', String(showOutfitGuide));
       button.classList.toggle('active', showOutfitGuide);
-      button.textContent = showOutfitGuide ? 'Hide outfit in grid' : 'Show outfit in grid';
+      button.textContent = showOutfitGuide ? 'Hide outfit guide' : 'Show outfit guide';
       const cells = document.getElementById('pixel-grid').children;
       for (let i = 0; i < cells.length; i++) cells[i].style.background = gridBackground(i);
     }
