@@ -466,6 +466,15 @@
     .backup-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
     .backup-actions button { justify-content:center; min-width:0; }
     .backup-actions button:last-child { grid-column:1/-1; }
+    @media(min-width:600px) {
+      .drawing-preview { grid-template-columns:192px minmax(0,1fr); gap:24px; }
+      .drawing-preview #preview-canvas { width:192px; height:160px; }
+    }
+    @media(min-width:900px) {
+      .drawing-preview { grid-template-columns:288px minmax(0,1fr); gap:32px; }
+      .drawing-preview #preview-canvas { width:288px; height:240px; }
+      .drawing-preview-options { width:100%; max-width:360px; }
+    }
   </style>
 </head>
 <body>
