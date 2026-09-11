@@ -484,7 +484,7 @@
           <canvas id="face-texture-canvas" width="46" height="32"></canvas>
         </div>
         <div class="identity-hint">
-          Your 16×16 drawing sits on the character's head. Anything outside
+          Your 16×16 drawing uses evenly sized pixels, with room for glasses and beards. Anything outside
           the marked square is skin, not paint.
         </div>
       </div>
@@ -959,21 +959,18 @@
     }
 
     // the lobby's face layer is a 46x32 tile, and the drawn avatar is rendered
-    // into a 20x20 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
+    // into a 32x32 square of it (`AVATAR_FACE_SIZE` in gamenight.rs). This
     // shows that tile at actual proportions, so it's obvious how much of the
     // head is yours and how much is skin.
-    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = 20;
+    const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = GRID_SIZE * 2;
 
-    function drawPixelFace(ctx, x, y, size) {
+    // Every editor pixel is exactly 2×2 sprite pixels. This leaves room for
+    // glasses and beards without uneven 16-to-20 resampling.
+    function drawPixelFace(ctx, x, y) {
       gridData.forEach((col, i) => {
         if (col === EMPTY) return;
-        const column = i % GRID_SIZE, row = Math.floor(i / GRID_SIZE);
-        const left = x + Math.round(column * size / GRID_SIZE);
-        const top = y + Math.round(row * size / GRID_SIZE);
-        const right = x + Math.round((column + 1) * size / GRID_SIZE);
-        const bottom = y + Math.round((row + 1) * size / GRID_SIZE);
         ctx.fillStyle = col;
-        ctx.fillRect(left, top, right - left, bottom - top);
+        ctx.fillRect(x + (i % GRID_SIZE) * 2, y + Math.floor(i / GRID_SIZE) * 2, 2, 2);
       });
     }
 
@@ -990,7 +987,7 @@
 
       const ox = (FACE_TILE_W - FACE_ART) / 2;
       const oy = (FACE_TILE_H - FACE_ART) / 2;
-      drawPixelFace(ctx, ox, oy, FACE_ART);
+      drawPixelFace(ctx, ox, oy);
 
       // Mark where the drawing ends.
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
@@ -1042,9 +1039,8 @@
         tint.globalCompositeOperation = 'source-over';
         ctx.drawImage(previewTint, 0, 0);
         // Face follows the right-facing opening of the hood.
-        // Snap both edges of every face pixel to the atlas pixel grid.
-        // imageSmoothingEnabled alone does not prevent fractional fillRect AA.
-        drawPixelFace(ctx, 44, 25, 20);
+        // Keep the face centre while leaving a larger area for accessories.
+        drawPixelFace(ctx, 38, 19);
       }
       updateFaceTexture();
     }

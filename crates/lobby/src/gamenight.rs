@@ -2583,14 +2583,10 @@ fn sync_player_avatar_system(
     }
 }
 
-/// World size the drawn face is rendered at.
-///
-/// Sized to the head, which is about 22 units across. It no longer has to be
-/// large enough to hide anything: the reskin wipes the stock face off the body
-/// art entirely, so what sits under an avatar is blank skin. Going bigger just
-/// spills the drawing onto the character's chest, since people draw right to
-/// the edge of the canvas.
-const AVATAR_FACE_SIZE: f32 = 20.0;
+/// Every editor pixel spans exactly 2×2 world pixels. The 32-unit square
+/// allows glasses and beards to extend past the head; transparent cells keep
+/// the hood and body visible. Fractional scaling distorts equal-sized features.
+const AVATAR_FACE_SIZE: f32 = 32.0;
 
 /// Keeps each drawn face locked to its player's face layer, and out of sight
 /// when that player has no body on screen.
