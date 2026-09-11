@@ -475,6 +475,11 @@
       .drawing-preview #preview-canvas { width:288px; height:240px; }
       .drawing-preview-options { width:100%; max-width:360px; }
     }
+    #character-colors .swatch { cursor:pointer; transition:box-shadow 100ms ease, border-color 100ms ease; }
+    @media(hover:hover) {
+      #character-colors .swatch:hover { border-color:#fff; box-shadow:0 0 0 3px rgba(165,180,252,.6); }
+    }
+    #character-colors .swatch:focus-visible { outline:2px solid #a5b4fc; outline-offset:3px; }
   </style>
 </head>
 <body>
@@ -534,6 +539,9 @@
           <div id="pixel-grid"></div>
         </div>
 
+        <label>Draw colour</label>
+        <div class="palette" id="palette-swatches"></div>
+
         <div class="toolbar">
           <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')">✏️ Draw</button>
           <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')">🧹 Erase</button>
@@ -543,8 +551,6 @@
           <button class="tool-btn" onclick="loadPreset()">🎲 Random</button>
         </div>
 
-        <label>Face colours</label>
-        <div class="palette" id="palette-swatches"></div>
         <details style="margin-top:1rem">
           <summary>Character colour</summary>
           <div class="palette" id="character-colors"></div>
@@ -660,10 +666,12 @@
       const el = document.getElementById('palette-swatches');
       el.innerHTML = '';
       PALETTE.forEach(col => {
-        const sw = document.createElement('div');
+        const sw = document.createElement('button');
+        sw.type = 'button';
+        sw.setAttribute('aria-label', col);
         sw.className = 'swatch' + (col === currentColor ? ' active' : '');
         sw.style.background = col;
-        sw.onclick = () => { currentColor = col; renderPalette(); };
+        sw.onclick = () => { currentColor = col; setTool('pencil'); renderPalette(); };
         el.appendChild(sw);
       });
     }
@@ -1063,7 +1071,9 @@
       if (!el) return;
       el.innerHTML = '';
       CHARACTER_COLORS.forEach(col => {
-        const sw = document.createElement('div');
+        const sw = document.createElement('button');
+        sw.type = 'button';
+        sw.setAttribute('aria-label', col);
         sw.className = 'swatch' + (col === characterColor ? ' active' : '');
         sw.style.background = col;
         sw.onclick = () => setCharacterColor(col);
