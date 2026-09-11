@@ -1,0 +1,5 @@
+{
+  "generator": "OpenAI built-in image generation",
+  "reference": "../../lobby-redesign/room-source.png",
+  "prompt": "Production rear-wall background texture for the GameNight 2D side-view pixel-art lobby. A cozy sky clubhouse above clouds, pale blue plaster and honey oak, big windows at far sides with fluffy clouds and tiny distant airships, aviation pennants and wind instruments in upper corners. Keep center and lower half calm soft blue. Match the crisp, cozy chunky pixel art and straight-on orthographic composition of the reference. Wide 5:3 image. Room wall only. No floor, no TV, no game shelf, no foreground furniture, no player characters, no UI, no QR code, no lettering. Main playable region and runtime furniture occupy lower half; leave that area quiet. Continuous room composition, no tiles or panel collage. Style reference is the attached living-room rear wall; create a distinct sky theme."
+}

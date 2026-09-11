@@ -1,0 +1,7 @@
+{
+  "walk": "Four-frame walk cycle in place facing right, little steps, feet stable baseline.",
+  "sleep": "Four frames falling asleep: gently lower head and body, eyes close. Stay standing or slightly crouched, retain same outfit.",
+  "wake": "Four frames waking up: lift head and stretch slightly, then return to standing facing right.",
+  "jump": "Four frames of jumping pose: knees bend slightly then extend legs while raising arms a little, remain centered without moving through the image.",
+  "crouch": "Four frames crouching down, knees bend and body lowers, head still facing right, final frame holds crouch."
+}

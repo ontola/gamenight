@@ -21,7 +21,7 @@ def source(name):
     return Image.open(SOURCE / (name + '.png')).convert('RGBA')
 
 
-def pose(name, hue):
+def pose(name, hue, center=None):
     im = source(name)
     bbox = im.getbbox()
     # Cream pixels bound the face. Fill only between its edges, preserving hood
@@ -41,7 +41,8 @@ def pose(name, hue):
                 rgb = colorsys.hsv_to_rgb((h + hue) % 1, s, v)
                 px[x, y] = tuple(round(c * 255) for c in rgb) + (a,)
     # Align the artist's drifting walk frame to the standing body centre.
-    center = 47 if name == 'walk-1' else 42
+    if center is None:
+        center = 47 if name == 'walk-1' else 42
     scaled = im.resize((round(96 * SCALE), round(96 * SCALE)), Image.Resampling.NEAREST)
     cell = Image.new('RGBA', (96, 80))
     cell.alpha_composite(scaled, (round(48 - center * SCALE), round(64 - bbox[3] * SCALE)))

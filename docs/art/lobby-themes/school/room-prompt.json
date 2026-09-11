@@ -1,0 +1,5 @@
+{
+  "generator": "OpenAI built-in image generation",
+  "reference": "../../lobby-redesign/room-source.png",
+  "prompt": "Production rear-wall background texture for the GameNight 2D side-view pixel-art lobby. A cheerful after-school classroom clubhouse, sage green wall with cork boards and classroom drawings in upper corners, windows at far sides, warm afternoon sunlight, a clock high to one side. Keep center and lower half calm sage. No readable writing. Match the crisp, cozy chunky pixel art and straight-on orthographic composition of the reference. Wide 5:3 image. Room wall only. No floor, no TV, no game shelf, no foreground furniture, no player characters, no UI, no QR code, no lettering. Main playable region and runtime furniture occupy lower half; leave that area quiet. Continuous room composition, no tiles or panel collage. Style reference is the attached living-room rear wall; create a distinct school theme."
+}

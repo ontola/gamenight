@@ -921,7 +921,8 @@ fn match_plugin_for_seats(
     player_gamepad: &std::collections::HashMap<gamenight_protocol::PlayerId, u32>,
 ) -> MatchPlugin {
     let default_player = meta.core.players.first().copied().unwrap_or_default();
-    let default_map = meta.core.lobby_map;
+    let theme = lobby_mode.then(|| themes::selected(&meta.core)).flatten();
+    let default_map = theme.map(|theme| theme.map).unwrap_or(meta.core.lobby_map);
 
     let mut player_info: [PlayerInput; MAX_PLAYERS as usize] =
         std::array::from_fn(|_| PlayerInput::default());
@@ -965,7 +966,7 @@ fn match_plugin_for_seats(
 
         player_info[idx] = PlayerInput {
             active,
-            selected_player: default_player,
+            selected_player: theme.and_then(|theme| theme.players.get(idx % theme.players.len().max(1))).copied().unwrap_or(default_player),
             selected_hat: None,
             control: default(),
             editor_input: default(),
@@ -1460,6 +1461,7 @@ pub fn is_lobby() -> bool {
 /// to reach a real winit `Window`.
 pub fn install_global_input(app: &mut bevy::app::App) {
     app.init_resource::<StashedFaceAtlases>();
+    app.add_systems(bevy::prelude::Update, themes::cycle_theme);
     app.init_resource::<crate::player_links::PlayerLinks>();
     app.insert_resource(GlobalInput {
         pending_joins: default(),
@@ -2136,7 +2138,7 @@ fn sync_player_menus_system(
                         ));
                     });
             }
-            parent.spawn(TextBundle::from_section("Start to close", TextStyle { font: font.clone(), font_size: 14.0, color: Color::GRAY }));
+            parent.spawn(TextBundle::from_section("Start to close · F6: room theme", TextStyle { font: font.clone(), font_size: 14.0, color: Color::GRAY }));
         });
     }
 }
@@ -3757,6 +3759,7 @@ fn sync_jukebox_system(
 struct LobbyTv(String);
 
 mod game_cases;
+mod themes;
 
 /// Draws the lobby TV: a cabinet, a screen showing whatever the daemon has
 /// warmed up next, and the prompt on the pad below it.
