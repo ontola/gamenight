@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GameNight - Local Character Studio</title>
   <style>
+    button, .swatch, #pixel-grid { -webkit-tap-highlight-color: transparent; }
+    #pixel-grid, #pixel-grid * { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .brush-sizes { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
+    .brush-sizes button { min-width:44px; min-height:44px; }
+
     /* Mobile first: this page is reached by scanning a QR with a phone, so
        the phone layout is the layout, and the desktop one is the exception. */
     .face-tex-box {
@@ -491,6 +496,13 @@
 
       <div class="card">
         <div class="card-title">Draw your face</div>
+        <div class="brush-sizes" role="group" aria-label="Brush size">
+          <span>Brush size</span>
+          <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
+          <button class="tool-btn" data-brush="2" aria-pressed="false" onclick="setBrushSize(2)">2 px</button>
+          <button class="tool-btn" data-brush="4" aria-pressed="false" onclick="setBrushSize(4)">4 px</button>
+          <button class="tool-btn" data-brush="8" aria-pressed="false" onclick="setBrushSize(8)">8 px</button>
+        </div>
         <div class="canvas-container">
           <div id="pixel-grid"></div>
         </div>
@@ -623,62 +635,106 @@
       updatePreview();
     }
 
-    // ---- Drawing -------------------------------------------------------
-    // Pointer events rather than mouse events: they cover touch, pen and
-    // mouse in one path, so dragging works on a phone. The grid was
-    // tap-only before because mousedown/mouseenter never fire for touch —
-    // a finger sliding across the screen produces pointermove on the
-    // element it started on, so we hit-test coordinates instead.
-    let drawing = false;
-    let strokeDirty = false;
-
-    function idxFromPoint(x, y) {
-      const el = document.elementFromPoint(x, y);
-      if (!el || !el.classList.contains('pixel')) return null;
-      const idx = parseInt(el.dataset.idx, 10);
-      return Number.isNaN(idx) ? null : idx;
+    // ---- Drawing: keep cells alive and only repaint changed pixels. ----
+    let drawing = false, strokeDirty = false, activePointer = null;
+    let brushSize = 1, lastPoint = null, strokeRect = null, previewFrame = null;
+    function setBrushSize(size) {
+      if (![1, 2, 4, 8].includes(size)) return;
+      brushSize = size;
+      document.querySelectorAll('[data-brush]').forEach(button => {
+        const active = Number(button.dataset.brush) === size;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
     }
-
+    function refreshPaintedPixel(idx) {
+      const cell = document.getElementById('pixel-grid').children[idx];
+      cell.style.background = gridData[idx] === EMPTY ? characterColor : gridData[idx];
+      cell.classList.toggle('empty', gridData[idx] === EMPTY);
+    }
+    function putPixel(x, y, color) {
+      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) return;
+      const idx = y * GRID_SIZE + x;
+      if (gridData[idx] === color) return;
+      gridData[idx] = color;
+      strokeDirty = true;
+      refreshPaintedPixel(idx);
+    }
+    function stampBrush(x, y) {
+      const offset = Math.floor((brushSize - 1) / 2);
+      const color = currentTool === 'eraser' ? EMPTY : currentColor;
+      for (let dy = 0; dy < brushSize; dy++)
+        for (let dx = 0; dx < brushSize; dx++) putPixel(x + dx - offset, y + dy - offset, color);
+    }
+    function paintLine(from, to) {
+      let [x, y] = from;
+      const [endX, endY] = to;
+      const dx = Math.abs(endX - x), dy = -Math.abs(endY - y);
+      const sx = x < endX ? 1 : -1, sy = y < endY ? 1 : -1;
+      let error = dx + dy;
+      while (true) {
+        stampBrush(x, y);
+        if (x === endX && y === endY) break;
+        const twice = error * 2;
+        if (twice >= dy) { error += dy; x += sx; }
+        if (twice <= dx) { error += dx; y += sy; }
+      }
+    }
+    function paintAt(clientX, clientY) {
+      const x = Math.floor((clientX - strokeRect.left) * GRID_SIZE / strokeRect.width);
+      const y = Math.floor((clientY - strokeRect.top) * GRID_SIZE / strokeRect.height);
+      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) { lastPoint = null; return; }
+      if (currentTool === 'fill') {
+        if (lastPoint) return;
+        const before = gridData.slice();
+        floodFill(y * GRID_SIZE + x, gridData[y * GRID_SIZE + x], currentColor);
+        gridData.forEach((color, idx) => {
+          if (color !== before[idx]) { strokeDirty = true; refreshPaintedPixel(idx); }
+        });
+      } else paintLine(lastPoint || [x, y], [x, y]);
+      lastPoint = [x, y];
+      // The stroke is already visible; render the two previews once per frame.
+      if (previewFrame === null) previewFrame = requestAnimationFrame(() => {
+        previewFrame = null;
+        updatePreview();
+      });
+    }
     function bindCanvas() {
       const grid = document.getElementById('pixel-grid');
-
-      grid.addEventListener('pointerdown', (e) => {
+      grid.addEventListener('contextmenu', e => e.preventDefault());
+      grid.addEventListener('pointerdown', e => {
+        if (activePointer !== null || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
+        activePointer = e.pointerId;
         drawing = true;
         strokeDirty = false;
-        // One undo entry per stroke, not per pixel.
+        lastPoint = null;
+        const rect = grid.getBoundingClientRect();
+        strokeRect = {left: rect.left + grid.clientLeft, top: rect.top + grid.clientTop,
+          width: grid.clientWidth, height: grid.clientHeight};
         pushUndo();
-        paintAt(e.clientX, e.clientY);
         grid.setPointerCapture(e.pointerId);
-      });
-
-      grid.addEventListener('pointermove', (e) => {
-        if (!drawing) return;
-        e.preventDefault();
         paintAt(e.clientX, e.clientY);
       });
-
-      const stop = () => {
-        if (!drawing) return;
+      grid.addEventListener('pointermove', e => {
+        if (e.pointerId !== activePointer) return;
+        e.preventDefault();
+        const samples = e.getCoalescedEvents?.() || [];
+        for (const sample of samples.length ? samples : [e]) paintAt(sample.clientX, sample.clientY);
+      });
+      const stop = e => {
+        if (e.pointerId !== activePointer) return;
+        if (e.type === 'pointerup') paintAt(e.clientX, e.clientY);
         drawing = false;
-        // A stroke that changed nothing shouldn't cost an undo step.
+        activePointer = null;
+        lastPoint = null;
+        if (grid.hasPointerCapture(e.pointerId)) grid.releasePointerCapture(e.pointerId);
         if (!strokeDirty) { undoStack.pop(); refreshUndoButton(); }
         else onArtworkChanged();
       };
       grid.addEventListener('pointerup', stop);
       grid.addEventListener('pointercancel', stop);
-      grid.addEventListener('pointerleave', stop);
-    }
-
-    function paintAt(x, y) {
-      const idx = idxFromPoint(x, y);
-      if (idx === null) return;
-      const before = gridData[idx];
-      applyToolInner(idx);
-      if (gridData[idx] !== before) {
-        strokeDirty = true;
-        renderGrid();
-      }
+      grid.addEventListener('lostpointercapture', stop);
     }
 
     function setTool(tool) {
@@ -689,22 +745,12 @@
       });
     }
 
-    function applyToolInner(idx) {
-      if (currentTool === 'pencil') {
-        gridData[idx] = currentColor;
-      } else if (currentTool === 'eraser') {
-        gridData[idx] = EMPTY;
-      } else if (currentTool === 'fill') {
-        floodFill(idx, gridData[idx], currentColor);
-      }
-    }
-
     function floodFill(startIdx, targetColor, replacementColor) {
       if (targetColor === replacementColor) return;
       const queue = [startIdx];
       const visited = new Set();
       while (queue.length) {
-        const curr = queue.shift();
+        const curr = queue.pop();
         if (visited.has(curr) || curr < 0 || curr >= gridData.length) continue;
         visited.add(curr);
         if (gridData[curr] !== targetColor) continue;
