@@ -1608,46 +1608,32 @@
       }, 'image/png');
     }
     function validateBackup(value) {
-      if (value?.version !== 2) return validateLegacyBackup(value);
-      if (value.format !== 'gamenight-character-backup' || ![16,32].includes(value.gridSize)
-          || !Array.isArray(value.palette) || value.palette.length > 200 * 1024
-          || !value.palette.every(c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c))
-          || !Array.isArray(value.artworks) || value.artworks.length > 200)
-        throw Error('This is not a supported GameNight backup.');
-      const cells = value.gridSize ** 2;
+      const color = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+      if (!value || value.format !== 'gamenight-character-backup' || value.version !== 2
+          || value.gridSize !== GRID_SIZE || !Array.isArray(value.palette)
+          || value.palette.length > 200 * GRID_SIZE ** 2 || !value.palette.every(color)
+          || !Array.isArray(value.artworks) || !value.artworks.length || value.artworks.length > 200
+          || typeof value.username !== 'string' || value.username.length > 100 || !color(value.color))
+        throw Error('Please import a current compact GameNight backup.');
+      const cells = GRID_SIZE ** 2, ids = new Set();
       const artworks = value.artworks.map(art => {
-        if (!art || !Array.isArray(art.runs) || !art.runs.length
+        if (!art || typeof art.id !== 'string' || art.id.length > 200 || ids.has(art.id)
+            || typeof art.name !== 'string' || art.name.length > 200
+            || !Array.isArray(art.runs) || !art.runs.length
             || art.runs.length % 2 || art.runs.length > cells * 2)
-          throw Error('Invalid pixel runs. Nothing was imported.');
+          throw Error('Invalid artwork. Nothing was imported.');
+        ids.add(art.id);
         const data = [];
         for (let i = 0; i < art.runs.length; i += 2) {
           const length = art.runs[i], index = art.runs[i + 1];
           if (!Number.isInteger(length) || length < 1 || data.length + length > cells
               || !Number.isInteger(index) || index < 0 || index > value.palette.length)
             throw Error('Invalid pixel runs. Nothing was imported.');
-          const color = index === 0 ? null : value.palette[index - 1];
-          for (let j = 0; j < length; j++) data.push(color);
+          const pixel = index === 0 ? null : value.palette[index - 1];
+          for (let j = 0; j < length; j++) data.push(pixel);
         }
         if (data.length !== cells) throw Error('Incomplete artwork. Nothing was imported.');
         return {id:art.id, name:art.name, data};
-      });
-      return validateLegacyBackup({...value, version:1, artworks});
-    }
-    function validateLegacyBackup(value) {
-      const color = c => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
-      if (!value || value.format !== 'gamenight-character-backup' || value.version !== 1
-          || ![16,32].includes(value.gridSize) || !Array.isArray(value.artworks)
-          || !value.artworks.length || value.artworks.length > 200
-          || typeof value.username !== 'string' || value.username.length > 100 || !color(value.color))
-        throw Error('This is not a supported GameNight backup.');
-      const ids = new Set();
-      const artworks = value.artworks.map(a => {
-        if (!a || typeof a.id !== 'string' || a.id.length > 200 || ids.has(a.id)
-            || typeof a.name !== 'string' || a.name.length > 200 || !Array.isArray(a.data)
-            || a.data.length !== value.gridSize ** 2 || !a.data.every(c => c === null || color(c)))
-          throw Error('The backup contains invalid artwork. Nothing was imported.');
-        ids.add(a.id);
-        return {id:a.id, name:a.name, data:normalizeFace(a.data, value.gridSize)};
       });
       return {...value, artworks};
     }
