@@ -91,7 +91,7 @@
     }
     .canvas-container { touch-action: none; }
     #preview-canvas {
-      width: 240px; height: 200px; image-rendering: pixelated;
+      width: 192px; height: 160px; image-rendering: pixelated;
       background: #1b2438; border-radius: 10px;
     }
     .status { font-size: 0.9rem; text-align: center; color: #34d399; min-height: 1.2rem; }
@@ -403,8 +403,8 @@
     }
 
     #preview-canvas {
-      width: 240px;
-      height: 200px;
+      width: 192px;
+      height: 160px;
       image-rendering: pixelated;
 
     }
@@ -964,6 +964,19 @@
     // head is yours and how much is skin.
     const FACE_TILE_W = 46, FACE_TILE_H = 32, FACE_ART = 20;
 
+    function drawPixelFace(ctx, x, y, size) {
+      gridData.forEach((col, i) => {
+        if (col === EMPTY) return;
+        const column = i % GRID_SIZE, row = Math.floor(i / GRID_SIZE);
+        const left = x + Math.round(column * size / GRID_SIZE);
+        const top = y + Math.round(row * size / GRID_SIZE);
+        const right = x + Math.round((column + 1) * size / GRID_SIZE);
+        const bottom = y + Math.round((row + 1) * size / GRID_SIZE);
+        ctx.fillStyle = col;
+        ctx.fillRect(left, top, right - left, bottom - top);
+      });
+    }
+
     function updateFaceTexture() {
       const cvs = document.getElementById('face-texture-canvas');
       if (!cvs) return;
@@ -977,16 +990,7 @@
 
       const ox = (FACE_TILE_W - FACE_ART) / 2;
       const oy = (FACE_TILE_H - FACE_ART) / 2;
-      const px = FACE_ART / GRID_SIZE;
-      gridData.forEach((col, i) => {
-        if (col === EMPTY) return;
-        ctx.fillStyle = col;
-        ctx.fillRect(
-          ox + (i % GRID_SIZE) * px,
-          oy + Math.floor(i / GRID_SIZE) * px,
-          px, px
-        );
-      });
+      drawPixelFace(ctx, ox, oy, FACE_ART);
 
       // Mark where the drawing ends.
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
@@ -1037,14 +1041,10 @@
         tint.drawImage(previewSprite, 0, 0, 96, 80, 0, 0, 96, 80);
         tint.globalCompositeOperation = 'source-over';
         ctx.drawImage(previewTint, 0, 0);
-        // 20px avatar, centred at body x+2 and face y+5, as in the lobby.
-        const scale = 20 / GRID_SIZE;
-        gridData.forEach((col, i) => {
-          if (col === EMPTY) return;
-          ctx.fillStyle = col;
-          ctx.fillRect(40 + (i % GRID_SIZE) * scale,
-            25 + Math.floor(i / GRID_SIZE) * scale, scale, scale);
-        });
+        // Face follows the right-facing opening of the hood.
+        // Snap both edges of every face pixel to the atlas pixel grid.
+        // imageSmoothingEnabled alone does not prevent fractional fillRect AA.
+        drawPixelFace(ctx, 44, 25, 20);
       }
       updateFaceTexture();
     }
