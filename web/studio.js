@@ -185,6 +185,7 @@ let initializing = true;
       grid.addEventListener('pointerdown', e => {
         if (activePointer !== null || !e.isPrimary || e.button !== 0) return;
         e.preventDefault();
+        grid.focus({preventScroll: true});
         activePointer = e.pointerId;
         drawing = true;
         strokeDirty = false;
@@ -1337,5 +1338,20 @@ document.getElementById("studio-action-18").addEventListener("click", function(e
 document.getElementById("backup-file").addEventListener("change", function(event) { importBackup(this) });
 document.getElementById("studio-action-20").addEventListener("click", function(event) { copyBackup() });
 document.getElementById("studio-action-21").addEventListener("click", function(event) { importBackup({files:[new File([document.getElementById('restore-text').value], 'backup.json')],value:''}) });
+
+// Keep native text undo in form fields and leave other tabs/dialogs alone.
+function handleDrawingUndo(event) {
+  if (event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey
+      || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
+  if (event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
+      || document.querySelector('dialog[open]')
+      || !document.getElementById('tab-character').classList.contains('active')) return;
+  event.preventDefault();
+  if (!drawing) undo();
+}
+document.addEventListener('keydown', handleDrawingUndo);
+document.getElementById('pixel-grid').tabIndex = 0;
+document.getElementById('btn-undo').setAttribute('aria-keyshortcuts', 'Control+z Meta+z');
+document.getElementById('btn-undo').title = 'Undo (Ctrl+Z / ⌘Z)';
 
 init();
