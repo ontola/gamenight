@@ -1,25 +1,29 @@
 "use strict";
 const shell = document.getElementById('site-shell');
+window.updatePlayerNavigation = name => {
+  const link=shell?.querySelector('.site-links a[href="/studio"]');
+  if(link)link.textContent=name?.trim() || 'Your player';
+  if(name?.trim())sessionStorage.setItem('gamenight_nav_name',name.trim());
+};
 if (shell) {
-  shell.innerHTML = `<nav class="site-nav" aria-label="Main navigation"><a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a><div class="site-links"><a href="/">Home</a><a href="https://gamenight.ontola.io/catalog">Games</a><a href="/studio">Your player</a><a href="/studio#session">Session</a></div></nav>`;
+  shell.innerHTML = `<nav class="site-nav" aria-label="Main navigation"><a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a><div class="site-links"><a href="/">Home</a><a href="/catalog">Games</a><a href="/studio">Your player</a><a href="/studio#session">Session</a></div></nav>`;
   const markCurrent=()=>{for(const link of shell.querySelectorAll('.site-links a')){const url=new URL(link.href,location.href);if(url.pathname===location.pathname && url.hash===location.hash)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');}};
   markCurrent();window.addEventListener('hashchange',markCurrent);
   const nav=shell.querySelector('.site-nav');
   const join=document.getElementById('qr-open');
   const actions=document.createElement('div');actions.className='site-room-actions';
   if(join){
-    join.textContent='Join';join.className='btn-primary';actions.append(join);
+    join.textContent='Join';join.hidden=true;join.className='btn-primary';actions.append(join);
     const leave=document.getElementById('room-leave');if(leave)actions.append(leave);
   }else{
-    const joinLink=document.createElement('a');joinLink.href='/studio#join';joinLink.textContent='Join';joinLink.className='btn-primary';actions.append(joinLink);
-    fetch('/v1/rooms/status',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(room=>{if(room?.status==='connected')joinLink.hidden=true;}).catch(()=>{});
+    const joinLink=document.createElement('a');joinLink.href='/studio#join';joinLink.hidden=true;joinLink.textContent='Join';joinLink.className='btn-primary';actions.append(joinLink);
+    const endpoint=document.body.dataset.local==='true'?'/api/dev-catalog/room?profile='+encodeURIComponent(localStorage.getItem('gamenight_profile_id')||''):'/v1/rooms/status';
+    fetch(endpoint,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(room=>{joinLink.hidden=room?.status==='connected';}).catch(()=>{});
   }
   nav.append(actions);
+  window.updatePlayerNavigation(sessionStorage.getItem('gamenight_nav_name') || localStorage.getItem('gamenight_player_name'));
 }
 
-if(shell && document.body.classList.contains('studio-page') && document.body.dataset.cloud !== 'true') {
-  for(const link of shell.querySelectorAll('a')) if(!link.getAttribute('href').startsWith('/studio') && link.getAttribute('href').startsWith('/')) link.href='https://gamenight.ontola.io'+link.getAttribute('href');
-}
 
 // One transient notification surface, shared by room and account actions.
 window.showToast = (() => {

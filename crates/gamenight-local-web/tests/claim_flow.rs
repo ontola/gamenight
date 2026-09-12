@@ -1126,7 +1126,9 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
         204
     );
     let after = Watcher::connect(&daemon).await.party;
-    assert_eq!(before.players, after.players);
+    assert_eq!(before.players[0].id, after.players[0].id);
+    assert_ne!(before.players[0].name, after.players[0].name);
+    assert!(after.players[0].avatar.as_deref().unwrap_or("").is_empty());
     assert_eq!(before.seats, after.seats);
     let (_, links) = http(&server, "GET", "/api/player-links", "").await;
     let links: serde_json::Value = serde_json::from_str(&links).unwrap();
@@ -1148,10 +1150,7 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
         serde_json::from_str::<serde_json::Value>(&stale).unwrap()["status"],
         "unlinked"
     );
-    assert_eq!(
-        Watcher::connect(&daemon).await.party.players,
-        before.players
-    );
+    assert_eq!(Watcher::connect(&daemon).await.party.players, after.players);
     let (_, fresh) = post(
         &server,
         "/api/profiles/phone/join",

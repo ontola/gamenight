@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 mod cloud;
+mod dev_catalog;
 mod dev_web;
 mod playlist;
 use gamenight_protocol::{ClientMessage, PlayerId};
@@ -90,6 +91,8 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
+        .route("/api/dev-catalog/room", get(dev_catalog::status))
+        .route("/api/dev-catalog/next", post(dev_catalog::next))
         .route(
             "/favicon.ico",
             get(|| async {
@@ -234,10 +237,81 @@ async fn room_pickup(
 }
 
 async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState>) -> StatusCode {
-    let mut state = state.lock().unwrap();
-    state.bindings.retain(|_, player| *player != id);
-    *state.link_revisions.entry(id).or_default() += 1;
-    StatusCode::NO_CONTENT
+    let addr = {
+        let mut local = state.lock().unwrap();
+        local.bindings.retain(|_, player| *player != id);
+        *local.link_revisions.entry(id).or_default() += 1;
+        local.daemon_addr.clone()
+    };
+    use futures_util::{SinkExt, StreamExt};
+    let result = tokio::time::timeout(daemon::REPLY_TIMEOUT * 2, async {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .ok()?;
+        let names = [
+            "Rocket", "Panda", "Pickle", "Tiger", "Comet", "Disco", "Pixel", "Mango",
+        ];
+        let random = uuid::Uuid::new_v4();
+        let mut index = random.as_bytes()[0] as usize % names.len();
+        ws.send(tokio_tungstenite::tungstenite::Message::Text(
+            ClientMessage::Hello {
+                role: gamenight_protocol::Role::Overlay,
+                game: None,
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .ok()?;
+        let party = read_welcome(&mut ws).await.ok()?;
+        let player = party.players.iter().find(|p| p.id == id)?;
+        if player.name == names[index] {
+            index = (index + 1) % names.len();
+        }
+        let name = names[index].to_string();
+        for message in [
+            ClientMessage::RenamePlayer {
+                player_id: id,
+                name: name.clone(),
+            },
+            ClientMessage::SetPlayerAvatar {
+                player_id: id,
+                avatar: String::new(),
+            },
+            ClientMessage::SetPlayerSkinColor {
+                player_id: id,
+                skin_color: default_skin_color(),
+            },
+        ] {
+            ws.send(tokio_tungstenite::tungstenite::Message::Text(
+                message.to_json(),
+            ))
+            .await
+            .ok()?;
+        }
+        while let Some(Ok(tokio_tungstenite::tungstenite::Message::Text(text))) = ws.next().await {
+            if let Ok(gamenight_protocol::ServerMessage::PartyState { party }) =
+                serde_json::from_str(&text)
+            {
+                if party.players.iter().any(|p| {
+                    p.id == id
+                        && p.name == name
+                        && p.avatar.as_deref().unwrap_or("").is_empty()
+                        && p.skin_color.as_deref() == Some(default_skin_color().as_str())
+                }) {
+                    let _ = ws.close(None).await;
+                    return Some(());
+                }
+            }
+        }
+        None
+    })
+    .await;
+    if matches!(result, Ok(Some(()))) {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::BAD_GATEWAY
+    }
 }
 
 async fn get_profile(

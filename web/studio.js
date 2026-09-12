@@ -724,6 +724,7 @@ let initializing = true;
         }
       }
       await loadProfileData();
+      window.updatePlayerNavigation?.(document.getElementById('player-name').value);
       initializing = false;
       if(storage.cloud)status(storage.pending?'Local changes need attention. Export before refreshing if another device edited your profile.':'Saved to your GameNight account', storage.pending?'#fbbf24':undefined);
     }
@@ -972,6 +973,7 @@ let initializing = true;
     function scheduleSave() {
       if(storage.cloud && initializing) return;
       const name = document.getElementById('player-name').value;
+      window.updatePlayerNavigation?.(name);
       if (name.trim()) localStorage.setItem('gamenight_player_name', name);
 
       clearTimeout(saveTimer);

@@ -89,6 +89,9 @@
     const roomForm=document.getElementById('room-form'), roomInput=document.getElementById('room-code');
     const roomStatus=document.getElementById('room-status'), roomCancel=document.getElementById('room-cancel');
     const roomLeave=document.getElementById("room-leave"), qrOpen=document.getElementById("qr-open");
+    // Offline rooms are reached by their LAN QR; hosted room codes must not
+    // unexpectedly navigate a local editing session to the hosted site.
+    if(!cloud)roomForm.hidden=true;
     let watching=false, roomTimer, roomEpoch=0;
     function showConnection(state) {
       const connected=state.status==="connected";
@@ -133,7 +136,7 @@
     async function joinRoom(){
       const code=roomInput.value.trim().toUpperCase();
       if(joiningRoom || !/^[A-Z2-9]{6}$/.test(code))return;
-      if(!cloud){location.href='https://gamenight.ontola.io/studio#room='+encodeURIComponent(code);return;}
+      if(!cloud){window.showToast('Scan the QR in your local lobby to connect.');return;}
       joiningRoom=true;roomInput.readOnly=true;
       roomForm.setAttribute('aria-busy','true');window.showToast('Joining room…');
       try {

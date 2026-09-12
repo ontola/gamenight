@@ -13,10 +13,9 @@ fn asset(path: &str) -> Option<(&str, &'static str)> {
         .or_else(|| path.strip_prefix("/assets/"))
         .unwrap_or_else(|| path.trim_start_matches('/'));
     let mime = match name {
-        "studio.js" | "storage.js" | "account.js" | "shell.js" | "qr-scanner.js" | "jsQR.js" => {
-            "text/javascript"
-        }
-        "studio.css" | "site.css" | "account.css" => "text/css",
+        "studio.js" | "storage.js" | "account.js" | "shell.js" | "qr-scanner.js" | "jsQR.js"
+        | "dev.js" | "catalog.js" => "text/javascript",
+        "studio.css" | "site.css" | "account.css" | "marketing.css" => "text/css",
         "icon.svg" => "image/svg+xml",
         "favicon.ico" => "image/x-icon",
         "apple-touch-icon.png" => "image/png",
@@ -40,7 +39,55 @@ async fn file(root: &Path, name: &str, mime: &'static str) -> Response {
 }
 
 pub async fn assets(request: Request, next: Next) -> Response {
+    if let Some(root) = std::env::var_os("GAMENIGHT_DEV_CATALOG_DIR") {
+        let name = match request.uri().path() {
+            "/catalog" | "/catalog.html" => Some(("index.html", "text/html; charset=utf-8")),
+            "/catalog/app.js" => Some(("app.js", "text/javascript")),
+            "/catalog/model.mjs" => Some(("model.mjs", "text/javascript")),
+            "/catalog/hls.js" => Some(("hls.light.min.js", "text/javascript")),
+            "/catalog/style.css" => Some(("style.css", "text/css")),
+            _ => None,
+        };
+        if let Some((name, mime)) = name {
+            if name == "index.html" {
+                if let Ok(text) = tokio::fs::read_to_string(PathBuf::from(&root).join(name)).await {
+                    return (
+                        [("content-type", mime), ("cache-control", "no-store")],
+                        text.replace(
+                            "class=\"discovery-page\"",
+                            "class=\"discovery-page\" data-local=\"true\"",
+                        ),
+                    )
+                        .into_response();
+                }
+            }
+            return file(&PathBuf::from(root), name, mime).await;
+        }
+        if request.uri().path() == "/v1/catalog" {
+            let root = PathBuf::from(root);
+            let mut games = vec![];
+            for name in ["foss.json", "commercial.json"] {
+                if let Ok(bytes) = tokio::fs::read(root.join(name)).await {
+                    if let Ok(mut entries) =
+                        serde_json::from_slice::<Vec<serde_json::Value>>(&bytes)
+                    {
+                        games.append(&mut entries);
+                    }
+                }
+            }
+            return axum::Json(games).into_response();
+        }
+    }
     if let Some(root) = std::env::var_os("GAMENIGHT_DEV_WEB_DIR") {
+        let page = match request.uri().path() {
+            "/" | "/index.html" => Some("index.html"),
+            "/dev.html" => Some("dev.html"),
+            "/catalog-guide.html" => Some("catalog.html"),
+            _ => None,
+        };
+        if let Some(page) = page {
+            return file(&PathBuf::from(root), page, "text/html; charset=utf-8").await;
+        }
         if let Some((name, mime)) = asset(request.uri().path()) {
             return file(&PathBuf::from(root), name, mime).await;
         }

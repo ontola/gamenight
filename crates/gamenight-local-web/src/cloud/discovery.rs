@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::Message;
 
 #[derive(Deserialize)]
-pub(super) struct Selection {
+pub(crate) struct Selection {
     #[serde(default)]
     pub edit: Option<Value>,
     pub id: String,
@@ -20,7 +20,7 @@ pub(super) struct Selection {
     pub expires: u64,
 }
 
-pub(super) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> Value {
+pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> Value {
     let mut games = Vec::new();
     let count = party
         .seats
@@ -81,7 +81,7 @@ pub(super) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
     json!({"playlist":party.playlist,"games":games,"current":party.active_session.as_ref().map(|s| &s.game),"next":party.warming.as_ref().map(|s| &s.game).or_else(|| party.warm_session.as_ref().map(|s| &s.game)),"acknowledged":acknowledged})
 }
 
-pub(super) async fn apply(state: &SharedState, selection: &Selection) -> bool {
+pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()

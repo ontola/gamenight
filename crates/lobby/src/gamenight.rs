@@ -2162,7 +2162,7 @@ fn sync_player_menus_system(
                     })
                     .with_children(|row| {
                         row.spawn(TextBundle::from_section(
-                            action.label(),
+                            if matches!(action, MenuAction::Unlink) { format!("Unlink {name}") } else { action.label() },
                             TextStyle {
                                 font: font.clone(),
                                 font_size: 16.0,

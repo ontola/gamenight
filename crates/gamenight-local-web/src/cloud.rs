@@ -1,5 +1,5 @@
 //! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
-mod discovery;
+pub(crate) mod discovery;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
 use axum::{
     extract::{Path, State},
@@ -14,10 +14,10 @@ use std::{
     time::Duration,
 };
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct Seat {
-    index: u8,
-    player: String,
-    revision: u64,
+pub(crate) struct Seat {
+    pub(crate) index: u8,
+    pub(crate) player: String,
+    pub(crate) revision: u64,
 }
 #[derive(Clone)]
 pub(crate) struct Bridge {

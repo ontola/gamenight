@@ -8,6 +8,7 @@ param(
     [string]$Screenshot,
     [switch]$CleanView,
     [string]$CloudUrl = 'https://gamenight.ontola.io',
+    [string]$CatalogDir,
     [int]$Port = 7912
 )
 $ErrorActionPreference = 'Stop'
@@ -83,6 +84,7 @@ $env:GAMENIGHT_LIBRARY=$library
 $env:GAMENIGHT_ADDR="127.0.0.1:$Port"
 $env:GAMENIGHT_WEB='1'
 $env:GAMENIGHT_DEV_WEB_DIR=Join-Path $repo 'web'
+if ($CatalogDir) { $env:GAMENIGHT_DEV_CATALOG_DIR=$CatalogDir }
 if ($games.Count -le 1) { $env:GAMENIGHT_NO_PREWARM='1' }
 else { Remove-Item Env:GAMENIGHT_NO_PREWARM -ErrorAction SilentlyContinue }
 $env:GAMENIGHT_EXIT_WITH_LOBBY='1'
