@@ -221,9 +221,10 @@ function love.keypressed(key)
 end
 function love.gamepadpressed(_, button)
 	if managed then
-		if button == "back" then
-			bridge:back()
-		end
+		-- The desktop lobby observes Back globally, including while this game
+		-- has focus. Sending another overlay request here races its toggle:
+		-- the same press could pause and then immediately resume (or reopen).
+		return
 	elseif button == "a" and (menu or finished) then
 		standalone()
 	elseif button == "back" then
@@ -248,8 +249,6 @@ function love.quit()
 	end
 end
 
-function love.focus(focused)
-	if focused and bridge and (bridge.phase == "ready" or bridge.phase == "paused") then
-		bridge.transport:send({ type = "request_start" })
-	end
-end
+-- Window activation can also happen while the host is moving focus to the
+-- lobby. Never interpret it as permission to unpause or start a warm game;
+-- only the host's explicit Start/Resume commands change the running phase.

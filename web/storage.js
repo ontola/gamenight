@@ -26,6 +26,12 @@
     window.gamenightStorage={cloud,local,initial:documentState,
       async playlist(change) {
         if (!cloud) {
+          const profile=local.getItem('gamenight_profile_id');
+          const linked=profile && await fetch('/api/profiles/'+encodeURIComponent(profile)+'/session',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+          if(!linked || !linked.ok || !(await linked.json()).linked){
+            window.updateRoomNavigation?.(false);
+            throw Error('Join a room to manage its playlist.');
+          }
           const response=await fetch('/api/playlist',{cache:'no-store',signal:AbortSignal.timeout(10000),...(change?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)}:{})});
           if(!response.ok)throw Error('Playlist unavailable or changed. Refresh and try again.');
           return response.json();
@@ -95,6 +101,7 @@
     let watching=false, roomTimer, roomEpoch=0;
     function showConnection(state) {
       const connected=state.status==="connected";
+      window.updateRoomNavigation?.(connected);
       qrOpen.hidden=connected; roomForm.hidden=connected; roomLeave.hidden=!connected;
       if(connected)document.getElementById('qr-scanner')?.close();
       roomLeave.textContent=state.room_code ? "Leave room "+state.room_code : "Leave room";

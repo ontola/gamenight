@@ -212,47 +212,18 @@ pub(super) fn spawn_shelf(
         );
         return;
     }
-    // Later games are narrow book spines. All cases share the same top and baseline.
+    // Stack later cases horizontally: reading order is top to bottom,
+    // while each title remains upright and readable left to right.
     for (index, case) in cases.iter().take(6).enumerate().skip(1).rev() {
-        let x = 48.0 + (index - 1) as f32 * 23.0 + motion * 22.0;
-        let accent =
-            Color::hex(case.color.trim_start_matches('#')).unwrap_or(Color::rgb(0.37, 0.72, 0.68));
-        block(
-            parent,
-            x,
-            2.0,
-            0.1,
-            21.0,
-            90.0,
-            Color::rgb(0.055, 0.07, 0.12),
-        );
-        block(parent, x, 2.0, 0.2, 17.0, 88.0, Color::rgb(0.10, 0.13, 0.19));
-        block(
-            parent,
-            x - 6.0,
-            2.0,
-            0.3,
-            2.0,
-            84.0,
-            accent,
-        );
-        let title = super::ellipsize(&case.title, 15);
-        parent.spawn(Text2dBundle {
-            text: Text::from_section(
-                title,
-                TextStyle {
-                    font: font.clone(),
-                    font_size: 10.0,
-                    color: Color::WHITE,
-                },
-            ),
-            transform: Transform {
-                translation: Vec3::new(x + 1.0, 2.0, 0.6),
-                rotation: Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
-                ..default()
-            },
-            ..default()
-        });
+        let x = 102.0;
+        let y = 37.0 - (index - 1) as f32 * 18.0 + motion * 18.0;
+        let accent = Color::hex(case.color.trim_start_matches('#'))
+            .unwrap_or(Color::rgb(0.37, 0.72, 0.68));
+        block(parent, x, y, 0.1, 122.0, 17.0, Color::rgb(0.055, 0.07, 0.12));
+        block(parent, x, y, 0.2, 118.0, 14.0, Color::rgb(0.10, 0.13, 0.19));
+        block(parent, x - 56.0, y, 0.3, 3.0, 12.0, accent);
+        label(parent, &super::ellipsize(&case.title, 20), x + 2.0, y,
+            110.0, 9.0, &font, Color::WHITE);
     }
     let case = &cases[0];
     let x = -3.0 + motion * 22.0;

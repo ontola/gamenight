@@ -53,7 +53,7 @@ if ($Action -eq 'sync') { Sync-DevAssets; exit }
 if ($Action -eq 'build') {
     # Explicit build; never package, sync or launch as a side effect.
     if ($Component -in @('host','all')) {
-        & cargo build --locked --manifest-path (Join-Path $repo 'Cargo.toml') -p gamenight-daemon
+        & cargo rustc --locked --manifest-path (Join-Path $repo 'Cargo.toml') -p gamenight-daemon --bin gamenight-daemon -- -C link-arg=/PDBPAGESIZE:8192
         if ($LASTEXITCODE -ne 0) { throw 'Host build failed; stop the preview if Windows locks its executable.' }
     }
     if ($Component -in @('lobby','all')) {

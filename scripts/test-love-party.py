@@ -33,7 +33,11 @@ def main():
                         stream.write((json.dumps({"type": "prepare", "game": game, "session": "session-one",
                                                    "seats": [{"index": 0, "occupant": {"kind": "ai"}},
                                                              {"index": 2, "occupant": {"kind": "ai"}}], "players": []})+"\n").encode())
-                        assert json.loads(stream.readline()) == {"type": "ready", "session": "session-one"}
+                        reply = json.loads(stream.readline())
+                        if reply.get("type") == "participation":
+                            assert reply["session"] == "session-one"
+                            reply = json.loads(stream.readline())
+                        assert reply == {"type": "ready", "session": "session-one"}, reply
                         stream.write(b'{"type":"start","session":"session-one"}\n')
                 child.wait(timeout=5)
                 assert child.returncode == 0, child.communicate()[0].decode(errors="replace")

@@ -66,6 +66,8 @@ function Lifecycle:activity(controller)
 	end
 end
 function Lifecycle:back()
-	self.transport:send({ type = "request_overlay" })
+	if self.phase == "running" or self.phase == "finished" then
+		self.transport:send({ type = "request_overlay" })
+	end
 end
 return Lifecycle

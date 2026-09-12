@@ -42,12 +42,9 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 
 /* One set of page edges for the player header, room controls and editor. */
 .studio-page { padding:0 0 24px; }
-.studio-page #site-shell { border:0; }
-.studio-page .site-nav,
 .studio-page .studio-toolbar,
 .studio-page .room-feedback,
-.studio-page > main { width:calc(100% - 40px); max-width:900px; margin-left:auto; margin-right:auto; }
-.studio-page .site-nav { padding:24px 0 16px; }
+.studio-page main { width:calc(100% - 40px); max-width:900px; margin-left:auto; margin-right:auto; }
 .studio-page .studio-toolbar { padding:0; border:0; margin-top:0; margin-bottom:20px; gap:12px; }
 .studio-toolbar #qr-open[hidden], .studio-toolbar #room-form[hidden], .studio-toolbar #room-leave[hidden] { display:none !important; }
 .studio-toolbar #room-leave { width:100%; }
@@ -142,3 +139,43 @@ body.drawing-fullscreen { position:fixed; width:100%; overflow:hidden; overscrol
 .studio-toolbar:empty{display:none}
 .studio-toolbar{display:none}
 @media(max-width:650px){.site-nav .site-logo{order:0}.site-room-actions{order:1}.site-nav .site-links{order:2;width:100%}}
+/* The application shell has identical geometry on every page. */
+html{scrollbar-gutter:stable}
+#site-shell{background:#0d1020;min-height:87px;view-transition-name:site-navigation}
+#site-shell .site-nav{display:grid;grid-template-columns:max-content minmax(0,1fr) 140px;width:100%;max-width:1100px;padding:20px 24px;gap:24px;min-height:87px;font:16px/1.6 system-ui,sans-serif}
+#site-shell .site-links{justify-content:center;gap:20px;flex-wrap:nowrap;min-width:0}
+#site-shell .site-links a{white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis}
+#site-shell .site-room-actions{width:140px;min-height:46px;margin:0;justify-content:flex-end}
+#site-shell .site-room-actions>*{max-width:140px;box-sizing:border-box}
+#site-shell .btn-primary{background:#6555e8;border:1px solid #8d80fa;border-radius:10px;color:#fff;cursor:pointer;box-shadow:none;opacity:1;padding:12px 24px;font:700 16px/1.3 system-ui,sans-serif;min-height:46px}
+#site-shell .btn-primary:hover{background:#7565f8}
+[data-app-view][hidden],#site-shell [hidden]{display:none!important}
+[data-app-view]{width:100%;min-width:0;box-sizing:border-box}
+#playlist-previous{list-style:none;padding:0;display:grid;gap:8px;margin-top:12px}
+#playlist-history{margin-top:20px}
+#playlist-history summary{cursor:pointer;color:var(--muted);padding:8px 0}
+.playlist-catalog-link{color:var(--muted);font-size:13px;white-space:nowrap;padding:8px;text-decoration:none}
+.playlist-catalog-link:hover{color:var(--text);text-decoration:underline}
+.studio-page [data-app-view="studio"]>main{box-sizing:border-box;width:100%;max-width:1100px;margin:0 auto;padding:24px;min-width:0}
+.studio-page [data-app-view="studio"] .tab-content{min-width:0;max-width:100%}
+@media(max-width:650px){.studio-page [data-app-view="studio"]>main{padding:20px 16px}}
+#site-shell .site-logo{color:#eef0fc}
+#site-shell .site-links a{color:#a8adc4}
+#site-shell a,#site-shell button{-webkit-tap-highlight-color:transparent}
+#site-shell .site-links a{border-radius:6px}
+#site-shell .site-links a:active{background:#ffffff12}
+#site-shell .site-links a[aria-current],#site-shell .site-links a:hover{color:#eef0fc}
+@media(max-width:650px){#site-shell{min-height:126px}#site-shell .site-nav{grid-template-columns:minmax(0,1fr) 140px;padding:16px;gap:14px;min-height:126px}#site-shell .site-links{grid-column:1/-1;justify-content:space-between;gap:12px;width:100%}#site-shell .site-room-actions{grid-column:2;grid-row:1}}
+@view-transition{navigation:auto}
+::view-transition-group(site-navigation){animation-duration:0s}
+::view-transition-old(site-navigation){display:none}
+::view-transition-new(site-navigation){animation:none}
+#site-shell .leave-room-dialog{margin:auto;padding:0;width:calc(100% - 32px);max-width:420px;max-height:calc(100dvh - 32px);box-sizing:border-box;border:1px solid #343b55;border-radius:18px;background:#191e30;color:#eef0fc;font:16px/1.5 system-ui,sans-serif;box-shadow:0 24px 80px #0008}
+#site-shell .leave-room-dialog::backdrop{background:#0009}
+#site-shell .leave-room-dialog section{padding:24px}
+#site-shell .leave-room-dialog h2{font-size:22px;margin:0 0 12px}
+#site-shell .leave-room-dialog p{margin:0 0 24px;color:#b9bfd1}
+#site-shell .leave-room-dialog-actions{display:flex;justify-content:flex-end;gap:12px}
+#site-shell .leave-room-dialog-actions button{border-radius:10px;padding:12px 18px;min-height:46px;font:inherit;cursor:pointer;border:1px solid #424961;background:#252c40;color:#fff}
+#site-shell .leave-room-dialog-actions .btn-primary{background:#6555e8}
+#site-shell .leave-room-dialog button:disabled{opacity:.6;cursor:wait}

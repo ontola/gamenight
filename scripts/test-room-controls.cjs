@@ -48,5 +48,22 @@ const path=require('node:path');
   failJoin=true;input.value='ab-c234';await input.listeners.input();
   assert.equal(joins,2);assert.match(node('room-status').textContent,/Too many/);
   assert.equal(input.readOnly,false);
+  // A saved local profile is not necessarily attached to this lobby. Never
+  // read or mutate its playlist after the controller has been unlinked.
+  context.document.body.dataset.cloud='false';
+  storage.getItem=key=>key==='gamenight_profile_id'?'saved-player':null;
+  let attached=false, playlistRequests=0, navigation;
+  context.AbortSignal=AbortSignal;
+  context.window.updateRoomNavigation=value=>navigation=value;
+  context.fetch=async url=>({ok:true,status:200,json:async()=>{
+    if(url==='/api/profiles/saved-player/session')return {linked:attached};
+    if(url==='/api/playlist'){playlistRequests++;return {playlist:{entries:[]}};}
+    throw Error('Unexpected request '+url);
+  }});
+  await vm.runInNewContext(readFileSync(path.join(__dirname,'../web/storage.js'),'utf8'),context);
+  await assert.rejects(()=>context.window.gamenightStorage.playlist(),/Join a room/);
+  await assert.rejects(()=>context.window.gamenightStorage.playlist({from:0,to:1}),/Join a room/);
+  assert.equal(playlistRequests,0);assert.equal(navigation,false);
+  attached=true;await context.window.gamenightStorage.playlist();assert.equal(playlistRequests,1);
   console.log('Room controls: initial connection, leave failure/success, reconnect and expired room passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

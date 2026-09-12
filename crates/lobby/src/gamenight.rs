@@ -1204,6 +1204,9 @@ struct GlobalInput {
     pending_joins: std::collections::HashMap<u32, (String, String)>,
     /// Pads that are done joining — no further action needed for them here.
     joined_pads: HashSet<u32>,
+    /// Back may resume only after being released while the lobby has focus.
+    /// This prevents the press that opens the lobby from immediately closing it.
+    select_can_close: HashSet<u32>,
     /// Ignore pre-Leave snapshots until the host acknowledges departure.
     departing_players: HashSet<PlayerId>,
     /// Confirmed pad -> player mappings not yet written into
@@ -1478,6 +1481,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.insert_resource(GlobalInput {
         pending_joins: default(),
         joined_pads: default(),
+        select_can_close: default(),
         departing_players: default(),
         newly_confirmed: default(),
         pad_player: default(),
@@ -1947,9 +1951,13 @@ fn global_input_system(
     {
         match button {
             GamepadButton::Select => {
-                // Back is an idempotent request, not a local toggle. The game
-                // may send RequestOverlay for this same physical press, and
-                // game transitions change focus without a local button event.
+                let paused = bones_game.0.shared_resource::<GameNightBridge>()
+                    .active_session.as_ref().is_some_and(|session| session.phase == gamenight_protocol::SessionPhase::Paused);
+                let ready=input.select_can_close.remove(&id);
+                if lobby_was_focused && lobby_available && paused && ready {
+                    let _ = join_tx.try_send(ClientMessage::CloseOverlay);
+                    continue;
+                }
                 let _ = join_tx.try_send(ClientMessage::OpenOverlay);
                 #[cfg(target_os = "macos")]
                 if !lobby_was_focused {
@@ -2045,6 +2053,14 @@ fn global_input_system(
             }
             _ => {}
         }
+    }
+    if !lobby_was_focused || !lobby_available {
+        input.select_can_close.clear();
+    } else {
+        let released: Vec<_> = input.joined_pads.iter().copied()
+            .filter(|id| !input.pressed_buttons.contains(&(*id, GamepadButton::Select)))
+            .collect();
+        input.select_can_close.extend(released);
     }
 }
 

@@ -1,3 +1,4 @@
+(() => {
 const storage = window.gamenightStorage;
 const localStorage = storage.local;
 let initializing = true;
@@ -735,12 +736,38 @@ let initializing = true;
     let draggedEntry = null;
 
     function switchTab(tab) {
+      if(tab==='playlist' && window.gamenightRoomConnected!==true)tab='character';
       document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + tab));
       if (tab === 'playlist') loadPlaylist();
       if (tab === 'session') loadSession();
     }
 
+    function clearControllerClaim() {
+      claimPlayerId=null;claimSeat=null;claimRevision=0;boundPlayerId=null;
+      localStorage.removeItem('gamenight_bound_player');
+      const url=new URL(location.href);
+      for(const key of ['claim','seat','link_revision'])url.searchParams.delete(key);
+      history.replaceState(null,'',url);
+      hideBlocked();
+    }
+    window.addEventListener('gamenight-room-left',clearControllerClaim);
+    window.addEventListener('gamenight-room-change',event=>{
+      if(!event.detail.connected){
+        playlistView=null;
+        document.getElementById('playlist-list').replaceChildren();
+        document.getElementById('playlist-status').textContent='';
+        if(!storage.cloud && !claimPlayerId && claimSeat===null)clearControllerClaim();
+        if(location.hash==='#session'){
+          history.replaceState(null,'',location.pathname+location.search);
+          switchTab('character');
+        }
+      }else if(location.hash==='#session')switchTab('playlist');
+    });
+
     window.addEventListener('hashchange',()=>{switchTab(location.hash==='#session'?'playlist':'character');});
+    window.addEventListener('gamenight-page-change',event=>{
+      if(event.detail.page==='studio')switchTab(location.hash==='#session'?'playlist':'character');
+    });
     setTimeout(()=>switchTab(location.hash==='#session'?'playlist':'character'),0);
     let sessionLoading = false;
     if(!storage.cloud)setTimeout(loadSession,0);
@@ -752,6 +779,7 @@ let initializing = true;
         if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
         const session = await response.json();
         document.getElementById('qr-open').hidden=session.linked;
+        window.updateRoomNavigation?.(session.linked);
         document.getElementById('session-link-status').textContent = session.linked ? `Signed in as ${session.player_name}` : 'Not linked to a controller';
         document.getElementById('session-link-help').textContent = session.linked ? `${session.seat === null ? "Your profile is linked to this party." : "Player " + (session.seat + 1) + "."} Edit your name and character in the Character tab. To disconnect, choose Unlink in your controller’s Start menu.` : 'Press Start on your controller in the lobby, then scan the QR shown in your player menu.';
         document.getElementById('session-player-count').textContent = session.players;
@@ -764,10 +792,12 @@ let initializing = true;
       } finally { sessionLoading = false; }
     }
     async function loadPlaylist() {
+      if(window.gamenightRoomConnected!==true)return;
       if (playlistBusy || playlistLoading || draggedEntry !== null) return;
       playlistLoading = true;
       try {
         const view = await storage.playlist();
+        if(window.gamenightRoomConnected!==true)return;
         if (JSON.stringify(view) !== JSON.stringify(playlistView)) {
           playlistView = view;
           renderPlaylist();
@@ -781,7 +811,19 @@ let initializing = true;
     function renderPlaylist(focusIndex) {
       const list = document.getElementById('playlist-list');
       list.replaceChildren();
+      const current=playlistView.playlist.current;
+      const start=current==null?0:current;
+      let history=document.getElementById('playlist-history');
+      if(!history){
+        history=document.createElement('details');history.id='playlist-history';
+        const summary=document.createElement('summary');summary.textContent='Show previous games';
+        const previous=document.createElement('ol');previous.id='playlist-previous';previous.setAttribute('aria-label','Previous games');
+        history.append(summary,previous);list.after(history);
+      }
+      const previous=document.getElementById('playlist-previous');previous.replaceChildren();
+      history.hidden=start===0;
       playlistView.playlist.entries.forEach((entry, index, entries) => {
+        const past=index<start,playing=index===current;
         const row = document.createElement('li');
         row.className = 'playlist-row';
         row.dataset.index = index;
@@ -790,7 +832,7 @@ let initializing = true;
         handle.className = 'drag-handle';
         handle.textContent = '⠿';
         handle.setAttribute('aria-label', `Drag ${entry.title} to reorder`);
-        handle.disabled = playlistBusy;
+        handle.disabled = playlistBusy || past || playing;
         row.append(handle);
         const title = document.createElement('div');
         title.className = 'playlist-title';
@@ -799,27 +841,18 @@ let initializing = true;
         badge.textContent = [playlistView.playlist.current === index ? 'Playing' : '', playlistView.next === entry.game ? 'Up next' : ''].filter(Boolean).join(' · ');
         title.append(badge);
         row.append(title);
-        [-1, 1].forEach(direction => {
-          const button = document.createElement('button');
-          button.type = 'button';
-          button.textContent = direction < 0 ? '↑' : '↓';
-          button.setAttribute('aria-label', `Move ${entry.title} ${direction < 0 ? 'up' : 'down'}`);
-          button.disabled = playlistBusy || index + direction < 0 || index + direction >= entries.length;
-          button.onclick = () => movePlaylistEntry(index, index + direction);
-          row.append(button);
-        });
-        const next = document.createElement('button');
-        next.type = 'button'; next.textContent = '⇈';
-        next.title = 'Play this next';
-        next.setAttribute('aria-label', `Play ${entry.title} next`);
-        const current = playlistView.playlist.current;
-        const nextIndex = current == null ? 0 : (current + 1) % entries.length;
-        next.disabled = playlistBusy || index === current || index === nextIndex;
-        next.onclick = () => {
-          const target = current == null ? 0 : current + 1 - (index < current ? 1 : 0);
-          movePlaylistEntry(index, target);
+        const details=document.createElement('a');
+        details.className='playlist-catalog-link';
+        details.href='/catalog#game='+encodeURIComponent(entry.game);
+        details.textContent='View game';
+        details.setAttribute('aria-label',`View ${entry.title} in the catalog`);
+        row.append(details);
+        handle.onkeydown=event=>{
+          if(handle.disabled || !['ArrowUp','ArrowDown'].includes(event.key))return;
+          event.preventDefault();
+          const to=index+(event.key==='ArrowUp'?-1:1);
+          if(to>=(current==null?0:current+1) && to<entries.length)movePlaylistEntry(index,to);
         };
-        row.append(next);
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'remove-entry';
@@ -829,7 +862,7 @@ let initializing = true;
         remove.onclick = () => updatePlaylist({ from: index, remove: true }, index);
         row.append(remove);
         handle.onpointerdown = event => {
-          if (playlistBusy || playlistLoading || draggedEntry !== null || event.button !== 0) return;
+          if (playlistBusy || playlistLoading || past || playing || draggedEntry !== null || event.button !== 0) return;
           event.preventDefault();
           draggedEntry = index;
           let target = index;
@@ -838,9 +871,9 @@ let initializing = true;
           handle.setPointerCapture(event.pointerId);
           const locate = y => {
             const rows = [...list.children];
-            target = rows.findIndex(el => y < el.getBoundingClientRect().bottom);
-            if (target < 0) target = rows.length - 1;
-            rows.forEach((el, i) => el.classList.toggle('drag-over', i === target && target !== index));
+            const hovered=rows.find(el => y < el.getBoundingClientRect().bottom) || rows.at(-1);
+            target=Math.max(current==null?0:current+1,Number(hovered.dataset.index));
+            rows.forEach(el => el.classList.toggle('drag-over', Number(el.dataset.index) === target && target !== index));
           };
           // Keep long queues movable beyond the visible phone viewport.
           const scrolling = setInterval(() => {
@@ -863,9 +896,9 @@ let initializing = true;
           handle.onpointercancel = () => finish(true);
           handle.onlostpointercapture = () => finish(true);
         };
-        list.append(row);
+        (past?previous:list).append(row);
       });
-      if (focusIndex !== undefined) list.children[focusIndex]?.querySelector('button:not(:disabled)')?.focus();
+      if (focusIndex !== undefined) list.querySelector(`[data-index="${focusIndex}"] button:not(:disabled)`)?.focus();
     }
 
     async function movePlaylistEntry(from, to) {
@@ -1002,6 +1035,7 @@ let initializing = true;
         // the one our first join created. Sending it makes every later save
         // an update rather than a second JoinParty.
         const target = claimPlayerId || boundPlayerId;
+        if(!target && claimSeat===null){status('Saved on your phone');return;}
         const join = await fetch('/api/profiles/' + profileId + '/join', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1014,7 +1048,9 @@ let initializing = true;
         if (join.ok) {
           const data = await join.json();
           if (data.status === 'unlinked') {
-            showBlocked("Controller unlinked", data.message, "Your saved character is still on this phone.");
+            clearControllerClaim();
+            window.updateRoomNavigation?.(false);
+            window.showToast('Controller unlinked. Your saved character is kept on this phone.');
             status("Saved on your phone", "#94a3b8");
             return;
           }
@@ -1346,6 +1382,7 @@ document.getElementById("studio-action-21").addEventListener("click", function(e
 
 // Keep native text undo in form fields and leave other tabs/dialogs alone.
 function handleDrawingUndo(event) {
+  if(document.getElementById('tab-character').closest('[data-app-view]')?.hidden)return;
   if (event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey
       || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z') return;
   if (event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"])')
@@ -1386,4 +1423,6 @@ init();
   const close=()=>{dialog.close();closePanels();anchor.after(card);document.body.classList.remove("drawing-fullscreen");document.body.style.top="";window.scrollTo(0,scrollY);launch.focus({preventScroll:true});};
   header.querySelector("button").onclick=close;
   dialog.addEventListener("cancel",event=>{event.preventDefault();close();});
+})();
+
 })();
