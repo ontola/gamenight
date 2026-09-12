@@ -17,11 +17,18 @@
     let url;
     try { url = new URL(text); } catch (_) { return false; }
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return false;
+    // Automatic navigation is only safe for our hosted app or this local host.
+    if (url.origin !== window.location.origin && url.origin !== 'https://gamenight.ontola.io') return false;
     if (!/^\/(session(?:\/[^/]+)?|studio|mobile)\/?$/.test(url.pathname)) return false;
     stop();
-    link.href = url.href; link.hidden = false;
-    link.textContent = 'Open GameNight · ' + url.host;
-    status.textContent = 'GameNight QR found. Open it to join.';
+    link.hidden = true;
+    status.textContent = 'Opening room…';
+    dialog.close();
+    const samePage = url.origin === window.location.origin && url.pathname === window.location.pathname && url.search === window.location.search;
+    window.location.assign(url.href);
+    // A fragment-only navigation otherwise leaves the existing editor running
+    // without processing the newly scanned invitation.
+    if (samePage) window.location.reload();
     return true;
   }
   let detector=null, cropIndex=0;
