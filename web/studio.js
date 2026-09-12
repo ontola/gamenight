@@ -11,10 +11,11 @@ let initializing = true;
     // head: that body is already in the party, so the profile is applied to
     // it rather than adding a second, bodiless player.
     const params = new URLSearchParams(window.location.search);
-    const claimPlayerId = params.get('claim');
+    let claimPlayerId = params.get('claim');
     // Set when the wall QR was aimed at a seat by someone standing on the
     // sign-in pad. Preferred over a player id: seats survive a lobby restart.
-    const claimSeat = params.get('seat');
+    let claimSeat = params.get('seat');
+    let claimRevision = Number(params.get('link_revision') || 0);
 
     // The party member this profile is bound to when we weren't opened from
     // a character's QR — remembered from the first join so later saves
@@ -950,27 +951,11 @@ let initializing = true;
     let savingNow = false;
     let savePending = false;
 
+    let lastBlockedMessage = '';
     function showBlocked(title, line1, line2) {
-      let el = document.getElementById('blocked-banner');
-      if (!el) {
-        el = document.createElement('div');
-        el.id = 'blocked-banner';
-        el.className = 'blocked';
-        document.querySelector('main').prepend(el);
-      }
-      el.innerHTML = '';
-      const h = document.createElement('div');
-      h.className = 'blocked-title';
-      h.innerText = '⚠️ ' + title;
-      const p1 = document.createElement('div');
-      p1.innerText = line1;
-      const p2 = document.createElement('div');
-      p2.className = 'blocked-hint';
-      p2.innerText = line2;
-      el.append(h, p1, p2);
-      el.style.display = 'block';
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      status('');
+      const message=[title,line1,line2].filter(Boolean).join('. ');
+      if(message!==lastBlockedMessage)window.showToast?.(message);
+      lastBlockedMessage=message;
     }
 
     function hideBlocked() {
@@ -1021,7 +1006,7 @@ let initializing = true;
           body: JSON.stringify({
             claim: target,
             seat: claimSeat === null ? null : Number(claimSeat),
-            link_revision: Number(params.get('link_revision') || 0)
+            link_revision: claimRevision
           })
         });
         if (join.ok) {
@@ -1036,20 +1021,21 @@ let initializing = true;
             return;
           }
           if (data.status === 'already_signed_in') {
-            // A dead end until they do something about it, so it gets a
-            // banner rather than a line of status text that scrolls past.
-            showBlocked(
-              "You're already signed in",
-              data.seat === null || data.seat === undefined
-                ? 'This phone is already playing as another character.'
-                : ('This phone is already playing as the character on seat '
-                   + (data.seat + 1) + '.'),
-              'Leave that character first, or use a different phone.'
-            );
+            const response=await fetch('/api/player-links',{cache:'no-store'});
+            if(!response.ok)throw Error('Could not check your current controller. Try again.');
+            const links=await response.json();
+            claimPlayerId=data.player_id;claimSeat=null;boundPlayerId=data.player_id;
+            claimRevision=links.revisions?.[data.player_id] || 0;
+            localStorage.setItem('gamenight_bound_player',boundPlayerId);
+            const url=new URL(location.href);
+            for(const key of ['claim','seat','link_revision'])url.searchParams.delete(key);
+            history.replaceState(null,'',url);
+            showBlocked('Already connected','Your edits will update your existing character.','');
+            savePending=true;
             return;
           }
           hideBlocked();
-          if (!boundPlayerId && data.player_id) {
+          if (data.player_id) {
             boundPlayerId = data.player_id;
             localStorage.setItem('gamenight_bound_player', boundPlayerId);
           }
