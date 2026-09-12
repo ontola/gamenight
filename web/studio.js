@@ -874,14 +874,30 @@ let initializing = true;
     async function updatePlaylist(change, focusIndex) {
       if (playlistBusy || playlistLoading || draggedEntry !== null) return;
       playlistBusy = true;
+      const previous = structuredClone(playlistView);
+      const expected = previous.playlist;
+      const currentEntry = playlistView.playlist.entries[playlistView.playlist.current];
+      const [entry] = playlistView.playlist.entries.splice(change.from, 1);
+      if (!change.remove) playlistView.playlist.entries.splice(change.to, 0, entry);
+      const currentIndex = playlistView.playlist.entries.indexOf(currentEntry);
+      playlistView.playlist.current = currentIndex < 0 ? null : currentIndex;
+      playlistView.next = playlistView.playlist.entries[(currentIndex + 1) % playlistView.playlist.entries.length]?.game || null;
+      document.getElementById('playlist-saving').hidden = false;
       renderPlaylist();
       const status = document.getElementById('playlist-status');
-      status.textContent = change.remove ? 'Removing game…' : 'Saving order…';
+      status.textContent = '';
       try {
-        playlistView = await storage.playlist({ expected: playlistView.playlist, ...change });
-        status.textContent = 'Playlist updated.';
-      } catch (error) { status.textContent = error.message; }
-      finally { playlistBusy = false; renderPlaylist(focusIndex); loadPlaylist(); }
+        playlistView = await storage.playlist({ expected, ...change });
+      } catch (error) {
+        playlistView = previous;
+        window.showToast?.(error.message);
+      }
+      finally {
+        playlistBusy = false;
+        document.getElementById('playlist-saving').hidden = true;
+        renderPlaylist(focusIndex);
+        loadPlaylist();
+      }
     }
     setInterval(() => {
       if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();

@@ -502,3 +502,5 @@
 .studio-inline-0{width:100%;box-sizing:border-box;margin-top:8px}
 .studio-inline-1{width:100%;box-sizing:border-box;margin-top:8px}
 .studio-inline-2{color:var(--muted)}
+    .playlist-heading-actions { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    #playlist-saving { font-size:24px; color:#b6a9ff; }
