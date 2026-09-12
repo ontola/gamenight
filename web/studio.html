@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameNight - Local Character Studio</title>
+  <link rel="stylesheet" href="/web/studio.css"><link rel="stylesheet" href="/web/site.css">
+<link rel="icon" href="/web/icon.svg"><script src="/web/shell.js" defer></script></head>
+<body class="studio-page">
+<div id="site-shell"></div>
+
+  <header class="studio-toolbar">
+    
+    <div class="nav-tabs">
+      <button class="nav-btn active" id="studio-action-0">Character</button>
+      <button class="nav-btn" id="studio-action-1">Session</button>
+      <button class="nav-btn" id="studio-action-2">Playlist</button>
+    </div>
+  <button type="button" class="nav-btn" id="qr-open">Scan QR</button>
+  </header>
+
+<main>
+    <div id="tab-playlist" class="tab-content">
+      <section class="playlist-editor">
+        <h2>Tonight’s playlist</h2>
+        <p>Drag games or use the arrows to change the order. The current game keeps playing. GameNight picks the next game that fits your party.</p>
+        <p id="playlist-status" role="status" aria-live="polite"></p>
+        <ol id="playlist-list" aria-label="Game playlist"></ol>
+        <button class="nav-btn" type="button" id="studio-action-3">Refresh playlist</button>
+      </section>
+    </div>
+    <!-- TAB 1: CHARACTER EDITOR -->
+    <div id="tab-character" class="tab-content active">
+      <!-- Identity: the first thing you see, and the first thing you change. -->
+      <div class="card identity">
+        <div class="identity-row">
+          <input id="player-name" class="name-input" value="" maxlength="20"
+                 aria-label="Your name" autocomplete="off" spellcheck="false">
+          <button class="icon-btn" id="name-edit" title="Edit your name" aria-label="Edit your name">✏️</button>
+          <button class="icon-btn" id="name-dice" title="Random name" aria-label="Random name">🎲</button>
+        </div>
+        <div class="identity-hint">This is the name above your character.</div>
+      </div>
+
+      <div class="card drawing-card">
+        <div class="card-title">Draw your face</div>
+        <div class="drawing-preview">
+          <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
+          <div class="drawing-preview-options">
+            <details class="clothing-preview skin-colour-options">
+              <summary>Skin colour</summary>
+              <p>Saved with your profile.</p>
+              <div class="palette" id="skin-colors" aria-label="Skin colour"></div>
+            </details>
+            <details class="clothing-preview">
+              <summary>Preview clothing colour</summary>
+              <p>The game chooses your clothing colour.</p>
+              <div class="palette" id="character-colors" aria-label="Clothing colour preview"></div>
+            </details>
+        <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false">Show outfit guide</button>
+            <span id="preview-status" role="status"></span>
+          </div>
+        </div>
+        <p class="identity-hint head-guide-hint">Draw anywhere on the head—including hats. The face sits lower and to the right in this grid.</p>
+        <div class="brush-sizes" role="group" aria-label="Brush size">
+          <span>Brush size</span>
+          <button class="tool-btn active" data-brush="1" aria-pressed="true" id="studio-action-5">1 px</button>
+          <button class="tool-btn" data-brush="2" aria-pressed="false" id="studio-action-6">2 px</button>
+          <button class="tool-btn" data-brush="4" aria-pressed="false" id="studio-action-7">4 px</button>
+          <button class="tool-btn" data-brush="8" aria-pressed="false" id="studio-action-8">8 px</button>
+        </div>
+        <div class="canvas-container">
+          <div id="pixel-grid"></div>
+        </div>
+
+        <label>Draw colour</label>
+        <div class="palette" id="palette-swatches"></div>
+
+        <div class="toolbar">
+          <button class="tool-btn active" id="tool-pencil">✏️ Draw</button>
+          <button class="tool-btn" id="tool-eraser">🧹 Erase</button>
+          <button class="tool-btn" id="tool-fill">🪣 Fill</button>
+          <button class="tool-btn" id="btn-undo">↩️ Undo</button>
+          <button class="tool-btn" id="studio-action-13">🗑️ Clear</button>
+          <button class="tool-btn" id="studio-action-14">🎲 Random</button>
+        </div>
+
+
+      </div>
+
+      <div class="card">
+        <div class="card-title">My faces</div>
+        <div id="artwork-gallery" class="artwork-list"></div>
+        <button class="btn-primary" id="studio-action-15">＋ New face</button>
+        <div class="backup-actions">
+          <button class="tool-btn" id="studio-action-16">Export backup</button>
+          <button class="tool-btn" id="studio-action-17">Import backup</button>
+          <button class="tool-btn" id="studio-action-18">Export face PNG</button>
+        </div>
+        <input type="file" id="backup-file" accept=".json,.txt,application/json,text/plain" hidden>
+        <p class="identity-hint">Your faces stay on this device. Export a backup to keep them safe or move them to another device. Import adds faces without deleting existing ones.</p>
+        <div id="backup-status" role="status" aria-live="polite"></div>
+        <details id="backup-text-panel">
+          <summary>Copy backup instead</summary>
+          <p class="identity-hint">If your phone blocks file saving, copy this text into a note. Keep the complete text to restore your faces.</p>
+          <button class="tool-btn" id="studio-action-20">Copy all backup data</button>
+          <textarea id="backup-text" aria-label="Complete backup data" readonly rows="5" class="studio-inline-0"></textarea>
+        </details>
+        <details>
+          <summary>Restore from backup text</summary>
+          <textarea id="restore-text" aria-label="Paste backup data" rows="5" class="studio-inline-1"></textarea>
+          <button class="tool-btn" id="studio-action-21">Import pasted backup</button>
+        </details>
+      </div>
+
+      <div id="status-msg" class="status"></div>
+    </div>
+
+    <!-- TAB 3: YOUR PARTY -->
+    <div id="tab-session" class="tab-content">
+      <div class="card">
+        <div class="card-title">Your session</div>
+        <p id="session-link-status" aria-live="polite">Checking your connection…</p>
+        <p id="session-link-help" class="studio-inline-2"></p>
+        <dl>
+          <dt>Players in the party</dt><dd id="session-player-count">—</dd>
+          <dt>Current game</dt><dd id="session-current-game">—</dd>
+          <dt>Up next</dt><dd id="session-next-game">—</dd>
+        </dl>
+      </div>
+    </div>
+  </main>
+
+  <script src="/web/storage.js" defer></script>
+
+<dialog id="qr-scanner" aria-labelledby="qr-title">
+  <div class="scanner-heading"><h2 id="qr-title">Scan lobby QR</h2><button type="button" id="qr-close" aria-label="Close scanner">✕</button></div>
+  <video id="qr-video" autoplay muted playsinline hidden></video>
+  <p id="qr-status" role="status" aria-live="polite"></p>
+  <a id="qr-result" class="tool-btn" hidden></a>
+  <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>
+  <label class="tool-btn" for="qr-photo">Scan a photo<input id="qr-photo" type="file" accept="image/*" capture="environment" hidden></label></div>
+  <p class="scanner-privacy">Images stay on your device.</p>
+</dialog>
+<script src="/assets/jsQR.js"></script>
+<script src="/assets/qr-scanner.js"></script>
+
+</body>
+</html>

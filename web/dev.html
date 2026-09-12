@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameNight for developers — integrate in under an hour</title>
+<meta name="description" content="Two messages you send, five you react to. Integrate your game with GameNight in under an hour — the full guide, on one page.">
+<link rel="icon" href="/web/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/web/marketing.css"><link rel="stylesheet" href="/web/site.css">
+<script src="/web/shell.js" defer></script></head>
+<body>
+<div class="wrap">
+  <div id="site-shell"></div>
+
+  <div class="hero">
+    <h1>Integrate in <span class="glow">under an hour.</span></h1>
+    <p class="sub">
+      The whole mandatory contract is <b>two messages you send</b> and
+      <b>five you react to</b>. Playlists, voting, controllers, transitions —
+      that's the daemon's problem, not yours.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#the-guide">Read the guide ↓</a>
+      <a class="btn" href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Wire reference</a>
+      <a class="btn" href="catalog.html">Get listed</a>
+    </div>
+  </div>
+
+  <section>
+    <div class="split">
+      <div>
+        <div class="panel-label">The entire integration — Godot 4</div>
+<pre><code>func _ready() -&gt; void:
+    GameNight.prepared.connect(_on_prepared)
+    GameNight.started.connect(_on_started)
+    GameNight.disposed.connect(_on_disposed)
+
+func _on_prepared(session, seats, players) -&gt; void:
+    load_arena(seats)          # one pawn per occupied seat
+    GameNight.notify_ready(session)   # show nothing yet!
+
+func _on_started(_session) -&gt; void:
+    start_match()              # gameplay within a second
+
+func _match_over() -&gt; void:
+    GameNight.notify_finished(session)
+    # keep rendering the scoreboard until `disposed`</code></pre>
+        <p class="site-inline-7">
+          Same shape in <a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-sdk/src/lib.rs" class="site-inline-8">Rust</a>,
+          or in <a href="https://github.com/ontola/gamenight/blob/main/examples/tiny-game.mjs" class="site-inline-9">60 lines
+          of dependency-free JavaScript</a> — it's a WebSocket and seven JSON
+          messages. The protocol is the product; SDKs are convenience.
+        </p>
+      </div>
+      <div>
+        <div class="panel-label">Prove it — one command</div>
+<pre class="term"><code><span class="dim">$ gamenight-certify my-game -- ./my-game</span>
+─────────────────────────────────────
+ GameNight conformance · my-game
+─────────────────────────────────────
+ <span class="ok">✔</span> process connects and says hello  <span class="dim">(487 ms)</span>
+ <span class="ok">✔</span> prepare → ready → instant start  <span class="dim">(warm in 42 ms)</span>
+ <span class="ok">✔</span> match ends with a single `finished`
+ <span class="ok">✔</span> replay vote → fresh session, same process
+ <span class="ok">✔</span> pause and resume tolerated mid-match
+ <span class="ok">✔</span> mid-match skips: dispose, re-prepare, stay resident
+ <span class="ok">✔</span> process resident for the whole night
+─────────────────────────────────────
+ <span class="ok">7/7 passed — my-game is party-ready 🎉</span></code></pre>
+        <p class="site-inline-10">
+          A scripted night runs against your real build — launch handshake,
+          warm-up, replay, five mid-match skips. Exit&nbsp;0 = party-ready, so
+          it drops straight into your CI.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="the-guide">
+    <div class="kicker">The full guide</div>
+    <p class="site-inline-11 lead">
+      Everything below is rendered live from
+      <a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md" class="site-inline-12">docs/integrating-your-game.md</a>
+      — the same file that ships in the repo. One source of truth.
+    </p>
+    <div class="md" id="guide"><p class="site-inline-13">Loading the guide…</p></div>
+  </section>
+
+  <footer>
+    <div class="q">"Does this make game night feel faster, smoother, and more fun?"</div>
+    <div>
+      <a href="https://github.com/ontola/gamenight">GitHub</a> ·
+      <a href="index.html">For gamers</a> ·
+      <a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Protocol</a> ·
+      <a href="https://github.com/ontola/gamenight/tree/main/catalog">Catalogue</a>
+    </div>
+  </footer>
+</div>
+
+<script src="/web/dev.js" defer></script>
+</body>
+</html>

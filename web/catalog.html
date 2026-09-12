@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameNight catalogue — submit a game</title>
+<meta name="description" content="Add your game to the GameNight catalogue: fork, add one JSON file, open a PR. Planned entries need nothing but metadata.">
+<link rel="icon" href="/web/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/web/marketing.css"><link rel="stylesheet" href="/web/site.css">
+<script src="/web/shell.js" defer></script></head>
+<body>
+<div class="wrap">
+  <div id="site-shell"></div>
+
+  <div class="hero">
+    <h1>One JSON file. <span class="glow">One PR.</span></h1>
+    <p class="sub">
+      The catalogue is an open, reviewable list of couch multiplayer games —
+      one file per game, no build step. A <b>planned</b> entry needs nothing
+      but metadata; climbing the ladder to <b>certified</b> is a follow-up PR
+      whenever you're ready.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="#the-guide">Read the guide ↓</a>
+      <a class="btn" href="https://github.com/ontola/gamenight/tree/main/catalog/games">Browse entries</a>
+      <a class="btn" href="dev.html">Integrate your game</a>
+    </div>
+  </div>
+
+  <section>
+    <div class="split">
+      <div>
+        <div class="panel-label">The whole entry — planned level</div>
+<pre><code>{
+  "id": "duck-game",
+  "title": "Duck Game",
+  "tagline": "Ducks. Guns. No mercy.",
+  "players": { "min": 1, "max": 4, "best": 4 },
+  "price": "paid",
+  "emoji": "🦆",
+  "color": "#ffb454",
+  "integration": { "level": "planned" }
+}</code></pre>
+        <p class="site-inline-14">
+          That's a mergeable PR by itself — enough for the shelf to show it.
+          Player counts, hardware requirements, and integration level all
+          climb later, in their own PRs.
+        </p>
+      </div>
+      <div>
+        <div class="panel-label">The ladder</div>
+        <table class="site-inline-15">
+          <tbody>
+            <tr><td class="site-inline-16">certified</td><td class="site-inline-17">speaks the protocol <i>and</i> passes <code>gamenight-certify</code></td></tr>
+            <tr><td class="site-inline-18">integrated</td><td class="site-inline-19">speaks the protocol; not (yet) certified</td></tr>
+            <tr><td class="site-inline-20">adapter</td><td class="site-inline-21">launchable but silent — kill-and-relaunch transitions</td></tr>
+            <tr><td class="site-inline-22">planned</td><td class="site-inline-23">wishlist metadata — no integration yet</td></tr>
+          </tbody>
+        </table>
+        <p class="site-inline-24">
+          Every entry declares honestly where it stands. Climbing the
+          ladder is the point — a PR that moves a game to
+          <code>certified</code> pastes the harness output straight in.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="the-guide">
+    <div class="kicker">The full guide</div>
+    <p class="site-inline-25 lead">
+      Everything below is rendered live from
+      <a href="https://github.com/ontola/gamenight/blob/main/catalog/README.md" class="site-inline-26">catalog/README.md</a>
+      — the same file that ships in the repo. One source of truth.
+    </p>
+    <div class="md" id="guide"><p class="site-inline-27">Loading the guide…</p></div>
+  </section>
+
+  <footer>
+    <div class="q">"Does this make game night feel faster, smoother, and more fun?"</div>
+    <div>
+      <a href="https://github.com/ontola/gamenight">GitHub</a> ·
+      <a href="index.html">For gamers</a> ·
+      <a href="dev.html">For developers</a> ·
+      <a href="https://github.com/ontola/gamenight/tree/main/catalog">The catalogue</a>
+    </div>
+  </footer>
+</div>
+
+<script src="/web/catalog.js" defer></script>
+</body>
+</html>

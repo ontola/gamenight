@@ -389,6 +389,9 @@ async fn session_url_with_claim_serves_a_studio_that_reads_it() {
 
     let (status, body) = get(&server, &format!("/session/gn-couch?claim={}", player.0)).await;
     assert_eq!(status, 200, "the claim URL must serve the studio");
+    assert!(body.contains("/web/storage.js"), "the page must load the shared editor");
+    let (status, body) = get(&server, "/web/studio.js").await;
+    assert_eq!(status, 200, "the shared script must be served");
     assert!(
         body.contains("claimPlayerId"),
         "the studio page must parse the claim parameter"

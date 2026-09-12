@@ -85,6 +85,7 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
         .route("/studio", get(serve_studio))
+        .route("/web/:asset", get(serve_web_asset))
         .route("/assets/jsQR.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/jsQR.js")) }))
         .route("/assets/qr-scanner.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/qr-scanner.js")) }))
         .route("/assets/characters/:theme", get(serve_character))
@@ -446,4 +447,17 @@ async fn serve_studio() -> Html<&'static str> {
     Html(STUDIO_HTML)
 }
 
-pub static STUDIO_HTML: &str = include_str!("studio.html");
+pub static STUDIO_HTML: &str = include_str!("../../../web/studio.html");
+
+async fn serve_web_asset(Path(asset): Path<String>) -> Response {
+    let (mime, data) = match asset.as_str() {
+        "storage.js" => ("text/javascript", include_str!("../../../web/storage.js")),
+        "site.css" => ("text/css", include_str!("../../../web/site.css")),
+        "studio.css" => ("text/css", include_str!("../../../web/studio.css")),
+        "studio.js" => ("text/javascript", include_str!("../../../web/studio.js")),
+        "shell.js" => ("text/javascript", include_str!("../../../web/shell.js")),
+        "icon.svg" => ("image/svg+xml", include_str!("../../../web/icon.svg")),
+        _ => return StatusCode::NOT_FOUND.into_response(),
+    };
+    ([("content-type", mime)], data).into_response()
+}

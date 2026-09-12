@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GameNight — the game night operating system</title>
+<meta name="description" content="A persistent multiplayer layer for games. The party stays; games come and go. The next game is already warm.">
+<link rel="icon" href="/web/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/web/marketing.css"><link rel="stylesheet" href="/web/site.css">
+<script src="/web/shell.js" defer></script></head>
+<body>
+<div class="wrap">
+  <div id="site-shell"></div>
+
+  <div class="hero">
+    <h1>One couch. One party.<br><span class="glow">Zero friction.</span></h1>
+    <p class="sub">
+      GameNight is a persistent multiplayer layer that sits above your games.
+      The party stays alive all night — games come and go like tracks on a
+      playlist, and the next one is <b>already warm</b>.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="/download/GameNight.dmg" download>Download for macOS</a>
+      <a class="btn" href="dev.html">Integrate your game →</a>
+    </div>
+    <p class="dl-note">
+      Drag it to Applications and open it. The lobby is right there — and the
+      first game downloads in the background while you're already playing.
+      <br>
+      <span class="dl-other">Windows and Linux next ·
+      <a href="https://github.com/ontola/gamenight#try-a-game-night-in-60-seconds">build from source</a></span>
+    </p>
+    <div class="flow" aria-label="how a transition works">
+      <span class="step">🎮 Playing</span>
+      <span class="arr">→</span>
+      <span class="step">✨ next game already warm</span>
+      <span class="arr">→</span>
+      <span class="step hot">⏭ press Next</span>
+      <span class="arr">→</span>
+      <span class="step">instant transition</span>
+      <span class="arr">→</span>
+      <span class="step">🎮 still playing</span>
+    </div>
+  </div>
+
+  <section>
+    <div class="kicker">The problem</div>
+    <h2 class="big">You don't stop after every song to reconfigure your speakers.</h2>
+    <p class="lead">
+      So why does every game switch mean browsing a library, re-inviting
+      everyone, remapping controllers, sitting through intros and loading
+      screens? GameNight deletes all of it. The whole evening becomes one
+      continuous multiplayer session.
+    </p>
+  </section>
+
+  <section>
+    <div class="kicker">How it feels</div>
+    <h2 class="big">Walk in. Grab a controller. Press A.</h2>
+    <div class="grid">
+      <div class="feature"><div class="ico">🛋️</div><h3>The party is persistent</h3>
+        <p>People, seats and names live above the games. Player 2 stays player 2
+        all night — across every game. No accounts, no lobbies, no setup.</p></div>
+      <div class="feature"><div class="ico">✨</div><h3>The next game is already warm</h3>
+        <p>While you play, the next game silently loads behind the current one.
+        Skipping a game is as instant as skipping a track.</p></div>
+      <div class="feature"><div class="ico">🗳️</div><h3>Voting is gameplay</h3>
+        <p>Match over? No dialog boxes. Everyone stands their avatar on
+        <i>Replay</i>, <i>Next game</i> or <i>Quit</i> — consensus starts the
+        transition.</p></div>
+      <div class="feature"><div class="ico">☰</div><h3>One overlay, every screen</h3>
+        <p>Open the party from any game: it pauses for everyone, everywhere.
+        Join, swap controllers, skip, browse — then drop straight back in.</p></div>
+      <div class="feature"><div class="ico">🖼️</div><h3>A shelf, not a file picker</h3>
+        <p>What's-next is cover art: browse the shelf mid-game, tap
+        <i>Play&nbsp;next</i>, and it's warming before the vote even opens.</p></div>
+      <div class="feature"><div class="ico">📖</div><h3>An open catalogue</h3>
+        <p>Community-reviewed metadata for couch games — player counts, hardware
+        needs, honest integration levels. Discovery you can trust.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">The shelf</div>
+    <h2 class="big">Tonight's lineup, always one press away.</h2>
+    <div class="shelfstrip">
+      <div class="site-inline-0 cover">🏹
+        <span class="tag live">● PLAYING</span><span class="name">TowerFall</span></div>
+      <div class="site-inline-1 cover">🦆
+        <span class="tag warm">✨ UP NEXT</span><span class="name">Duck Game</span></div>
+      <div class="site-inline-2 cover">🐟
+        <span class="name">Fish Folk: Jumpy</span></div>
+      <div class="site-inline-3 cover">🥊
+        <span class="name">Stick Fight</span></div>
+      <div class="site-inline-4 cover">🐔
+        <span class="name">Chicken Horse</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">The vote</div>
+    <h2 class="big">Match over. Nobody reaches for a mouse.</h2>
+    <p class="lead">Avatars stand on options — from a gamepad d-pad, a click, or
+      (soon) a tap on your phone. When everyone agrees, the room transitions.</p>
+    <div class="votemock">
+      <div class="tile">🔁 Replay<div class="standing">🐼</div></div>
+      <div class="tile">⏭ Skip<div class="standing"></div></div>
+      <div class="tile winning">🎲 Next game<div class="standing">🦊 🦖 🐸</div></div>
+      <div class="tile">🌙 Quit<div class="standing"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Under the hood</div>
+    <h2 class="big">A daemon, a protocol, and games that just show up.</h2>
+    <p class="lead">
+      A small Rust daemon hosts the party and launches games on demand.
+      Games speak a seven-message WebSocket protocol — open by design, with a
+      conformance harness, SDKs for Godot and Rust, and a 60-line
+      no-dependency example. If your favourite couch game isn't integrated
+      yet, it can be —
+      <a href="dev.html" class="site-inline-5">in under an hour</a>.
+    </p>
+  </section>
+
+  <section id="studio">
+    <div class="kicker">Character Studio & Game Store</div>
+    <h2 class="big">Design your character. Scan QR. Play together.</h2>
+    <p class="lead">
+      GameNight includes a built-in Pixel Art Character Designer and Game Store.
+      Players scan the on-screen QR code on their phones, create custom avatars, buy games, and share their libraries in one unified party session.
+    </p>
+    <p class="site-inline-6 dl-note">
+      Both live inside GameNight itself, on the machine hosting the party —
+      your phone pairs with the couch over your own network, so there is
+      nothing to sign into and no account to lose.
+    </p>
+  </section>
+
+  <footer>
+    <div class="q">"Does this make game night feel faster, smoother, and more fun?"</div>
+    <div>
+      <a href="https://github.com/ontola/gamenight">GitHub</a> ·
+      <a href="dev.html">For developers</a> ·
+      <a href="https://github.com/ontola/gamenight/blob/main/docs/vision.md">The vision</a> ·
+      <a href="https://github.com/ontola/gamenight/tree/main/catalog">The catalogue</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>

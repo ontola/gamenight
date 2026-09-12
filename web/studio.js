@@ -1,638 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameNight - Local Character Studio</title>
-  <style>
-    button, .swatch, #pixel-grid { -webkit-tap-highlight-color: transparent; }
-    #pixel-grid, #pixel-grid * { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-    .brush-sizes { display:flex; gap:8px; margin:12px 0; align-items:center; flex-wrap:wrap; }
-    .brush-sizes button { min-width:44px; min-height:44px; }
+const storage = window.gamenightStorage;
+const localStorage = storage.local;
 
-    /* Mobile first: this page is reached by scanning a QR with a phone, so
-       the phone layout is the layout, and the desktop one is the exception. */
-    .face-tex-box {
-      display: flex; justify-content: center; padding: 0.5rem;
-      background: #0f172a; border-radius: 10px; margin-top: 0.4rem;
-    }
-    #face-texture-canvas {
-      width: 184px; height: 128px; image-rendering: pixelated;
-      border: 1px solid #2b3550; border-radius: 6px;
-    }
-
-    .blocked {
-      display: none; margin: 0 0 1rem; padding: 0.9rem 1rem;
-      border: 2px solid #b45309; border-radius: 12px;
-      background: #2a1a06; color: #fde68a; font-size: 0.95rem;
-    }
-    .blocked-title { font-weight: 800; font-size: 1.1rem; margin-bottom: 0.35rem; }
-    .blocked-hint { margin-top: 0.4rem; color: #fbbf24; font-size: 0.85rem; }
-
-    .identity-row { display: flex; align-items: center; gap: 0.5rem; }
-    .name-input {
-      flex: 1; min-width: 0; font-size: 1.6rem; font-weight: 800;
-      background: transparent; border: none; border-bottom: 2px dashed #2b3550;
-      color: #f8fafc; padding: 0.25rem 0.1rem;
-    }
-    .name-input:focus { outline: none; border-bottom-color: #6366f1; }
-    .identity-hint { font-size: 0.8rem; color: #64748b; margin-top: 0.35rem; }
-    .icon-btn {
-      flex: none; width: 44px; height: 44px; border-radius: 10px;
-      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
-      font-size: 1.1rem; cursor: pointer;
-    }
-    .icon-btn:hover { background: #2b3550; }
-
-    /* Touch targets: 44px is the smallest thing a thumb reliably hits. */
-    .tool-btn { min-height: 44px; }
-    .toolbar { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-
-    /* Artwork as a list — the old thumbnail grid put three controls inside
-       48 pixels, which is unusable on a phone. */
-    .artwork-list { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.5rem 0 0.75rem; }
-    /* Wraps, so three 44px-tall buttons plus a preview can never be wider
-       than a phone. The row used to hold a growing "Editing" label, which
-       pushed the buttons past the edge and took the whole page with it. */
-    .artwork-row {
-      display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem;
-      border: 2px solid #2b3550; border-radius: 10px; background: #0f172a;
-      flex-wrap: wrap;
-    }
-    .artwork-row.active { border-color: #6366f1; }
-    .artwork-row canvas {
-      width: 52px; height: 52px; image-rendering: pixelated; flex: none;
-      border-radius: 6px; background:
-        repeating-conic-gradient(#1e293b 0% 25%, #0f172a 0% 50%) 50% / 12px 12px;
-    }
-    /* A badge, not a spacer: it states which face is open without claiming
-       any width of its own. */
-    .artwork-row .badge {
-      flex: none; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em;
-      color: #a5b4fc; text-transform: uppercase;
-    }
-    .artwork-row .row-actions {
-      display: flex; gap: 0.3rem; flex: 1 1 100%; min-width: 0;
-    }
-    .artwork-row .row-actions button {
-      flex: 1 1 0; min-width: 0;
-      min-height: 44px; padding: 0 0.4rem; border-radius: 8px;
-      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
-      font-size: 0.85rem; cursor: pointer; white-space: nowrap;
-    }
-    .artwork-row .row-actions button:hover { background: #2b3550; }
-
-    /* Roomier screens can put the buttons back on the same line. */
-    @media (min-width: 560px) {
-      .artwork-row .row-actions { flex: 0 1 auto; margin-left: auto; }
-      .artwork-row .row-actions button { flex: none; padding: 0 0.9rem; }
-    }
-
-    /* Transparent pixels read as a checkerboard, so "no colour" is visibly
-       different from "dark colour". */
-    #pixel-grid .pixel.empty {
-      background:
-        repeating-conic-gradient(#1b2438 0% 25%, #131c2e 0% 50%) 50% / 8px 8px;
-    }
-    .canvas-container { touch-action: none; }
-    #preview-canvas {
-      width: 192px; height: 160px; image-rendering: pixelated;
-      background: #1b2438; border-radius: 10px;
-    }
-    .status { font-size: 0.9rem; text-align: center; color: #34d399; min-height: 1.2rem; }
-
-    @media (min-width: 900px) {
-      .name-input { font-size: 2rem; }
-    }
-
-    .artwork-gallery {
-      display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;
-    }
-    .artwork-card {
-      position: relative; border: 2px solid #2b3550; border-radius: 8px;
-      padding: 4px; background: #0f172a; cursor: pointer; line-height: 0;
-    }
-    .artwork-card.active { border-color: #6366f1; }
-    .artwork-card canvas {
-      width: 48px; height: 48px; image-rendering: pixelated; display: block;
-    }
-    .artwork-actions {
-      display: flex; gap: 2px; margin-top: 3px; line-height: 1;
-    }
-    .artwork-actions button {
-      flex: 1; font-size: 0.7rem; padding: 1px 0; border-radius: 4px;
-      border: 1px solid #2b3550; background: #1b2438; color: #cbd5e1;
-      cursor: pointer;
-    }
-    .artwork-actions button:hover { background: #2b3550; }
-    .artwork-new {
-      width: 56px; height: 56px; border: 2px dashed #2b3550; border-radius: 8px;
-      background: transparent; color: #64748b; font-size: 1.5rem; cursor: pointer;
-    }
-    .artwork-new:hover { border-color: #6366f1; color: #6366f1; }
-    :root {
-      --bg: #0b0f19;
-      --card-bg: #161e2e;
-      --accent: #6366f1;
-      --accent-hover: #4f46e5;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --border: #2e3a52;
-      --grid-border: #334155;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Outfit', sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 1rem;
-    }
-
-    header {
-      width: 100%;
-      max-width: 900px;
-      /* Mobile first: brand over tabs. Side by side, the three tab labels
-         plus the wordmark are wider than a phone and pushed the whole page
-         into a horizontal scroll. */
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      gap: 0.6rem;
-      margin-bottom: 1.5rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .nav-tabs {
-      display: flex;
-      gap: 0.3rem;
-      width: 100%;
-    }
-
-    @media (min-width: 700px) {
-      header {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .nav-tabs { width: auto; }
-    }
-
-    .brand {
-      font-size: 0.85rem;
-      font-family: 'Press Start 2P', cursive;
-      font-size: 1.2rem;
-      color: #818cf8;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .nav-tabs {
-      display: flex;
-      gap: 0.5rem;
-      background: #111827;
-      padding: 0.25rem;
-      border-radius: 8px;
-    }
-
-    .nav-btn {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      /* Equal thirds so three tabs always fit the width exactly, however
-         narrow the screen is. */
-      flex: 1;
-      min-width: 0;
-      padding: 0.6rem 0.4rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.9rem;
-      white-space: nowrap;
-      transition: all 0.2s;
-    }
-
-    @media (min-width: 700px) {
-      .nav-btn { flex: none; padding: 0.5rem 1rem; font-size: 1rem; }
-    }
-
-    #playlist-list { list-style: none; padding: 0; display: grid; gap: .65rem; }
-    .playlist-row { display: flex; align-items: center; gap: .6rem; padding: .7rem; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; }
-    .playlist-row.drag-over { border-color: var(--accent); }
-    .playlist-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-    .playlist-title small { display: block; color: var(--muted); margin-top: .25rem; }
-    .playlist-row button { min-width: 44px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
-    .playlist-editor { padding:0 4px; }
-    .playlist-row button:hover:not(:disabled), .playlist-row button:focus-visible { background:rgba(255,255,255,.07); color:var(--text); }
-    .playlist-row button:disabled { opacity: .35; cursor: default; }
-    .playlist-row .drag-handle { touch-action: none; cursor: grab; user-select: none; }
-    .playlist-row.dragging { opacity: .55; }
-    .playlist-row.drag-over { outline: 2px solid var(--accent); }
-    .playlist-row .remove-entry { color: #f87171; }
-    @media (max-width: 480px) { .playlist-row { gap: .3rem; padding: .4rem; } .playlist-row button { min-width: 40px; } }
-    .nav-btn.active {
-      background: var(--accent);
-      color: #fff;
-    }
-
-    main {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 1.5rem;
-    }
-
-    .tab-content { display: none; }
-    .tab-content.active { display: flex; flex-direction: column; gap: 1.5rem; }
-
-    .editor-layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
-    }
-
-    @media(min-width: 768px) {
-      .editor-layout {
-        grid-template-columns: 340px 1fr;
-      }
-    }
-
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .card-title {
-      font-size: 1.1rem;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      color: #e2e8f0;
-    }
-
-    /* Pixel Grid */
-    .canvas-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      background: #0f172a;
-      padding: 1rem;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-    }
-
-    #pixel-grid {
-      display: grid;
-      grid-template-columns: repeat(48, 1fr);
-      gap: 1px;
-      background: var(--grid-border);
-      width: 280px;
-      height: 280px;
-      user-select: none;
-      cursor: pointer;
-    }
-
-    .pixel {
-      background: #1e293b;
-      aspect-ratio: 1;
-    }
-
-    /* Tools */
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-
-    .tool-btn {
-      background: #1e293b;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 0.5rem 0.8rem;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 0.9rem;
-      display: flex;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .tool-btn.active {
-      border-color: var(--accent);
-      background: #312e81;
-    }
-
-    .palette {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.4rem;
-      margin-top: 0.5rem;
-    }
-    /* 40px is a thumb-sized target; the swatches had no size rule at all
-       before, so they collapsed to nothing. */
-    .swatch {
-      width: 40px; height: 40px; border-radius: 8px; cursor: pointer;
-      border: 2px solid #2b3550;
-    }
-    .swatch.active { border-color: #ffffff; transform: scale(1.08); }
-
-    .color-swatch {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      cursor: pointer;
-      border: 2px solid transparent;
-      transition: transform 0.1s;
-    }
-
-    .color-swatch.selected {
-      border-color: #fff;
-      transform: scale(1.15);
-    }
-
-    /* Profile Info */
-    .form-group {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
-
-    label { font-size: 0.85rem; font-weight: 600; color: var(--muted); }
-    input[type="text"] {
-      background: #0f172a;
-      border: 1px solid var(--border);
-      color: #fff;
-      padding: 0.6rem 0.8rem;
-      border-radius: 6px;
-      font-size: 1rem;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 0.75rem 1.2rem;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background 0.2s;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .btn-primary:hover {
-      background: var(--accent-hover);
-    }
-
-    /* Character Animation Preview */
-    .preview-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.8rem;
-      background: #0f172a;
-      padding: 1rem;
-      border-radius: 8px;
-    }
-
-    #preview-canvas {
-      width: 192px;
-      height: 160px;
-      image-rendering: pixelated;
-
-    }
-
-    @keyframes idleBob {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-    }
-
-    /* QR pairing box */
-    .qr-card {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      text-align: center;
-      gap: 1rem;
-    }
-    .drawing-preview { display:flex; align-items:center; gap:12px; min-height:88px;
-      position:sticky; top:0; z-index:5; background:var(--card-bg); }
-    .drawing-preview #preview-canvas { width:96px; height:80px; flex:none;
-      background:transparent; border-radius:0; }
-    .drawing-preview-options { display:flex; flex-direction:column; gap:6px; }
-    .drawing-preview-options select { min-height:40px; max-width:100%; }
-    /* The drawing tools share the same edges and spacing on narrow phones. */
-    .drawing-card { gap:16px; }
-    .drawing-preview { display:grid; grid-template-columns:96px minmax(0,1fr);
-      gap:12px; padding:4px 0 8px; align-items:center; }
-    .drawing-preview-options { min-width:0; gap:8px; }
-    .drawing-preview-options label { margin:0; font-size:13px; color:var(--muted); }
-    .drawing-preview-options select { width:100%; min-height:44px; padding:8px 10px;
-      border:1px solid var(--border); border-radius:8px; background:#1e293b;
-      color:var(--text); font:inherit; color-scheme:dark; }
-    #outfit-guide-toggle { width:100%; justify-content:center; padding:8px;
-      font-size:13px; line-height:1.25; }
-    #preview-status:empty { display:none; }
-    .brush-sizes { display:grid; grid-template-columns:repeat(4,minmax(0,1fr));
-      gap:8px; margin:0; }
-    .brush-sizes > span { grid-column:1/-1; font-size:13px; color:var(--muted); }
-    .brush-sizes .tool-btn { min-width:0; justify-content:center; padding:8px 4px; }
-    .drawing-card .canvas-container { padding:8px; width:100%; box-sizing:border-box; }
-    .drawing-card #pixel-grid { width:100%; height:auto; aspect-ratio:1; min-width:0; }
-    .drawing-card .toolbar { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-    .drawing-card .toolbar .tool-btn { justify-content:center; padding:8px 4px;
-      min-width:0; font-size:13px; white-space:nowrap; }
-    .drawing-card .palette { display:grid; grid-template-columns:repeat(auto-fit,minmax(44px,1fr));
-      gap:8px; margin:0; }
-    .drawing-card .swatch { width:100%; height:44px; box-sizing:border-box; }
-    .drawing-card label { margin-bottom:0; }
-    .tool-btn:focus-visible, select:focus-visible { outline:2px solid #a5b4fc; outline-offset:2px; }
-    @media(max-width:480px) {
-      .card { padding:16px; }
-      main, .tab-content.active { gap:16px; }
-    }
-    .backup-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-    .backup-actions button { justify-content:center; min-width:0; }
-    .backup-actions button:last-child { grid-column:1/-1; }
-    @media(min-width:600px) {
-      .drawing-preview { grid-template-columns:192px minmax(0,1fr); gap:24px; }
-      .drawing-preview #preview-canvas { width:192px; height:160px; }
-    }
-    @media(min-width:900px) {
-      .drawing-preview { grid-template-columns:288px minmax(0,1fr); gap:32px; }
-      .drawing-preview #preview-canvas { width:288px; height:240px; }
-      .drawing-preview-options { width:100%; max-width:360px; }
-    }
-    :is(#character-colors, #skin-colors) .swatch { cursor:pointer; transition:box-shadow 100ms ease, border-color 100ms ease; }
-    @media(hover:hover) {
-      :is(#character-colors, #skin-colors) .swatch:hover { border-color:#fff; box-shadow:0 0 0 3px rgba(165,180,252,.6); }
-    }
-    :is(#character-colors, #skin-colors) .swatch:focus-visible { outline:2px solid #a5b4fc; outline-offset:3px; }
-    .drawing-preview-options :is(#character-colors, #skin-colors) { display:grid;
-      grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
-    .drawing-preview-options :is(#character-colors, #skin-colors) .swatch { width:100%; min-width:0;
-      height:36px; padding:0; }
-    @media(min-width:600px) {
-      .drawing-preview-options :is(#character-colors, #skin-colors) { grid-template-columns:repeat(6,minmax(0,1fr)); }
-      .drawing-preview-options :is(#character-colors, #skin-colors) .swatch { height:44px; }
-    }
-    .clothing-preview summary { cursor:pointer; padding:8px 0; font-size:13px; }
-    .clothing-preview p { color:var(--muted); font-size:12px; margin:0 0 8px; }
-    #qr-open { background:var(--accent); color:white; font-weight:700; min-height:48px; margin-top:8px; width:100%; }
-    #qr-scanner { box-sizing:border-box; width:min(94vw,480px); max-height:90dvh; overflow:auto; background:var(--card-bg); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:20px; }
-    #qr-scanner::backdrop { background:rgba(0,0,0,.7); }
-    .scanner-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
-    .scanner-heading h2 { margin:0; }
-    #qr-close { min-width:44px; min-height:44px; cursor:pointer; }
-    #qr-video { width:100%; max-height:45dvh; object-fit:cover; border-radius:10px; margin-top:16px; }
-    .scanner-actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:16px; }
-    .scanner-actions label { cursor:pointer; }
-    #qr-result:not([hidden]) { display:block; overflow-wrap:anywhere; }
-    #qr-scanner [hidden] { display:none !important; }
-    .scanner-privacy { font-size:12px; color:var(--muted); }
-  </style>
-</head>
-<body>
-
-  <header>
-    <div class="brand">
-      <span>🎮 GAMENIGHT</span>
-    </div>
-    <div class="nav-tabs">
-      <button class="nav-btn active" onclick="switchTab('character')">Character</button>
-      <button class="nav-btn" onclick="switchTab('session')">Session</button>
-      <button class="nav-btn" onclick="switchTab('playlist')">Playlist</button>
-    </div>
-  <button type="button" class="nav-btn" id="qr-open">Scan QR</button>
-  </header>
-
-<main>
-    <div id="tab-playlist" class="tab-content">
-      <section class="playlist-editor">
-        <h2>Tonight’s playlist</h2>
-        <p>Drag games or use the arrows to change the order. The current game keeps playing. GameNight picks the next game that fits your party.</p>
-        <p id="playlist-status" role="status" aria-live="polite"></p>
-        <ol id="playlist-list" aria-label="Game playlist"></ol>
-        <button class="nav-btn" type="button" onclick="loadPlaylist()">Refresh playlist</button>
-      </section>
-    </div>
-    <!-- TAB 1: CHARACTER EDITOR -->
-    <div id="tab-character" class="tab-content active">
-      <!-- Identity: the first thing you see, and the first thing you change. -->
-      <div class="card identity">
-        <div class="identity-row">
-          <input id="player-name" class="name-input" value="" maxlength="20"
-                 aria-label="Your name" autocomplete="off" spellcheck="false">
-          <button class="icon-btn" id="name-edit" title="Edit your name" aria-label="Edit your name">✏️</button>
-          <button class="icon-btn" id="name-dice" title="Random name" aria-label="Random name">🎲</button>
-        </div>
-        <div class="identity-hint">This is the name above your character.</div>
-      </div>
-
-      <div class="card drawing-card">
-        <div class="card-title">Draw your face</div>
-        <div class="drawing-preview">
-          <canvas id="preview-canvas" width="96" height="80" aria-label="Live character preview"></canvas>
-          <div class="drawing-preview-options">
-            <details class="clothing-preview skin-colour-options">
-              <summary>Skin colour</summary>
-              <p>Saved with your profile.</p>
-              <div class="palette" id="skin-colors" aria-label="Skin colour"></div>
-            </details>
-            <details class="clothing-preview">
-              <summary>Preview clothing colour</summary>
-              <p>The game chooses your clothing colour.</p>
-              <div class="palette" id="character-colors" aria-label="Clothing colour preview"></div>
-            </details>
-        <button type="button" class="tool-btn" id="outfit-guide-toggle" aria-pressed="false" onclick="toggleOutfitGuide()">Show outfit guide</button>
-            <span id="preview-status" role="status"></span>
-          </div>
-        </div>
-        <p class="identity-hint head-guide-hint">Draw anywhere on the head—including hats. The face sits lower and to the right in this grid.</p>
-        <div class="brush-sizes" role="group" aria-label="Brush size">
-          <span>Brush size</span>
-          <button class="tool-btn active" data-brush="1" aria-pressed="true" onclick="setBrushSize(1)">1 px</button>
-          <button class="tool-btn" data-brush="2" aria-pressed="false" onclick="setBrushSize(2)">2 px</button>
-          <button class="tool-btn" data-brush="4" aria-pressed="false" onclick="setBrushSize(4)">4 px</button>
-          <button class="tool-btn" data-brush="8" aria-pressed="false" onclick="setBrushSize(8)">8 px</button>
-        </div>
-        <div class="canvas-container">
-          <div id="pixel-grid"></div>
-        </div>
-
-        <label>Draw colour</label>
-        <div class="palette" id="palette-swatches"></div>
-
-        <div class="toolbar">
-          <button class="tool-btn active" id="tool-pencil" onclick="setTool('pencil')">✏️ Draw</button>
-          <button class="tool-btn" id="tool-eraser" onclick="setTool('eraser')">🧹 Erase</button>
-          <button class="tool-btn" id="tool-fill" onclick="setTool('fill')">🪣 Fill</button>
-          <button class="tool-btn" id="btn-undo" onclick="undo()">↩️ Undo</button>
-          <button class="tool-btn" onclick="clearCanvas()">🗑️ Clear</button>
-          <button class="tool-btn" onclick="loadPreset()">🎲 Random</button>
-        </div>
-
-
-      </div>
-
-      <div class="card">
-        <div class="card-title">My faces</div>
-        <div id="artwork-gallery" class="artwork-list"></div>
-        <button class="btn-primary" onclick="newArtwork()">＋ New face</button>
-        <div class="backup-actions">
-          <button class="tool-btn" onclick="exportBackup()">Export backup</button>
-          <button class="tool-btn" onclick="document.getElementById('backup-file').click()">Import backup</button>
-          <button class="tool-btn" onclick="exportFacePng()">Export face PNG</button>
-        </div>
-        <input type="file" id="backup-file" accept=".json,.txt,application/json,text/plain" hidden onchange="importBackup(this)">
-        <p class="identity-hint">Your faces stay on this device. Export a backup to keep them safe or move them to another device. Import adds faces without deleting existing ones.</p>
-        <div id="backup-status" role="status" aria-live="polite"></div>
-        <details id="backup-text-panel">
-          <summary>Copy backup instead</summary>
-          <p class="identity-hint">If your phone blocks file saving, copy this text into a note. Keep the complete text to restore your faces.</p>
-          <button class="tool-btn" onclick="copyBackup()">Copy all backup data</button>
-          <textarea id="backup-text" aria-label="Complete backup data" readonly rows="5" style="width:100%;box-sizing:border-box;margin-top:8px"></textarea>
-        </details>
-        <details>
-          <summary>Restore from backup text</summary>
-          <textarea id="restore-text" aria-label="Paste backup data" rows="5" style="width:100%;box-sizing:border-box;margin-top:8px"></textarea>
-          <button class="tool-btn" onclick="importBackup({files:[new File([document.getElementById('restore-text').value], 'backup.json')],value:''})">Import pasted backup</button>
-        </details>
-      </div>
-
-      <div id="status-msg" class="status"></div>
-    </div>
-
-    <!-- TAB 3: YOUR PARTY -->
-    <div id="tab-session" class="tab-content">
-      <div class="card">
-        <div class="card-title">Your session</div>
-        <p id="session-link-status" aria-live="polite">Checking your connection…</p>
-        <p id="session-link-help" style="color:var(--muted)"></p>
-        <dl>
-          <dt>Players in the party</dt><dd id="session-player-count">—</dd>
-          <dt>Current game</dt><dd id="session-current-game">—</dd>
-          <dt>Up next</dt><dd id="session-next-game">—</dd>
-        </dl>
-      </div>
-    </div>
-  </main>
-
-  <script>
     // ---- Identity state -------------------------------------------------
     let profileId = localStorage.getItem('gamenight_profile_id')
       || ('prof_' + Math.random().toString(36).slice(2, 11));
@@ -1312,7 +680,7 @@
       return null;
     }
 
-    function init() {
+    async function init() {
       loadPreviewSprite();
       refreshOutfitGuide();
       renderCharacterColors();
@@ -1333,7 +701,22 @@
         scheduleSave();
       };
 
-      loadProfileData();
+      if (storage.cloud) {
+        document.querySelector('.nav-tabs').hidden=true;
+        const initial=storage.initial;
+        if(initial.workspace && !storage.pending){
+          const saved=validateBackup(initial.workspace);
+          localStorage.setItem('gamenight_artworks',JSON.stringify(saved.artworks));
+          localStorage.setItem('gamenight_current_artwork',saved.activeArtworkId);
+          currentArtworkId=saved.activeArtworkId;
+        }
+        if (!storage.pending) {
+          localStorage.setItem('gamenight_player_name',initial.profile.display_name);
+          skinColor=initial.profile.skin_color;
+        }
+      }
+      await loadProfileData();
+      if(storage.cloud)status(storage.pending?'Local changes need attention. Export before refreshing if another device edited your profile.':'Saved to your GameNight account', storage.pending?'#fbbf24':undefined);
     }
 
     let playlistView = null;
@@ -1508,9 +891,8 @@
       try { cachedProfile = JSON.parse(localStorage.getItem('gamenight_saved_profile')); } catch (_) {}
       document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || randomName();
       try {
-        const res = await fetch('/api/profiles/' + profileId);
-        if (res.ok) {
-          const prof = await res.json();
+        const prof = await storage.loadProfile(profileId);
+        if (prof) {
           document.getElementById('player-name').value = localStorage.getItem('gamenight_player_name') || cachedProfile?.username || prof.username || randomName();
           if (prof.skin_color) {
             skinColor = prof.skin_color;
@@ -1604,12 +986,8 @@
           avatar: encodeAvatar(gridData),
         };
         localStorage.setItem('gamenight_saved_profile', JSON.stringify(prof));
-        const res = await fetch('/api/profiles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(prof)
-        });
-        if (!res.ok) { status('⚠️ Could not save profile', '#f87171'); return; }
+        await storage.save(prof, buildBackup());
+        if(storage.cloud){status('Saved to your GameNight account');return;}
 
         // Push straight through to the party. `claim` is whichever player
         // this profile is bound to — the character whose QR was scanned, or
@@ -1930,20 +1308,29 @@
       });
     }
 
-    window.onload = init;
-  </script>
 
-<dialog id="qr-scanner" aria-labelledby="qr-title">
-  <div class="scanner-heading"><h2 id="qr-title">Scan lobby QR</h2><button type="button" id="qr-close" aria-label="Close scanner">✕</button></div>
-  <video id="qr-video" autoplay muted playsinline hidden></video>
-  <p id="qr-status" role="status" aria-live="polite"></p>
-  <a id="qr-result" class="tool-btn" hidden></a>
-  <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>
-  <label class="tool-btn" for="qr-photo">Scan a photo<input id="qr-photo" type="file" accept="image/*" capture="environment" hidden></label></div>
-  <p class="scanner-privacy">Images stay on your device.</p>
-</dialog>
-<script src="/assets/jsQR.js"></script>
-<script src="/assets/qr-scanner.js"></script>
+  
+document.getElementById("studio-action-0").addEventListener("click", function(event) { switchTab('character') });
+document.getElementById("studio-action-1").addEventListener("click", function(event) { switchTab('session') });
+document.getElementById("studio-action-2").addEventListener("click", function(event) { switchTab('playlist') });
+document.getElementById("studio-action-3").addEventListener("click", function(event) { loadPlaylist() });
+document.getElementById("outfit-guide-toggle").addEventListener("click", function(event) { toggleOutfitGuide() });
+document.getElementById("studio-action-5").addEventListener("click", function(event) { setBrushSize(1) });
+document.getElementById("studio-action-6").addEventListener("click", function(event) { setBrushSize(2) });
+document.getElementById("studio-action-7").addEventListener("click", function(event) { setBrushSize(4) });
+document.getElementById("studio-action-8").addEventListener("click", function(event) { setBrushSize(8) });
+document.getElementById("tool-pencil").addEventListener("click", function(event) { setTool('pencil') });
+document.getElementById("tool-eraser").addEventListener("click", function(event) { setTool('eraser') });
+document.getElementById("tool-fill").addEventListener("click", function(event) { setTool('fill') });
+document.getElementById("btn-undo").addEventListener("click", function(event) { undo() });
+document.getElementById("studio-action-13").addEventListener("click", function(event) { clearCanvas() });
+document.getElementById("studio-action-14").addEventListener("click", function(event) { loadPreset() });
+document.getElementById("studio-action-15").addEventListener("click", function(event) { newArtwork() });
+document.getElementById("studio-action-16").addEventListener("click", function(event) { exportBackup() });
+document.getElementById("studio-action-17").addEventListener("click", function(event) { document.getElementById('backup-file').click() });
+document.getElementById("studio-action-18").addEventListener("click", function(event) { exportFacePng() });
+document.getElementById("backup-file").addEventListener("change", function(event) { importBackup(this) });
+document.getElementById("studio-action-20").addEventListener("click", function(event) { copyBackup() });
+document.getElementById("studio-action-21").addEventListener("click", function(event) { importBackup({files:[new File([document.getElementById('restore-text').value], 'backup.json')],value:''}) });
 
-</body>
-</html>
+init();
