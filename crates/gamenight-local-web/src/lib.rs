@@ -89,6 +89,8 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
+        .route("/favicon.ico", get(|| async { ([("content-type", "image/x-icon")], include_bytes!("../../../web/favicon.ico").as_slice()) }))
+        .route("/apple-touch-icon.png", get(|| async { ([("content-type", "image/png")], include_bytes!("../../../web/apple-touch-icon.png").as_slice()) }))
         .route("/studio", get(serve_studio))
         .route("/web/:asset", get(serve_web_asset))
         .route(

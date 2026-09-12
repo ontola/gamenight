@@ -1,0 +1,13 @@
+{
+  "source": "web/icon.svg",
+  "sha256": {
+    "web/icon.svg": "95089c6c885e9fae95378dcf0bdfd618ddb93ec5cad2356f574b6caba27ee39b",
+    "web/favicon.ico": "10e14aed85b5507e616325b88c61e10f2aa6f82adaa63401f720492347d77b76",
+    "web/apple-touch-icon.png": "a66bf033fae4e5ab5d20e99a80bc7925b8cd44cd94fece57ad97616f746229df",
+    "site/icon.svg": "95089c6c885e9fae95378dcf0bdfd618ddb93ec5cad2356f574b6caba27ee39b",
+    "site/icon.png": "97c40495685f041b11e1344325e1a1976efe0e015e8bd2d6dd639dfc2d8f8a80",
+    "site/favicon.ico": "10e14aed85b5507e616325b88c61e10f2aa6f82adaa63401f720492347d77b76",
+    "crates/lobby/branding/gamenight.ico": "10e14aed85b5507e616325b88c61e10f2aa6f82adaa63401f720492347d77b76",
+    "crates/lobby/branding/icon-64.rgba": "5e2d37400e93dcd895b73212f23cbd9c17d5e310307e0f923cb2fd421a34b3eb"
+  }
+}
