@@ -128,3 +128,5 @@ body.drawing-fullscreen { position:fixed; width:100%; overflow:hidden; overscrol
 .scanner-preview { position:relative; height:min(300px,40dvh); margin-top:16px; border-radius:10px; overflow:hidden; background:#0b1020; display:grid; place-items:center; color:var(--muted); }
 .scanner-preview #qr-video { position:absolute; inset:0; width:100%; height:100%; max-height:none; margin:0; object-fit:contain; background:#0b1020; }
 @media(max-width:699px) { .drawing-preview-options #outfit-guide-toggle { display:none; } }
+
+#mobile-colour-dot { width:18px; height:18px; flex:none; border-radius:50%; border:1px solid #ffffff80; box-shadow:0 0 0 1px #0008; }

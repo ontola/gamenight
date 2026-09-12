@@ -64,6 +64,8 @@ let initializing = true;
     let currentTool = 'pencil';
 
     function renderPalette() {
+      const dot=document.getElementById("mobile-colour-dot");
+      if(dot)dot.style.backgroundColor=currentColor;
       const el = document.getElementById('palette-swatches');
       el.innerHTML = '';
       PALETTE.forEach(col => {
@@ -1374,6 +1376,7 @@ init();
   controls.innerHTML="<button type=\"button\" class=\"tool-btn\" aria-expanded=\"false\">Colour</button><button type=\"button\" class=\"tool-btn\" aria-expanded=\"false\">Brush · 1 px</button><button type=\"button\" class=\"tool-btn\" aria-pressed=\"true\">Outfit</button>";
   card.append(controls);
   const [colour,brush,guide]=controls.children;
+  const dot=document.createElement("span");dot.id="mobile-colour-dot";dot.setAttribute("aria-hidden","true");dot.style.backgroundColor=currentColor;colour.prepend(dot);
   function closePanels(){card.classList.remove("choose-colour","choose-brush");colour.setAttribute("aria-expanded","false");brush.setAttribute("aria-expanded","false");}
   function togglePanel(name,button){const open=!card.classList.contains(name);closePanels();card.classList.toggle(name,open);button.setAttribute("aria-expanded",String(open));}
   colour.onclick=()=>togglePanel("choose-colour",colour);brush.onclick=()=>togglePanel("choose-brush",brush);
