@@ -1273,9 +1273,34 @@ struct PruneCountdown {
 /// highlighted, moved by that player's own d-pad. Rendered fresh from
 /// `GameNightBridge`'s live player list every frame, so there's nothing here
 /// to keep in sync on rename/color-change.
+fn random_guest_avatar() -> String {
+    let seed=PlayerId::new();
+    let bytes=seed.0.as_bytes();
+    let mut art=gamenight_protocol::avatar::Avatar{width:48,height:48,pixels:vec![None;48*48]};
+    let hair=[[48,35,29],[107,57,38],[192,120,50],[239,208,120],[220,227,239]][bytes[0] as usize%5];
+    let hat=[[214,76,100],[67,123,209],[117,82,184],[54,166,154]][bytes[1] as usize%4];
+    let mut rect=|x:usize,y:usize,w:usize,h:usize,c:[u8;3]| {
+        for row in y..(y+h).min(48) {for col in x..(x+w).min(48) {art.pixels[row*48+col]=Some(c);}}
+    };
+    match bytes[2]%4 {
+        0=>{rect(13,14,24,7,hair);rect(12,20,5,13,hair);},
+        1=>{rect(22,6,6,16,hair);rect(18,18,16,4,hair);},
+        2=>{rect(14,13,23,9,hat);rect(12,22,31,3,hat);rect(27,16,3,4,[255,255,255]);},
+        _=>{rect(14,13,23,10,hat);rect(18,10,15,3,hat);rect(24,6,5,4,[255,255,255]);rect(12,22,27,3,[235,225,209]);}
+    }
+    for x in [23,32] {
+        if bytes[3]%3==0 {rect(x,28,4,2,[26,26,26]);}
+        else {rect(x,26,5,5,[255,255,255]);rect(x+2,27,2,3,[26,26,26]);}
+    }
+    rect(27,35,8,2,[26,26,26]);
+    if bytes[4]%2==0 {rect(29,37,4,1,[26,26,26]);}
+    art.encode()
+}
+
 struct PlayerMenuState {
     highlight: usize,
     has_inactive: bool,
+    was_linked: Option<bool>,
 }
 
 /// The menu's fixed action list — a d-pad-navigated list, not a mouse-driven
@@ -1395,7 +1420,7 @@ impl GlobalInput {
             name: name.clone(),
             seat: None,
             color: Some(color.clone()),
-            avatar: None,
+            avatar: Some(random_guest_avatar()),
             library: Vec::new(),
         });
         self.pending_joins.insert(pad, (name, color));
@@ -1438,7 +1463,7 @@ impl GlobalInput {
     fn toggle_menu(&mut self, player_id: PlayerId) {
         if self.open_menus.remove(&player_id).is_none() {
             self.open_menus
-                .insert(player_id, PlayerMenuState { highlight: 0, has_inactive: false });
+                .insert(player_id, PlayerMenuState { highlight: 0, has_inactive: false, was_linked: None });
         }
     }
 
@@ -1863,6 +1888,11 @@ fn global_input_system(
     if !input.newly_confirmed.is_empty() {
         let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
         for (pad, player_id) in input.newly_confirmed.drain(..) {
+            if bridge.latest_players.iter().find(|p|p.id==player_id).is_some_and(|p|p.skin_color.is_none()) {
+                let skins=["#f5e9be","#edc59a","#d7a477","#b77b50","#895735","#563b2d"];
+                let seed=PlayerId::new();
+                let _=join_tx.try_send(ClientMessage::SetPlayerSkinColor {player_id,skin_color:skins[seed.0.as_bytes()[0] as usize%skins.len()].into()});
+            }
             bridge.player_gamepad.insert(player_id, pad);
             let mut connected: Vec<_> = gamepads.iter().map(|g| g.id).collect();
             connected.sort_unstable();
@@ -2093,7 +2123,7 @@ fn sync_player_menus_system(
     mut images: bevy::prelude::ResMut<bevy::prelude::Assets<bevy::prelude::Image>>,
     mut qr_cache: bevy::prelude::Local<std::collections::HashMap<String, bevy::prelude::Handle<bevy::prelude::Image>>>,
     mut commands: bevy::prelude::Commands,
-    input: bevy::prelude::Res<GlobalInput>,
+    mut input: bevy::prelude::ResMut<GlobalInput>,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
     roots: bevy::prelude::Query<(bevy::prelude::Entity, &PlayerMenuRoot)>,
@@ -2101,6 +2131,14 @@ fn sync_player_menus_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
+    if let Some(snapshot)=links.snapshot() {
+        input.open_menus.retain(|id,menu| {
+            let linked=snapshot.linked.contains(id);
+            let claimed=menu.was_linked==Some(false) && linked;
+            menu.was_linked=Some(linked);
+            !claimed
+        });
+    }
     for (entity, PlayerMenuRoot(player_id)) in &roots {
         if !input.open_menus.contains_key(player_id) {
             commands.entity(entity).despawn_recursive();

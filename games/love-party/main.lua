@@ -29,6 +29,13 @@ local function prepare(seats, players)
 	state = mode.new(roster, U.rng(tonumber(os.getenv("GNLOVE_SEED")) or os.time()))
 	remaining, finished, accumulator = duration or mode.duration or 60, false, 0
 	menu = false
+	if managed and love.graphics then
+		-- Exercise lazy font/texture uploads before reporting Ready. Keep the
+		-- window hidden and do not advance gameplay during this warm frame.
+		love.graphics.clear()
+		Render.game(mode, state, remaining, finished, managed)
+		love.graphics.present()
+	end
 end
 local function standalone()
 	mode = modes[selected]
@@ -72,6 +79,7 @@ function love.load(args)
 	end
 	mode = modes[selected]
 	if love.graphics then
+		if managed then Screen.prepare() end
 		Render.load()
 	end
 	Audio.load()

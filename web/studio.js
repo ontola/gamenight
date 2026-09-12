@@ -839,7 +839,8 @@ let initializing = true;
         handle.textContent = '⠿';
         handle.setAttribute('aria-label', `Drag ${entry.title} to reorder`);
         handle.disabled = playlistBusy || past || playing;
-        row.append(handle);
+        if(!past)row.append(handle);
+        else row.classList.add('playlist-past');
         const title = document.createElement('div');
         title.className = 'playlist-title';
         title.textContent = entry.title;
@@ -862,10 +863,15 @@ let initializing = true;
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'remove-entry';
-        remove.textContent = '×';
-        remove.setAttribute('aria-label', `Remove ${entry.title} from playlist`);
+        remove.textContent = past ? '+ Play next' : '×';
+        remove.setAttribute('aria-label', past ? `Play ${entry.title} next` : `Remove ${entry.title} from playlist`);
         remove.disabled = playlistBusy;
-        remove.onclick = () => updatePlaylist({ from: index, remove: true }, index);
+        remove.onclick = past ? async()=>{
+          remove.disabled=true;
+          try{await storage.playNext(entry.game);window.showToast(`${entry.title} will play next`);await loadPlaylist();}
+          catch(error){window.showToast(error.message);}
+          finally{remove.disabled=false;}
+        } : () => updatePlaylist({ from: index, remove: true }, index);
         row.append(remove);
         handle.onpointerdown = event => {
           if (playlistBusy || playlistLoading || past || playing || draggedEntry !== null || event.button !== 0) return;
@@ -1034,6 +1040,7 @@ let initializing = true;
         };
         localStorage.setItem('gamenight_saved_profile', JSON.stringify(prof));
         await storage.save(prof, buildBackup());
+        window.dispatchEvent(new Event('gamenight-profile-ready'));
         if(storage.cloud){status('Saved to your GameNight account');return;}
 
         // Push straight through to the party. `claim` is whichever player
@@ -1366,7 +1373,6 @@ let initializing = true;
 
 
   
-document.getElementById("studio-action-3").addEventListener("click", function(event) { loadPlaylist() });
 document.getElementById("outfit-guide-toggle").addEventListener("click", function(event) { toggleOutfitGuide() });
 document.getElementById("studio-action-5").addEventListener("click", function(event) { setBrushSize(1) });
 document.getElementById("studio-action-6").addEventListener("click", function(event) { setBrushSize(2) });

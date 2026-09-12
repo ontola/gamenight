@@ -52,21 +52,23 @@ function M.hide()
 	end
 end
 
+function M.prepare()
+	if not love.window then return end
+	local width, height = love.window.getDesktopDimensions()
+	love.window.setMode(width, height, {borderless=true, resizable=false, vsync=1, x=-10000, y=-10000})
+	M.hide()
+end
+
 function M.show()
 	if not love.window then
 		return
 	end
 	native_window()
-	if sdl then
-		sdl.SDL_ShowWindow(window)
-	end
+	-- The managed window already has its final dimensions and borderless
+	-- style. Moving and showing it must not recreate graphics resources.
+	love.window.setPosition(0, 0)
+	if sdl then sdl.SDL_ShowWindow(window) end
 	love.window.restore()
-	-- Enter desktop fullscreen only at Start/Resume: prewarming must not
-	-- change the display or reveal the game. Refresh SDL after mode changes.
-	if not love.window.getFullscreen() then
-		love.window.setPosition(0, 0)
-		love.window.setFullscreen(true, "desktop")
-	end
 	native_window()
 	if sdl then
 		sdl.SDL_RaiseWindow(window)

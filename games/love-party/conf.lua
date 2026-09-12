@@ -6,6 +6,7 @@ function love.conf(t)
 	t.window.resizable, t.window.vsync = true, 1
 	t.modules.physics, t.modules.video, t.modules.touch = false, false, false
 	if os.getenv("GAMENIGHT") == "1" then
+		t.window.borderless = true
 		t.window.x, t.window.y = -10000, -10000
 	end
 	if os.getenv("GNLOVE_HEADLESS") == "1" then

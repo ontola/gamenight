@@ -57,7 +57,7 @@ function M.draw(s, G, fonts, playerColor)
 	end
 	for _, e in ipairs(s.enemies) do
 		local c = Siege.enemyColors[e.kind]
-		local n = e.kind == "splitter" and 6 or (e.kind == "weaver" or e.kind == "shard") and 3 or 4
+		local n = e.kind == "boss" and 8 or e.kind == "splitter" and 6 or (e.kind == "weaver" or e.kind == "shard") and 3 or 4
 		local angle = e.kind == "fort" and math.pi / 4 or s.time * 0.7 + e.phase
 		if e.warm > 0 then
 			tint(c, 0.25)
@@ -69,6 +69,13 @@ function M.draw(s, G, fonts, playerColor)
 			tint(c, 0.15)
 			G.setLineWidth(7)
 			polygon(e.x, e.y, e.r, n, angle)
+			if e.kind=="boss" then
+				polygon(e.x,e.y,e.r*0.65,8,-angle)
+				G.setColor(0.15,0.1,0.2)
+				G.rectangle("fill",e.x-38,e.y-e.r-14,76,5)
+				tint(c)
+				G.rectangle("fill",e.x-38,e.y-e.r-14,76*math.max(0,e.hp/e.maxHp),5)
+			end
 			tint(e.flash > 0 and { 1, 1, 1 } or c)
 			G.setLineWidth(2)
 			polygon(e.x, e.y, e.r, n, angle)

@@ -17,6 +17,23 @@ local function tick(s, dt)
 	M.update(s, dt or 1 / 120, inputs)
 end
 local tests = {}
+function tests.bots_patrol_but_do_not_fire_without_targets()
+	local s=fresh(1)
+	s.waveRest=10
+	local p=s.players[1]
+	local x,y=p.x,p.y
+	for _=1,60 do M.update(s,1/60,{M.bot(s,p)}) end
+	assert(#s.shots==0 and ((p.x-x)^2+(p.y-y)^2)>100)
+end
+function tests.boss_is_not_killed_by_one_pulse()
+	local s=fresh(1)
+	local p=s.players[1]
+	local boss=M.spawn(s,"boss",p.x+100,p.y,0)
+	M.pulse(s,p)
+	assert(not boss.dead and boss.hp==boss.maxHp-12)
+	local plan,name=require("games.siege_waves").plan(5,2,1280,800)
+	assert(name=="OVERSEER" and plan[#plan].kind=="boss")
+end
 function tests.releasing_aim_stops_fire_even_while_moving()
 	local s = fresh(1)
 	local function step(aimX, aimY)
@@ -194,22 +211,22 @@ function tests.waves_warn_clear_and_rest_before_advancing()
 	s.enemies = {}
 	W.update(s, 0.01, spawn)
 	assert(s.wavePhase == "rest")
-	W.update(s, 2.9, spawn)
+	W.update(s, W.rest-0.1, spawn)
 	assert(s.wave == 1 and #s.enemies == 0)
 	W.update(s, 0.11, spawn)
 	assert(s.wave == 2)
 	for number = 1, 12 do
 		local plan, name = W.plan(number, 4, 1422, 800)
-		assert(#plan <= 32 and name == W.names[(number - 1) % 4 + 1])
+		assert(#plan <= 61 and name == (number%5==0 and "OVERSEER" or W.names[(number - 1) % 4 + 1]))
 		for _, e in ipairs(plan) do
 			assert(e.x >= 0 and e.x <= 1422 and e.y >= 0 and e.y <= 800)
-			if number < 3 then
+			if number < 2 then
 				assert(e.kind == "chaser")
 			end
-			if number < 5 then
+			if number < 3 then
 				assert(e.kind ~= "splitter")
 			end
-			if number < 7 then
+			if number < 4 then
 				assert(e.kind ~= "fort")
 			end
 		end

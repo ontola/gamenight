@@ -64,7 +64,16 @@ pub(super) fn sync(
         }
     }
     if !code.is_empty() && !labels.iter().any(|(_, label)| label.0 == code) {
-        spawn_room_plaque(&mut commands, &assets, code);
+        let origin=if snapshot.as_ref().is_some_and(|s|s.cloud) {
+            std::env::var("GAMENIGHT_CLOUD_URL").unwrap_or_else(|_|"https://gamenight.ontola.io".into())
+        }else{super::lobby_join_url()};
+        let base=origin.split("/studio").next().unwrap_or(&origin).trim_end_matches('/');
+        let url=format!("{base}/studio#room={code}");
+        let qr=super::generate_qr_bevy_image(&url).map(|mut image|{
+            image.sampler_descriptor=bevy::render::texture::ImageSampler::nearest();
+            images.add(image)
+        });
+        spawn_room_plaque(&mut commands, &assets, code, qr);
     }
     for (entity, door) in &existing {
         if !pending.iter().any(|p| {
@@ -239,7 +248,7 @@ pub(super) fn sync(
 
 /// A wall-mounted enamel sign, clear of every station and platform. Opaque
 /// backing keeps its contrast independent of the selected room background.
-fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str) {
+fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str, qr:Option<Handle<Image>>) {
     let font: Handle<Font> = assets.load("ui/ark-pixel-16px-latin.ttf");
     commands.spawn((RoomLabel(code.into()), SpatialBundle {
         transform: Transform::from_xyz(640., 640., -910.), ..default()
@@ -247,20 +256,20 @@ fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str) 
         // Integer-sized, layered rectangles give the frame pixel-art edges;
         // no rounded vector borders or translucent text over the wallpaper.
         for (x, y, z, w, h, color) in [
-            (4., -6., 0., 280., 104., Color::rgb_u8(32, 24, 29)),
-            (0., 0., 1., 280., 104., Color::rgb_u8(74, 47, 34)),
-            (0., 2., 2., 272., 96., Color::rgb_u8(202, 153, 84)),
-            (0., 0., 3., 264., 88., Color::rgb_u8(25, 39, 48)),
-            (0., 42., 4., 264., 4., Color::rgb_u8(242, 210, 155)),
-            (0., -42., 4., 264., 4., Color::rgb_u8(101, 72, 44)),
+            (4., -6., 0., 420., 152., Color::rgb_u8(32, 24, 29)),
+            (0., 0., 1., 420., 152., Color::rgb_u8(74, 47, 34)),
+            (0., 2., 2., 412., 144., Color::rgb_u8(202, 153, 84)),
+            (0., 0., 3., 404., 136., Color::rgb_u8(25, 39, 48)),
+            (0., 66., 4., 404., 4., Color::rgb_u8(242, 210, 155)),
+            (0., -66., 4., 404., 4., Color::rgb_u8(101, 72, 44)),
         ] {
             parent.spawn(SpriteBundle {
                 sprite: Sprite { color, custom_size: Some(Vec2::new(w,h)), ..default() },
                 transform: Transform::from_xyz(x,y,z), ..default()
             });
         }
-        for x in [-120., 120.] {
-            for y in [-30., 30.] {
+        for x in [-192., 192.] {
+            for y in [-55., 55.] {
                 parent.spawn(SpriteBundle {
                     sprite: Sprite { color: Color::rgb_u8(202,153,84), custom_size: Some(Vec2::splat(4.)), ..default() },
                     transform: Transform::from_xyz(x,y,5.), ..default()
@@ -268,14 +277,19 @@ fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str) 
             }
         }
         for (text, y, size, color) in [
-            ("ROOM CODE", 24., 16., Color::rgb_u8(224,190,132)),
-            (code, -10., 32., Color::rgb_u8(255,248,222)),
+            ("GameNight", 35., 24., Color::rgb_u8(224,190,132)),
+            (code, 0., 32., Color::rgb_u8(255,248,222)),
+            ("ROOM CODE", -32., 12., Color::rgb_u8(224,190,132)),
         ] {
             parent.spawn(Text2dBundle {
                 text: Text::from_section(text, TextStyle {font:font.clone(), font_size:size, color})
                     .with_alignment(TextAlignment::Center),
-                transform: Transform::from_xyz(0.,y,6.), ..default()
+                transform: Transform::from_xyz(-65.,y,6.), ..default()
             });
         }
+        if let Some(texture)=qr {parent.spawn(SpriteBundle{
+            texture,sprite:Sprite{custom_size:Some(Vec2::splat(120.)),..default()},
+            transform:Transform::from_xyz(124.,0.,6.),..default()
+        });}
     });
 }

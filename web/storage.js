@@ -5,7 +5,7 @@
   const pairing=new URLSearchParams(location.hash.slice(1)).get('pair');
   if(cloud && pairing){sessionStorage.setItem('gamenight_pair',pairing);history.replaceState(null,'',location.pathname);}
   const roomCode=new URLSearchParams(location.hash.slice(1)).get('room');
-  if(cloud && roomCode){sessionStorage.setItem('gamenight_room_code',roomCode);history.replaceState(null,'',location.pathname);}
+  if(roomCode){sessionStorage.setItem('gamenight_room_code',roomCode);history.replaceState(null,'',location.pathname);}
   const nativeStorage=window.localStorage;
   const local={ getItem:k=>nativeStorage.getItem(prefix+k), setItem:(k,v)=>nativeStorage.setItem(prefix+k,v), removeItem:k=>nativeStorage.removeItem(prefix+k) };
   async function request(path,method='GET',body) {
@@ -24,6 +24,10 @@
       window.initAccountSettings(account,request);
     }
     window.gamenightStorage={cloud,local,initial:documentState,
+      async playNext(game){
+        const requestId=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
+        await request(cloud?'/v1/rooms/next':'/api/dev-catalog/next','POST',{game,request_id:requestId,...(!cloud?{profile:local.getItem('gamenight_profile_id')}:{})});
+      },
       async playlist(change) {
         if (!cloud) {
           const profile=local.getItem('gamenight_profile_id');
@@ -175,6 +179,14 @@
       finally{roomCancel.disabled=false;}
     });
     if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');renderRoomCode();if(roomInput.value)await joinRoom();else checkRoom();}
+    else {
+      roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';
+      sessionStorage.removeItem('gamenight_room_code');renderRoomCode();
+      if(roomInput.value){
+        // A fresh phone needs the editor to create and save its local profile.
+        window.addEventListener('gamenight-profile-ready',()=>joinRoom(),{once:true});
+      }
+    }
     const script=document.createElement('script');script.src='/web/studio.js';document.body.append(script);
   }catch(error){const el=document.createElement('p');el.setAttribute('role','alert');el.textContent=error.message;document.querySelector('main').prepend(el);}
 })();

@@ -5,11 +5,12 @@ local M = {
 	title = "NEON SIEGE",
 	tagline = "One swarm. One team. Keep moving.",
 	coop = true,
-	duration = 90,
+	duration = 240,
 	controls = "MOVE left stick / keys   AIM + FIRE right stick / keyboard auto   DASH A / action   PULSE B / secondary",
-	limits = { enemies = 64, shots = 600, hostile = 160, particles = 650, pickups = 36 },
+	limits = { enemies = 96, shots = 600, hostile = 240, particles = 650, pickups = 36 },
 }
 local specs = {
+	boss = { hp = 180, r = 38, speed = 60, value = 1000 },
 	chaser = { hp = 1, r = 11, speed = 115, value = 10 },
 	weaver = { hp = 1, r = 10, speed = 145, value = 15 },
 	splitter = { hp = 4, r = 21, speed = 65, value = 45 },
@@ -70,6 +71,8 @@ function M.spawn(s, kind, x, y, delay)
 		fire = 1.0 + s.rng(),
 		flash = 0,
 	}
+	if kind == "boss" then e.hp=def.hp + math.max(0,#s.players-1)*60 end
+	e.maxHp=e.hp
 	s.enemies[#s.enemies + 1] = e
 	return e
 end
@@ -140,6 +143,7 @@ function M.multiplier(s)
 	return math.min(5, 1 + math.floor(s.chain / 12))
 end
 local enemyColors = {
+	boss = { 0.85, 0.35, 1 },
 	chaser = { 1, 0.27, 0.57 },
 	weaver = { 0.4, 1, 0.5 },
 	splitter = { 1, 0.76, 0.23 },
@@ -203,7 +207,10 @@ function M.pulse(s, p)
 	for i = 1, count do
 		local e = s.enemies[i]
 		if not e.dead and (e.x - p.x) ^ 2 + (e.y - p.y) ^ 2 < 190 ^ 2 then
-			M.kill(s, e)
+			if e.kind=="boss" then
+				e.hp=e.hp-12;e.flash=0.2
+				if e.hp<=0 then M.kill(s,e) end
+			else M.kill(s, e) end
 		end
 	end
 	for i = #s.hostile, 1, -1 do
@@ -319,7 +326,7 @@ local function playerStep(s, p, c, dt)
 			local n = math.max(0.001, U.length(ax, ay))
 			ax, ay = ax / n, ay / n
 		else
-			ax, ay = p.aimX, p.aimY
+			return -- Auto aim must not keep firing into an empty arena.
 		end
 	else
 		return
@@ -353,6 +360,19 @@ local function enemiesStep(s, dt)
 					local wave = math.sin(s.time * 5 + e.phase) * 0.85
 					dx, dy = dx - dy * wave, dy + dx * wave
 				end
+				if e.kind == "boss" then
+					e.fire=e.fire-dt
+					if length<260 then speed=0 end
+					if e.fire<=0 then
+						e.fire=e.hp<e.maxHp/2 and 1.1 or 1.8
+						for i=1,12 do
+							if #s.hostile>=M.limits.hostile then break end
+							local a=i*math.pi/6+s.time*0.4
+							-- A rotating radial volley has visible lanes to dodge.
+							s.hostile[#s.hostile+1]={x=e.x,y=e.y,vx=math.cos(a)*190,vy=math.sin(a)*190,ttl=6}
+						end
+					end
+				end
 				if e.kind == "fort" then
 					if length < 300 then
 						speed = 0
@@ -367,7 +387,7 @@ local function enemiesStep(s, dt)
 				for _, pilot in ipairs(s.players) do
 					if not e.dead and alive(pilot) and (pilot.x - e.x) ^ 2 + (pilot.y - e.y) ^ 2 < (e.r + 11) ^ 2 then
 						M.hurt(s, pilot)
-						if pilot.dash > 0 then
+						if pilot.dash > 0 and e.kind~="boss" then
 							M.kill(s, e)
 						end
 					end
@@ -391,8 +411,8 @@ local function shotsStep(s, dt)
 		b.ttl = b.ttl - dt
 		while b.hits > 0 do
 			local best, t = nil, math.huge
-			for gy = math.floor((math.min(b.y, y) - 25) / 64), math.floor((math.max(b.y, y) + 25) / 64) do
-				for gx = math.floor((math.min(b.x, x) - 25) / 64), math.floor((math.max(b.x, x) + 25) / 64) do
+			for gy = math.floor((math.min(b.y, y) - 45) / 64), math.floor((math.max(b.y, y) + 45) / 64) do
+				for gx = math.floor((math.min(b.x, x) - 45) / 64), math.floor((math.max(b.x, x) + 45) / 64) do
 					for _, e in ipairs(grid[gy * 32 + gx] or {}) do
 						if not e.dead and not b.hit[e] then
 							local hit = M.segmentHit(b.x, b.y, x, y, e.x, e.y, e.r + 3)
@@ -531,7 +551,13 @@ function M.describe(p)
 		.. (p.pulseClock == 0 and "READY" or math.ceil(p.pulseClock) .. "s")
 end
 function M.bot(s, p)
-	local dx, dy = (s.width / 2 - p.x) * 0.001, (s.height / 2 - p.y) * 0.001
+	local angle=s.time*0.45+p.slot*1.7
+	local dx, dy = (s.width/2+math.cos(angle)*s.width*0.25-p.x)*0.008, (s.height/2+math.sin(angle)*s.height*0.25-p.y)*0.008
+	for _,b in ipairs(s.hostile) do
+		local x,y=p.x-b.x,p.y-b.y
+		local d=x*x+y*y
+		if d<110^2 then dx=dx+x/math.max(100,d)*150;dy=dy+y/math.max(100,d)*150 end
+	end
 	local nearby = 0
 	for _, e in ipairs(s.enemies) do
 		if not e.dead then
