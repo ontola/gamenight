@@ -1,5 +1,6 @@
 const storage = window.gamenightStorage;
 const localStorage = storage.local;
+let initializing = true;
 
     // ---- Identity state -------------------------------------------------
     let profileId = localStorage.getItem('gamenight_profile_id')
@@ -716,6 +717,7 @@ const localStorage = storage.local;
         }
       }
       await loadProfileData();
+      initializing = false;
       if(storage.cloud)status(storage.pending?'Local changes need attention. Export before refreshing if another device edited your profile.':'Saved to your GameNight account', storage.pending?'#fbbf24':undefined);
     }
 
@@ -965,6 +967,7 @@ const localStorage = storage.local;
     }
 
     function scheduleSave() {
+      if(storage.cloud && initializing) return;
       const name = document.getElementById('player-name').value;
       if (name.trim()) localStorage.setItem('gamenight_player_name', name);
 
@@ -1034,10 +1037,10 @@ const localStorage = storage.local;
           }
           status(target ? '✓ Synced to your character' : '✓ Joined the party');
         } else {
-          status('⚠️ Saved locally — is the daemon running?', '#fbbf24');
+          status(storage.cloud ? e.message : '⚠️ Saved locally — is the daemon running?', '#fbbf24');
         }
       } catch (e) {
-        status('⚠️ Saved locally — is the daemon running?', '#fbbf24');
+        status(storage.cloud ? e.message : '⚠️ Saved locally — is the daemon running?', '#fbbf24');
       } finally {
         savingNow = false;
         if (savePending) { savePending = false; pushProfile(); }
