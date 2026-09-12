@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use crate::prelude::*;
 
+pub mod punch;
 mod state;
 pub use state::*;
 use turborand::GenCore;
@@ -17,6 +18,7 @@ const PLAYER_COLORS: [Color; 4] = [
 
 pub fn plugin(session: &mut SessionBuilder) {
     session.install_plugin(state::plugin);
+    punch::install(session);
 
     // Add other player systems
     session

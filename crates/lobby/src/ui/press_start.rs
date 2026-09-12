@@ -92,6 +92,10 @@ fn mix(a: egui::Color32, b: egui::Color32, t: f32) -> egui::Color32 {
 }
 
 fn press_start_system(meta: Root<GameMeta>, ctx: Res<EguiCtx>, game: Res<GameNightBridge>) {
+    // Clean, real-frame captures for remote layout reviews without a controller.
+    if std::env::var_os("LOBBY_SHOT").is_some()
+        && std::env::var("LOBBY_SHOT_CLEAN").as_deref() == Ok("1") { return; }
+
     // Somebody is here — nothing to ask for.
     if !game.latest_players.is_empty() {
         return;

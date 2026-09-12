@@ -649,22 +649,45 @@ pub fn demo_library() -> Vec<GameMeta> {
 pub fn load_library(path: &str) -> std::io::Result<Vec<GameMeta>> {
     let text = std::fs::read_to_string(path)?;
     let mut library: Vec<GameMeta> = serde_json::from_str(&text).map_err(|e| {
-        std::io::Error::new(std::io::ErrorKind::InvalidData, format!("bad library file {path}: {e}"))
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("bad library file {path}: {e}"),
+        )
     })?;
-    let root = std::path::Path::new(path).parent().unwrap_or(std::path::Path::new("."));
+    let root = std::path::Path::new(path)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
     for game in &mut library {
-        if let Some(cover) = game.cover.clone().filter(|cover| !cover.contains("://") && !cover.starts_with("data:")) {
+        if let Some(cover) = game
+            .cover
+            .clone()
+            .filter(|cover| !cover.contains("://") && !cover.starts_with("data:"))
+        {
             let relative = std::path::Path::new(&cover);
-            let safe = !relative.is_absolute() && relative.components().all(|part| matches!(part, std::path::Component::Normal(_) | std::path::Component::CurDir));
+            let safe = !relative.is_absolute()
+                && relative.components().all(|part| {
+                    matches!(
+                        part,
+                        std::path::Component::Normal(_) | std::path::Component::CurDir
+                    )
+                });
             game.cover = if safe {
-                std::fs::File::open(root.join(relative)).ok().and_then(|file| {
-                    use std::io::Read;
-                    let mut bytes = Vec::new();
-                    file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64).read_to_end(&mut bytes).ok()?;
-                    gamenight_protocol::artwork::png_data_uri(&bytes)
-                })
-            } else { None };
-            if game.cover.is_none() { tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback"); }
+                std::fs::File::open(root.join(relative))
+                    .ok()
+                    .and_then(|file| {
+                        use std::io::Read;
+                        let mut bytes = Vec::new();
+                        file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64)
+                            .read_to_end(&mut bytes)
+                            .ok()?;
+                        gamenight_protocol::artwork::png_data_uri(&bytes)
+                    })
+            } else {
+                None
+            };
+            if game.cover.is_none() {
+                tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback");
+            }
         }
     }
     Ok(library)
@@ -1217,9 +1240,13 @@ fn message_to_command(
         ClientMessage::RenamePlayer { player_id, name } => {
             Command::RenamePlayer { player_id, name }
         }
-        ClientMessage::SetPlayerSkinColor { player_id, skin_color } => {
-            Command::SetPlayerSkinColor { player_id, skin_color }
-        }
+        ClientMessage::SetPlayerSkinColor {
+            player_id,
+            skin_color,
+        } => Command::SetPlayerSkinColor {
+            player_id,
+            skin_color,
+        },
         ClientMessage::SetPlayerColor { player_id, color } => {
             Command::SetPlayerColor { player_id, color }
         }
@@ -1239,7 +1266,9 @@ fn message_to_command(
         ClientMessage::MovePlaylistEntry { expected, from, to } => {
             Command::MovePlaylistEntry { expected, from, to }
         }
-        ClientMessage::RemovePlaylistEntry { expected, index } => Command::RemovePlaylistEntry { expected, index },
+        ClientMessage::RemovePlaylistEntry { expected, index } => {
+            Command::RemovePlaylistEntry { expected, index }
+        }
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
         ClientMessage::Pause => Command::Pause,
@@ -1312,7 +1341,10 @@ mod local_artwork_tests {
         std::fs::write(root.join("icon.png"), &png).unwrap();
         std::fs::write(root.join("shelf.json"), r##"[{"id":"one","title":"One","cover":"icon.png","color":"#44CCAA"},{"id":"two","title":"Two","cover":"missing.png"},{"id":"three","title":"Three","cover":"../icon.png"}]"##).unwrap();
         let games = super::load_library(root.join("shelf.json").to_str().unwrap()).unwrap();
-        assert_eq!(gamenight_protocol::artwork::decode_png_data_uri(games[0].cover.as_ref().unwrap()), Some(png));
+        assert_eq!(
+            gamenight_protocol::artwork::decode_png_data_uri(games[0].cover.as_ref().unwrap()),
+            Some(png)
+        );
         assert_eq!(games[0].color.as_deref(), Some("#44CCAA"));
         assert!(games[1].cover.is_none());
         assert!(games[2].cover.is_none());

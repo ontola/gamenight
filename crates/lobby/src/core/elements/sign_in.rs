@@ -49,8 +49,7 @@ pub fn game_plugin(game: &mut Game) {
 pub fn session_plugin(session: &mut SessionBuilder) {
     session
         .stages
-        .add_system_to_stage(CoreStage::PreUpdate, hydrate)
-        .add_system_to_stage(CoreStage::PostUpdate, update);
+        .add_system_to_stage(CoreStage::PreUpdate, hydrate);
 }
 
 #[derive(Clone, Debug, HasSchema, Default)]
@@ -94,7 +93,7 @@ fn hydrate(
             solids.insert(
                 entity,
                 Solid {
-                    disabled: false,
+                    disabled: true,
                     pos: transforms
                         .get(entity)
                         .map(|t| t.translation.truncate())
@@ -116,47 +115,8 @@ fn hydrate(
     }
 }
 
-fn update(
-    entities: Res<Entities>,
-    mut pads: CompMut<SignInPad>,
-    solids: Comp<Solid>,
-    player_indexes: Comp<PlayerIdx>,
-    bodies: Comp<KinematicBody>,
-    transforms: Comp<Transform>,
-    time: Res<Time>,
-    bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
-) {
-    let Some(mut bridge) = bridge else {
-        // Standalone play: no party, nothing to sign in to.
-        return;
-    };
-    let dt = time.delta_seconds();
-
-    for (_, (pad, solid)) in entities.iter_with((&mut pads, &solids)) {
-        pad.cooling = (pad.cooling - dt).max(0.0);
-        pad.press = (pad.press - dt / PAD_PRESS_SECONDS).max(0.0);
-        if pad.cooling > 0.0 {
-            continue;
-        }
-        if let Some(seat_index) = player_landed_on(
-            solid.pos,
-            solid.size,
-            &entities,
-            &player_indexes,
-            &bodies,
-            &transforms,
-        ) {
-            pad.cooling = pad.cooldown_secs;
-            pad.press = 1.0;
-            // The *seat*, not the player id. A seat index is stable across a
-            // party rebuild (the daemon clears players when the lobby
-            // process restarts), so a code printed minutes ago still points
-            // at the right chair. The server resolves seat -> player at the
-            // moment of the claim instead of trusting a stale id.
-            bridge.set_claim_seat(seat_index as u8);
-        }
-    }
-}
+// Sign-in is available through each player's Start menu. This non-solid
+// map marker remains the room/profile-pickup anchor; it has no interaction.
 
 #[cfg(test)]
 mod tests {

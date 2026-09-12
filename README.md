@@ -14,6 +14,9 @@ cross-game controller identity are not finished features.
 [Get started](#try-it-locally) · [Integrate a game](docs/integrating-your-game.md) ·
 [Protocol](docs/protocol.md) · [Contribute](CONTRIBUTING.md)
 
+Working on the lobby? See the [fast development loop](docs/development-loop.md)
+for native Windows restarts, component builds and web edits without recompiling.
+
 ## Windows preview
 
 A native Windows preview includes the lobby and automatically downloads Pinpals

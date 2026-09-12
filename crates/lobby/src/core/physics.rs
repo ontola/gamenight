@@ -294,7 +294,7 @@ fn update_kinematic_bodies(
             if has_moved || !body.is_controlled {
                 puffin::profile_scope!("fall through check");
                 // Don't get stuck floating in fall-through platforms
-                if body.velocity == Vec2::ZERO
+                if !body.is_controlled && body.velocity == Vec2::ZERO
                     && collision_world.tile_collision_filtered(transform, body.shape, |ent| {
                         collision_world
                             .tile_collision_kinds
@@ -312,18 +312,9 @@ fn update_kinematic_bodies(
 
             body.was_on_ground = body.is_on_ground;
 
-            let collider = collision_world.get_collider(entity);
-
+            let feet = body.bounding_box(*transforms.get(entity).unwrap()).min.y;
             let tile = collision_world.tile_collision_filtered(transform, body.shape, |ent| {
-                if collider.seen_wood {
-                    collision_world
-                        .tile_collision_kinds
-                        .get(ent)
-                        .map(|x| *x != TileCollisionKind::JumpThrough)
-                        .unwrap_or(false)
-                } else {
-                    true
-                }
+                collision_world.supports_feet(ent, feet, body.velocity.y, body.fall_through)
             });
 
             let on_jump_through_tile = tile == TileCollisionKind::JumpThrough;

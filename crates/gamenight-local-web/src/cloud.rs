@@ -1,4 +1,5 @@
-//! Optional outbound profile relay. Offline studios never require cloud availability.
+//! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
+mod discovery;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
 use axum::{
     extract::{Path, State},
@@ -25,6 +26,64 @@ pub(crate) struct Bridge {
     session: Arc<Mutex<Option<String>>>,
     seats: Arc<Mutex<Vec<Seat>>>,
     waiting: Arc<Mutex<serde_json::Value>>,
+    pairing: Arc<Mutex<HashMap<String, CachedPairing>>>,
+    pairing_request: Arc<tokio::sync::Mutex<()>>,
+}
+#[derive(Clone)]
+struct CachedPairing {
+    seat: Seat,
+    url: String,
+    created: std::time::Instant,
+}
+
+#[cfg(test)]
+mod pairing_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn cached_ticket_is_stable_but_expires_and_tracks_seat_identity() {
+        let seat = Seat {
+            index: 0,
+            player: "player-a".into(),
+            revision: 1,
+        };
+        // No network server: a valid cached ticket must not send a request.
+        let bridge = Bridge {
+            origin: "https://gamenight.invalid".into(),
+            http: reqwest::Client::new(),
+            session: Arc::default(),
+            seats: Arc::new(Mutex::new(vec![seat.clone()])),
+            waiting: Arc::default(),
+            pairing: Arc::new(Mutex::new(HashMap::from([(
+                seat.player.clone(),
+                CachedPairing {
+                    seat: seat.clone(),
+                    url: "https://gamenight.invalid/studio#pair=stable".into(),
+                    created: std::time::Instant::now(),
+                },
+            )]))),
+            pairing_request: Arc::default(),
+        };
+        let query = HashMap::from([("claim".into(), seat.player.clone())]);
+        let first = bridge.pairing_url(&query).await.unwrap();
+        assert_eq!(
+            bridge.pairing_url(&query).await.as_deref(),
+            Some(first.as_str())
+        );
+        bridge.seats.lock().unwrap()[0].revision += 1;
+        assert!(bridge.pairing_urls().is_empty());
+        assert!(bridge.pairing_url(&query).await.is_none());
+        bridge.seats.lock().unwrap()[0] = seat.clone();
+        bridge
+            .pairing
+            .lock()
+            .unwrap()
+            .get_mut(&seat.player)
+            .unwrap()
+            .created -= Duration::from_secs(241);
+        assert!(bridge.pairing_urls().is_empty());
+        assert!(bridge.pairing_url(&query).await.is_none());
+    }
 }
 #[derive(Deserialize)]
 struct Registration {
@@ -36,6 +95,8 @@ struct Ticket {
 }
 #[derive(Deserialize)]
 struct Updates {
+    #[serde(default)]
+    selection: Option<discovery::Selection>,
     updates: Vec<Update>,
     #[serde(default)]
     pending: Vec<serde_json::Value>,
@@ -78,6 +139,8 @@ impl Bridge {
                 .ok()?,
             session: Arc::default(),
             seats: Arc::default(),
+            pairing: Arc::default(),
+            pairing_request: Arc::default(),
             waiting: Arc::new(Mutex::new(serde_json::json!({}))),
         })
     }
@@ -100,7 +163,7 @@ impl Bridge {
         {
             return StatusCode::CONFLICT;
         }
-        let Some(seats) = self.snapshot(state).await else {
+        let Some((seats, _)) = self.snapshot(state).await else {
             return StatusCode::SERVICE_UNAVAILABLE;
         };
         let Some(seat) = seats.iter().find(|s| s.player == player.0.to_string()) else {
@@ -121,6 +184,18 @@ impl Bridge {
             Err(_) => StatusCode::BAD_GATEWAY,
         }
     }
+    pub fn pairing_urls(&self) -> HashMap<String, String> {
+        let seats = self.seats.lock().unwrap().clone();
+        self.pairing
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, p)| {
+                seats.contains(&p.seat) && p.created.elapsed() < Duration::from_secs(240)
+            })
+            .map(|(id, p)| (id.clone(), p.url.clone()))
+            .collect()
+    }
     pub async fn pairing_url(&self, query: &HashMap<String, String>) -> Option<String> {
         let seat = {
             let seats = self.seats.lock().ok()?;
@@ -131,6 +206,12 @@ impl Bridge {
                 seats.iter().find(|s| &s.player == player).cloned()
             }
         }?;
+        let _guard = self.pairing_request.lock().await;
+        if let Some(cached) = self.pairing.lock().ok()?.get(&seat.player) {
+            if cached.seat == seat && cached.created.elapsed() < Duration::from_secs(240) {
+                return Some(cached.url.clone());
+            }
+        }
         let token = self.session.lock().ok()?.clone()?;
         let response = self
             .http
@@ -144,9 +225,21 @@ impl Bridge {
             return None;
         }
         let ticket: Ticket = response.json().await.ok()?;
-        Some(format!("{}/studio#pair={}", self.origin, ticket.ticket))
+        let url = format!("{}/studio#pair={}", self.origin, ticket.ticket);
+        self.pairing.lock().ok()?.insert(
+            seat.player.clone(),
+            CachedPairing {
+                seat,
+                url: url.clone(),
+                created: std::time::Instant::now(),
+            },
+        );
+        Some(url)
     }
-    async fn snapshot(&self, state: &SharedState) -> Option<Vec<Seat>> {
+    async fn snapshot(
+        &self,
+        state: &SharedState,
+    ) -> Option<(Vec<Seat>, gamenight_protocol::PartySnapshot)> {
         let addr = state.lock().ok()?.daemon_addr.clone();
         let (mut ws, _) = tokio::time::timeout(
             Duration::from_secs(3),
@@ -168,7 +261,7 @@ impl Bridge {
         let party = daemon::read_welcome(&mut ws).await.ok()?;
         let _ = ws.close(None).await;
         let local = state.lock().ok()?;
-        Some(
+        Some((
             party
                 .seats
                 .iter()
@@ -180,13 +273,15 @@ impl Bridge {
                     })
                 })
                 .collect(),
-        )
+            party,
+        ))
     }
     pub async fn run(self, state: SharedState) {
         let mut applied: HashMap<String, (Seat, u64)> = HashMap::new();
+        let mut acknowledged: Option<String> = None;
         loop {
             tokio::time::sleep(Duration::from_secs(3)).await;
-            let Some(seats) = self.snapshot(&state).await else {
+            let Some((seats, party)) = self.snapshot(&state).await else {
                 continue;
             };
             *self.seats.lock().unwrap() = seats.clone();
@@ -210,12 +305,13 @@ impl Bridge {
                 token = Some(reg.token);
                 *self.session.lock().unwrap() = token.clone();
                 applied.clear();
+                acknowledged = None;
             }
             let Ok(response) = self
                 .http
                 .post(format!("{}/v1/lobbies/poll", self.origin))
                 .bearer_auth(token.unwrap())
-                .json(&serde_json::json!({"seats":seats}))
+                .json(&serde_json::json!({"seats":seats,"discovery":discovery::snapshot(&party, &acknowledged)}))
                 .send()
                 .await
             else {
@@ -223,6 +319,7 @@ impl Bridge {
             };
             if response.status() == 401 {
                 *self.session.lock().unwrap() = None;
+                self.pairing.lock().unwrap().clear();
                 *self.waiting.lock().unwrap() = serde_json::json!({});
                 continue;
             }
@@ -232,6 +329,23 @@ impl Bridge {
             let Ok(updates) = response.json::<Updates>().await else {
                 continue;
             };
+            if let Some(selection) = &updates.selection {
+                if acknowledged.as_ref() != Some(&selection.id)
+                    && seats.contains(&selection.seat)
+                    && updates.updates.iter().any(|u| u.seat == selection.seat)
+                    && discovery::apply(&state, selection).await
+                {
+                    acknowledged = Some(selection.id.clone());
+                }
+            }
+            self.pairing
+                .lock()
+                .unwrap()
+                .retain(|_, p| seats.contains(&p.seat));
+            for seat in &seats {
+                let query = HashMap::from([("claim".into(), seat.player.clone())]);
+                let _ = self.pairing_url(&query).await;
+            }
             *self.waiting.lock().unwrap() =
                 serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
             {

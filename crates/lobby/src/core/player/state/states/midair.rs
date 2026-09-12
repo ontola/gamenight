@@ -93,6 +93,7 @@ pub fn handle_player_state(
     player_states: Comp<PlayerState>,
     assets: Res<AssetServer>,
     collision_world: CollisionWorld,
+    time: Res<Time>,
     transforms: Comp<Transform>,
     mut sprites: CompMut<AtlasSprite>,
     mut animations: CompMut<AnimationBankSprite>,
@@ -141,10 +142,8 @@ pub fn handle_player_state(
             animation.current = "fall".into();
         }
 
-        // Limit fall speed if holding jump button
-        if control.jump_pressed {
-            body.velocity.y = body.velocity.y.max(-meta.stats.slow_fall_speed);
-        }
+        // Releasing jump cuts the rise; holding never changes falling speed.
+        body.velocity.y = jump_release_velocity(body.velocity.y, body.gravity, time.delta_seconds(), control.jump_pressed);
 
         // Walk in movement direction
         body.velocity.x += meta.stats.accel_air_speed * control.move_direction.x;
@@ -163,7 +162,7 @@ pub fn handle_player_state(
         }
 
         // Fall through platforms
-        body.fall_through = control.move_direction.y < -0.5 && control.jump_pressed;
+        body.fall_through = control.move_direction.y < -0.5 && control.jump_just_pressed;
 
         // Point in movement direction
         if control.move_direction.x > 0.0 {
@@ -171,5 +170,33 @@ pub fn handle_player_state(
         } else if control.move_direction.x < 0.0 {
             sprite.flip_x = true;
         }
+    }
+}
+
+fn jump_release_velocity(velocity: f32, gravity: f32, dt: f32, held: bool) -> f32 {
+    if held || velocity <= 0.0 { velocity } else { (velocity-gravity*2.0*dt).max(0.0) }
+}
+#[cfg(test)]
+mod jump_tests {
+    use super::jump_release_velocity;
+    fn height(hold_frames:usize)->f32 {
+        let (mut y,mut peak,mut velocity)=(0.0_f32,0.0_f32,660.0_f32);
+        for frame in 0..120 {
+            velocity=jump_release_velocity(velocity,2160.,1./60.,frame<hold_frames);
+            y+=velocity/60.;peak=peak.max(y);velocity-=2160./60.;
+        }
+        peak
+    }
+    #[test]
+    fn holding_longer_gives_measurably_more_height() {
+        assert!(height(3)+10.<height(6));
+        assert!(height(6)+15.<height(18));
+        // Twenty frames is beyond the natural apex: holding cannot extend flight.
+        assert_eq!(height(20),height(120));
+    }
+    #[test]
+    fn holding_never_slows_falling() {
+        assert_eq!(jump_release_velocity(-400.,2160.,1./60.,true),-400.);
+        assert_eq!(jump_release_velocity(-400.,2160.,1./60.,false),-400.);
     }
 }

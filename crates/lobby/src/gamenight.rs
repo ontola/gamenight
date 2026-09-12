@@ -71,6 +71,7 @@ pub enum NextGameStatus {
 /// Resume the active game from the TV; disabled until a game is open.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TvButton {
+    Play,
     Back,
     Disabled,
 }
@@ -216,9 +217,16 @@ pub struct GameNightBridge {
     /// rate and the bevy side drains this once a frame, so two people leaving
     /// together must not overwrite each other. Drained, never read twice.
     exit_requests: Vec<(u8, f32)>,
+    pub(crate) interact_pressed: HashSet<u32>,
+    pub(crate) interaction_hints: HashMap<u32, (String, Vec2)>,
 }
 
 impl GameNightBridge {
+    pub(crate) fn offer_interaction(&mut self, seat: u32, label: &str, position: Vec2) -> bool {
+        self.interaction_hints.insert(seat, (label.to_owned(), position));
+        self.interact_pressed.remove(&seat)
+    }
+
     /// Tell the daemon the current match is over. Safe to call more than
     /// once per session: only the first call after a `prepare` sends
     /// anything.
@@ -261,6 +269,7 @@ impl GameNightBridge {
     pub fn tv_button(&self) -> TvButton {
         match self.next_game_status() {
             NextGameStatus::Live { .. } => TvButton::Back,
+            NextGameStatus::Ready(_) => TvButton::Play,
 
             _ => TvButton::Disabled,
         }
@@ -276,6 +285,7 @@ impl GameNightBridge {
             TvButton::Back => {
                 let _ = self.join_tx.try_send(ClientMessage::CloseOverlay);
             }
+            TvButton::Play => self.play_next_game(),
             TvButton::Disabled => {}
         }
     }
@@ -578,6 +588,8 @@ pub fn game_plugin(game: &mut Game) {
         claim_seat: None,
         claim_mark: None,
         exit_requests: Vec::new(),
+        interact_pressed: default(),
+        interaction_hints: default(),
     });
 
     game.sessions
@@ -1258,6 +1270,7 @@ struct PruneCountdown {
 /// to keep in sync on rename/color-change.
 struct PlayerMenuState {
     highlight: usize,
+    has_inactive: bool,
 }
 
 /// The menu's fixed action list — a d-pad-navigated list, not a mouse-driven
@@ -1276,12 +1289,10 @@ enum MenuAction {
     Quit,
 }
 
-fn menu_actions(linked: bool) -> Vec<MenuAction> {
-    let mut actions = vec![
-        MenuAction::Leave,
-        MenuAction::PruneInactive,
-        MenuAction::Quit,
-    ];
+fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
+    let mut actions = vec![MenuAction::Leave];
+    if has_inactive { actions.push(MenuAction::PruneInactive); }
+    actions.push(MenuAction::Quit);
     if linked { actions.insert(0, MenuAction::Unlink); }
     actions
 }
@@ -1422,13 +1433,13 @@ impl GlobalInput {
     fn toggle_menu(&mut self, player_id: PlayerId) {
         if self.open_menus.remove(&player_id).is_none() {
             self.open_menus
-                .insert(player_id, PlayerMenuState { highlight: 0 });
+                .insert(player_id, PlayerMenuState { highlight: 0, has_inactive: false });
         }
     }
 
     fn move_highlight(&mut self, player_id: PlayerId, delta: isize, linked: bool) {
         if let Some(state) = self.open_menus.get_mut(&player_id) {
-            let len = menu_actions(linked).len() as isize;
+            let len = menu_actions(linked, state.has_inactive).len() as isize;
             state.highlight = (((state.highlight as isize) + delta).rem_euclid(len)) as usize;
         }
     }
@@ -1484,12 +1495,17 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     // a menu-open player's controls would always be a frame late.
     use bevy::prelude::IntoSystemConfigs as _;
     app.add_systems(bevy::prelude::PreUpdate, gate_gamepad_input_system);
+    app.add_systems(bevy::prelude::PreUpdate, interaction_visual::capture
+        .after(gate_gamepad_input_system).after(bevy::input::InputSystem));
+    app.add_systems(bevy::prelude::PostUpdate,
+        (interaction_visual::sync, bevy::ecs::schedule::apply_deferred)
+            .chain().before(bevy::transform::TransformSystem::TransformPropagate));
     app.add_systems(
         bevy::prelude::Update,
         (
             global_input_system,
-            sync_player_menus_system,
-            position_player_menus_system,
+            (sync_player_menus_system, bevy::ecs::schedule::apply_deferred,
+                position_player_menus_system).chain(),
             apply_player_colors_system,
             sync_player_skin_system,
             sync_name_tags_system,
@@ -1501,7 +1517,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             sync_prune_countdown_system,
             sync_exit_door_system,
             sync_lobby_qr_system,
-            (sync_sign_in_pad_system, room_pickup::sync).chain(),
+            (room_pickup::sync, punch_visual::sync).chain(),
             sync_jukebox_system,
             sync_next_game_tv_system,
             press_pads_system,
@@ -1698,6 +1714,22 @@ fn global_input_system(
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (bridge.latest_players.clone(), bridge.join_tx.clone())
     };
+    // Keep navigation and rendering on the same action list. Reset the selection
+    // when availability changes so a disappearing action cannot select Quit.
+    {
+        let bridge = bones_game.0.shared_resource::<GameNightBridge>();
+        for (&player_id, menu) in &mut input.open_menus {
+            let has_inactive = bridge.latest_presence.iter().any(|presence| {
+                presence.player_id != player_id
+                    && presence.state != gamenight_protocol::PresenceState::Active
+                    && bridge.latest_seats.iter().any(|seat| seat.occupant.player_id() == Some(presence.player_id))
+            });
+            if menu.has_inactive != has_inactive {
+                menu.has_inactive = has_inactive;
+                menu.highlight = 0;
+            }
+        }
+    }
     // Held input counts as activity; neutral sticks and connection events do not.
     let mut connected: Vec<_> = gamepads.iter().collect();
     connected.sort_by_key(|g| g.id);
@@ -1968,7 +2000,7 @@ fn global_input_system(
                 if let Some(&player_id) = input.pad_player.get(&id) {
                     let highlight = input.open_menus.get(&player_id).map(|s| s.highlight);
                     if let Some(highlight) = highlight {
-                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)));
+                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)), input.open_menus.get(&player_id).is_some_and(|m| m.has_inactive));
                         if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
                                 MenuAction::Unlink => {
@@ -2063,9 +2095,8 @@ fn sync_player_menus_system(
 
         let link_state = links.snapshot();
         let linked = link_state.as_ref().is_some_and(|s| s.linked.contains(&player_id));
-        let code = if !linked && link_state.is_some() {
-            let revision = link_state.as_ref().and_then(|s| s.revisions.get(&player_id)).copied().unwrap_or(0);
-            let url = format!("{}?claim={}&link_revision={revision}", lobby_join_url(), player_id.0);
+        let join_url = link_state.as_ref().filter(|_| !linked).and_then(|s| s.join_url(player_id, &lobby_join_url()));
+        let code = if let Some(url) = join_url {
             if !qr_cache.contains_key(&url) {
                 if let Some(image) = generate_qr_bevy_image(&url) { qr_cache.insert(url.clone(), images.add(image)); }
             }
@@ -2081,6 +2112,8 @@ fn sync_player_menus_system(
                         PlayerMenuRoot(player_id),
                         NodeBundle {
                             style: Style {
+                                // Never render at the default origin before projection.
+                                display: Display::None,
                                 position_type: PositionType::Absolute,
                                 flex_direction: FlexDirection::Column,
                                 padding: UiRect::all(Val::Px(8.0)),
@@ -2104,16 +2137,14 @@ fn sync_player_menus_system(
                     color: Color::WHITE,
                 },
             ));
-            if linked {
-                parent.spawn(TextBundle::from_section(format!("Signed in as {name}"), TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
-            } else if let Some(code) = code {
+            if let Some(code) = code {
                 parent.spawn(ImageBundle { image: code.into(), style: Style { width: Val::Px(176.0), height: Val::Px(176.0), margin: UiRect::all(Val::Px(8.0)), ..default() }, ..default() });
                 parent.spawn(TextBundle::from_section("Scan to sign in", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
-            } else {
+            } else if !linked {
                 parent.spawn(TextBundle::from_section("Connecting to sign-in…", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
             }
-            for (i, action) in menu_actions(linked).iter().enumerate() {
-                let highlighted = i == state.highlight.min(menu_actions(linked).len() - 1);
+            for (i, action) in menu_actions(linked, state.has_inactive).iter().enumerate() {
+                let highlighted = i == state.highlight.min(menu_actions(linked, state.has_inactive).len() - 1);
                 // Every row is an action now, so every row looks alike; the
                 // highlight is the only thing that distinguishes them.
                 let base = Color::rgb(0.25, 0.25, 0.25);
@@ -2165,7 +2196,8 @@ fn position_player_menus_system(
     if roots.is_empty() {
         return;
     }
-    let Some((camera, camera_transform)) = cameras.iter().next() else {
+    let Some((camera, camera_transform)) = cameras.iter().find(|(c, _)| c.is_active) else {
+        for (_, mut style) in &mut roots { style.display = bevy::prelude::Display::None; }
         return;
     };
     let seats = bones_game
@@ -2187,12 +2219,13 @@ fn position_player_menus_system(
             style.display = bevy::prelude::Display::None;
             continue;
         };
-        style.display = bevy::prelude::Display::Flex;
+        style.display = bevy::prelude::Display::None;
 
         // A player-height offset above their translation, projected to
         // screen space, so the menu sits over their head rather than on it.
         let anchor = world_pos + bevy::prelude::Vec3::new(0.0, 40.0, 0.0);
         if let Some(screen_pos) = camera.world_to_viewport(camera_transform, anchor) {
+            style.display = bevy::prelude::Display::Flex;
             style.left = bevy::prelude::Val::Px(screen_pos.x.clamp(8.0, camera.logical_viewport_size().map(|s| (s.x - 250.0).max(8.0)).unwrap_or(screen_pos.x)));
             style.top = bevy::prelude::Val::Px(screen_pos.y.clamp(8.0, camera.logical_viewport_size().map(|s| (s.y - 390.0).max(8.0)).unwrap_or(screen_pos.y)));
         }
@@ -2947,105 +2980,25 @@ fn lobby_exit_door(game: &Game) -> Option<(bevy::prelude::Vec3, bevy::prelude::V
 #[derive(bevy::prelude::Component)]
 struct LobbyExitDoor;
 
-/// Marks the bar itself, so its width can be set without rebuilding the tree.
-#[derive(bevy::prelude::Component)]
-struct LobbyExitBar(f32);
-
-/// Show how far through leaving the person in the doorway is.
-///
-/// Without this the door is a trapdoor: you wander into it, nothing happens,
-/// and then three quarters of a second later you are gone with no idea what did
-/// it. A bar that fills — and empties the moment you step back out — makes the
-/// dwell legible, and makes stepping out an obvious way to change your mind.
+/// The exit is a visible front door; acceptance still belongs to the controller.
 fn sync_exit_door_system(
     mut commands: bevy::prelude::Commands,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
-    asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
-    mut existing: bevy::prelude::Query<(
-        bevy::prelude::Entity,
-        &LobbyExitDoor,
-        &mut bevy::prelude::Transform,
-    )>,
-    mut bars: bevy::prelude::Query<
-        (
-            &mut LobbyExitBar,
-            &mut bevy::prelude::Sprite,
-            &mut bevy::prelude::Transform,
-        ),
-        bevy::prelude::Without<LobbyExitDoor>,
-    >,
+    mut existing: bevy::prelude::Query<(bevy::prelude::Entity, &LobbyExitDoor, &mut bevy::prelude::Transform)>,
 ) {
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
-
-    let Some((pos, size, progress)) = lobby_exit_door(&bones_game.0) else {
-        for (entity, _, _) in &existing {
-            commands.entity(entity).despawn_recursive();
-        }
+    let Some((pos,size,_))=lobby_exit_door(&bones_game.0) else {
+        for (entity,_,_) in &existing {commands.entity(entity).despawn_recursive();}
         return;
     };
-
-    let width = size.x - 8.0;
-    if existing.iter().next().is_some() {
-        for (_, _, mut transform) in &mut existing {
-            transform.translation = pos;
-        }
-        for (_, mut sprite, mut transform) in &mut bars {
-            let filled = width * progress.clamp(0.0, 1.0);
-            sprite.custom_size = Some(Vec2::new(filled.max(0.001), 5.0));
-            // Grown from the left edge rather than the centre, so it reads as
-            // filling up rather than as spreading out from nothing.
-            transform.translation.x = -width / 2.0 + filled / 2.0;
-        }
+    let translation=Vec3::new(pos.x,pos.y,LOBBY_FURNITURE_Z);
+    if let Some((_,_,mut transform))=existing.iter_mut().next() {
+        transform.translation=translation;
         return;
     }
-
-    let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
-    commands
-        .spawn((
-            LobbyExitDoor,
-            SpatialBundle {
-                transform: Transform::from_translation(pos),
-                ..default()
-            },
-        ))
-        .with_children(|parent| {
-            // The track the bar runs along, always present so the doorway has a
-            // sill to read against.
-            parent.spawn(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(width, 5.0)),
-                    color: Color::rgba(0.10, 0.05, 0.06, 0.55),
-                    ..default()
-                },
-                transform: Transform::from_xyz(0.0, -size.y / 2.0 + 6.0, 0.2),
-                ..default()
-            });
-            parent.spawn((
-                LobbyExitBar(0.0),
-                SpriteBundle {
-                    sprite: Sprite {
-                        custom_size: Some(Vec2::new(0.001, 5.0)),
-                        color: Color::rgb(0.925, 0.651, 0.216),
-                        ..default()
-                    },
-                    transform: Transform::from_xyz(-width / 2.0, -size.y / 2.0 + 6.0, 0.3),
-                    ..default()
-                },
-            ));
-            parent.spawn(Text2dBundle {
-                text: Text::from_section(
-                    "LEAVE",
-                    TextStyle {
-                        font,
-                        font_size: 9.0,
-                        color: Color::rgba(1.0, 0.84, 0.55, 0.75),
-                    },
-                ),
-                transform: Transform::from_xyz(0.0, -size.y / 2.0 + 15.0, 0.3),
-                ..default()
-            });
-        });
+    commands.spawn((LobbyExitDoor,SpatialBundle {transform:Transform::from_translation(translation),..default()}))
+        .with_children(|parent|station_art::front_door(parent,-size.y/2.));
 }
 
 /// Marks the top-of-screen "removing inactive players in Ns..." banner shown
@@ -3133,66 +3086,6 @@ fn lobby_sign_in_pad(game: &Game) -> Option<(bevy::prelude::Vec3, bevy::prelude:
         })
 }
 
-/// Marks the drawn sign-in button.
-#[derive(bevy::prelude::Component)]
-struct LobbySignInPad;
-
-/// Draws the sign-in pad on the floor.
-///
-/// The element itself is only a collider — without this it was invisible, so
-/// the instruction to jump on the pad pointed at nothing.
-fn sync_sign_in_pad_system(
-    mut commands: bevy::prelude::Commands,
-    bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
-    asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
-    mut existing: bevy::prelude::Query<(
-        bevy::prelude::Entity,
-        &LobbySignInPad,
-        &mut bevy::prelude::Transform,
-    )>,
-) {
-    use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
-    use bevy::prelude::*;
-
-    let Some((pos, size)) = lobby_sign_in_pad(&bones_game.0) else {
-        for (entity, _, _) in &existing {
-            commands.entity(entity).despawn_recursive();
-        }
-        return;
-    };
-
-    // Nothing about this button's *contents* ever changes — who the code is
-    // for is said by the sign, not the pad — so once it's drawn it only ever
-    // needs following around, and the press animates on the sprites already
-    // there (see `press_pads_system`).
-    if let Some((entity, _, mut transform)) = existing.iter_mut().next() {
-        transform.translation = Vec3::new(pos.x, pos.y, LOBBY_PROP_Z - 1.0);
-        let _ = entity;
-        return;
-    }
-
-    let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
-    commands
-        .spawn((
-            LobbySignInPad,
-            SpatialBundle {
-                transform: Transform::from_xyz(pos.x, pos.y, LOBBY_PROP_Z - 1.0),
-                ..default()
-            },
-        ))
-        .with_children(|parent| {
-            spawn_pad_button(
-                parent,
-                PadButton::SignIn,
-                Vec3::ZERO,
-                size,
-                "SIGN IN",
-                Color::rgb(0.925, 0.651, 0.216),
-                font,
-            );
-        });
-}
-
 /// Marks the in-world QR signboard. Spawned once and then kept in step with
 /// the map element every frame — the lobby session is rebuilt from scratch
 /// on every seat change (`rebuild_lobby`), so the element's entity, and with
@@ -3241,10 +3134,9 @@ fn sync_lobby_qr_system(
         .0
         .shared_resource::<GameNightBridge>()
         .claim_seat();
-    let url = seat.map(|seat| {
-        let id = bones_game.0.shared_resource::<GameNightBridge>().seat_player(seat as u32);
-        let revision = links.snapshot().and_then(|s| id.and_then(|id| s.revisions.get(&id).copied())).unwrap_or(0);
-        format!("{}?seat={seat}&link_revision={revision}", lobby_join_url())
+    let url = seat.and_then(|seat| {
+        let id = bones_game.0.shared_resource::<GameNightBridge>().seat_player(seat as u32)?;
+        links.snapshot()?.join_url(id, &lobby_join_url())
     });
     let name = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
@@ -3454,13 +3346,13 @@ struct PadFace {
     pad: PadButton,
 }
 
-#[derive(bevy::prelude::Component)]
-struct PadHoldLabel { pad: PadButton, label: String }
 
 /// How far into its housing a button sinks when fully pressed, in world
 /// units. Deep enough to read across a living room, shallow enough that a
 /// button barely taller than this doesn't vanish into the floor.
-const PAD_PRESS_DEPTH: f32 = 4.0;
+// The 14px face stays inside its fixed 17px housing throughout the press.
+// Moving it down exposes a dark upper crescent instead of escaping the rim.
+const PAD_PRESS_DEPTH: f32 = 2.0;
 
 /// Draw a lobby button: a fixed base with a face resting on top of it.
 ///
@@ -3468,79 +3360,6 @@ const PAD_PRESS_DEPTH: f32 = 4.0;
 /// is what makes the press legible — a plate that simply changes colour reads
 /// as decoration, one that drops into its housing reads as a button somebody
 /// just hit.
-fn spawn_pad_button(
-    parent: &mut bevy::hierarchy::ChildBuilder,
-    pad: PadButton,
-    offset: bevy::prelude::Vec3,
-    size: bevy::prelude::Vec2,
-    label: &str,
-    face_color: bevy::prelude::Color,
-    font: bevy::prelude::Handle<bevy::prelude::Font>,
-) {
-    use bevy::hierarchy::BuildChildren;
-    use bevy::prelude::*;
-
-    let floor_zone = matches!(pad, PadButton::NextGame { .. });
-    // Housing: sits still, and is as tall as the face's full travel plus a
-    // little, so a pressed button still has something under it.
-    parent.spawn(SpriteBundle {
-        sprite: Sprite {
-            custom_size: Some(size + if floor_zone { Vec2::new(4.0, 0.0) } else { Vec2::new(10.0, 4.0) }),
-            color: Color::rgb(0.07, 0.06, 0.10),
-            ..default()
-        },
-        transform: Transform::from_xyz(offset.x, offset.y - if floor_zone { 0.0 } else { PAD_PRESS_DEPTH }, offset.z - 0.2),
-        ..default()
-    });
-
-    let home_y = offset.y;
-    parent
-        .spawn((
-            PadFace { home_y, pad },
-            SpatialBundle {
-                transform: Transform::from_translation(offset),
-                ..default()
-            },
-        ))
-        .with_children(|face| {
-            face.spawn(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(size),
-                    color: face_color,
-                    ..default()
-                },
-                ..default()
-            });
-            // A lit top edge, so the face reads as a surface with a height
-            // rather than a flat rectangle painted on the floor.
-            face.spawn(SpriteBundle {
-                sprite: Sprite {
-                    custom_size: Some(Vec2::new(size.x - 8.0, if floor_zone { 1.0 } else { 5.0 })),
-                    color: Color::rgba(1.0, 1.0, 1.0, 0.28),
-                    ..default()
-                },
-                transform: Transform::from_xyz(0.0, size.y / 2.0 - if floor_zone { 1.0 } else { 4.0 }, 0.1),
-                ..default()
-            });
-            let mut label_entity = face.spawn(Text2dBundle {
-                text: Text::from_section(
-                    label.to_string(),
-                    TextStyle {
-                        font,
-                        font_size: if matches!(pad, PadButton::NextGame { .. }) { 10.0 } else { 13.0 },
-                        color: Color::rgba(1.0, 1.0, 1.0, 0.92),
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
-                transform: Transform::from_xyz(0.0, size.y / 2.0 + 11.0, 0.2),
-                ..default()
-            });
-            if matches!(pad, PadButton::NextGame { .. }) {
-                label_entity.insert(PadHoldLabel { pad, label: label.to_string() });
-            }
-
-        });
-}
 
 /// Cut `text` to at most `max` characters, ending in an ellipsis when it had
 /// to. Counts characters rather than bytes and cuts on a char boundary — track
@@ -3618,21 +3437,15 @@ fn lobby_pad_presses(game: &Game) -> PadPresses {
 fn press_pads_system(
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     mut faces: bevy::prelude::Query<(&PadFace, &mut bevy::prelude::Transform)>,
-    mut labels: bevy::prelude::Query<(&PadHoldLabel, &mut bevy::prelude::Text)>,
 ) {
     if faces.is_empty() {
         return;
     }
     let presses = lobby_pad_presses(&bones_game.0);
     for (face, mut transform) in &mut faces {
-        transform.translation.y = face.home_y - presses.of(face.pad) * if matches!(face.pad, PadButton::NextGame { .. }) { 0.0 } else { PAD_PRESS_DEPTH };
+        transform.translation.y = face.home_y - presses.of(face.pad) * PAD_PRESS_DEPTH;
     }
-    for (label, mut text) in &mut labels {
-        let progress = presses.of(label.pad);
-        text.sections[0].value = if progress > 0.0 {
-            format!("{}\n{:.1}s", label.label, (1.0 - progress) * crate::core::elements::next_game_trigger::HOLD_SECONDS)
-        } else { label.label.to_string() };
-    }
+
 
 }
 
@@ -3797,15 +3610,7 @@ fn sync_jukebox_system(
                     (false, true) => "PAUSE ⏸",
                     (false, false) => "PLAY ▶",
                 };
-                spawn_pad_button(
-                    parent,
-                    PadButton::Music { skips: *skips },
-                    Vec3::new(pos.x - anchor.x, pos.y - anchor.y, -1.0),
-                    *size,
-                    label,
-                    Color::rgb(0.62, 0.30, 0.58),
-                    font.clone(),
-                );
+
             }
         });
 }
@@ -3817,6 +3622,9 @@ struct LobbyTv(String);
 
 mod game_cases;
 mod room_pickup;
+mod punch_visual;
+mod interaction_visual;
+mod station_art;
 mod themes;
 
 /// Draws the lobby TV: a cabinet, a screen showing whatever the daemon has
@@ -3994,55 +3802,7 @@ fn sync_next_game_tv_system(
                 ..default()
             });
             game_cases::spawn_shelf(parent, &cases, &next_line, animation, font.clone(), &mut cover_cache, &mut cover_images);
-            let [(play_pos, play_size), (next_pos, next_size), (skip_pos, skip_size)] =
-                crate::core::elements::next_game_trigger::pad_thirds(
-                    bevy::math::Vec2::new(pad_pos.x, pad_pos.y),
-                    pad_size,
-                );
-            // Three states, because the button genuinely has three jobs:
-            // walk back into the open game, start the warm one, or sit there
-            // greyed out because it hasn't finished loading. That last one is
-            // the place the party looks when they wonder why nothing
-            // happened, so it has to look disabled rather than broken.
-            let (label, colour) = match button {
-                TvButton::Back => ("RESUME", Color::rgb(0.26, 0.60, 0.44)),
-                TvButton::Disabled => ("RESUME", Color::rgb(0.24, 0.26, 0.30)),
-            };
-            spawn_pad_button(
-                parent,
-                PadButton::NextGame { index: 0 },
-                Vec3::new(play_pos.x - pos.x, play_pos.y - pos.y, 21.0),
-                play_size,
-                label,
-                colour,
-                font.clone(),
-            );
-            spawn_pad_button(
-                parent,
-                PadButton::NextGame { index: 1 },
-                Vec3::new(next_pos.x - pos.x, next_pos.y - pos.y, 21.0),
-                next_size,
-                "PLAY NEXT",
-                if next_ready {
-                    Color::rgb(0.26, 0.60, 0.44)
-                } else {
-                    Color::rgb(0.24, 0.26, 0.30)
-                },
-                font.clone(),
-            );
-            spawn_pad_button(
-                parent,
-                PadButton::NextGame { index: 2 },
-                Vec3::new(skip_pos.x - pos.x, skip_pos.y - pos.y, 21.0),
-                skip_size,
-                "SKIP",
-                if can_skip {
-                    Color::rgb(0.42, 0.36, 0.62)
-                } else {
-                    Color::rgb(0.24, 0.26, 0.30)
-                },
-                font,
-            );
+
         });
 }
 
@@ -4353,6 +4113,8 @@ mod next_game_status_tests {
             claim_seat: None,
             claim_mark: None,
             exit_requests: Vec::new(),
+        interact_pressed: default(),
+        interaction_hints: default(),
         };
         bridge.active_session = Some(session("duo", SessionPhase::Paused));
         bridge.latest_warm = Some(session("quad", SessionPhase::Ready));
@@ -4380,12 +4142,23 @@ mod next_game_status_tests {
             commands.try_recv().unwrap(),
             ClientMessage::CloseOverlay
         ));
+        // With no live game the TV previews up next: Y must start it,
+        // even though both stations display the same game.
+        bridge.active_session = None;
+        assert_eq!(bridge.tv_button(), TvButton::Play);
+        bridge.press_tv_button();
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
         bridge.latest_warm = Some(session("quad", SessionPhase::Preparing));
+        assert_eq!(bridge.tv_button(), TvButton::Disabled);
+        bridge.press_tv_button();
+        assert!(commands.try_recv().is_err());
+
         bridge.play_next_game();
         assert!(
             commands.try_recv().is_err(),
             "loading games cannot be started"
         );
+        bridge.active_session = Some(session("duo", SessionPhase::Paused));
         bridge.latest_playlist.pop();
         bridge.skip_next_game();
         assert!(

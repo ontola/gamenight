@@ -709,7 +709,9 @@ let initializing = true;
       };
 
       if (storage.cloud) {
-        document.querySelector('.nav-tabs').hidden=true;
+        document.getElementById('studio-action-1').hidden=true;
+        document.getElementById('studio-action-2').textContent='Session';
+        if(location.hash==='#session')setTimeout(()=>switchTab('playlist'),0);
         document.getElementById('gallery-help').textContent='Your faces sync with your GameNight account. You can also export a backup to keep a separate copy.';
         const initial=storage.initial;
         if(initial.workspace && !storage.pending){
@@ -735,7 +737,7 @@ let initializing = true;
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + tab));
-      document.querySelectorAll('.nav-tabs .nav-btn').forEach(el => el.classList.toggle('active', el.textContent.toLowerCase() === tab));
+      document.querySelectorAll('.nav-tabs .nav-btn').forEach(el => el.classList.toggle('active', (storage.cloud && el.id === 'studio-action-2' ? 'playlist' : el.textContent.toLowerCase()) === tab));
       if (tab === 'playlist') loadPlaylist();
       if (tab === 'session') loadSession();
     }
@@ -763,9 +765,7 @@ let initializing = true;
       if (playlistBusy || playlistLoading || draggedEntry !== null) return;
       playlistLoading = true;
       try {
-        const response = await fetch('/api/playlist', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error('Playlist unavailable. Check that GameNight is running, then refresh.');
-        const view = await response.json();
+        const view = await storage.playlist();
         if (JSON.stringify(view) !== JSON.stringify(playlistView)) {
           playlistView = view;
           renderPlaylist();
@@ -878,15 +878,10 @@ let initializing = true;
       const status = document.getElementById('playlist-status');
       status.textContent = change.remove ? 'Removing game…' : 'Saving order…';
       try {
-        const response = await fetch('/api/playlist', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(10000),
-          body: JSON.stringify({ expected: playlistView.playlist, ...change })
-        });
-        if (!response.ok) throw new Error(response.status === 409 ? 'The playlist changed on another screen. Refresh and try again.' : 'Could not save the order. Refresh and try again.');
-        playlistView = await response.json();
+        playlistView = await storage.playlist({ expected: playlistView.playlist, ...change });
         status.textContent = 'Playlist updated.';
       } catch (error) { status.textContent = error.message; }
-      finally { playlistBusy = false; renderPlaylist(focusIndex); }
+      finally { playlistBusy = false; renderPlaylist(focusIndex); loadPlaylist(); }
     }
     setInterval(() => {
       if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();

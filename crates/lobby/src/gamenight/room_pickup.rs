@@ -1,4 +1,7 @@
 //! Physical, controller-owned acceptance of cloud profiles waiting at the room door.
+#[path = "door_layout.rs"]
+mod layout;
+use layout::{DOOR_X, DOOR_Y, PLAYER_Y};
 use super::{avatar_image, lobby_sign_in_pad, seat_world_position, GameNightBridge};
 use crate::player_links::PlayerLinks;
 use bevy::prelude::*;
@@ -61,21 +64,7 @@ pub(super) fn sync(
         }
     }
     if !code.is_empty() && !labels.iter().any(|(_, label)| label.0 == code) {
-        commands.spawn((
-            RoomLabel(code.into()),
-            Text2dBundle {
-                text: Text::from_section(
-                    format!("ROOM  {code}"),
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 20.,
-                        color: Color::WHITE,
-                    },
-                ),
-                transform: Transform::from_xyz(600., 235., -100.),
-                ..default()
-            },
-        ));
+        spawn_room_plaque(&mut commands, &assets, code);
     }
     for (entity, door) in &existing {
         if !pending.iter().any(|p| {
@@ -96,12 +85,12 @@ pub(super) fn sync(
     let focused = windows.iter().any(|w| w.focused);
     for p in pending {
         if !state.slots.contains_key(&p.id) {
-            let Some(slot) = (0..8).find(|s| !state.slots.values().any(|v| v == s)) else {
+            let Some(slot) = (0..DOOR_X.len()).find(|s| !state.slots.values().any(|v| v == s)) else {
                 continue;
             };
             state.slots.insert(p.id.clone(), slot);
         }
-        let x = 220. + state.slots[&p.id] as f32 * 96.;
+        let x = DOOR_X[state.slots[&p.id]];
         let mark = format!(
             "{}{}{}",
             p.profile.display_name, p.profile.skin_color, p.profile.avatar
@@ -112,7 +101,7 @@ pub(super) fn sync(
                 .spawn((
                     Door(p.id.clone(), mark),
                     SpatialBundle {
-                        transform: Transform::from_xyz(x, 138., -910.),
+                        transform: Transform::from_xyz(x, DOOR_Y, -910.),
                         ..default()
                     },
                 ))
@@ -210,20 +199,20 @@ pub(super) fn sync(
                         return None;
                     }
                     let pos = seat_world_position(&game.0, seat.index)?;
-                    ((pos.x - x).abs() < 30. && (pos.y - 118.).abs() < 30.).then_some(id)
+                    ((pos.x - x).abs() < 30. && (pos.y - PLAYER_Y).abs() < 30.).then_some((id, seat.index))
                 })
                 .next()
         } else {
             None
         };
-        if let Some(player) = candidate {
+        if let Some((player, seat)) = candidate {
             let hold = state.holds.entry(p.id.clone()).or_insert((player, 0., 0.));
             if hold.0 != player {
                 *hold = (player, 0., 0.);
             }
             if time.elapsed_seconds_f64() >= hold.2 {
-                hold.1 += time.delta_seconds().min(0.1);
-                if hold.1 >= 2. {
+                if game.0.shared_resource_mut::<GameNightBridge>().offer_interaction(seat as u32, "Pick up profile", crate::prelude::Vec2::new(x, PLAYER_Y)) {
+                    hold.1 = 2.;
                     links.pickup(p.id.clone(), player);
                     hold.2 = time.elapsed_seconds_f64() + 5.;
                 }
@@ -246,4 +235,47 @@ pub(super) fn sync(
             4.,
         ));
     }
+}
+
+/// A wall-mounted enamel sign, clear of every station and platform. Opaque
+/// backing keeps its contrast independent of the selected room background.
+fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str) {
+    let font: Handle<Font> = assets.load("ui/ark-pixel-16px-latin.ttf");
+    commands.spawn((RoomLabel(code.into()), SpatialBundle {
+        transform: Transform::from_xyz(640., 640., -910.), ..default()
+    })).with_children(|parent| {
+        // Integer-sized, layered rectangles give the frame pixel-art edges;
+        // no rounded vector borders or translucent text over the wallpaper.
+        for (x, y, z, w, h, color) in [
+            (4., -6., 0., 280., 104., Color::rgb_u8(32, 24, 29)),
+            (0., 0., 1., 280., 104., Color::rgb_u8(74, 47, 34)),
+            (0., 2., 2., 272., 96., Color::rgb_u8(202, 153, 84)),
+            (0., 0., 3., 264., 88., Color::rgb_u8(25, 39, 48)),
+            (0., 42., 4., 264., 4., Color::rgb_u8(242, 210, 155)),
+            (0., -42., 4., 264., 4., Color::rgb_u8(101, 72, 44)),
+        ] {
+            parent.spawn(SpriteBundle {
+                sprite: Sprite { color, custom_size: Some(Vec2::new(w,h)), ..default() },
+                transform: Transform::from_xyz(x,y,z), ..default()
+            });
+        }
+        for x in [-120., 120.] {
+            for y in [-30., 30.] {
+                parent.spawn(SpriteBundle {
+                    sprite: Sprite { color: Color::rgb_u8(202,153,84), custom_size: Some(Vec2::splat(4.)), ..default() },
+                    transform: Transform::from_xyz(x,y,5.), ..default()
+                });
+            }
+        }
+        for (text, y, size, color) in [
+            ("ROOM CODE", 24., 16., Color::rgb_u8(224,190,132)),
+            (code, -10., 32., Color::rgb_u8(255,248,222)),
+        ] {
+            parent.spawn(Text2dBundle {
+                text: Text::from_section(text, TextStyle {font:font.clone(), font_size:size, color})
+                    .with_alignment(TextAlignment::Center),
+                transform: Transform::from_xyz(0.,y,6.), ..default()
+            });
+        }
+    });
 }

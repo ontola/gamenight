@@ -134,9 +134,9 @@ fn update(
     time: Res<Time>,
     // Read-only: a pad press is sent straight out to the daemon, and what's
     // playing comes back the same way everything else about the party does.
-    bridge: Option<Res<crate::gamenight::GameNightBridge>>,
+    bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
 ) {
-    let Some(bridge) = bridge else {
+    let Some(mut bridge) = bridge else {
         // Standalone play: no daemon, so no host music to speak of.
         return;
     };
@@ -147,23 +147,15 @@ fn update(
     let dt = time.delta_seconds();
 
     for (entity, (pad, solid)) in entities.iter_with((&mut pads, &mut solids)) {
-        solid.disabled = !playing;
+        solid.disabled = true;
         pad.cooling = (pad.cooling - dt).max(0.0);
         pad.press = (pad.press - dt / PAD_PRESS_SECONDS).max(0.0);
         let _ = entity;
         if !playing || pad.cooling > 0.0 {
             continue;
         }
-        if player_landed_on(
-            solid.pos,
-            solid.size,
-            &entities,
-            &player_indexes,
-            &bodies,
-            &transforms,
-        )
-        .is_some()
-        {
+        for seat in players_on_pad(solid.pos,solid.size,&entities,&player_indexes,&bodies,&transforms) {
+            if !bridge.offer_interaction(seat, if pad.skips {"Next track"} else {"Play / pause music"}, Vec2::new(solid.pos.x, solid.pos.y-solid.size.y/2.)) {continue;}
             pad.cooling = pad.cooldown_secs;
             pad.press = 1.0;
             bridge.control_music(if pad.skips {

@@ -17,7 +17,8 @@
   "color": "#f5a742",
   "tags": [
     "pinball",
-    "local-multiplayer"
+    "local-multiplayer",
+    "love2d"
   ],
   "links": {
     "source": "https://github.com/Polleps/pinpals",

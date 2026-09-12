@@ -114,14 +114,12 @@ fn update(
     player_indexes: Comp<PlayerIdx>,
     bodies: Comp<KinematicBody>,
     transforms: Comp<Transform>,
-    time: Res<Time>,
     bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
 ) {
     let Some(mut bridge) = bridge else {
         // Standalone play: no party, so there is nothing to leave.
         return;
     };
-    let dt = time.delta_seconds();
 
     for (door_entity, door) in entities.iter_with(&mut doors) {
         let Some(door_pos) = transforms
@@ -147,17 +145,20 @@ fn update(
         let (bottom, top) = (door_pos.y - half.y, door_pos.y + half.y);
         let inside = entities
             .iter_with((&player_indexes, &bodies, &transforms))
-            .find(|(_, (idx, body, transform))| {
+            .filter(|(_, (idx, body, transform))| {
                 if bridge.seat_player(idx.0).is_none() || !body.is_on_ground {
                     return false;
                 }
                 let b = body.bounding_box(**transform);
                 b.min.x < right && b.max.x > left && b.min.y < top && b.max.y > bottom
             })
-            .map(|(_, (idx, _, _))| idx.0);
+            .map(|(_, (idx, _, _))| idx.0).collect::<Vec<_>>();
 
-        if let Some(seat) = door.advance_dwell(inside, dt) {
-            bridge.request_exit(seat as u8, door.rejoin_block_secs);
+        door.progress=0.;
+        for seat in inside {
+            if bridge.offer_interaction(seat, "Leave", Vec2::new(door_pos.x, bottom)) {
+                bridge.request_exit(seat as u8, door.rejoin_block_secs);
+            }
         }
     }
 }

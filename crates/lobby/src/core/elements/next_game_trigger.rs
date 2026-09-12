@@ -176,10 +176,9 @@ fn update(
     bodies: Comp<KinematicBody>,
     transforms: Comp<Transform>,
     time: Res<Time>,
-    mut audio_center: ResMut<AudioCenter>,
-    bridge: Option<Res<crate::gamenight::GameNightBridge>>,
+    bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
 ) {
-    let Some(bridge) = bridge else {
+    let Some(mut bridge) = bridge else {
         // Standalone play: no daemon, no next game to start.
         return;
     };
@@ -202,8 +201,15 @@ fn update(
                 station_transform.translation.truncate(),
                 trigger.body_size,
             ) {
-                // Deterministic ownership when two players share a pad.
-                occupants[index] = Some(occupants[index].map_or(idx.0, |old: u32| old.min(idx.0)));
+                let live=button==crate::gamenight::TvButton::Back;
+                let label=match index {
+                    0 if live => "Resume",
+                    0 => "Play",
+                    1 if live => "Play next",
+                    1 => "Play",
+                    _ => "Skip",
+                };
+                if bridge.offer_interaction(idx.0,label,pad_thirds(station_transform.translation.truncate(),trigger.body_size)[index].0) { occupants[index]=Some(idx.0); }
             }
         }
         let enabled = [
@@ -211,32 +217,19 @@ fn update(
             bridge.next_game_is_ready(),
             bridge.can_skip_next_game(),
         ];
-        // At most one party action in a frame. Reset competing countdowns.
+        trigger.press=(trigger.press-dt*4.).max(0.);
+        trigger.play_press=(trigger.play_press-dt*4.).max(0.);
+        trigger.skip_press=(trigger.skip_press-dt*4.).max(0.);
         for index in 0..3 {
-            let fired = trigger.holds[index].update(occupants[index], enabled[index], dt);
-            if let Some(cue) = trigger.holds[index].take_cue(enabled[index]) {
-                if let Some(sound) = trigger.hold_sounds.get(cue) {
-                    audio_center.play_sound(*sound, 0.35);
-                }
-            }
-            if fired {
+            if occupants[index].is_some() && enabled[index] {
                 match index {
-                    0 => bridge.press_tv_button(),
-                    1 => bridge.play_next_game(),
-                    _ => bridge.skip_next_game(),
-                }
-                for other in 0..3 {
-                    if other != index {
-                        trigger.holds[other].elapsed = 0.0;
-                        trigger.holds[other].last_cue = None;
-                    }
+                    0=>{bridge.press_tv_button();trigger.press=1.;},
+                    1=>{bridge.play_next_game();trigger.play_press=1.;},
+                    _=>{bridge.skip_next_game();trigger.skip_press=1.;},
                 }
                 break;
             }
         }
-        trigger.press = trigger.holds[0].progress();
-        trigger.play_press = trigger.holds[1].progress();
-        trigger.skip_press = trigger.holds[2].progress();
     }
 }
 

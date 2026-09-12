@@ -24,6 +24,28 @@
       window.initAccountSettings(account,request);
     }
     window.gamenightStorage={cloud,local,initial:documentState,
+      async playlist(change) {
+        if (!cloud) {
+          const response=await fetch('/api/playlist',{cache:'no-store',signal:AbortSignal.timeout(10000),...(change?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(change)}:{})});
+          if(!response.ok)throw Error('Playlist unavailable or changed. Refresh and try again.');
+          return response.json();
+        }
+        const view = room => {
+          if(room.status!=='connected')throw Error('Join a room to manage its playlist.');
+          if(!room.fresh || !room.discovery?.playlist)throw Error('Waiting for your lobby to connect.');
+          return {playlist:room.discovery.playlist,playing:room.discovery.current,next:room.discovery.next};
+        };
+        if(!change)return view(await request('/v1/rooms/status'));
+        const id=crypto.randomUUID();
+        await request('/v1/rooms/next','POST',{edit:change,request_id:id});
+        for(let attempt=0;attempt<12;attempt++) {
+          await new Promise(resolve=>setTimeout(resolve,1000));
+          const room=await request('/v1/rooms/status');
+          if(room.discovery?.acknowledged===id)return view(room);
+          if(room.selection?.id && room.selection.id!==id)throw Error('Another player changed the queue. Refresh and try again.');
+        }
+        throw Error('Your host has not confirmed the change. Refresh before trying again.');
+      },
       async loadProfile(id){if(cloud)return {username:documentState.profile.display_name,skin_color:documentState.profile.skin_color,avatar:documentState.profile.avatar};const r=await fetch('/api/profiles/'+encodeURIComponent(id));return r.ok?r.json():null;},
       async save(profile,workspace){
         if(!cloud){const r=await fetch('/api/profiles',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(profile)});if(!r.ok)throw Error('Could not save profile');return;}

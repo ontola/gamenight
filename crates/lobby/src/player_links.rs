@@ -27,9 +27,22 @@ pub struct PendingProfile {
 #[derive(Default, Clone, serde::Deserialize)]
 pub struct Snapshot {
     #[serde(default)]
+    pub cloud: bool,
+    #[serde(default)]
+    pub pairing_urls: HashMap<PlayerId, String>,
+    #[serde(default)]
     pub room: Option<Room>,
     pub linked: HashSet<PlayerId>,
     pub revisions: HashMap<PlayerId, u64>,
+}
+impl Snapshot {
+    pub fn join_url(&self, player: PlayerId, local_base: &str) -> Option<String> {
+        if self.cloud { return self.pairing_urls.get(&player).cloned(); }
+        let revision = self.revisions.get(&player).copied().unwrap_or(0);
+        let base = local_base.trim_end_matches('/');
+        let base = if base.strip_prefix("http://").or_else(|| base.strip_prefix("https://")).is_some_and(|s| !s.contains('/')) { format!("{base}/studio") } else { base.to_owned() };
+        Some(format!("{base}?claim={}&link_revision={revision}", player.0))
+    }
 }
 #[derive(bevy::prelude::Resource)]
 pub struct PlayerLinks {
@@ -103,4 +116,27 @@ fn request(method: &str, path: &str) -> Option<String> {
         return None;
     }
     Some(body.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cloud_qr_uses_hosted_ticket_and_never_local_fallback() {
+        let player = PlayerId::default();
+        let mut snapshot = Snapshot { cloud: true, ..Default::default() };
+        assert_eq!(snapshot.join_url(player, "http://localhost:7913"), None);
+        let url = "https://gamenight.ontola.io/studio#pair=opaque-ticket";
+        snapshot.pairing_urls.insert(player, url.into());
+        assert_eq!(snapshot.join_url(player, "http://localhost:7913").as_deref(), Some(url));
+    }
+
+    #[test]
+    fn offline_qr_has_scanner_recognized_studio_path() {
+        let player = PlayerId::default();
+        let snapshot = Snapshot::default();
+        assert!(snapshot.join_url(player, "http://192.168.0.85:7913/").unwrap()
+            .starts_with("http://192.168.0.85:7913/studio?claim="));
+    }
 }

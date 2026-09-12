@@ -15,6 +15,7 @@ use bones_framework::prelude::*;
 
 pub mod audio;
 mod branding;
+mod startup_timing;
 pub mod core;
 pub mod debug;
 pub mod fullscreen;
@@ -137,6 +138,7 @@ pub struct GameMusic {
 }
 
 fn main() {
+    let startup_started = std::time::Instant::now();
     if !std::path::Path::new("assets").exists() {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         if manifest_dir.join("assets").exists() {
@@ -258,6 +260,7 @@ fn main() {
     gamenight::install_global_input(&mut app);
     shot::install(&mut app);
 
+    startup_timing::install(&mut app, startup_started);
     app.run();
 }
 

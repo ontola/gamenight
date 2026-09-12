@@ -1133,18 +1133,11 @@ impl<'a> CollisionWorld<'a> {
                         return false;
                     };
 
-                    // Rising through a jump-through platform is always
-                    // allowed, whatever state the flags happen to be in.
-                    // Getting this wrong doesn't read as a physics quirk from
-                    // the couch, it reads as a jump that didn't work — and a
-                    // platform you can stand under but not enter is worse than
-                    // no platform.
-                    if *tile_kind == TileCollisionKind::JumpThrough && dy > 0.0 {
-                        return false;
+                    if *tile_kind == TileCollisionKind::JumpThrough {
+                        let feet = shape.compute_aabb(&position).mins.y;
+                        return one_way_support(feet, rapier_collider.compute_aabb().maxs.y, dy, collider.descent);
                     }
-
-                    // Ignore jump-through tiles if we have already seen wood
-                    !(collider.seen_wood && *tile_kind == TileCollisionKind::JumpThrough)
+                    true
                 }),
             );
 
@@ -1163,25 +1156,8 @@ impl<'a> CollisionWorld<'a> {
                     break true;
                 }
 
-                let tile_kind = *self.tile_collision_kinds.get(ent).unwrap();
-
-                // collider wants to go down and collided with jumpthrough tile
-                if tile_kind == TileCollisionKind::JumpThrough && collider.descent {
-                    collider.seen_wood = true;
-                }
-                // collider wants to go up and encoutered jumpthrough obstace
-                if tile_kind == TileCollisionKind::JumpThrough && dy > 0.0 {
-                    collider.seen_wood = true;
-                    collider.descent = true;
-                }
-
-                // If we hit a solid block, or a jumpthrough tile that we aren't falling through
-                if !(tile_kind == TileCollisionKind::JumpThrough
-                    && (collider.descent || dy > 0.0 || collider.seen_wood))
-                {
-                    // Indicate we ran into something and stop processing
-                    break true;
-                }
+                // The sweep filter already excluded undersides, ascent and explicit drops.
+                break true;
 
             // If there is no collision
             } else {
@@ -1282,8 +1258,7 @@ impl<'a> CollisionWorld<'a> {
                             return false;
                         };
 
-                        // Ignore jump-through tiles if we have already seen wood.
-                        !(collider.seen_wood && *tile_kind == TileCollisionKind::JumpThrough)
+                        *tile_kind != TileCollisionKind::JumpThrough
                     }),
                 )
             };
@@ -1449,6 +1424,14 @@ impl<'a> CollisionWorld<'a> {
             .unwrap_or_default()
     }
 
+    pub fn supports_feet(&self, tile: Entity, feet: f32, velocity_y: f32, dropping: bool) -> bool {
+        if self.tile_collision_kinds.get(tile) != Some(&TileCollisionKind::JumpThrough) { return true; }
+        let Some(handle) = self.tile_rapier_handles.get(tile) else { return false; };
+        let Some(body) = self.ctx.rigid_body_set.get(handle.0) else { return false; };
+        body.colliders().iter().any(|handle| self.ctx.collider_set.get(*handle)
+            .is_some_and(|tile| one_way_support(feet, tile.compute_aabb().maxs.y, velocity_y, dropping)))
+    }
+
     /// Get the collider for the given entity.
     pub fn get_collider(&self, actor: Entity) -> &Collider {
         assert!(self.actors.contains(actor));
@@ -1466,5 +1449,23 @@ mod test {
         let bits = RapierUserData::from(e1);
         let e2 = RapierUserData::entity(bits);
         assert_eq!(e1, e2);
+    }
+}
+
+// Only a descending body whose feet have cleared the top can land on a shelf.
+fn one_way_support(feet: f32, top: f32, vertical: f32, dropping: bool) -> bool {
+    !dropping && vertical <= 0.0 && feet >= top - 0.15
+}
+
+#[cfg(test)]
+mod platform_tests {
+    use super::one_way_support;
+    #[test]
+    fn platform_landing_requires_feet_above_top() {
+        assert!(one_way_support(132., 128., -400., false));
+        assert!(one_way_support(128., 128., 0., false));
+        assert!(!one_way_support(110., 128., -400., false));
+        assert!(!one_way_support(132., 128., 400., false));
+        assert!(!one_way_support(132., 128., -400., true));
     }
 }

@@ -1,0 +1,31 @@
+{
+  "$schema": "../schema.json",
+  "id": "blast-party",
+  "title": "Blast Party",
+  "tagline": "Blast crates, collect powers and be the last player standing.",
+  "developer": "GameNight contributors",
+  "players": {
+    "min": 2,
+    "max": 4
+  },
+  "match_minutes": 1,
+  "price": "free",
+  "tags": [
+    "versus",
+    "arcade",
+    "bombs",
+    "local-multiplayer",
+    "open-source",
+    "love2d"
+  ],
+  "emoji": "💣",
+  "color": "#ffb454",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "bundled": "games/love-party",
+  "links": {
+    "source": "https://github.com/ontola/gamenight/tree/main/games/love-party"
+  }
+}
