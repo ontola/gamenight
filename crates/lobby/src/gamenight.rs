@@ -852,7 +852,13 @@ fn ensure_lobby_running(
     if let Some(at) = bridge.lobby_rebuild_at {
         let now = std::time::Instant::now();
         if now >= at {
-            rebuild_lobby(bridge, sessions, meta, assets);
+            // Keep the live room, camera and existing bodies when seats change.
+            // The lobby spawner reconciles active slots on its next update.
+            let seat_match = match_plugin_for_seats(&bridge.latest_seats, meta, assets,
+                true, &bridge.player_gamepad);
+            if let Some(session) = sessions.get_mut(SessionNames::GAME) {
+                session.world.resource_mut::<MatchInputs>().players = seat_match.player_info;
+            }
             bridge.lobby_rebuild_at = None;
         } else {
             debug!(
@@ -1533,6 +1539,10 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.add_systems(bevy::prelude::PostUpdate,
         (interaction_visual::sync, bevy::ecs::schedule::apply_deferred)
             .chain().before(bevy::transform::TransformSystem::TransformPropagate));
+    app.add_systems(bevy::prelude::PostUpdate,
+        (sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
+            position_player_avatar_system).chain()
+            .before(bevy::transform::TransformSystem::TransformPropagate));
     app.add_systems(
         bevy::prelude::Update,
         (
@@ -1543,8 +1553,6 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             sync_player_skin_system,
             sync_name_tags_system,
             position_name_tags_system,
-            sync_player_avatar_system,
-            position_player_avatar_system,
             swap_player_faces_system,
             deal_player_faces_system,
             sync_prune_countdown_system,
@@ -2523,7 +2531,7 @@ fn avatar_image(data: &str) -> Option<bevy::render::texture::Image> {
 /// and the walk cycle for free.
 /// The drawn face's placement: where it goes, and whether it should be
 /// mirrored. Returned together because both come from the same lookup.
-fn player_face_placement(game: &Game, seat_index: u8) -> Option<(bevy::prelude::Vec3, bool)> {
+fn player_face_placement(game: &Game, seat_index: u8) -> Option<(bevy::prelude::Transform, bool)> {
     let session = game.sessions.get(SessionNames::GAME)?;
     let world = &session.world;
     let entities = world.resource::<Entities>();
@@ -2546,23 +2554,22 @@ fn player_face_placement(game: &Game, seat_index: u8) -> Option<(bevy::prelude::
     };
     let facing = if flipped { -1.0 } else { 1.0 };
 
-    // Horizontal position from the *body*, vertical from the face layer.
-    //
-    // jumpy's face layer carries an offset of `[10, 15]` (see any
-    // `*.player.yaml`): the fish snout sits well forward of the head's
-    // centre. Inheriting all of it put a drawn face out on the edge of the
-    // head, so x comes from the body instead — then leans back toward the
-    // facing direction by a couple of pixels, which reads as looking where
-    // you're walking without sliding off the head. The face layer's y keeps
-    // the head bob and walk cycle for free.
-    Some((
-        bevy::prelude::Vec3::new(
-            body.translation.x + facing * AVATAR_FACE_LEAD,
-            face.translation.y + AVATAR_FACE_NUDGE_Y,
-            face.translation.z,
-        ),
-        flipped,
-    ))
+    Some((avatar_head_transform(body, face, facing), flipped))
+}
+
+/// Apply the head correction in body-local coordinates, so the artwork and
+/// its anchor rotate together during ragdoll motion.
+fn avatar_head_transform(body: &Transform, face: &Transform, facing: f32) -> bevy::prelude::Transform {
+    let local = body.rotation.inverse() * (face.translation - body.translation);
+    let offset = body.rotation * Vec3::new(
+        facing * AVATAR_FACE_LEAD, local.y + AVATAR_FACE_NUDGE_Y, 0.0,
+    );
+    bevy::prelude::Transform {
+        translation: Vec3::new(body.translation.x + offset.x,
+            body.translation.y + offset.y, face.translation.z + 0.005),
+        rotation: body.rotation,
+        scale: body.scale,
+    }
 }
 
 /// How far the drawn face leans toward the way the character is facing, in
@@ -2790,7 +2797,7 @@ fn position_player_avatar_system(
         };
         *visibility = Visibility::Visible;
         // Just in front of the face layer it replaces.
-        transform.translation = Vec3::new(face.x, face.y, face.z + 0.005);
+        *transform = face;
         // Mirror with the character, exactly as jumpy's own face atlas does —
         // a face that keeps looking right while its body walks left reads as
         // a sticker rather than a head.
@@ -3938,6 +3945,28 @@ fn generate_qr_bevy_image(url: &str) -> Option<bevy::render::texture::Image> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drawn_head_rotates_with_ragdoll_without_changing_depth() {
+        for angle in [0.0, std::f32::consts::FRAC_PI_2, std::f32::consts::PI, -1.2] {
+            for facing in [-1.0, 1.0] {
+                let body = Transform {
+                    translation: Vec3::new(100.0, 200.0, -100.0),
+                    rotation: Quat::from_rotation_z(angle),
+                    ..default()
+                };
+                let face = Transform {
+                    translation: body.translation + body.rotation * Vec3::new(facing * 10.0, 15.0, 0.1),
+                    ..body
+                };
+                let actual = avatar_head_transform(&body, &face, facing);
+                let expected = body.translation + body.rotation * Vec3::new(0.0, 22.0, 0.0);
+                assert!((actual.translation.truncate() - expected.truncate()).length() < 0.0001);
+                assert!((actual.translation.z - face.translation.z - 0.005).abs() < 0.0001);
+                assert_eq!(actual.rotation, body.rotation);
+            }
+        }
+    }
 
     /// The join/reroll name pick must actually vary. This used to be
     /// `FUN_NAMES.iter().find(...)`, which made the first joiner always

@@ -27,7 +27,7 @@ def build():
             tiles.append(dict(pos=[x, row], idx=44 if x == start else 46 if x == end else 45,
                               collision='JumpThrough'))
     positions = {'qr_sign': [136., 352.], 'sign_in': [224., 263.],
-                 'exit_door': [88., 134.], 'next_game': [620., 290.],
+                 'exit_door': [88., 134.], 'next_game': [620., 98.],
                  'music_screen': [976., 437.], 'music_pause': [940., 488.],
                  'music_skip': [1012., 488.]}
     for element in room['layers'][1]['elements']:
@@ -106,9 +106,9 @@ def validate(room, anchors):
     # Gaps between the separate station shelves can be cleared with margin.
     for distance in (128, 160):
         assert distance+20 < speed*2*jump/gravity, 'Station gap too wide'
-    # Upper controls have separate landings, with music buttons one
-    # short jump above it. Check full player standing space at every control.
-    for x, feet in [(224,270), (500,288), (620,288), (740,288), (940,495), (1012,495)]:
+    # The TV controls sit on the continuous spawn-floor corridor. Music has
+    # upper landings. Check full player standing space at every control.
+    for x, feet in [(224,270), (500,96), (620,96), (740,96), (940,495), (1012,495)]:
         assert not any(overlaps((x-16,feet,32,48),s) for s in solids), 'Blocked control'
     assert 495-416+10 < jump*jump/(2*gravity), 'Music controls too high'
 

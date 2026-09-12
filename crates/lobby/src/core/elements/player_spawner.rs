@@ -85,6 +85,8 @@ fn hydrate(
 }
 
 fn update(
+    mut commands: Commands,
+    player_layers: Comp<PlayerLayers>,
     mut entities: ResMutInit<Entities>,
     mut current_spawner: ResMutInit<CurrentSpawner>,
     mut lobby_order: ResMutInit<LobbySpawnOrder>,
@@ -96,6 +98,13 @@ fn update(
     player_inputs: Res<MatchInputs>,
     mut spawner_manager: SpawnerManager,
 ) {
+    if lobby.0 {
+        for (entity, (index, _)) in entities.iter_with((&player_indexes, &player_layers)) {
+            if !player_inputs.players[index.0 as usize].active {
+                commands.add(PlayerCommand::despawn(entity));
+            }
+        }
+    }
     let alive_players = entities
         .iter_with(&player_indexes)
         .map(|(_ent, pidx)| pidx.0)

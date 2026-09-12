@@ -6,11 +6,11 @@ outputs without writing; CI runs this check.
 
 The ground floor is a clear corridor: Leave at the left and eight reserved
 profile door bays. Decorative furniture must not occupy those bays. The
-right-hand steps lead up to separate sign-in, TV/playlist and music shelves.
+TV and playlist controls stand on the spawn floor, so entering the next game needs no jump. The right-hand steps lead to the music shelves.
 All shelf tiles are jump-through: players rise through them and land from above.
 Only the floor and outside walls are solid. The QR is a
 non-solid wall display above sign-in. Music buttons have their own higher
-landing. Player spawns are on the ground floor, away from the controls.
+landing. Player spawns are on the ground floor, close to the TV and playlist controls.
 
 The validator checks door clearance, spacing, control landing clearance and
 a sampled staircase jump path using the character's jump speed, air speed,
