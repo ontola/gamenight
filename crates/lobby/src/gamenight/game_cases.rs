@@ -193,7 +193,7 @@ pub(super) fn spawn_shelf(
         parent,
         "UP NEXT",
         -2.0,
-        57.0,
+        84.0,
         100.0,
         11.0,
         &font,
@@ -286,25 +286,17 @@ pub(super) fn spawn_shelf(
         &font,
         Color::WHITE,
     );
-    let hint = if status.contains("DOWNLOAD FAILED") {
-        "DOWNLOAD FAILED"
-    } else if status.contains("DOWNLOADING") {
-        "DOWNLOADING"
-    } else if status.contains("LOADING") {
-        "LOADING"
-    } else {
-        ""
-    };
+    let hint = status;
     if !hint.is_empty() {
         label(
             parent,
             hint,
-            108.0,
-            39.0,
-            112.0,
+            -2.0,
+            65.0,
+            140.0,
             9.0,
             &font,
-            Color::rgb(1.0, 0.83, 0.48),
+            if status=="READY" {Color::rgb(0.6,1.0,0.7)} else {Color::rgb(1.0, 0.83, 0.48)},
         );
     }
     if cases.len() > 6 {

@@ -3765,11 +3765,11 @@ fn sync_next_game_tv_system(
     };
 
     let next_line = match upcoming {
-        NextGameStatus::Ready(t) => format!("UP NEXT  {t}"),
-        NextGameStatus::Loading(t, _) => format!("UP NEXT  {t} · LOADING"),
-        NextGameStatus::Downloading(t, _) => format!("UP NEXT  {t} · DOWNLOADING"),
-        NextGameStatus::DownloadFailed(t) => format!("UP NEXT  {t} · DOWNLOAD FAILED"),
-        _ => "UP NEXT  Nothing ready yet".to_string(),
+        NextGameStatus::Ready(_) => "READY".to_string(),
+        NextGameStatus::Loading(_, progress) => progress.map(|p|format!("PRELOADING {}%",p.percent)).unwrap_or_else(||"PRELOADING...".into()),
+        NextGameStatus::Downloading(_, progress) => progress.map(|p|format!("DOWNLOADING {p}%")).unwrap_or_else(||"DOWNLOADING...".into()),
+        NextGameStatus::DownloadFailed(_) => "DOWNLOAD FAILED".to_string(),
+        _ => String::new(),
     };
     let case_fingerprint = game_cases::fingerprint(&cases);
     let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}");
