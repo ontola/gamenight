@@ -513,6 +513,7 @@ async fn serve_web_asset(Path(asset): Path<String>) -> Response {
         "site.css" => ("text/css", include_str!("../../../web/site.css")),
         "studio.css" => ("text/css", include_str!("../../../web/studio.css")),
         "studio.js" => ("text/javascript", include_str!("../../../web/studio.js")),
+        "account.js" => ("text/javascript", include_str!("../../../web/account.js")),
         "shell.js" => ("text/javascript", include_str!("../../../web/shell.js")),
         "icon.svg" => ("image/svg+xml", include_str!("../../../web/icon.svg")),
         _ => return StatusCode::NOT_FOUND.into_response(),
