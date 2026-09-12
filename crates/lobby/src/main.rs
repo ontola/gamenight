@@ -209,17 +209,6 @@ fn main() {
     // to. Opening to a title screen — or letting Start pause into one — is
     // precisely what the lobby exists not to do.
 
-    // The attract overlay: drawn over the running lobby whenever nobody is in
-    // the party. Priority above the game session so it sits on top of the room.
-    game.sessions
-        .create_with(SessionNames::PRESS_START, |builder: &mut SessionBuilder| {
-            builder.install_plugin(ui::press_start::session_plugin);
-        });
-    game.sessions
-        .get_mut(SessionNames::PRESS_START)
-        .unwrap()
-        .priority = 2;
-
     // Scoring menu plugin, activated by game between round tarnsitions when appropriate
     game.sessions
         .create_with(SessionNames::SCORING, |builder: &mut SessionBuilder| {
