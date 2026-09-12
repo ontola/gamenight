@@ -84,3 +84,13 @@ jobs:
           python -m pip install Pillow PyYAML
           python crates/lobby/tools/reskin/verify_themes.py
       - run: cargo build --manifest-path crates/lobby/Cargo.toml --locked --profile ci
+
+  shared-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check shared browser scripts
+        run: for file in web/*.js; do node --check "$file"; done

@@ -1,12 +1,12 @@
 use axum::{
-    extract::{Path, State, Query},
+    extract::{Path, Query, State},
     http::{HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
-mod playlist;
 mod cloud;
+mod playlist;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -25,7 +25,9 @@ pub struct Profile {
     pub avatar: String, // 16x16 pixel matrix serialized or data URI
 }
 
-fn default_skin_color() -> String { "#f5e9be".into() }
+fn default_skin_color() -> String {
+    "#f5e9be".into()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JoinSessionRequest {
@@ -89,8 +91,24 @@ pub fn create_router(state: SharedState) -> Router {
     Router::new()
         .route("/studio", get(serve_studio))
         .route("/web/:asset", get(serve_web_asset))
-        .route("/assets/jsQR.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/jsQR.js")) }))
-        .route("/assets/qr-scanner.js", get(|| async { ([(axum::http::header::CONTENT_TYPE, "text/javascript")], include_str!("../assets/qr-scanner.js")) }))
+        .route(
+            "/assets/jsQR.js",
+            get(|| async {
+                (
+                    [(axum::http::header::CONTENT_TYPE, "text/javascript")],
+                    include_str!("../assets/jsQR.js"),
+                )
+            }),
+        )
+        .route(
+            "/assets/qr-scanner.js",
+            get(|| async {
+                (
+                    [(axum::http::header::CONTENT_TYPE, "text/javascript")],
+                    include_str!("../assets/qr-scanner.js"),
+                )
+            }),
+        )
         .route("/assets/characters/:theme", get(serve_character))
         .route("/mobile", get(serve_studio))
         .route("/session/:session_id", get(serve_studio))
@@ -114,8 +132,8 @@ pub async fn run_server(
     addr: std::net::SocketAddr,
     state: SharedState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    if let Some(bridge)=cloud::Bridge::configured(){
-        state.lock().unwrap().cloud=Some(bridge.clone());
+    if let Some(bridge) = cloud::Bridge::configured() {
+        state.lock().unwrap().cloud = Some(bridge.clone());
         tokio::spawn(bridge.run(state.clone()));
     }
     let app = create_router(state);
@@ -130,7 +148,10 @@ pub async fn run_server(
     Ok(())
 }
 
-async fn profile_session(Path(id): Path<String>, State(state): State<SharedState>) -> Result<Json<serde_json::Value>, StatusCode> {
+async fn profile_session(
+    Path(id): Path<String>,
+    State(state): State<SharedState>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
     use futures_util::SinkExt;
     use gamenight_protocol::Role;
     let addr = state.lock().unwrap().daemon_addr.clone();
@@ -150,7 +171,9 @@ async fn profile_session(Path(id): Path<String>, State(state): State<SharedState
 
 async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let state = state.lock().unwrap();
-    Json(serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions}))
+    Json(
+        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions}),
+    )
 }
 
 async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState>) -> StatusCode {
@@ -276,9 +299,17 @@ async fn join_session_inner(
             };
             let mut target = seat_target.or(req.claim);
             if let Some(target) = target {
-                let revision = state.lock().unwrap().link_revisions.get(&target).copied().unwrap_or(0);
+                let revision = state
+                    .lock()
+                    .unwrap()
+                    .link_revisions
+                    .get(&target)
+                    .copied()
+                    .unwrap_or(0);
                 if req.link_revision != revision {
-                    return Ok(Json(serde_json::json!({"status": "unlinked", "message": "This controller was unlinked. Scan its new QR code to sign in again."})));
+                    return Ok(Json(
+                        serde_json::json!({"status": "unlinked", "message": "This controller was unlinked. Scan its new QR code to sign in again."}),
+                    ));
                 }
             }
 
@@ -366,9 +397,16 @@ async fn join_session_inner(
             }
 
             if let Some(player_id) = player_id {
-                ws_stream.send(tokio_tungstenite::tungstenite::Message::Text(
-                    ClientMessage::SetPlayerSkinColor { player_id, skin_color: profile.skin_color.clone() }.to_json()
-                )).await.map_err(|_| StatusCode::BAD_GATEWAY)?;
+                ws_stream
+                    .send(tokio_tungstenite::tungstenite::Message::Text(
+                        ClientMessage::SetPlayerSkinColor {
+                            player_id,
+                            skin_color: profile.skin_color.clone(),
+                        }
+                        .to_json(),
+                    ))
+                    .await
+                    .map_err(|_| StatusCode::BAD_GATEWAY)?;
             }
 
             // Close politely rather than dropping the socket mid-flight. The
@@ -447,12 +485,23 @@ async fn serve_character(Path(theme): Path<String>) -> Response {
         "gameroom" => include_bytes!("../../lobby/assets/themes/gameroom/fishy/body.png"),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
-    ([("content-type", "image/png"), ("cache-control", "no-cache")], png).into_response()
+    (
+        [("content-type", "image/png"), ("cache-control", "no-cache")],
+        png,
+    )
+        .into_response()
 }
 
-async fn serve_studio(State(state):State<SharedState>,Query(query):Query<HashMap<String,String>>) -> Response {
-    let bridge=state.lock().unwrap().cloud.clone();
-    if let Some(bridge)=bridge { if let Some(url)=bridge.pairing_url(&query).await { return axum::response::Redirect::to(&url).into_response(); } }
+async fn serve_studio(
+    State(state): State<SharedState>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let bridge = state.lock().unwrap().cloud.clone();
+    if let Some(bridge) = bridge {
+        if let Some(url) = bridge.pairing_url(&query).await {
+            return axum::response::Redirect::to(&url).into_response();
+        }
+    }
     Html(STUDIO_HTML).into_response()
 }
 

@@ -59,7 +59,11 @@ async fn http(addr: &str, method: &str, path: &str, body: &str) -> (u16, String)
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("").to_string();
+    let body = raw
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
+        .to_string();
     (status, body)
 }
 
@@ -154,7 +158,9 @@ async fn join_without_claim_adds_a_player() {
     assert_eq!(status, 200, "join failed: {body}");
     assert!(body.contains("\"joined\""), "expected joined, got {body}");
 
-    let party = watcher.wait_for(|p| p.players.iter().any(|p| p.skin_color.is_some())).await;
+    let party = watcher
+        .wait_for(|p| p.players.iter().any(|p| p.skin_color.is_some()))
+        .await;
     assert_eq!(party.players.len(), 1);
     assert_eq!(party.players[0].name, "Ada");
     assert_eq!(party.players[0].skin_color.as_deref(), Some("#ff0000"));
@@ -239,7 +245,11 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
     assert_eq!(claimed.id, target, "claim must rewrite the same player id");
     assert_eq!(claimed.name, "Grace");
     assert_eq!(claimed.skin_color.as_deref(), Some("#00ff00"));
-    assert_eq!(claimed.color.as_deref(), Some("#5c9eff"), "profile must not overwrite game clothing colour");
+    assert_eq!(
+        claimed.color.as_deref(),
+        Some("#5c9eff"),
+        "profile must not overwrite game clothing colour"
+    );
     assert_eq!(
         claimed.avatar.as_deref(),
         Some("avatar-g"),
@@ -373,7 +383,11 @@ async fn get(addr: &str, path: &str) -> (u16, String) {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split_once("\r\n\r\n").map(|(_, body)| body).unwrap_or("").to_string();
+    let body = raw
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
+        .to_string();
     (status, body)
 }
 
@@ -389,7 +403,10 @@ async fn session_url_with_claim_serves_a_studio_that_reads_it() {
 
     let (status, body) = get(&server, &format!("/session/gn-couch?claim={}", player.0)).await;
     assert_eq!(status, 200, "the claim URL must serve the studio");
-    assert!(body.contains("/web/storage.js"), "the page must load the shared editor");
+    assert!(
+        body.contains("/web/storage.js"),
+        "the page must load the shared editor"
+    );
     let (status, body) = get(&server, "/web/studio.js").await;
     assert_eq!(status, 200, "the shared script must be served");
     assert!(
@@ -869,11 +886,25 @@ async fn playlist_removal_is_broadcast_and_guarded() {
     let daemon = start_daemon().await;
     let server = start_server(&daemon).await;
     let mut watcher = Watcher::connect(&daemon).await;
-    watcher.ws.send(Message::Text(ClientMessage::SetPlaylist {
-        entries: ["a", "b", "a"].into_iter().map(|id| PlaylistEntry { game: GameId::new(id), title: id.into() }).collect()
-    }.to_json())).await.unwrap();
+    watcher
+        .ws
+        .send(Message::Text(
+            ClientMessage::SetPlaylist {
+                entries: ["a", "b", "a"]
+                    .into_iter()
+                    .map(|id| PlaylistEntry {
+                        game: GameId::new(id),
+                        title: id.into(),
+                    })
+                    .collect(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
     let before = watcher.wait_for(|p| p.playlist.entries.len() == 3).await;
-    let request = serde_json::json!({"expected": before.playlist, "from": 0, "remove": true}).to_string();
+    let request =
+        serde_json::json!({"expected": before.playlist, "from": 0, "remove": true}).to_string();
     let (code, body) = post(&server, "/api/playlist", &request).await;
     assert_eq!(code, 200, "{body}");
     let view: serde_json::Value = serde_json::from_str(&body).unwrap();
@@ -881,10 +912,17 @@ async fn playlist_removal_is_broadcast_and_guarded() {
     assert_eq!(view["playlist"]["entries"][1]["game"], "a");
     watcher.wait_for(|p| p.playlist.entries.len() == 2).await;
     assert_eq!(post(&server, "/api/playlist", &request).await.0, 409);
-    for change in [serde_json::json!({"from":99,"remove":true}), serde_json::json!({"from":0}), serde_json::json!({"from":0,"to":1,"remove":true})] {
+    for change in [
+        serde_json::json!({"from":99,"remove":true}),
+        serde_json::json!({"from":0}),
+        serde_json::json!({"from":0,"to":1,"remove":true}),
+    ] {
         let mut req = change;
         req["expected"] = view["playlist"].clone();
-        assert_eq!(post(&server, "/api/playlist", &req.to_string()).await.0, 400);
+        assert_eq!(
+            post(&server, "/api/playlist", &req.to_string()).await.0,
+            400
+        );
     }
 }
 
@@ -1068,7 +1106,12 @@ async fn opted_in_game_receives_a_new_controller_without_a_new_session() {
 async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned() {
     let daemon = start_daemon().await;
     let server = start_server(&daemon).await;
-    post(&server, "/api/profiles", &profile_json("phone", "Disco", "blue", "face")).await;
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("phone", "Disco", "blue", "face"),
+    )
+    .await;
     let (_, joined) = post(&server, "/api/profiles/phone/join", "{}").await;
     let joined: serde_json::Value = serde_json::from_str(&joined).unwrap();
     let id = joined["player_id"].as_str().unwrap();
@@ -1076,7 +1119,12 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
     let (_, links) = http(&server, "GET", "/api/player-links", "").await;
     let links: serde_json::Value = serde_json::from_str(&links).unwrap();
     assert_eq!(links["linked"][0], id);
-    assert_eq!(post(&server, &format!("/api/player-links/{id}/unlink"), "").await.0, 204);
+    assert_eq!(
+        post(&server, &format!("/api/player-links/{id}/unlink"), "")
+            .await
+            .0,
+        204
+    );
     let after = Watcher::connect(&daemon).await.party;
     assert_eq!(before.players, after.players);
     assert_eq!(before.seats, after.seats);
@@ -1084,14 +1132,41 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
     let links: serde_json::Value = serde_json::from_str(&links).unwrap();
     assert_eq!(links["linked"].as_array().unwrap().len(), 0);
     assert_eq!(links["revisions"][id], 1);
-    post(&server, "/api/profiles", &profile_json("phone", "Changed", "red", "other")).await;
-    let (_, stale) = post(&server, "/api/profiles/phone/join", &format!(r#"{{"claim":"{id}"}}"#)).await;
-    assert_eq!(serde_json::from_str::<serde_json::Value>(&stale).unwrap()["status"], "unlinked");
-    assert_eq!(Watcher::connect(&daemon).await.party.players, before.players);
-    let (_, fresh) = post(&server, "/api/profiles/phone/join", &format!(r#"{{"claim":"{id}","link_revision":1}}"#)).await;
-    assert_eq!(serde_json::from_str::<serde_json::Value>(&fresh).unwrap()["status"], "claimed");
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("phone", "Changed", "red", "other"),
+    )
+    .await;
+    let (_, stale) = post(
+        &server,
+        "/api/profiles/phone/join",
+        &format!(r#"{{"claim":"{id}"}}"#),
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&stale).unwrap()["status"],
+        "unlinked"
+    );
+    assert_eq!(
+        Watcher::connect(&daemon).await.party.players,
+        before.players
+    );
+    let (_, fresh) = post(
+        &server,
+        "/api/profiles/phone/join",
+        &format!(r#"{{"claim":"{id}","link_revision":1}}"#),
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&fresh).unwrap()["status"],
+        "claimed"
+    );
     let (_, links) = http(&server, "GET", "/api/player-links", "").await;
-    assert_eq!(serde_json::from_str::<serde_json::Value>(&links).unwrap()["linked"][0], id);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&links).unwrap()["linked"][0],
+        id
+    );
 }
 
 #[tokio::test]
@@ -1101,9 +1176,17 @@ async fn session_tab_tracks_link_unlink_and_does_not_show_a_phone_qr() {
     let (_, page) = http(&server, "GET", "/mobile", "").await;
     assert!(!page.contains("Scan QR Code with Phone"));
     assert!(page.contains("session-link-status"));
-    post(&server, "/api/profiles", &profile_json("session-phone", "Disco", "blue", "face")).await;
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("session-phone", "Disco", "blue", "face"),
+    )
+    .await;
     let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
-    assert_eq!(serde_json::from_str::<serde_json::Value>(&status).unwrap()["linked"], false);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&status).unwrap()["linked"],
+        false
+    );
     post(&server, "/api/profiles/session-phone/join", "{}").await;
     let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
     let status: serde_json::Value = serde_json::from_str(&status).unwrap();
@@ -1111,7 +1194,12 @@ async fn session_tab_tracks_link_unlink_and_does_not_show_a_phone_qr() {
     assert_eq!(status["player_name"], "Disco");
     assert_eq!(status["players"], 1);
     let party = Watcher::connect(&daemon).await.party;
-    post(&server, &format!("/api/player-links/{}/unlink", party.players[0].id.0), "").await;
+    post(
+        &server,
+        &format!("/api/player-links/{}/unlink", party.players[0].id.0),
+        "",
+    )
+    .await;
     let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
     let status: serde_json::Value = serde_json::from_str(&status).unwrap();
     assert_eq!(status["linked"], false);

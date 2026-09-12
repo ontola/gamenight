@@ -73,7 +73,9 @@ async fn exchange(
         }
         if request.remove == request.to.is_some()
             || request.from >= request.expected.entries.len()
-            || request.to.is_some_and(|to| to >= request.expected.entries.len())
+            || request
+                .to
+                .is_some_and(|to| to >= request.expected.entries.len())
         {
             return Err(StatusCode::BAD_REQUEST);
         }
@@ -81,13 +83,20 @@ async fn exchange(
         let moved = target.remove(request.from);
         let command = if let Some(to) = request.to {
             target.insert(to, moved);
-            ClientMessage::MovePlaylistEntry { expected: request.expected, from: request.from, to }
+            ClientMessage::MovePlaylistEntry {
+                expected: request.expected,
+                from: request.from,
+                to,
+            }
         } else {
-            ClientMessage::RemovePlaylistEntry { expected: request.expected, index: request.from }
+            ClientMessage::RemovePlaylistEntry {
+                expected: request.expected,
+                index: request.from,
+            }
         };
         ws.send(Message::Text(command.to_json()))
-        .await
-        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
         while let Some(message) = ws.next().await {
             if let Message::Text(text) = message.map_err(|_| StatusCode::BAD_GATEWAY)? {
                 match serde_json::from_str::<ServerMessage>(&text)
