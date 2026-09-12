@@ -1,4 +1,12 @@
 "use strict";
+// Redirects retain the original fragment. Keep room invitations through sign-in.
+const invitation = new URLSearchParams(location.hash.slice(1));
+for (const kind of ["pair", "room"]) {
+  const value = invitation.get(kind);
+  if (value) sessionStorage.setItem(kind === "pair" ? "gamenight_pair" : "gamenight_room_code", value);
+}
+if (invitation.has("pair") || invitation.has("room")) history.replaceState(null, "", location.pathname + location.search);
+
 const $ = id => document.getElementById(id);
 let busy = false, resendAt = 0;
 function status(text) { $("status").textContent = text; }
