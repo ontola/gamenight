@@ -67,7 +67,23 @@
   document.getElementById('qr-open').onclick = () => { dialog.showModal(); startCamera(); };
   document.getElementById('qr-retry').onclick = startCamera;
   document.getElementById('qr-close').onclick = () => dialog.close();
-  dialog.addEventListener('close', stop);
+  // A backdrop tap is targeted at the dialog too. Check bounds so taps on
+  // its padding/content never close it, and drags out of the dialog are safe.
+  let backdropPointer = null;
+  function outside(event) {
+    const rect = dialog.getBoundingClientRect();
+    return event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right
+      || event.clientY < rect.top || event.clientY > rect.bottom);
+  }
+  dialog.addEventListener('pointerdown', event => {
+    backdropPointer = event.isPrimary && event.button === 0 && outside(event) ? event.pointerId : null;
+  });
+  dialog.addEventListener('pointerup', event => {
+    if (event.pointerId === backdropPointer && outside(event)) dialog.close();
+    backdropPointer = null;
+  });
+  dialog.addEventListener('pointercancel', () => { backdropPointer = null; });
+  dialog.addEventListener('close', () => { backdropPointer = null; stop(); });
   window.addEventListener('pagehide', stop);
   document.addEventListener('visibilitychange', () => { if (document.hidden) stop(); });
   document.getElementById('qr-photo').onchange = async event => {
