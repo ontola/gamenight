@@ -18,6 +18,7 @@
       csrf=(await request('/auth/session')).csrf;
       const account=await request('/v1/me'); prefix='cloud:'+account.id+':';pendingKey='pending';
       documentState=await request('/v1/me/studio');
+      window.initAccountSettings(account,request);
     }
     window.gamenightStorage={cloud,local,initial:documentState,
       async loadProfile(id){if(cloud)return {username:documentState.profile.display_name,skin_color:documentState.profile.skin_color,avatar:documentState.profile.avatar};const r=await fetch('/api/profiles/'+encodeURIComponent(id));return r.ok?r.json():null;},

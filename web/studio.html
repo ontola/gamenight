@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameNight · Character Studio</title>
+  <title>GameNight · Your player</title>
   <link rel="stylesheet" href="/web/studio.css"><link rel="stylesheet" href="/web/site.css">
 <link rel="icon" href="/web/icon.svg"><script src="/web/shell.js" defer></script></head>
 <body class="studio-page">
@@ -129,8 +129,20 @@
         </dl>
       </div>
     </div>
+    <details class="card account-settings" id="account-settings" hidden>
+      <summary>Account settings</summary>
+      <p id="account-status" role="status" aria-live="polite"></p>
+      <label class="preference-toggle"><input id="personalization" type="checkbox"> Remember my game preferences</label>
+      <p class="identity-hint">Turning this off clears your saved game preferences.</p>
+      <div class="account-actions">
+        <button type="button" class="tool-btn" id="unlink">Disconnect lobbies</button>
+        <button type="button" class="tool-btn" id="logout">Sign out</button>
+        <button type="button" class="tool-btn danger" id="delete">Delete account</button>
+      </div>
+    </details>
   </main>
 
+  <script src="/web/account.js" defer></script>
   <script src="/web/storage.js" defer></script>
 
 <dialog id="qr-scanner" aria-labelledby="qr-title">
