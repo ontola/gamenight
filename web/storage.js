@@ -39,14 +39,29 @@
     if(cloud){
       const ticket=sessionStorage.getItem('gamenight_pair');
       if(ticket){
-        const box=document.createElement('section');box.className='card';box.setAttribute('aria-live','polite');document.querySelector('main').prepend(box);
+        const box=document.createElement('dialog');box.className='pairing-confirmation';
+        box.setAttribute('aria-labelledby','pairing-title');
+        const panel=document.createElement('div');panel.className='pairing-content';
+        const close=document.createElement('button');close.className='icon-btn pairing-close';close.textContent='×';close.setAttribute('aria-label','Cancel joining room');
+        const title=document.createElement('h1');title.id='pairing-title';title.textContent='Join this room?';
+        const text=document.createElement('p');text.textContent='Checking your room…';text.setAttribute('role','status');
+        const button=document.createElement('button');button.className='btn-primary';button.textContent='Accept';button.disabled=true;
+        let accepting=false;
+        const dismiss=()=>{if(accepting)return;sessionStorage.removeItem('gamenight_pair');box.close();box.remove();document.getElementById('qr-open').focus();};
+        close.onclick=dismiss;
+        box.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
+        panel.append(close,title,text,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
         try{
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
-          const text=document.createElement('p');text.textContent='Connect your player to controller '+(info.seat+1)+' in the lobby you scanned?';
-          const button=document.createElement('button');button.className='btn-primary';button.textContent='Connect to lobby';
-          button.onclick=async()=>{button.disabled=true;try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');text.textContent='Connected. Your saved character updates in this lobby.';button.remove();await checkRoom();}catch(error){text.textContent=error.message;button.disabled=false;}};
-          box.append(text,button);
-        }catch{sessionStorage.removeItem('gamenight_pair');box.textContent='This lobby link has expired. Scan the QR again.';}
+          text.textContent='Your saved character will connect to player '+(info.seat+1)+' in the room you scanned.';
+          button.disabled=false;
+          button.onclick=async()=>{
+            if(accepting)return;accepting=true;button.disabled=true;close.disabled=true;text.textContent='Joining room…';
+            try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();await checkRoom();document.getElementById('room-leave').focus();}
+            catch(error){text.textContent=error.message;button.disabled=false;close.disabled=false;}
+            finally{accepting=false;}
+          };
+        }catch{sessionStorage.removeItem('gamenight_pair');title.textContent='Room link expired';text.textContent='Close this screen and scan the lobby QR again.';button.hidden=true;}
       }
     }
     const roomForm=document.getElementById('room-form'), roomInput=document.getElementById('room-code');
