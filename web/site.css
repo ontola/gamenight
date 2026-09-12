@@ -39,3 +39,26 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 .room-feedback { max-width:1052px; margin:auto; padding:0 24px; }
 .room-feedback p:empty { display:none; }
 @media(max-width:520px){.room-code-form{width:100%}.room-code-form label{width:100%}.room-code-form input{flex:1}.room-feedback{padding:0 16px}}
+
+/* One set of page edges for the player header, room controls and editor. */
+.studio-page { padding:0 0 24px; }
+.studio-page #site-shell { border:0; }
+.studio-page .site-nav,
+.studio-page .studio-toolbar,
+.studio-page .room-feedback,
+.studio-page > main { width:calc(100% - 40px); max-width:900px; margin-left:auto; margin-right:auto; }
+.studio-page .site-nav { padding:24px 0 16px; }
+.studio-page .studio-toolbar { padding:0; border:0; margin-top:0; margin-bottom:20px; gap:12px; }
+.studio-page .room-feedback { padding:0; }
+.studio-page .room-feedback:has(#room-status:empty):has(#room-cancel[hidden]) { display:none; }
+.studio-page .room-feedback:not(:has(#room-status:empty)) { margin-bottom:20px; }
+.studio-page .name-input { border-bottom:0; }
+.studio-page .name-input:focus-visible { outline:2px solid var(--accent); outline-offset:4px; border-radius:4px; }
+@media(max-width:699px) {
+  .studio-page .studio-toolbar { flex-direction:column; align-items:stretch; }
+  .studio-page .studio-toolbar #qr-open { width:100%; }
+  .studio-page .room-code-form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; width:100%; }
+  .studio-page .room-code-form label { grid-column:1/-1; }
+  .studio-page .room-code-form input { width:100%; min-width:0; }
+  .studio-page .room-code-form button { min-height:44px; }
+}
