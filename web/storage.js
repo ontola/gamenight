@@ -4,11 +4,14 @@
   let csrf, documentState, pendingKey, prefix='';
   const pairing=new URLSearchParams(location.hash.slice(1)).get('pair');
   if(cloud && pairing){sessionStorage.setItem('gamenight_pair',pairing);history.replaceState(null,'',location.pathname);}
+  const roomCode=new URLSearchParams(location.hash.slice(1)).get('room');
+  if(cloud && roomCode){sessionStorage.setItem('gamenight_room_code',roomCode);history.replaceState(null,'',location.pathname);}
   const nativeStorage=window.localStorage;
   const local={ getItem:k=>nativeStorage.getItem(prefix+k), setItem:(k,v)=>nativeStorage.setItem(prefix+k,v), removeItem:k=>nativeStorage.removeItem(prefix+k) };
   async function request(path,method='GET',body) {
     const response=await fetch(path,{method,headers:{'Content-Type':'application/json',...(csrf?{'X-GameNight-CSRF':csrf}:{})},...(body===undefined?{}:{body:JSON.stringify(body)})});
     if(response.status===401){location.replace('/auth/login');throw Error('Please sign in.');}
+    if(response.status===429)throw Error('Too many attempts. Wait a minute before trying again.');
     if(response.status===409)throw Error('Another device saved changes. Export your work before refreshing; your local copy is kept.');
     if(!response.ok)throw Error('Not synced. Your work is saved on this device; try again when connected.');
     return response.status===204?null:response.json();
@@ -46,6 +49,41 @@
         }catch{sessionStorage.removeItem('gamenight_pair');box.textContent='This lobby link has expired. Scan the QR again.';}
       }
     }
+    const roomForm=document.getElementById('room-form'), roomInput=document.getElementById('room-code');
+    const roomStatus=document.getElementById('room-status'), roomCancel=document.getElementById('room-cancel');
+    let watching=false, roomTimer;
+    async function checkRoom(){
+      if(!cloud)return;
+      try {
+        const state=await request('/v1/rooms/status');
+        if(state.status==='waiting') {
+          watching=true; roomCancel.hidden=false;
+          roomStatus.textContent='Walk your unlinked character to your door in the lobby and stand there to connect. Pickup expires in '+Math.max(1,Math.ceil((state.expires-Date.now()/1000)/60))+' minutes.';
+          roomTimer=setTimeout(checkRoom,3000);
+        } else {
+          roomCancel.hidden=true;
+          if(watching)roomStatus.textContent=state.status==='connected'?'Connected! Your saved character now follows your controller.':'Your pickup expired or was cancelled. Enter the room code to try again.';
+          watching=false;
+        }
+      } catch { if(watching)roomTimer=setTimeout(checkRoom,5000); }
+    }
+    roomForm.addEventListener('submit',async event=>{
+      event.preventDefault();const code=roomInput.value.trim().toUpperCase();
+      if(!cloud){location.href='https://gamenight.ontola.io/studio#room='+encodeURIComponent(code);return;}
+      const button=event.submitter;button.disabled=true;
+      try {
+        await request('/v1/rooms/join','POST',{code});
+        clearTimeout(roomTimer);watching=true;await checkRoom();
+      } catch(error){roomStatus.textContent=error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.';}
+      finally{button.disabled=false;}
+    });
+    roomCancel.addEventListener('click',async()=>{
+      roomCancel.disabled=true;
+      try {await request('/v1/rooms/cancel','POST',{});clearTimeout(roomTimer);watching=false;roomCancel.hidden=true;roomStatus.textContent='Pickup cancelled.';}
+      catch(error){roomStatus.textContent=error.message;}
+      finally{roomCancel.disabled=false;}
+    });
+    if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');checkRoom();}
     const script=document.createElement('script');script.src='/web/studio.js';document.body.append(script);
   }catch(error){const el=document.createElement('p');el.setAttribute('role','alert');el.textContent=error.message;document.querySelector('main').prepend(el);}
 })();

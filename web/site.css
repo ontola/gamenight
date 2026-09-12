@@ -31,3 +31,11 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 .preference-toggle { display:flex; gap:10px; align-items:center; }
 .account-actions .danger { color:#ffb6bb; }
 @media(max-width:520px) { .account-actions > button { flex:1 1 140px; } }
+
+.room-code-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.room-code-form label { font-size:14px; color:var(--muted); }
+.room-code-form input { box-sizing:border-box; width:110px; min-height:44px; border:1px solid var(--border); border-radius:10px; background:#20283c; color:var(--text); padding:10px; font:600 16px monospace; text-transform:uppercase; }
+.room-code-form input:focus-visible { outline:2px solid #b6acff; outline-offset:3px; }
+.room-feedback { max-width:1052px; margin:auto; padding:0 24px; }
+.room-feedback p:empty { display:none; }
+@media(max-width:520px){.room-code-form{width:100%}.room-code-form label{width:100%}.room-code-form input{flex:1}.room-feedback{padding:0 16px}}

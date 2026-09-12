@@ -24,6 +24,7 @@ pub(crate) struct Bridge {
     http: reqwest::Client,
     session: Arc<Mutex<Option<String>>>,
     seats: Arc<Mutex<Vec<Seat>>>,
+    waiting: Arc<Mutex<serde_json::Value>>,
 }
 #[derive(Deserialize)]
 struct Registration {
@@ -36,6 +37,10 @@ struct Ticket {
 #[derive(Deserialize)]
 struct Updates {
     updates: Vec<Update>,
+    #[serde(default)]
+    pending: Vec<serde_json::Value>,
+    #[serde(default)]
+    room_code: String,
 }
 #[derive(Deserialize)]
 struct Update {
@@ -73,7 +78,48 @@ impl Bridge {
                 .ok()?,
             session: Arc::default(),
             seats: Arc::default(),
+            waiting: Arc::new(Mutex::new(serde_json::json!({}))),
         })
+    }
+    pub fn waiting(&self) -> serde_json::Value {
+        self.waiting.lock().unwrap().clone()
+    }
+    pub async fn pickup(
+        &self,
+        state: &SharedState,
+        id: &str,
+        player: PlayerId,
+    ) -> axum::http::StatusCode {
+        use axum::http::StatusCode;
+        if state
+            .lock()
+            .unwrap()
+            .bindings
+            .values()
+            .any(|p| *p == player)
+        {
+            return StatusCode::CONFLICT;
+        }
+        let Some(seats) = self.snapshot(state).await else {
+            return StatusCode::SERVICE_UNAVAILABLE;
+        };
+        let Some(seat) = seats.iter().find(|s| s.player == player.0.to_string()) else {
+            return StatusCode::GONE;
+        };
+        let Some(token) = self.session.lock().unwrap().clone() else {
+            return StatusCode::SERVICE_UNAVAILABLE;
+        };
+        match self
+            .http
+            .post(format!("{}/v1/lobbies/pickup", self.origin))
+            .bearer_auth(token)
+            .json(&serde_json::json!({"pending":id,"seat":seat}))
+            .send()
+            .await
+        {
+            Ok(r) => r.status(),
+            Err(_) => StatusCode::BAD_GATEWAY,
+        }
     }
     pub async fn pairing_url(&self, query: &HashMap<String, String>) -> Option<String> {
         let seat = {
@@ -177,6 +223,7 @@ impl Bridge {
             };
             if response.status() == 401 {
                 *self.session.lock().unwrap() = None;
+                *self.waiting.lock().unwrap() = serde_json::json!({});
                 continue;
             }
             if !response.status().is_success() {
@@ -185,6 +232,8 @@ impl Bridge {
             let Ok(updates) = response.json::<Updates>().await else {
                 continue;
             };
+            *self.waiting.lock().unwrap() =
+                serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
             {
                 let mut local = state.lock().unwrap();
                 let retired: Vec<_> = applied
@@ -213,6 +262,14 @@ impl Bridge {
                 {
                     let mut local = state.lock().unwrap();
                     if *local.link_revisions.get(&player).unwrap_or(&0) != u.seat.revision {
+                        continue;
+                    }
+                    if local
+                        .bindings
+                        .iter()
+                        .any(|(bound, p)| *p == player && bound != &id)
+                    {
+                        *local.link_revisions.entry(player).or_default() += 1;
                         continue;
                     }
                     if local.bindings.get(&id).is_some_and(|old| *old != player) {

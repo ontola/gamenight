@@ -117,6 +117,7 @@ pub fn create_router(state: SharedState) -> Router {
             get(playlist::get).post(playlist::move_entry),
         )
         .route("/api/player-links", get(player_links))
+        .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
         .route("/api/profiles", post(save_profile))
         .route("/api/profiles/:id", get(get_profile))
@@ -144,7 +145,7 @@ pub async fn run_server(
         "🌐 GameNight Web Server & Studio bound to {addr}, reachable at {}",
         gamenight_protocol::web_base_url()
     );
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await?;
     Ok(())
 }
 
@@ -172,8 +173,22 @@ async fn profile_session(
 async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let state = state.lock().unwrap();
     Json(
-        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions}),
+        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions,"room":state.cloud.as_ref().map(|b|b.waiting())}),
     )
+}
+
+async fn room_pickup(
+    axum::extract::ConnectInfo(peer): axum::extract::ConnectInfo<std::net::SocketAddr>,
+    headers: axum::http::HeaderMap,
+    Path((pending, player)): Path<(String, PlayerId)>, State(state): State<SharedState>,
+) -> StatusCode {
+    // Only the native lobby on this machine may complete a pickup. The custom
+    // header also forces browser callers through an unsupported CORS preflight.
+    if !peer.ip().is_loopback() || headers.get("x-gamenight-local-pickup").and_then(|h|h.to_str().ok()) != Some("1") {
+        return StatusCode::FORBIDDEN;
+    }
+    let bridge = state.lock().unwrap().cloud.clone();
+    match bridge { Some(b) => b.pickup(&state,&pending,player).await, None => StatusCode::SERVICE_UNAVAILABLE }
 }
 
 async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState>) -> StatusCode {
@@ -519,4 +534,19 @@ async fn serve_web_asset(Path(asset): Path<String>) -> Response {
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     ([("content-type", mime)], data).into_response()
+}
+
+#[cfg(test)]
+mod room_pickup_tests {
+    use super::*;
+    #[tokio::test]
+    async fn pickup_requires_local_peer_and_native_header() {
+        let state=Arc::new(Mutex::new(ServerState::new("127.0.0.1:1".into())));
+        let player=PlayerId(uuid::Uuid::new_v4());
+        for (peer, native, expected) in [("192.168.1.20:1234",true,StatusCode::FORBIDDEN),("127.0.0.1:1234",false,StatusCode::FORBIDDEN),("127.0.0.1:1234",true,StatusCode::SERVICE_UNAVAILABLE)] {
+            let mut headers=axum::http::HeaderMap::new();
+            if native {headers.insert("x-gamenight-local-pickup", "1".parse().unwrap());}
+            assert_eq!(room_pickup(axum::extract::ConnectInfo(peer.parse().unwrap()),headers,Path(("pending".into(),player)),State(state.clone())).await,expected);
+        }
+    }
 }

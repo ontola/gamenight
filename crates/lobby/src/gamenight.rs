@@ -1461,6 +1461,7 @@ pub fn is_lobby() -> bool {
 /// to reach a real winit `Window`.
 pub fn install_global_input(app: &mut bevy::app::App) {
     app.init_resource::<StashedFaceAtlases>();
+    app.init_resource::<room_pickup::Doors>();
     app.add_systems(bevy::prelude::Update, themes::cycle_theme);
     app.init_resource::<crate::player_links::PlayerLinks>();
     app.insert_resource(GlobalInput {
@@ -1500,7 +1501,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             sync_prune_countdown_system,
             sync_exit_door_system,
             sync_lobby_qr_system,
-            sync_sign_in_pad_system,
+            (sync_sign_in_pad_system, room_pickup::sync).chain(),
             sync_jukebox_system,
             sync_next_game_tv_system,
             press_pads_system,
@@ -3815,6 +3816,7 @@ fn sync_jukebox_system(
 struct LobbyTv(String);
 
 mod game_cases;
+mod room_pickup;
 mod themes;
 
 /// Draws the lobby TV: a cabinet, a screen showing whatever the daemon has
