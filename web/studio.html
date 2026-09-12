@@ -156,7 +156,7 @@
 
 <dialog id="qr-scanner" aria-labelledby="qr-title">
   <div class="scanner-heading"><h2 id="qr-title">Scan lobby QR</h2><button type="button" id="qr-close" class="tool-btn" aria-label="Close scanner">✕</button></div>
-  <video id="qr-video" autoplay muted playsinline hidden></video>
+  <div class="scanner-preview"><span aria-hidden="true">Camera preview</span><video id="qr-video" autoplay muted playsinline hidden></video></div>
   <p id="qr-status" role="status" aria-live="polite"></p>
   <a id="qr-result" class="tool-btn" hidden></a>
   <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>

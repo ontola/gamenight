@@ -24,16 +24,42 @@
     status.textContent = 'GameNight QR found. Open it to join.';
     return true;
   }
-  function decode(source, width, height) {
-    const scale = Math.min(1, 800 / Math.max(width, height));
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const code = window.jsQR(pixels.data, pixels.width, pixels.height);
-    if (!code) return false;
-    if (accept(code.data)) return true;
-    status.textContent = 'This is not a GameNight sign-in QR. Try the code in the lobby.';
+  let detector=null, cropIndex=0;
+  const detectorReady=(async()=>{
+    try {
+      if(window.BarcodeDetector && (await window.BarcodeDetector.getSupportedFormats()).includes("qr_code"))
+        detector=new window.BarcodeDetector({formats:["qr_code"]});
+    } catch (_) { /* jsQR remains available on browsers without native detection. */ }
+  })();
+  function decodeRegion(source,x,y,width,height,maxSize) {
+    const scale=Math.min(1,maxSize/Math.max(width,height));
+    canvas.width=Math.max(1,Math.round(width*scale));canvas.height=Math.max(1,Math.round(height*scale));
+    ctx.drawImage(source,x,y,width,height,0,0,canvas.width,canvas.height);
+    const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
+    const code=window.jsQR(pixels.data,pixels.width,pixels.height);
+    if(!code)return false;
+    if(accept(code.data))return true;
+    status.textContent="This is not a GameNight sign-in QR. Try the code in the lobby.";
+    return false;
+  }
+  async function decode(source,width,height,current,photo=false) {
+    await detectorReady;
+    if(current!==generation || !dialog.open || !width || !height)return false;
+    if(detector) {
+      try {
+        const codes=await detector.detect(source);
+        if(current!==generation || !dialog.open)return false;
+        for(const code of codes)if(accept(code.rawValue))return true;
+      } catch (_) { detector=null; }
+    }
+    if(decodeRegion(source,0,0,width,height,1600))return true;
+    // Overlapping high-detail views preserve tiny codes anywhere in the frame.
+    // Cycle one per video frame; photos get all five without requiring retakes.
+    const views=[[0,0],[.4,0],[0,.4],[.4,.4],[.2,.2]];
+    for(let i=0;i<(photo?views.length:1);i++) {
+      const [x,y]=views[cropIndex++%views.length];
+      if(decodeRegion(source,x*width,y*height,width*.6,height*.6,1600))return true;
+    }
     return false;
   }
   async function startCamera() {
@@ -45,15 +71,18 @@
     }
     status.textContent = 'Allow camera access, then point at the lobby QR.';
     try {
-      const camera = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1280}}});
+      const camera = await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}}});
       if (current !== generation || !dialog.open) { camera.getTracks().forEach(track => track.stop()); return; }
       stream = camera; video.srcObject = stream; video.hidden = false;
+      const track=stream.getVideoTracks()[0];
+      try { if(track.getCapabilities?.().focusMode?.includes("continuous"))await track.applyConstraints({advanced:[{focusMode:"continuous"}]}); } catch (_) {}
+      if(current!==generation || !dialog.open)return;
       await video.play();
-      function tick() {
+      async function tick() {
         if (current !== generation || !dialog.open) return;
-        try { if (video.readyState >= 2 && decode(video, video.videoWidth, video.videoHeight)) return; }
+        try { if (video.readyState >= 2 && await decode(video, video.videoWidth, video.videoHeight,current)) return; }
         catch (_) { status.textContent = 'Could not read this frame. Hold the QR steady.'; }
-        timer = setTimeout(tick, 180);
+        if(current===generation && dialog.open)timer = setTimeout(tick, 220);
       }
       tick();
     } catch (error) {
@@ -94,7 +123,7 @@
     try {
       const image = new Image(); image.src = url; await image.decode();
       if (current !== generation || !dialog.open) return;
-      if (!decode(image, image.naturalWidth, image.naturalHeight)) status.textContent = 'No GameNight QR found. Try a closer, sharper photo.';
+      if (!await decode(image, image.naturalWidth, image.naturalHeight,current,true) && current===generation) status.textContent = 'No GameNight QR found. Try a closer, sharper photo.';
     } catch (_) { status.textContent = 'Could not read this photo. Try another image.'; }
     finally { URL.revokeObjectURL(url); event.target.value = ''; }
   };
