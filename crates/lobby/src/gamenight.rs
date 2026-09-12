@@ -3850,7 +3850,7 @@ fn sync_next_game_tv_system(
                     custom_size: Some(cabinet + Vec2::new(12.0, 16.0)),
                     ..default()
                 },
-                transform: Transform::from_xyz(tv_x, -3.0, 0.0),
+                transform: Transform::from_xyz(tv_x, -10.0, 0.0),
                 ..default()
             });
             // State line: UP NEXT when ready, LOADING… while on its way.
@@ -3863,7 +3863,7 @@ fn sync_next_game_tv_system(
                         color: kicker_color,
                     },
                 ),
-                transform: Transform::from_xyz(tv_x, size.y / 2.0 - 9.0, 0.1),
+                transform: Transform::from_xyz(tv_x, size.y / 2.0 - 16.0, 0.1),
                 ..default()
             });
             // The game itself
@@ -3880,10 +3880,16 @@ fn sync_next_game_tv_system(
                 text_2d_bounds: bevy::text::Text2dBounds {
                     size: Vec2::new(screen.x - 8.0, screen.y - 22.0),
                 },
-                transform: Transform::from_xyz(tv_x, -2.0, 0.1),
+                transform: Transform::from_xyz(tv_x, -9.0, 0.1),
                 ..default()
             });
-            game_cases::spawn_shelf(parent, &cases, &next_line, animation, font.clone(), &mut cover_cache, &mut cover_images);
+            parent.spawn(SpatialBundle {
+                transform: Transform::from_xyz(0.0, -17.0, 0.0),
+                ..default()
+            }).with_children(|cabinet| {
+                game_cases::spawn_shelf(cabinet, &cases, &next_line, animation,
+                    font.clone(), &mut cover_cache, &mut cover_images);
+            });
 
         });
 }

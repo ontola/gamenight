@@ -167,28 +167,19 @@ pub(super) fn spawn_shelf(
     images: &mut Assets<Image>,
 ) {
     let wood = Color::rgb(0.46, 0.26, 0.16);
-    // Backboard, upright ends and a low shelf: all scenery behind the players.
-    block(
-        parent,
-        60.0,
-        -7.0,
-        -0.2,
-        224.0,
-        76.0,
-        Color::rgb(0.20, 0.14, 0.13),
-    );
-    block(parent, 60.0, -47.0, 0.0, 224.0, 8.0, wood);
-    block(
-        parent,
-        60.0,
-        -42.0,
-        0.1,
-        224.0,
-        3.0,
-        Color::rgb(0.82, 0.57, 0.32),
-    );
-    block(parent, -48.0, -9.0, 0.1, 8.0, 76.0, wood);
-    block(parent, 168.0, -9.0, 0.1, 8.0, 76.0, wood);
+    // Solid wooden cabinet: recessed back, full-height stiles, crown and plinth.
+    // The plinth's bottom is -51; the caller places it exactly on the floor.
+    block(parent, 60.0, 0.0, -0.3, 224.0, 102.0, Color::rgb(0.16, 0.09, 0.07));
+    block(parent, 60.0, 0.0, -0.2, 204.0, 88.0, Color::rgb(0.25, 0.15, 0.10));
+    block(parent, -47.0, 0.0, 0.0, 10.0, 96.0, wood);
+    block(parent, 167.0, 0.0, 0.0, 10.0, 96.0, wood);
+    block(parent, 35.0, 0.0, 0.0, 6.0, 88.0, wood);
+    block(parent, 60.0, 49.0, 0.1, 228.0, 8.0, wood);
+    block(parent, 60.0, 52.0, 0.2, 228.0, 2.0, Color::rgb(0.70, 0.45, 0.25));
+    block(parent, 60.0, -47.0, 0.1, 228.0, 8.0, wood);
+    block(parent, 60.0, -43.0, 0.2, 220.0, 2.0, Color::rgb(0.70, 0.45, 0.25));
+    block(parent, -50.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
+    block(parent, 164.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
     label(
         parent,
         "UP NEXT",
