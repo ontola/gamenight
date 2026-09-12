@@ -526,6 +526,7 @@ let initializing = true;
       scheduleSave();
     }
     function renderSkinColors() {
+      document.getElementById("skin-colour-dot").style.backgroundColor=skinColor;
       const el = document.getElementById('skin-colors');
       el.replaceChildren();
       SKIN_COLORS.forEach(col => {
@@ -560,6 +561,7 @@ let initializing = true;
     }
 
     function renderCharacterColors() {
+      document.getElementById("clothing-colour-dot").style.backgroundColor=characterColor;
       const el = document.getElementById('character-colors');
       if (!el) return;
       el.innerHTML = '';

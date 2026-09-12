@@ -130,3 +130,8 @@ body.drawing-fullscreen { position:fixed; width:100%; overflow:hidden; overscrol
 @media(max-width:699px) { .drawing-preview-options #outfit-guide-toggle { display:none; } }
 
 #mobile-colour-dot { width:18px; height:18px; flex:none; border-radius:50%; border:1px solid #ffffff80; box-shadow:0 0 0 1px #0008; }
+
+.colour-dot { display:inline-block; width:18px; height:18px; flex:none; border-radius:50%; border:1px solid #ffffff80; box-shadow:0 0 0 1px #0008; }
+.clothing-preview summary.colour-picker-button { display:flex; justify-content:flex-start; gap:10px; padding:10px 14px; min-height:44px; list-style:none; font-size:14px; }
+.colour-picker-button::-webkit-details-marker { display:none; }
+.clothing-preview[open] summary.colour-picker-button { border-color:var(--accent); margin-bottom:8px; }
