@@ -1360,3 +1360,29 @@ document.getElementById('btn-undo').setAttribute('aria-keyshortcuts', 'Control+z
 document.getElementById('btn-undo').title = 'Undo (Ctrl+Z / ⌘Z)';
 
 init();
+
+// Reuse the same editor and state in a deliberate, scroll-free mobile workspace.
+(() => {
+  const card=document.querySelector(".drawing-card");
+  const canvas=card.querySelector(".canvas-container");
+  const anchor=document.createComment("drawing editor home");card.before(anchor);
+  const launch=document.createElement("button");launch.type="button";launch.className="mobile-edit-launch";launch.textContent="Tap to edit";canvas.append(launch);
+  const dialog=document.createElement("dialog");dialog.id="mobile-drawing-editor";dialog.setAttribute("aria-labelledby","mobile-editor-title");
+  const header=document.createElement("header");header.innerHTML="<strong id=\"mobile-editor-title\">Draw your face</strong><button type=\"button\" class=\"tool-btn\">Done</button>";
+  dialog.append(header);document.body.append(dialog);
+  const controls=document.createElement("div");controls.className="mobile-drawing-controls";
+  controls.innerHTML="<button type=\"button\" class=\"tool-btn\" aria-expanded=\"false\">Colour</button><button type=\"button\" class=\"tool-btn\" aria-expanded=\"false\">Brush · 1 px</button><button type=\"button\" class=\"tool-btn\" aria-pressed=\"true\">Outfit</button>";
+  card.append(controls);
+  const [colour,brush,guide]=controls.children;
+  function closePanels(){card.classList.remove("choose-colour","choose-brush");colour.setAttribute("aria-expanded","false");brush.setAttribute("aria-expanded","false");}
+  function togglePanel(name,button){const open=!card.classList.contains(name);closePanels();card.classList.toggle(name,open);button.setAttribute("aria-expanded",String(open));}
+  colour.onclick=()=>togglePanel("choose-colour",colour);brush.onclick=()=>togglePanel("choose-brush",brush);
+  guide.onclick=()=>{toggleOutfitGuide();guide.setAttribute("aria-pressed",document.getElementById("outfit-guide-toggle").getAttribute("aria-pressed"));};
+  card.querySelector("#palette-swatches").addEventListener("click",event=>{if(event.target.closest(".swatch")){colour.style.borderColor=currentColor;closePanels();}});
+  card.querySelector(".brush-sizes").addEventListener("click",event=>{if(event.target.closest("button")){brush.textContent="Brush · "+brushSize+" px";closePanels();}});
+  let scrollY=0;
+  launch.onclick=()=>{scrollY=window.scrollY;dialog.append(card);document.body.classList.add("drawing-fullscreen");document.body.style.top=-scrollY+"px";dialog.showModal();guide.setAttribute("aria-pressed",document.getElementById("outfit-guide-toggle").getAttribute("aria-pressed"));};
+  const close=()=>{dialog.close();closePanels();anchor.after(card);document.body.classList.remove("drawing-fullscreen");document.body.style.top="";window.scrollTo(0,scrollY);launch.focus({preventScroll:true});};
+  header.querySelector("button").onclick=close;
+  dialog.addEventListener("cancel",event=>{event.preventDefault();close();});
+})();

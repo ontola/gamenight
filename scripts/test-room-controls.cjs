@@ -7,7 +7,7 @@ const path=require('node:path');
   function node(id){if(!nodes.has(id))nodes.set(id,{children:Array.from({length:6},()=>({textContent: ""})),hidden:false,disabled:false,textContent:'',listeners:{},addEventListener(n,fn){this.listeners[n]=fn;},append(){},prepend(){},setAttribute(){}});return nodes.get(id);}
   let state={status:'connected',room_code:'ABC234'}, poll, failLeave=false, joins=0, failJoin=false;
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
-  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{localStorage:storage,initAccountSettings(){}},sessionStorage:storage,
+  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{showToast(text){node('room-status').textContent=text;},localStorage:storage,initAccountSettings(){}},sessionStorage:storage,
     location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,
     setTimeout(fn){poll=fn;return 1;},clearTimeout(){},fetch:async(url,options)=>{
       let data={}; let status=200;

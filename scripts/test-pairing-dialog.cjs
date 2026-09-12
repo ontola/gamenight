@@ -7,7 +7,7 @@ async function run(action, failure=false){
   const make=tag=>({tag,children:[],listeners:{},value:'',append(...c){this.children.push(...c);},prepend(){},setAttribute(){},addEventListener(k,v){this.listeners[k]=v;},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){}});
   const node=id=>{if(!nodes.has(id))nodes.set(id,make(id));return nodes.get(id);};
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
-  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement(tag){const n=make(tag);created.push(n);return n;}},window:{localStorage:storage,initAccountSettings(){}},sessionStorage:{...storage,getItem(k){return k==='gamenight_pair'&&!cleared?'ticket':null;},removeItem(k){if(k==='gamenight_pair')cleared=true;}},location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,setTimeout(){},clearTimeout(){},fetch:async url=>{
+  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement(tag){const n=make(tag);created.push(n);return n;}},window:{showToast(text){node('room-status').textContent=text;},localStorage:storage,initAccountSettings(){}},sessionStorage:{...storage,getItem(k){return k==='gamenight_pair'&&!cleared?'ticket':null;},removeItem(k){if(k==='gamenight_pair')cleared=true;}},location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,setTimeout(){},clearTimeout(){},fetch:async url=>{
     let data={},status=200;
     if(url==='/v1/me')data={id:'test'};
     if(url==='/v1/pairing/ticket')data={seat:1};

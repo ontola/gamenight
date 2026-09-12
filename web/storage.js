@@ -57,8 +57,8 @@
           button.disabled=false;
           button.onclick=async()=>{
             if(accepting)return;accepting=true;button.disabled=true;close.disabled=true;text.textContent='Joining room…';
-            try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();await checkRoom();document.getElementById('room-leave').focus();}
-            catch(error){text.textContent=error.message;button.disabled=false;close.disabled=false;}
+            try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();window.showToast('Connected to the room.');await checkRoom();document.getElementById('room-leave').focus();}
+            catch(error){window.showToast(error.message);text.textContent='Could not connect. You can try again or close this screen.';button.disabled=false;close.disabled=false;}
             finally{accepting=false;}
           };
         }catch{sessionStorage.removeItem('gamenight_pair');title.textContent='Room link expired';text.textContent='Close this screen and scan the lobby QR again.';button.hidden=true;}
@@ -82,12 +82,13 @@
         if(epoch!==roomEpoch)return;
         showConnection(state);
         if(state.status==='waiting') {
-          watching=true; roomCancel.hidden=false;
-          roomStatus.textContent='Walk your unlinked character to your door in the lobby and stand there to connect. Pickup expires in '+Math.max(1,Math.ceil((state.expires-Date.now()/1000)/60))+' minutes.';
+          roomCancel.hidden=false;
+          if(!watching)window.showToast('Walk your unlinked character to your door in the lobby and stand there to connect. Pickup expires in '+Math.max(1,Math.ceil((state.expires-Date.now()/1000)/60))+' minutes.');
+          watching=true;
 
         } else {
           roomCancel.hidden=true;
-          if(watching)roomStatus.textContent=state.status==='connected'?'Connected! Your saved character now follows your controller.':'Your pickup expired or was cancelled. Enter the room code to try again.';
+          if(watching)window.showToast(state.status==='connected'?'Connected! Your saved character now follows your controller.':'Your pickup expired or was cancelled. Enter the room code to try again.');
           watching=false;
         }
       } catch { /* Retain the last known connection on a network failure. */ }
@@ -98,8 +99,8 @@
       try {
         await request("/v1/pairing/unlink","POST",{});
         watching=false; roomCancel.hidden=true; showConnection({status:"none"});
-        roomStatus.textContent="You left the room. Your saved player is kept.";
-      } catch(error) { roomStatus.textContent=error.message; }
+        window.showToast("You left the room. Your saved player is kept.");
+      } catch(error) { window.showToast(error.message); }
       finally { roomLeave.disabled=false; await checkRoom(); }
     });
     function renderRoomCode(){
@@ -111,11 +112,11 @@
       if(joiningRoom || !/^[A-Z2-9]{6}$/.test(code))return;
       if(!cloud){location.href='https://gamenight.ontola.io/studio#room='+encodeURIComponent(code);return;}
       joiningRoom=true;roomInput.readOnly=true;
-      roomForm.setAttribute('aria-busy','true');roomStatus.textContent='Joining room…';
+      roomForm.setAttribute('aria-busy','true');window.showToast('Joining room…');
       try {
         await request('/v1/rooms/join','POST',{code});
-        clearTimeout(roomTimer);watching=true;await checkRoom();
-      } catch(error){roomStatus.textContent=error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.';}
+        clearTimeout(roomTimer);await checkRoom();
+      } catch(error){window.showToast(error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.');}
       finally{joiningRoom=false;roomInput.readOnly=false;roomForm.setAttribute('aria-busy','false');}
     }
     roomInput.addEventListener('input',()=>{
@@ -127,8 +128,8 @@
     });
     roomCancel.addEventListener('click',async()=>{
       roomCancel.disabled=true;
-      try {await request('/v1/rooms/cancel','POST',{});clearTimeout(roomTimer);watching=false;roomCancel.hidden=true;roomStatus.textContent='Pickup cancelled.';}
-      catch(error){roomStatus.textContent=error.message;}
+      try {await request('/v1/rooms/cancel','POST',{});clearTimeout(roomTimer);watching=false;roomCancel.hidden=true;window.showToast('Pickup cancelled.');}
+      catch(error){window.showToast(error.message);}
       finally{roomCancel.disabled=false;}
     });
     if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');renderRoomCode();if(roomInput.value)await joinRoom();else checkRoom();}

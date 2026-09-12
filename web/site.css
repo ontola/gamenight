@@ -96,3 +96,30 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 .pairing-content h1 { margin:0 0 16px; font-size:clamp(30px,6vw,44px); line-height:1.15; }
 .pairing-content p { color:var(--muted); margin:0 0 32px; }
 .pairing-content > .btn-primary { width:100%; min-height:52px; font-size:18px; }
+
+.app-toast { position:fixed; z-index:10000; bottom:max(20px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); box-sizing:border-box; width:max-content; max-width:calc(100% - 32px); display:flex; align-items:center; gap:16px; padding:12px 12px 12px 20px; border:1px solid #7565ee; border-radius:12px; background:#25283f; color:var(--text); box-shadow:0 8px 30px #0006; font:16px/1.45 system-ui,sans-serif; }
+.app-toast > span { max-width:440px; }
+.app-toast .icon-btn { flex-shrink:0; background:transparent; border:0; font-size:24px; }
+.mobile-edit-launch,.mobile-drawing-controls { display:none; }
+@media(max-width:699px) {
+  .drawing-card:not(#mobile-drawing-editor .drawing-card) .canvas-container { position:relative; touch-action:pan-y; }
+  .drawing-card:not(#mobile-drawing-editor .drawing-card) #pixel-grid { pointer-events:none; touch-action:pan-y; }
+  .drawing-card:not(#mobile-drawing-editor .drawing-card) :is(.brush-sizes,.toolbar,#palette-swatches,label,.head-guide-hint) { display:none; }
+  .mobile-edit-launch { display:block; position:absolute; inset:0; width:100%; border:0; border-radius:8px; background:#0d102055; color:white; font:700 20px system-ui; text-shadow:0 2px 6px #000; touch-action:pan-y; cursor:pointer; }
+}
+body.drawing-fullscreen { position:fixed; width:100%; overflow:hidden; overscroll-behavior:none; }
+#mobile-drawing-editor { box-sizing:border-box; position:fixed; inset:0; margin:0; width:100vw; height:100dvh; max-width:none; max-height:none; padding:max(8px,env(safe-area-inset-top)) 12px max(8px,env(safe-area-inset-bottom)); border:0; background:var(--bg); color:var(--text); overflow:hidden; }
+#mobile-drawing-editor[open] { display:flex; flex-direction:column; gap:8px; }
+#mobile-drawing-editor > header { display:flex; align-items:center; justify-content:space-between; flex:none; min-height:44px; }
+#mobile-drawing-editor .drawing-card { position:relative; display:flex; flex:1; flex-direction:column; gap:8px; padding:0; margin:0; min-height:0; border:0; background:none; }
+#mobile-drawing-editor :is(.card-title,.drawing-preview,.head-guide-hint,.mobile-edit-launch,.drawing-card > label) { display:none; }
+#mobile-drawing-editor .canvas-container { order:0; flex:1; min-height:0; padding:0; border:0; background:none; }
+#mobile-drawing-editor #pixel-grid { flex:none; width:min(100%,calc(100dvh - 248px)); height:auto; aspect-ratio:1; }
+#mobile-drawing-editor .toolbar { order:2; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; flex:none; margin:0; }
+#mobile-drawing-editor .toolbar button { min-height:44px; padding:6px; font-size:13px; }
+#mobile-drawing-editor .mobile-drawing-controls { display:grid; order:1; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; flex:none; }
+#mobile-drawing-editor .mobile-drawing-controls button { padding:6px; font-size:13px; }
+#mobile-drawing-editor :is(.brush-sizes,#palette-swatches) { display:none; position:absolute; z-index:2; bottom:152px; left:0; right:0; margin:0; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--card-bg); box-shadow:0 4px 24px #0008; }
+#mobile-drawing-editor .choose-colour #palette-swatches { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); gap:6px; }
+#mobile-drawing-editor #palette-swatches .swatch { min-width:0; height:40px; }
+#mobile-drawing-editor .choose-brush .brush-sizes { display:grid; }
