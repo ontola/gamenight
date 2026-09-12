@@ -15,6 +15,8 @@ pub(super) struct Door(String, String);
 pub(super) struct Progress(String);
 #[derive(Component)]
 pub(super) struct RoomLabel(String);
+#[derive(Component)]
+pub(super) struct DoorLeaf(String, f32);
 
 pub(super) fn sync(
     mut commands: Commands,
@@ -28,6 +30,7 @@ pub(super) fn sync(
     labels: Query<(Entity, &RoomLabel)>,
     mut bars: Query<(&Progress, &mut Sprite)>,
     windows: Query<&Window>,
+    mut leaves: Query<(&DoorLeaf, &mut Transform)>,
 ) {
     let snapshot = links.snapshot();
     let room = snapshot.as_ref().and_then(|s| s.room.as_ref());
@@ -178,6 +181,12 @@ pub(super) fn sync(
                         transform: Transform::from_xyz(0., 58., 5.),
                         ..default()
                     });
+                    for side in [-1.0, 1.0] {
+                        parent.spawn((DoorLeaf(p.id.clone(),side),SpriteBundle {
+                            sprite:Sprite{color:Color::rgb_u8(125,82,51),custom_size:Some(Vec2::new(36.,32.)),..default()},
+                            transform:Transform::from_xyz(side*18.,-25.,5.),..default()
+                        }));
+                    }
                     parent.spawn((
                         Progress(p.id.clone()),
                         SpriteBundle {
@@ -222,6 +231,10 @@ pub(super) fn sync(
         } else {
             state.holds.remove(&p.id);
         }
+    }
+    for (leaf,mut transform) in &mut leaves {
+        let progress=state.holds.get(&leaf.0).map(|h|(h.1/2.).min(1.)).unwrap_or(0.);
+        transform.translation.x=leaf.1*(18.+36.*progress);
     }
     for (id, mut sprite) in &mut bars {
         sprite.custom_size = Some(Vec2::new(
