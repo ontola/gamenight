@@ -76,3 +76,11 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 }
 .studio-page .room-code-form input::placeholder { color:#8991ab; opacity:1; }
 .studio-page .room-code-form[aria-busy=true] input { opacity:.65; }
+
+.room-code-entry { position:relative; width:242px; max-width:100%; }
+.studio-page .room-code-entry input { position:relative; z-index:1; width:100%; color:transparent; caret-color:transparent; background:transparent; letter-spacing:normal; }
+.studio-page .room-code-entry input::placeholder { color:transparent; }
+#room-code-slots { position:absolute; inset:1px; display:grid; grid-template-columns:repeat(6,1fr); pointer-events:none; border-radius:7px; overflow:hidden; background:#20283c; font:400 32px/1 GameNightPixel,monospace; color:#fff3ce; }
+#room-code-slots span { display:grid; place-items:center; border-right:1px solid var(--border); }
+#room-code-slots span:last-child { border-right:0; }
+.room-code-form[aria-busy=true] #room-code-slots { opacity:.65; }

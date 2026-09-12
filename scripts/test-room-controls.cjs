@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const path=require('node:path');
 (async()=>{
   const nodes=new Map();
-  function node(id){if(!nodes.has(id))nodes.set(id,{hidden:false,disabled:false,textContent:'',listeners:{},addEventListener(n,fn){this.listeners[n]=fn;},append(){},prepend(){},setAttribute(){}});return nodes.get(id);}
+  function node(id){if(!nodes.has(id))nodes.set(id,{children:Array.from({length:6},()=>({textContent: ""})),hidden:false,disabled:false,textContent:'',listeners:{},addEventListener(n,fn){this.listeners[n]=fn;},append(){},prepend(){},setAttribute(){}});return nodes.get(id);}
   let state={status:'connected',room_code:'ABC234'}, poll, failLeave=false, joins=0, failJoin=false;
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
   const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{localStorage:storage,initAccountSettings(){}},sessionStorage:storage,

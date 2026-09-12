@@ -87,6 +87,9 @@
       } catch(error) { roomStatus.textContent=error.message; }
       finally { roomLeave.disabled=false; await checkRoom(); }
     });
+    function renderRoomCode(){
+      Array.from(document.getElementById("room-code-slots").children).forEach((slot,i)=>{slot.textContent=roomInput.value[i]||"·";});
+    }
     let joiningRoom=false;
     async function joinRoom(){
       const code=roomInput.value.trim().toUpperCase();
@@ -102,7 +105,7 @@
     }
     roomInput.addEventListener('input',()=>{
       roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6);
-      return joinRoom();
+      renderRoomCode();return joinRoom();
     });
     roomForm.addEventListener('submit',event=>{
       event.preventDefault();return joinRoom();
@@ -113,7 +116,7 @@
       catch(error){roomStatus.textContent=error.message;}
       finally{roomCancel.disabled=false;}
     });
-    if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');if(roomInput.value)await joinRoom();else checkRoom();}
+    if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');renderRoomCode();if(roomInput.value)await joinRoom();else checkRoom();}
     const script=document.createElement('script');script.src='/web/studio.js';document.body.append(script);
   }catch(error){const el=document.createElement('p');el.setAttribute('role','alert');el.textContent=error.message;document.querySelector('main').prepend(el);}
 })();
