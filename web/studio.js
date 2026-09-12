@@ -778,6 +778,12 @@ let initializing = true;
         const response = await fetch('/api/profiles/' + encodeURIComponent(profileId) + '/session', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
         if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
         const session = await response.json();
+        if(session.linked && session.player_id){
+          boundPlayerId=session.player_id;claimPlayerId=session.player_id;claimSeat=null;
+          claimRevision=session.link_revision||0;
+          localStorage.setItem('gamenight_bound_player',boundPlayerId);
+        }
+        document.getElementById('room-cancel').hidden=!session.waiting;
         document.getElementById('qr-open').hidden=session.linked;
         window.updateRoomNavigation?.(session.linked);
         document.getElementById('session-link-status').textContent = session.linked ? `Signed in as ${session.player_name}` : 'Not linked to a controller';

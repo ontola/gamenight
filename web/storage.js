@@ -97,7 +97,7 @@
     const roomLeave=document.getElementById("room-leave"), qrOpen=document.getElementById("qr-open");
     // Offline rooms are reached by their LAN QR; hosted room codes must not
     // unexpectedly navigate a local editing session to the hosted site.
-    if(!cloud)roomForm.hidden=true;
+    roomForm.hidden=false;
     let watching=false, roomTimer, roomEpoch=0;
     function showConnection(state) {
       const connected=state.status==="connected";
@@ -143,11 +143,19 @@
     async function joinRoom(){
       const code=roomInput.value.trim().toUpperCase();
       if(joiningRoom || !/^[A-Z2-9]{6}$/.test(code))return;
-      if(!cloud){window.showToast('Scan the QR in your local lobby to connect.');return;}
       joiningRoom=true;roomInput.readOnly=true;
       roomForm.setAttribute('aria-busy','true');window.showToast('Joining room…');
       try {
-        await request('/v1/rooms/join','POST',{code});
+        if(cloud)await request('/v1/rooms/join','POST',{code});
+        else {
+          const profile=local.getItem('gamenight_profile_id');
+          const saved=local.getItem('gamenight_saved_profile');
+          if(!profile || !saved)throw Error('Open You to create your player first.');
+          await request('/api/profiles','POST',JSON.parse(saved));
+          await request('/api/local-room/join','POST',{code,profile});
+          roomCancel.hidden=false;
+          window.showToast('Walk your character to your profile door in the lobby to connect.');
+        }
         document.getElementById('qr-scanner')?.close();
         clearTimeout(roomTimer);await checkRoom();
       } catch(error){window.showToast(error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.');}
@@ -162,7 +170,7 @@
     });
     roomCancel.addEventListener('click',async()=>{
       roomCancel.disabled=true;
-      try {await request('/v1/rooms/cancel','POST',{});clearTimeout(roomTimer);watching=false;roomCancel.hidden=true;window.showToast('Pickup cancelled.');}
+      try {await request(cloud?'/v1/rooms/cancel':'/api/local-room/cancel/'+encodeURIComponent(local.getItem('gamenight_profile_id')),'POST',{});clearTimeout(roomTimer);watching=false;roomCancel.hidden=true;window.showToast('Pickup cancelled.');}
       catch(error){window.showToast(error.message);}
       finally{roomCancel.disabled=false;}
     });

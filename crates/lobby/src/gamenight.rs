@@ -1207,6 +1207,7 @@ struct GlobalInput {
     /// Back may resume only after being released while the lobby has focus.
     /// This prevents the press that opens the lobby from immediately closing it.
     select_can_close: HashSet<u32>,
+    select_paused_since: Option<std::time::Instant>,
     /// Ignore pre-Leave snapshots until the host acknowledges departure.
     departing_players: HashSet<PlayerId>,
     /// Confirmed pad -> player mappings not yet written into
@@ -1482,6 +1483,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         pending_joins: default(),
         joined_pads: default(),
         select_can_close: default(),
+        select_paused_since: None,
         departing_players: default(),
         newly_confirmed: default(),
         pad_player: default(),
@@ -1942,6 +1944,18 @@ fn global_input_system(
     // part of raising the lobby, and a menu decision made after the ask would
     // see the lobby as already frontmost when it plainly wasn't.
     let lobby_was_focused = windows.get_single().map(|w| w.focused).unwrap_or(false);
+    let paused = bones_game.0.shared_resource::<GameNightBridge>()
+        .active_session.as_ref().is_some_and(|s|s.phase == gamenight_protocol::SessionPhase::Paused);
+    if !paused {
+        input.select_paused_since=None;
+        input.select_can_close.clear();
+    } else if input.select_paused_since.is_none() {
+        input.select_paused_since=Some(std::time::Instant::now());
+        input.select_can_close.clear();
+    }
+    // Focus changes can replay the opening press. Only re-arm after the
+    // paused state has settled and the button is released in the lobby.
+    let resume_armed = input.select_paused_since.is_some_and(|since|since.elapsed().as_millis()>=400);
 
     for GamepadButtonEvent {
         gamepad: id,
@@ -1954,7 +1968,7 @@ fn global_input_system(
                 let paused = bones_game.0.shared_resource::<GameNightBridge>()
                     .active_session.as_ref().is_some_and(|session| session.phase == gamenight_protocol::SessionPhase::Paused);
                 let ready=input.select_can_close.remove(&id);
-                if lobby_was_focused && lobby_available && paused && ready {
+                if lobby_was_focused && lobby_available && paused && ready && resume_armed {
                     let _ = join_tx.try_send(ClientMessage::CloseOverlay);
                     continue;
                 }
@@ -2054,7 +2068,7 @@ fn global_input_system(
             _ => {}
         }
     }
-    if !lobby_was_focused || !lobby_available {
+    if !lobby_was_focused || !lobby_available || !resume_armed {
         input.select_can_close.clear();
     } else {
         let released: Vec<_> = input.joined_pads.iter().copied()

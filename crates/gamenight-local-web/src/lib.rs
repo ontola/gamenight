@@ -9,6 +9,7 @@ mod cloud;
 mod dev_catalog;
 mod dev_web;
 mod playlist;
+mod local_room;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -57,6 +58,7 @@ pub struct JoinSessionRequest {
 }
 
 pub struct ServerState {
+    local_room: local_room::Room,
     cloud: Option<cloud::Bridge>,
     pub profiles: HashMap<String, Profile>,
     pub daemon_addr: String,
@@ -78,6 +80,7 @@ pub struct ServerState {
 impl ServerState {
     pub fn new(daemon_addr: String) -> Self {
         Self {
+            local_room: local_room::Room::new(),
             cloud: None,
             profiles: HashMap::new(),
             daemon_addr,
@@ -148,6 +151,8 @@ pub fn create_router(state: SharedState) -> Router {
             get(playlist::get).post(playlist::move_entry),
         )
         .route("/api/player-links", get(player_links))
+        .route("/api/local-room/join", post(local_room::join))
+        .route("/api/local-room/cancel/:id", post(local_room::cancel))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
         .route("/api/profiles", post(save_profile))
@@ -202,14 +207,15 @@ async fn profile_session(
         let title = |game: &gamenight_protocol::GameId| party.library.iter().find(|meta| &meta.id == game).map(|meta| meta.title.clone()).unwrap_or_else(|| game.0.clone());
         let current = party.active_session.as_ref().map(|session| serde_json::json!({"title": title(&session.game), "phase": session.phase}));
         let next = party.warm_session.as_ref().map(|session| title(&session.game)).or_else(|| party.warming.as_ref().map(|entry| entry.title.clone()));
-        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
+        let local = state.lock().unwrap();
+        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
     }).await.map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
 }
 
 async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let state = state.lock().unwrap();
     Json(
-        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions,"room":state.cloud.as_ref().map(|b|b.waiting()), "cloud":state.cloud.is_some(), "pairing_urls":state.cloud.as_ref().map(|b|b.pairing_urls()).unwrap_or_default()}),
+        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions,"room":state.cloud.as_ref().map(|b|b.waiting()).unwrap_or_else(||state.local_room.snapshot(&state.profiles)), "cloud":state.cloud.is_some(), "pairing_urls":state.cloud.as_ref().map(|b|b.pairing_urls()).unwrap_or_default()}),
     )
 }
 
@@ -232,7 +238,7 @@ async fn room_pickup(
     let bridge = state.lock().unwrap().cloud.clone();
     match bridge {
         Some(b) => b.pickup(&state, &pending, player).await,
-        None => StatusCode::SERVICE_UNAVAILABLE,
+        None => local_room::pickup(&state, &pending, player).await,
     }
 }
 
@@ -665,7 +671,7 @@ mod room_pickup_tests {
         for (peer, native, expected) in [
             ("192.168.1.20:1234", true, StatusCode::FORBIDDEN),
             ("127.0.0.1:1234", false, StatusCode::FORBIDDEN),
-            ("127.0.0.1:1234", true, StatusCode::SERVICE_UNAVAILABLE),
+            ("127.0.0.1:1234", true, StatusCode::GONE),
         ] {
             let mut headers = axum::http::HeaderMap::new();
             if native {

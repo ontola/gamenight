@@ -221,9 +221,9 @@ function love.keypressed(key)
 end
 function love.gamepadpressed(_, button)
 	if managed then
-		-- The desktop lobby observes Back globally, including while this game
-		-- has focus. Sending another overlay request here races its toggle:
-		-- the same press could pause and then immediately resume (or reopen).
+		-- Some Windows input backends stop delivering events to unfocused
+		-- windows. The foreground game must still be able to open the lobby.
+		if button == "back" then bridge:back() end
 		return
 	elseif button == "a" and (menu or finished) then
 		standalone()
