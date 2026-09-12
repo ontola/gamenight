@@ -93,6 +93,7 @@
     function showConnection(state) {
       const connected=state.status==="connected";
       qrOpen.hidden=connected; roomForm.hidden=connected; roomLeave.hidden=!connected;
+      if(connected)document.getElementById('qr-scanner')?.close();
       roomLeave.textContent=state.room_code ? "Leave room "+state.room_code : "Leave room";
     }
     async function checkRoom(){
@@ -137,6 +138,7 @@
       roomForm.setAttribute('aria-busy','true');window.showToast('Joining room…');
       try {
         await request('/v1/rooms/join','POST',{code});
+        document.getElementById('qr-scanner')?.close();
         clearTimeout(roomTimer);await checkRoom();
       } catch(error){window.showToast(error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.');}
       finally{joiningRoom=false;roomInput.readOnly=false;roomForm.setAttribute('aria-busy','false');}

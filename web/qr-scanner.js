@@ -100,7 +100,12 @@
         : 'Could not open the camera. Try again or scan a photo.';
     }
   }
+  const roomForm=document.getElementById('room-form');
+  if(roomForm)dialog.querySelector('.scanner-heading').after(roomForm);
+  document.getElementById('qr-title').textContent='Join a room';
   document.getElementById('qr-open').onclick = () => { dialog.showModal(); startCamera(); };
+  if(location.hash==='#join')document.getElementById('qr-open').click();
+  window.addEventListener('hashchange',()=>{if(location.hash==='#join' && !dialog.open)document.getElementById('qr-open').click();});
   document.getElementById('qr-retry').onclick = startCamera;
   document.getElementById('qr-close').onclick = () => dialog.close();
   // A backdrop tap is targeted at the dialog too. Check bounds so taps on

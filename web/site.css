@@ -135,3 +135,10 @@ body.drawing-fullscreen { position:fixed; width:100%; overflow:hidden; overscrol
 .clothing-preview summary.colour-picker-button { display:flex; justify-content:flex-start; gap:10px; padding:10px 14px; min-height:44px; list-style:none; font-size:14px; }
 .colour-picker-button::-webkit-details-marker { display:none; }
 .clothing-preview[open] summary.colour-picker-button { border-color:var(--accent); margin-bottom:8px; }
+.site-room-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.site-room-actions .btn-primary{padding:12px 24px;min-height:46px;text-decoration:none;font:inherit;font-weight:700}
+#qr-scanner .room-code-form{display:block;margin:16px 0 20px}
+#qr-scanner .room-code-entry{width:100%;margin-top:8px}
+.studio-toolbar:empty{display:none}
+.studio-toolbar{display:none}
+@media(max-width:650px){.site-nav .site-logo{order:0}.site-room-actions{order:1}.site-nav .site-links{order:2;width:100%}}

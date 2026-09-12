@@ -709,9 +709,6 @@ let initializing = true;
       };
 
       if (storage.cloud) {
-        document.getElementById('studio-action-1').hidden=true;
-        document.getElementById('studio-action-2').textContent='Session';
-        if(location.hash==='#session')setTimeout(()=>switchTab('playlist'),0);
         document.getElementById('gallery-help').textContent='Your faces sync with your GameNight account. You can also export a backup to keep a separate copy.';
         const initial=storage.initial;
         if(initial.workspace && !storage.pending){
@@ -737,13 +734,14 @@ let initializing = true;
 
     function switchTab(tab) {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('active', el.id === 'tab-' + tab));
-      document.querySelectorAll('.nav-tabs .nav-btn').forEach(el => el.classList.toggle('active', (storage.cloud && el.id === 'studio-action-2' ? 'playlist' : el.textContent.toLowerCase()) === tab));
       if (tab === 'playlist') loadPlaylist();
       if (tab === 'session') loadSession();
     }
 
-    window.addEventListener('hashchange',()=>{if(storage.cloud)switchTab(location.hash==='#session'?'playlist':'character');});
+    window.addEventListener('hashchange',()=>{switchTab(location.hash==='#session'?'playlist':'character');});
+    setTimeout(()=>switchTab(location.hash==='#session'?'playlist':'character'),0);
     let sessionLoading = false;
+    if(!storage.cloud)setTimeout(loadSession,0);
     async function loadSession() {
       if (sessionLoading) return;
       sessionLoading = true;
@@ -751,6 +749,7 @@ let initializing = true;
         const response = await fetch('/api/profiles/' + encodeURIComponent(profileId) + '/session', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
         if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
         const session = await response.json();
+        document.getElementById('qr-open').hidden=session.linked;
         document.getElementById('session-link-status').textContent = session.linked ? `Signed in as ${session.player_name}` : 'Not linked to a controller';
         document.getElementById('session-link-help').textContent = session.linked ? `${session.seat === null ? "Your profile is linked to this party." : "Player " + (session.seat + 1) + "."} Edit your name and character in the Character tab. To disconnect, choose Unlink in your controller’s Start menu.` : 'Press Start on your controller in the lobby, then scan the QR shown in your player menu.';
         document.getElementById('session-player-count').textContent = session.players;
@@ -902,7 +901,7 @@ let initializing = true;
     }
     setInterval(() => {
       if (!document.hidden && document.getElementById('tab-playlist').classList.contains('active')) loadPlaylist();
-      if (!document.hidden && document.getElementById('tab-session').classList.contains('active')) loadSession();
+      if (!document.hidden && !storage.cloud) loadSession();
     }, 4000);
 
 
@@ -1337,9 +1336,6 @@ let initializing = true;
 
 
   
-document.getElementById("studio-action-0").addEventListener("click", function(event) { switchTab('character') });
-document.getElementById("studio-action-1").addEventListener("click", function(event) { switchTab('session') });
-document.getElementById("studio-action-2").addEventListener("click", function(event) { switchTab('playlist') });
 document.getElementById("studio-action-3").addEventListener("click", function(event) { loadPlaylist() });
 document.getElementById("outfit-guide-toggle").addEventListener("click", function(event) { toggleOutfitGuide() });
 document.getElementById("studio-action-5").addEventListener("click", function(event) { setBrushSize(1) });
