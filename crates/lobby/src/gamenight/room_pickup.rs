@@ -67,8 +67,7 @@ pub(super) fn sync(
         let origin=if snapshot.as_ref().is_some_and(|s|s.cloud) {
             std::env::var("GAMENIGHT_CLOUD_URL").unwrap_or_else(|_|"https://gamenight.ontola.io".into())
         }else{super::lobby_join_url()};
-        let base=origin.split("/studio").next().unwrap_or(&origin).trim_end_matches('/');
-        let url=format!("{base}/studio#room={code}");
+        let url=room_join_url(&origin,code);
         let qr=super::generate_qr_bevy_image(&url).map(|mut image|{
             image.sampler_descriptor=bevy::render::texture::ImageSampler::nearest();
             images.add(image)
@@ -248,6 +247,24 @@ pub(super) fn sync(
 
 /// A wall-mounted enamel sign, clear of every station and platform. Opaque
 /// backing keeps its contrast independent of the selected room background.
+fn room_join_url(base:&str,code:&str)->String {
+    let end=base.find("://").map(|i|i+3).unwrap_or(0);
+    let authority=base[end..].split(['/', '?', '#']).next().unwrap_or("");
+    format!("{}{authority}/?r={code}",&base[..end])
+}
+
+#[cfg(test)]
+mod url_tests {
+    use super::room_join_url;
+    #[test]
+    fn room_qr_replaces_existing_session_path() {
+        for base in ["http://192.168.0.85:7913", "http://192.168.0.85:7913/session/gn-couch", "http://192.168.0.85:7913/studio?claim=old"] {
+            assert_eq!(room_join_url(base,"ABC234"),"http://192.168.0.85:7913/?r=ABC234");
+        }
+        assert_eq!(room_join_url("https://gamenight.ontola.io/","ABC234"),"https://gamenight.ontola.io/?r=ABC234");
+    }
+}
+
 fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str, qr:Option<Handle<Image>>) {
     let font: Handle<Font> = assets.load("ui/ark-pixel-16px-latin.ttf");
     commands.spawn((RoomLabel(code.into()), SpatialBundle {
@@ -288,7 +305,7 @@ fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str, 
             });
         }
         if let Some(texture)=qr {parent.spawn(SpriteBundle{
-            texture,sprite:Sprite{custom_size:Some(Vec2::splat(120.)),..default()},
+            texture,sprite:Sprite{custom_size:Some(Vec2::splat(104.)),..default()},
             transform:Transform::from_xyz(124.,0.,6.),..default()
         });}
     });

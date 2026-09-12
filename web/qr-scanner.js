@@ -19,7 +19,8 @@
     if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return false;
     // Automatic navigation is only safe for our hosted app or this local host.
     if (url.origin !== window.location.origin && url.origin !== 'https://gamenight.ontola.io') return false;
-    if (!/^\/(session(?:\/[^/]+)?|studio|mobile)\/?$/.test(url.pathname)) return false;
+    const compactRoom=url.pathname==='/' && /^[A-Z2-9]{6}$/.test(url.searchParams.get('r')||'');
+    if (!compactRoom && !/^\/(session(?:\/[^/]+)?|studio|mobile)\/?$/.test(url.pathname)) return false;
     stop();
     link.hidden = true;
     status.textContent = 'Opening room…';

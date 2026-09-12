@@ -1,6 +1,6 @@
 import { mount } from 'svelte';
 import Navigation from './Navigation.svelte';
-import { startRouter } from './router';
+import { startRouter, navigate } from './router';
 import './toast.js';
 import './state';
 const shell=document.getElementById('site-shell');
@@ -8,6 +8,11 @@ if(shell){
   startRouter();
   shell.replaceChildren();
   mount(Navigation,{target:shell});
+  const scannedRoom=new URLSearchParams(location.search).get('r');
+  if(scannedRoom && /^[A-Z2-9]{6}$/.test(scannedRoom)){
+    sessionStorage.setItem('gamenight_room_code',scannedRoom);
+    void navigate('/studio');
+  }
   const local=document.body.dataset.local==='true' || (document.body.classList.contains('studio-page') && document.body.dataset.cloud!=='true');
   if(local)document.body.dataset.local='true';
   async function refreshRoom(){
