@@ -23,6 +23,21 @@ function tests.back_does_not_bounce_after_resume()
 	assert(gate:press())
 	assert(not gate:press())
 end
+function tests.controllers_are_never_shared_between_players()
+    local input = require("shared.input")
+    local a, b = {}, {}
+    input.bind({{slot=1,controller="ordinal:1"},{slot=2,controller="ordinal:0"}}, {a,b})
+    equal(input.pads[1], b)
+    equal(input.pads[2], a)
+    input.bind({{slot=1,controller="ordinal:1"},{slot=2}}, {a,b})
+    equal(input.pads[1], b)
+    equal(input.pads[2], nil)
+    input.attach(a)
+    equal(input.pads[2], nil)
+    input.bind({{slot=1,controller="ordinal:0"},{slot=2,controller="ordinal:0"}}, {a,b})
+    equal(input.pads[1], a)
+    equal(input.pads[2], nil)
+end
 function tests.participation()
 	local mode = require("games.siege")
 	local seats = { { index = 0, occupant = { kind = "local", player_id = "one" }, controller = "ordinal:1" } }

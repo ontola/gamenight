@@ -475,6 +475,14 @@ impl GameNight {
                 player_id,
                 controller,
             } => {
+                if self.seats.iter().any(|s| s.occupant.player_id() == Some(player_id)) {
+                    for seat in &mut self.seats {
+                        if seat.occupant.player_id() != Some(player_id)
+                            && seat.controller.as_deref() == Some(&controller) {
+                            seat.controller = None;
+                        }
+                    }
+                }
                 if let Some(seat) = self
                     .seats
                     .iter_mut()

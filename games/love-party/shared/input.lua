@@ -11,16 +11,25 @@ local M = {
 }
 function M.bind(players, pads)
 	M.pads, M.active, M.keyboardOnly = {}, {}, {}
+	local claimed, explicit = {}, false
+	for _, p in ipairs(players) do
+		explicit = explicit or p.controller ~= nil
+	end
+	M.explicit = explicit
 	for _, p in ipairs(players) do
 		M.active[p.slot] = not p.bot
 		if not p.bot then
 			local ordinal = p.controller and tonumber(p.controller:match("^ordinal:(%d+)$"))
-			M.pads[p.slot] = pads[ordinal and ordinal + 1 or p.slot]
+			local pad = ordinal and pads[ordinal + 1] or (not explicit and pads[p.slot] or nil)
+			if pad and not claimed[pad] then
+				M.pads[p.slot], claimed[pad] = pad, true
+			end
 			M.keyboardOnly[p.slot] = not p.controller and M.pads[p.slot] == nil
 		end
 	end
 end
 function M.attach(pad)
+	if M.explicit then return end
 	for _, existing in pairs(M.pads) do
 		if existing == pad then
 			return

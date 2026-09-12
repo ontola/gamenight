@@ -428,6 +428,21 @@ mod night_tests {
     }
 
     #[test]
+    fn controller_binding_has_only_one_owner() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Joep", Some(0), None));
+        night.handle(join_cmd("Falcon", Some(1), None));
+        let players = night.snapshot().players;
+        for player in &players {
+            night.handle(Command::BindController { player_id: player.id, controller: "ordinal:0".into() });
+        }
+        let party = night.snapshot();
+        let owners: Vec<_> = party.seats.iter().filter(|s| s.controller.as_deref() == Some("ordinal:0")).collect();
+        assert_eq!(owners.len(), 1);
+        assert_eq!(owners[0].occupant.player_id(), Some(players[1].id));
+    }
+
+    #[test]
     fn controller_binding_is_sent_with_the_named_player_to_the_game() {
         let mut night = GameNight::default();
         night.handle(join_cmd("Ada", Some(0), None));

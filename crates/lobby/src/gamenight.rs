@@ -1434,6 +1434,8 @@ impl GlobalInput {
 
     fn adopt_controller_binding(&mut self, pad: u32, player: PlayerId) -> bool {
         if self.departing_players.contains(&player) { return false; }
+        self.pad_player.retain(|other_pad, id| *other_pad == pad || *id != player);
+        self.joined_pads.retain(|id| self.pad_player.contains_key(id));
         self.pending_joins.remove(&pad);
         self.joined_pads.insert(pad);
         self.pad_player.insert(pad, player);
@@ -1453,8 +1455,7 @@ impl GlobalInput {
         for (pad, (name, color)) in pending {
             match seated.iter().find(|p| p.name == name && !self.departing_players.contains(&p.id)) {
                 Some(player) => {
-                    self.joined_pads.insert(pad);
-                    self.pad_player.insert(pad, player.id);
+                    self.adopt_controller_binding(pad, player.id);
                     self.newly_confirmed.push((pad, player.id));
                 }
                 None => {
@@ -1799,13 +1800,21 @@ fn global_input_system(
                 .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
                 if let Some(pad) = connected.get(ordinal) {
                     if input.adopt_controller_binding(pad.id as u32, id) {
-                        bridge.player_gamepad.insert(id, pad.id as u32);
+                        // Rebuild the inverse mapping below; inserting alone leaves stale owners.
                     }
                 }
             }
         }
     }
     input.reconcile_joins(&seated);
+    {
+        let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
+        let bindings = input.pad_player.iter().map(|(&pad, &player)| (player, pad)).collect();
+        if bridge.player_gamepad != bindings {
+            bridge.player_gamepad = bindings;
+            bridge.lobby_rebuild_at = Some(std::time::Instant::now());
+        }
+    }
 
     // Show out anybody who walked into the exit doorway. Drained here rather
     // than acted on in the bones session because only this side can reach the
@@ -3977,6 +3986,19 @@ mod tests {
     /// The join/reroll name pick must actually vary. This used to be
     /// `FUN_NAMES.iter().find(...)`, which made the first joiner always
     /// "Falcon" and made the menu's "New Name" reroll a no-op.
+    #[test]
+    fn controller_rebinding_removes_the_old_owner_and_old_pad() {
+        let mut input = GlobalInput::default();
+        let joep = PlayerId::new();
+        let falcon = PlayerId::new();
+        input.adopt_controller_binding(0, joep);
+        input.adopt_controller_binding(1, falcon);
+        input.adopt_controller_binding(0, falcon);
+        assert_eq!(input.pad_player.len(), 1);
+        assert_eq!(input.pad_player.get(&0), Some(&falcon));
+        assert!(!input.joined_pads.contains(&1));
+    }
+
     #[test]
     fn random_unused_name_varies() {
         let taken = HashSet::new();
