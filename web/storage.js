@@ -87,15 +87,25 @@
       } catch(error) { roomStatus.textContent=error.message; }
       finally { roomLeave.disabled=false; await checkRoom(); }
     });
-    roomForm.addEventListener('submit',async event=>{
-      event.preventDefault();const code=roomInput.value.trim().toUpperCase();
+    let joiningRoom=false;
+    async function joinRoom(){
+      const code=roomInput.value.trim().toUpperCase();
+      if(joiningRoom || !/^[A-Z2-9]{6}$/.test(code))return;
       if(!cloud){location.href='https://gamenight.ontola.io/studio#room='+encodeURIComponent(code);return;}
-      const button=event.submitter;button.disabled=true;
+      joiningRoom=true;roomInput.readOnly=true;
+      roomForm.setAttribute('aria-busy','true');roomStatus.textContent='Joining room…';
       try {
         await request('/v1/rooms/join','POST',{code});
         clearTimeout(roomTimer);watching=true;await checkRoom();
       } catch(error){roomStatus.textContent=error.message.startsWith('Too many')?error.message:'Could not join this room. Check the code and that you are not already connected.';}
-      finally{button.disabled=false;}
+      finally{joiningRoom=false;roomInput.readOnly=false;roomForm.setAttribute('aria-busy','false');}
+    }
+    roomInput.addEventListener('input',()=>{
+      roomInput.value=roomInput.value.toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6);
+      return joinRoom();
+    });
+    roomForm.addEventListener('submit',event=>{
+      event.preventDefault();return joinRoom();
     });
     roomCancel.addEventListener('click',async()=>{
       roomCancel.disabled=true;
@@ -103,7 +113,7 @@
       catch(error){roomStatus.textContent=error.message;}
       finally{roomCancel.disabled=false;}
     });
-    if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');checkRoom();}
+    if(cloud){roomInput.value=sessionStorage.getItem('gamenight_room_code')||'';sessionStorage.removeItem('gamenight_room_code');if(roomInput.value)await joinRoom();else checkRoom();}
     const script=document.createElement('script');script.src='/web/studio.js';document.body.append(script);
   }catch(error){const el=document.createElement('p');el.setAttribute('role','alert');el.textContent=error.message;document.querySelector('main').prepend(el);}
 })();

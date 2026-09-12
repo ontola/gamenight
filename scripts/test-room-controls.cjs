@@ -5,7 +5,7 @@ const path=require('node:path');
 (async()=>{
   const nodes=new Map();
   function node(id){if(!nodes.has(id))nodes.set(id,{hidden:false,disabled:false,textContent:'',listeners:{},addEventListener(n,fn){this.listeners[n]=fn;},append(){},prepend(){},setAttribute(){}});return nodes.get(id);}
-  let state={status:'connected',room_code:'ABC234'}, poll, failLeave=false;
+  let state={status:'connected',room_code:'ABC234'}, poll, failLeave=false, joins=0, failJoin=false;
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
   const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{localStorage:storage,initAccountSettings(){}},sessionStorage:storage,
     location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,
@@ -14,6 +14,11 @@ const path=require('node:path');
       if(url==='/auth/session')data={csrf:'csrf'};
       if(url==='/v1/me')data={id:'account'};
       if(url==='/v1/rooms/status')data=state;
+      if(url==='/v1/rooms/join'){
+        joins++; assert.equal(JSON.parse(options.body).code,'ABC234');
+        status=failJoin?429:200;
+        if(!failJoin)state={status:'waiting',expires:Date.now()/1000+300};
+      }
       if(url==='/v1/pairing/unlink'){
         assert.equal(options.headers['X-GameNight-CSRF'],'csrf');
         status=failLeave?500:204;
@@ -33,5 +38,15 @@ const path=require('node:path');
   assert.equal(node('room-leave').textContent,'Leave room XYZ678');
   state={status:'none'};await poll();
   assert.equal(node('qr-open').hidden,false);
+  const input=node('room-code');
+  input.value='abc23';await input.listeners.input();assert.equal(joins,0);
+  input.value='abc234';const joining=input.listeners.input();
+  await node('room-form').listeners.submit({preventDefault(){}});
+  await joining;assert.equal(joins,1);assert.equal(input.value,'ABC234');
+  assert.equal(input.readOnly,false);assert.equal(node('room-cancel').hidden,false);
+  input.value='';await input.listeners.input();assert.equal(joins,1);
+  failJoin=true;input.value='ab-c234';await input.listeners.input();
+  assert.equal(joins,2);assert.match(node('room-status').textContent,/Too many/);
+  assert.equal(input.readOnly,false);
   console.log('Room controls: initial connection, leave failure/success, reconnect and expired room passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

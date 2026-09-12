@@ -19,8 +19,7 @@
   <button type="button" class="nav-btn" id="qr-open">Scan QR</button>
     <form id="room-form" class="room-code-form">
       <label for="room-code">Room code</label>
-      <input id="room-code" name="room-code" placeholder="ABC234" maxlength="6" minlength="6" pattern="[A-Za-z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
-      <button type="submit" class="tool-btn">Enter room</button>
+      <input id="room-code" name="room-code" aria-label="Room code, six characters. Joins automatically when complete." placeholder="······" maxlength="6" minlength="6" pattern="[A-Za-z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
     </form>
     <button id="room-leave" class="nav-btn" type="button" hidden>Leave room</button>
   </header>

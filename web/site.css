@@ -64,3 +64,15 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
   .studio-page .room-code-form input { width:100%; min-width:0; }
   .studio-page .room-code-form button { min-height:44px; }
 }
+
+/* Six fixed pixel-font cells: one accessible input supports typing and paste. */
+@font-face { font-family:GameNightPixel; src:url(/web/fonts/ark-pixel-16px-latin.ttf) format("truetype"); font-weight:400; font-display:swap; }
+.studio-page .room-code-form { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+.studio-page .room-code-form input {
+  flex:none; width:242px; max-width:100%; height:58px; padding:10px 12px;
+  font:400 32px/1 GameNightPixel,monospace; letter-spacing:24px;
+  border-radius:8px; background:repeating-linear-gradient(to right,transparent 0 39px,var(--border) 39px 40px),#20283c;
+  color:#fff3ce; caret-color:#c5baff;
+}
+.studio-page .room-code-form input::placeholder { color:#8991ab; opacity:1; }
+.studio-page .room-code-form[aria-busy=true] input { opacity:.65; }
