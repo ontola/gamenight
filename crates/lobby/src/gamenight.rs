@@ -1468,6 +1468,7 @@ impl GlobalInput {
     /// Toggle the given player's start menu — Start opens it, Start again
     /// closes it; Leave also dismisses the menu.
     fn toggle_menu(&mut self, player_id: PlayerId) {
+        info!(open = !self.open_menus.contains_key(&player_id), "gamenight: player Start menu toggled");
         if self.open_menus.remove(&player_id).is_none() {
             self.open_menus
                 .insert(player_id, PlayerMenuState { highlight: 0, has_inactive: false, was_linked: None });
@@ -1540,6 +1541,11 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.add_systems(bevy::prelude::PostUpdate,
         (interaction_visual::sync, bevy::ecs::schedule::apply_deferred)
             .chain().before(bevy::transform::TransformSystem::TransformPropagate));
+    // Bones replaces Camera during Update, clearing its computed viewport.
+    // Project UI only after Bevy has rebuilt that viewport, before UI layout.
+    app.add_systems(bevy::prelude::PostUpdate, position_player_menus_system
+        .after(bevy::render::camera::CameraUpdateSystem)
+        .before(bevy::ui::UiSystem::Layout));
     app.add_systems(bevy::prelude::PostUpdate,
         (sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
             position_player_avatar_system).chain()
@@ -1548,8 +1554,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         bevy::prelude::Update,
         (
             global_input_system,
-            (sync_player_menus_system, bevy::ecs::schedule::apply_deferred,
-                position_player_menus_system).chain(),
+            sync_player_menus_system,
             apply_player_colors_system,
             sync_player_skin_system,
             sync_name_tags_system,
@@ -2143,7 +2148,7 @@ fn sync_player_menus_system(
     mut input: bevy::prelude::ResMut<GlobalInput>,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
-    roots: bevy::prelude::Query<(bevy::prelude::Entity, &PlayerMenuRoot)>,
+    roots: bevy::prelude::Query<(bevy::prelude::Entity, &PlayerMenuRoot, &PlayerMenuContent)>,
 ) {
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
@@ -2156,7 +2161,7 @@ fn sync_player_menus_system(
             !claimed
         });
     }
-    for (entity, PlayerMenuRoot(player_id)) in &roots {
+    for (entity, PlayerMenuRoot(player_id), _) in &roots {
         if !input.open_menus.contains_key(player_id) {
             commands.entity(entity).despawn_recursive();
         }
@@ -2188,6 +2193,11 @@ fn sync_player_menus_system(
         let link_state = links.snapshot();
         let linked = link_state.as_ref().is_some_and(|s| s.linked.contains(&player_id));
         let join_url = link_state.as_ref().filter(|_| !linked).and_then(|s| s.join_url(player_id, &lobby_join_url()));
+        let content = format!("{seat_index}|{name}|{linked}|{:?}|{}|{}",
+            join_url, state.highlight, state.has_inactive);
+        if roots.iter().any(|(_, root, previous)| root.0 == player_id && previous.0 == content) {
+            continue;
+        }
         let code = if let Some(url) = join_url {
             if !qr_cache.contains_key(&url) {
                 if let Some(image) = generate_qr_bevy_image(&url) { qr_cache.insert(url.clone(), images.add(image)); }
@@ -2196,12 +2206,13 @@ fn sync_player_menus_system(
         } else { None };
         let root_entity = roots
             .iter()
-            .find(|(_, r)| r.0 == player_id)
-            .map(|(e, _)| e)
+            .find(|(_, r, _)| r.0 == player_id)
+            .map(|(e, _, _)| e)
             .unwrap_or_else(|| {
                 commands
                     .spawn((
                         PlayerMenuRoot(player_id),
+                        PlayerMenuContent(content.clone()),
                         NodeBundle {
                             style: Style {
                                 // Never render at the default origin before projection.
@@ -2219,6 +2230,7 @@ fn sync_player_menus_system(
                     .id()
             });
 
+        commands.entity(root_entity).insert(PlayerMenuContent(content));
         commands.entity(root_entity).despawn_descendants();
         commands.entity(root_entity).with_children(|parent| {
             parent.spawn(TextBundle::from_section(
@@ -2270,11 +2282,11 @@ fn sync_player_menus_system(
 
 /// Marks a player start-menu's root UI node. Persists across frames so
 /// `position_player_menus_system` has something stable to move; its
-/// children are rebuilt fresh every frame in `sync_player_menus_system` —
-/// the whole tree is a handful of tiny nodes, cheap enough that incremental
-/// per-widget updates would just be complexity for no real benefit.
+/// children remain alive until the visible content or selection changes.
 #[derive(bevy::prelude::Component)]
 struct PlayerMenuRoot(PlayerId);
+#[derive(bevy::prelude::Component)]
+struct PlayerMenuContent(String);
 
 /// Keeps each open menu positioned just above the player it belongs to,
 /// re-projected every frame since the player keeps moving. Reaches directly
