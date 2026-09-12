@@ -10,6 +10,19 @@ local function equal(a, b)
 	assert(a == b, tostring(a) .. " ~= " .. tostring(b))
 end
 local tests = {}
+function tests.back_does_not_bounce_after_resume()
+	local gate=require("shared.back_gate").new()
+	gate:update(1,false)
+	assert(gate:press())
+	gate:reset() -- Resume while the same physical button is still held.
+	gate:update(2,true)
+	assert(not gate:press())
+	gate:update(0.1,false)
+	assert(not gate:press()) -- A focus replay is not a new deliberate press.
+	gate:update(1.0,false)
+	assert(gate:press())
+	assert(not gate:press())
+end
 function tests.participation()
 	local mode = require("games.siege")
 	local seats = { { index = 0, occupant = { kind = "local", player_id = "one" }, controller = "ordinal:1" } }

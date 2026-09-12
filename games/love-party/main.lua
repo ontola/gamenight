@@ -10,6 +10,7 @@ local Input = require("shared.input")
 local Lifecycle = require("shared.lifecycle")
 local Render = require("shared.render")
 local Screen = require("shared.window")
+local backGate = require("shared.back_gate").new()
 local Audio = require("shared.audio")
 local state, bridge, mode, remaining, finished, accumulator
 local selected, count, menu = 1, 2, true
@@ -87,6 +88,7 @@ function love.load(args)
 					Screen.hide()
 				end,
 				show = function()
+					backGate:reset()
 					Audio.enabled = true
 					Screen.show()
 				end,
@@ -119,6 +121,11 @@ function love.update(dt)
 	end
 	if bridge then
 		bridge:update()
+		local backHeld = love.keyboard and (love.keyboard.isDown("escape") or love.keyboard.isDown("backspace")) or false
+		for _, pad in ipairs(pads()) do
+			if pad:isGamepadDown("back") then backHeld = true end
+		end
+		backGate:update(dt, backHeld or bridge.phase ~= "running")
 		activityClock = activityClock + dt
 		if bridge.phase == "running" then
 			for i, pad in ipairs(pads()) do
@@ -199,7 +206,7 @@ function love.draw()
 end
 function love.keypressed(key)
 	if managed then
-		if key == "escape" or key == "backspace" then
+		if (key == "escape" or key == "backspace") and backGate:press() then
 			bridge:back()
 		end
 		return
@@ -223,7 +230,7 @@ function love.gamepadpressed(_, button)
 	if managed then
 		-- Some Windows input backends stop delivering events to unfocused
 		-- windows. The foreground game must still be able to open the lobby.
-		if button == "back" then bridge:back() end
+		if button == "back" and backGate:press() then bridge:back() end
 		return
 	elseif button == "a" and (menu or finished) then
 		standalone()

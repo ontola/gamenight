@@ -1208,6 +1208,7 @@ struct GlobalInput {
     /// This prevents the press that opens the lobby from immediately closing it.
     select_can_close: HashSet<u32>,
     select_paused_since: Option<std::time::Instant>,
+    select_last_toggle: Option<std::time::Instant>,
     /// Ignore pre-Leave snapshots until the host acknowledges departure.
     departing_players: HashSet<PlayerId>,
     /// Confirmed pad -> player mappings not yet written into
@@ -1484,6 +1485,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         joined_pads: default(),
         select_can_close: default(),
         select_paused_since: None,
+        select_last_toggle: None,
         departing_players: default(),
         newly_confirmed: default(),
         pad_player: default(),
@@ -1955,7 +1957,7 @@ fn global_input_system(
     }
     // Focus changes can replay the opening press. Only re-arm after the
     // paused state has settled and the button is released in the lobby.
-    let resume_armed = input.select_paused_since.is_some_and(|since|since.elapsed().as_millis()>=400);
+    let resume_armed = input.select_paused_since.is_some_and(|since|since.elapsed().as_millis()>=1000);
 
     for GamepadButtonEvent {
         gamepad: id,
@@ -1965,14 +1967,19 @@ fn global_input_system(
     {
         match button {
             GamepadButton::Select => {
+                if input.select_last_toggle.is_some_and(|last|last.elapsed().as_secs_f32()<1.0) {
+                    continue;
+                }
                 let paused = bones_game.0.shared_resource::<GameNightBridge>()
                     .active_session.as_ref().is_some_and(|session| session.phase == gamenight_protocol::SessionPhase::Paused);
                 let ready=input.select_can_close.remove(&id);
                 if lobby_was_focused && lobby_available && paused && ready && resume_armed {
+                    input.select_last_toggle=Some(std::time::Instant::now());
                     let _ = join_tx.try_send(ClientMessage::CloseOverlay);
                     continue;
                 }
                 let _ = join_tx.try_send(ClientMessage::OpenOverlay);
+                input.select_last_toggle=Some(std::time::Instant::now());
                 #[cfg(target_os = "macos")]
                 if !lobby_was_focused {
                     input.previous_app = crate::gamenight_macos::capture_frontmost_app();
