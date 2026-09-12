@@ -49,6 +49,8 @@ body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-u
 .studio-page > main { width:calc(100% - 40px); max-width:900px; margin-left:auto; margin-right:auto; }
 .studio-page .site-nav { padding:24px 0 16px; }
 .studio-page .studio-toolbar { padding:0; border:0; margin-top:0; margin-bottom:20px; gap:12px; }
+.studio-toolbar #qr-open[hidden], .studio-toolbar #room-form[hidden], .studio-toolbar #room-leave[hidden] { display:none !important; }
+.studio-toolbar #room-leave { width:100%; }
 .studio-page .room-feedback { padding:0; }
 .studio-page .room-feedback:has(#room-status:empty):has(#room-cancel[hidden]) { display:none; }
 .studio-page .room-feedback:not(:has(#room-status:empty)) { margin-bottom:20px; }

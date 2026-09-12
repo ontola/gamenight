@@ -44,29 +44,49 @@
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
           const text=document.createElement('p');text.textContent='Connect your player to controller '+(info.seat+1)+' in the lobby you scanned?';
           const button=document.createElement('button');button.className='btn-primary';button.textContent='Connect to lobby';
-          button.onclick=async()=>{button.disabled=true;try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');text.textContent='Connected. Your saved character updates in this lobby.';button.remove();}catch(error){text.textContent=error.message;button.disabled=false;}};
+          button.onclick=async()=>{button.disabled=true;try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');text.textContent='Connected. Your saved character updates in this lobby.';button.remove();await checkRoom();}catch(error){text.textContent=error.message;button.disabled=false;}};
           box.append(text,button);
         }catch{sessionStorage.removeItem('gamenight_pair');box.textContent='This lobby link has expired. Scan the QR again.';}
       }
     }
     const roomForm=document.getElementById('room-form'), roomInput=document.getElementById('room-code');
     const roomStatus=document.getElementById('room-status'), roomCancel=document.getElementById('room-cancel');
-    let watching=false, roomTimer;
+    const roomLeave=document.getElementById("room-leave"), qrOpen=document.getElementById("qr-open");
+    let watching=false, roomTimer, roomEpoch=0;
+    function showConnection(state) {
+      const connected=state.status==="connected";
+      qrOpen.hidden=connected; roomForm.hidden=connected; roomLeave.hidden=!connected;
+      roomLeave.textContent=state.room_code ? "Leave room "+state.room_code : "Leave room";
+    }
     async function checkRoom(){
       if(!cloud)return;
+      clearTimeout(roomTimer);
+      const epoch=++roomEpoch;
       try {
         const state=await request('/v1/rooms/status');
+        if(epoch!==roomEpoch)return;
+        showConnection(state);
         if(state.status==='waiting') {
           watching=true; roomCancel.hidden=false;
           roomStatus.textContent='Walk your unlinked character to your door in the lobby and stand there to connect. Pickup expires in '+Math.max(1,Math.ceil((state.expires-Date.now()/1000)/60))+' minutes.';
-          roomTimer=setTimeout(checkRoom,3000);
+
         } else {
           roomCancel.hidden=true;
           if(watching)roomStatus.textContent=state.status==='connected'?'Connected! Your saved character now follows your controller.':'Your pickup expired or was cancelled. Enter the room code to try again.';
           watching=false;
         }
-      } catch { if(watching)roomTimer=setTimeout(checkRoom,5000); }
+      } catch { /* Retain the last known connection on a network failure. */ }
+      finally { if(epoch===roomEpoch)roomTimer=setTimeout(checkRoom,3000); }
     }
+    roomLeave.addEventListener("click",async()=>{
+      roomLeave.disabled=true; ++roomEpoch; clearTimeout(roomTimer);
+      try {
+        await request("/v1/pairing/unlink","POST",{});
+        watching=false; roomCancel.hidden=true; showConnection({status:"none"});
+        roomStatus.textContent="You left the room. Your saved player is kept.";
+      } catch(error) { roomStatus.textContent=error.message; }
+      finally { roomLeave.disabled=false; await checkRoom(); }
+    });
     roomForm.addEventListener('submit',async event=>{
       event.preventDefault();const code=roomInput.value.trim().toUpperCase();
       if(!cloud){location.href='https://gamenight.ontola.io/studio#room='+encodeURIComponent(code);return;}
