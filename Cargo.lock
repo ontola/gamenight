@@ -572,6 +572,7 @@ dependencies = [
  "gamenight-daemon",
  "gamenight-protocol",
  "qrcode",
+ "reqwest",
  "serde",
  "serde_json",
  "tokio",

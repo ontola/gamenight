@@ -19,3 +19,5 @@ $('import').onchange=async()=>{try{const file=$('import').files[0];if(!file)retu
 $('logout').onclick=async()=>{try{await api('/v1/session','DELETE');location.reload();}catch(e){message(e.message);}};
 $('delete').onclick=async()=>{if(!confirm('Delete your cloud profile, preferences and sessions?'))return;try{await api('/v1/me','DELETE');location.reload();}catch(e){message(e.message);}};
 load();
+
+$('unlink').onclick=async()=>{try{await api('/v1/pairing/unlink','POST',{});message('Lobbies disconnected. Your artwork stays in your account.');}catch(e){message(e.message);}};

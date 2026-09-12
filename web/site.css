@@ -1,5 +1,5 @@
 :root { --bg:#0d1020; --text:#eef0fc; --muted:#a8adc4; --accent:#7565ee; --card-bg:#181e30; --border:#343b53; color-scheme:dark; }
-body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
 #site-shell { width:100%; border-bottom:1px solid var(--border); }
 .site-nav { box-sizing:border-box; max-width:1100px; margin:auto; padding:20px 24px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
 .site-nav .site-logo { display:flex; align-items:center; gap:10px; color:var(--text); font-size:21px; font-weight:800; text-decoration:none; white-space:nowrap; }

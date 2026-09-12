@@ -1,11 +1,12 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, State, Query},
     http::{HeaderValue, StatusCode},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
     Json, Router,
 };
 mod playlist;
+mod cloud;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -52,6 +53,7 @@ pub struct JoinSessionRequest {
 }
 
 pub struct ServerState {
+    cloud: Option<cloud::Bridge>,
     pub profiles: HashMap<String, Profile>,
     pub daemon_addr: String,
     /// Which party member each profile is currently signed in as.
@@ -72,6 +74,7 @@ pub struct ServerState {
 impl ServerState {
     pub fn new(daemon_addr: String) -> Self {
         Self {
+            cloud: None,
             profiles: HashMap::new(),
             daemon_addr,
             bindings: HashMap::new(),
@@ -111,6 +114,10 @@ pub async fn run_server(
     addr: std::net::SocketAddr,
     state: SharedState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if let Some(bridge)=cloud::Bridge::configured(){
+        state.lock().unwrap().cloud=Some(bridge.clone());
+        tokio::spawn(bridge.run(state.clone()));
+    }
     let app = create_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     // Log the address a phone can actually use, not just the bind address —
@@ -443,8 +450,10 @@ async fn serve_character(Path(theme): Path<String>) -> Response {
     ([("content-type", "image/png"), ("cache-control", "no-cache")], png).into_response()
 }
 
-async fn serve_studio() -> Html<&'static str> {
-    Html(STUDIO_HTML)
+async fn serve_studio(State(state):State<SharedState>,Query(query):Query<HashMap<String,String>>) -> Response {
+    let bridge=state.lock().unwrap().cloud.clone();
+    if let Some(bridge)=bridge { if let Some(url)=bridge.pairing_url(&query).await { return axum::response::Redirect::to(&url).into_response(); } }
+    Html(STUDIO_HTML).into_response()
 }
 
 pub static STUDIO_HTML: &str = include_str!("../../../web/studio.html");

@@ -2,6 +2,8 @@
 (async () => {
   const cloud = document.body.dataset.cloud === 'true';
   let csrf, documentState, pendingKey, prefix='';
+  const pairing=new URLSearchParams(location.hash.slice(1)).get('pair');
+  if(cloud && pairing){sessionStorage.setItem('gamenight_pair',pairing);history.replaceState(null,'',location.pathname);}
   const nativeStorage=window.localStorage;
   const local={ getItem:k=>nativeStorage.getItem(prefix+k), setItem:(k,v)=>nativeStorage.setItem(prefix+k,v), removeItem:k=>nativeStorage.removeItem(prefix+k) };
   async function request(path,method='GET',body) {
@@ -30,6 +32,19 @@
       },
       pending:cloud?local.getItem(pendingKey):null
     };
+    if(cloud){
+      const ticket=sessionStorage.getItem('gamenight_pair');
+      if(ticket){
+        const box=document.createElement('section');box.className='card';box.setAttribute('aria-live','polite');document.querySelector('main').prepend(box);
+        try{
+          const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
+          const text=document.createElement('p');text.textContent='Connect your player to controller '+(info.seat+1)+' in the lobby you scanned?';
+          const button=document.createElement('button');button.className='btn-primary';button.textContent='Connect to lobby';
+          button.onclick=async()=>{button.disabled=true;try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');text.textContent='Connected. Your saved character updates in this lobby.';button.remove();}catch(error){text.textContent=error.message;button.disabled=false;}};
+          box.append(text,button);
+        }catch{sessionStorage.removeItem('gamenight_pair');box.textContent='This lobby link has expired. Scan the QR again.';}
+      }
+    }
     const script=document.createElement('script');script.src='/web/studio.js';document.body.append(script);
   }catch(error){const el=document.createElement('p');el.setAttribute('role','alert');el.textContent=error.message;document.querySelector('main').prepend(el);}
 })();
