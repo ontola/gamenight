@@ -28,15 +28,22 @@ pub(super) fn sync(mut commands:Commands, game:Res<BonesGame>, assets:Res<AssetS
     }
     if bridge.lobby_away {return;}
     let font:Handle<Font>=assets.load("ui/ark-pixel-16px-latin.ttf");
-    for (&seat,(label,position)) in &bridge.interaction_hints {
+    // Give each complete card its own depth band. Children occupy 0..=2,
+    // so the next card's background must be in front of that entire range.
+    // Sort by the displayed position; seat breaks ties deterministically.
+    let mut hints: Vec<_> = bridge.interaction_hints.iter().filter_map(|(&seat, (label, position))| {
+        super::seat_world_position(&game.0, seat as u8)
+            .map(|player_position| (seat, label, position, player_position))
+    }).collect();
+    hints.sort_by(|a, b| a.3.x.total_cmp(&b.3.x).then(a.0.cmp(&b.0)));
+    for (order, (seat, label, position, player_position)) in hints.into_iter().enumerate() {
         let Some(player)=bridge.seat_player(seat) else {continue;};
         if input.open_menus.contains_key(&player) {continue;}
         let pressed=input.pad_player.iter().any(|(&pad,&id)| id==player && buttons.pressed(GamepadButton::new(Gamepad::new(pad as usize),GamepadButtonType::North)));
         let press_offset=if pressed {2.} else {0.};
-        let Some(player_position)=super::seat_world_position(&game.0,seat as u8) else {continue;};
         let width=(label.chars().count() as f32*6.5+30.).max(78.);
         let badge_x=-width/2.+12.;
-        let translation=Vec3::new(player_position.x.round(),position.y.round()-13.-press_offset,-70.);
+        let translation=Vec3::new(player_position.x.round(),position.y.round()-13.-press_offset,-70. + order as f32 * 4.);
         if let Some((_,_,mut transform))=old.iter_mut().find(|(_,hint,_)|hint.0==seat && hint.1==*label) {
             transform.translation=translation;
             continue;
