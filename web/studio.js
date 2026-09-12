@@ -636,6 +636,7 @@ let initializing = true;
           outfitGuideSprite = previewSprite;
           outfitGuideColor = characterColor + skinColor;
           refreshOutfitGuide();
+          renderGallery();
         }
         // Paint stays above the skin without being tinted.
         // Keep the face centre while leaving a larger area for accessories.
@@ -1284,6 +1285,10 @@ let initializing = true;
         const cvs = document.createElement('canvas');
         cvs.width = GRID_SIZE; cvs.height = GRID_SIZE;
         const ctx = cvs.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        // Same native-pixel head crop as the drawing guide, beneath each saved face.
+        if (previewSprite) ctx.drawImage(previewTint, 24, 4, GRID_SIZE, GRID_SIZE, 0, 0, GRID_SIZE, GRID_SIZE);
+        cvs.setAttribute('aria-label', art.name + ' character preview');
         art.data.forEach((col, i) => {
           if (col) { ctx.fillStyle = col; ctx.fillRect(i % GRID_SIZE, Math.floor(i / GRID_SIZE), 1, 1); }
         });
