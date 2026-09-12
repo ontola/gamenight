@@ -846,3 +846,9 @@ Opt into [player participation](protocol.md#player-activity-sleep-and-joining-du
 after Prepare. Report real controller input and handle `party_updated` for warning,
 sleep, and wake states. Set `instant_join:true` only when you can insert players into
 a running round without resetting it. Player IDs and controller bindings survive sleep.
+
+## Desktop integration lessons
+
+Use [the desktop integration checklist](desktop-integration-checklist.md) before adding
+or updating a game. It records regression cases found while testing the Windows lobby,
+including Back/Select bounce, controller ownership, and native-resolution rendering.
