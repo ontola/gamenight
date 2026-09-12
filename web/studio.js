@@ -704,6 +704,7 @@ let initializing = true;
 
       if (storage.cloud) {
         document.querySelector('.nav-tabs').hidden=true;
+        document.getElementById('gallery-help').textContent='Your faces sync with your GameNight account. You can also export a backup to keep a separate copy.';
         const initial=storage.initial;
         if(initial.workspace && !storage.pending){
           const saved=validateBackup(initial.workspace);
@@ -1208,6 +1209,7 @@ let initializing = true;
 
     function saveArtworks(list) {
       localStorage.setItem('gamenight_artworks', JSON.stringify(list));
+      if(storage.cloud) scheduleSave();
     }
 
     /// Write the live grid back into the artwork it came from, then save.
