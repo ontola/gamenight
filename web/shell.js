@@ -1,8 +1,9 @@
 "use strict";
 const shell = document.getElementById('site-shell');
 if (shell) {
-  shell.innerHTML = `<nav class="site-nav" aria-label="Main navigation"><a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a><div class="site-links"><a href="/">Home</a><a href="https://gamenight.ontola.io/catalog">Games</a><a href="/studio">Your player</a></div></nav>`;
-  for (const link of shell.querySelectorAll('.site-links a')) if (new URL(link.href,location.href).pathname === location.pathname) link.setAttribute('aria-current', 'page');
+  shell.innerHTML = `<nav class="site-nav" aria-label="Main navigation"><a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a><div class="site-links"><a href="/">Home</a><a href="https://gamenight.ontola.io/catalog">Games</a><a href="/studio">Your player</a><a href="/studio#session">Session</a></div></nav>`;
+  const markCurrent=()=>{for(const link of shell.querySelectorAll('.site-links a')){const url=new URL(link.href,location.href);if(url.pathname===location.pathname && url.hash===location.hash)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');}};
+  markCurrent();window.addEventListener('hashchange',markCurrent);
 }
 
 if(shell && document.body.classList.contains('studio-page') && document.body.dataset.cloud !== 'true') {

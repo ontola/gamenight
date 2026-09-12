@@ -742,6 +742,7 @@ let initializing = true;
       if (tab === 'session') loadSession();
     }
 
+    window.addEventListener('hashchange',()=>{if(storage.cloud)switchTab(location.hash==='#session'?'playlist':'character');});
     let sessionLoading = false;
     async function loadSession() {
       if (sessionLoading) return;
