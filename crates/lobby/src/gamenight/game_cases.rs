@@ -203,7 +203,6 @@ pub(super) fn spawn_shelf(
             94.0, 9.0, &font, Color::WHITE);
     }
     let case = &cases[0];
-    let x = -3.0 + motion * 22.0;
     if let Some(texture) = cache.image(case.cover.as_deref(), images) {
         // Keep the title at the top of portrait artwork when filling the slot.
         let mut crop = fill_rect(&texture, images, Vec2::new(74.0, 76.0));
@@ -220,31 +219,17 @@ pub(super) fn spawn_shelf(
             ..default()
         });
     } else {
-        for (row, pixels) in motif(&case.id.0).iter().enumerate() {
-            for (col, pixel) in pixels.bytes().enumerate() {
-                if pixel == b'#' {
-                    block(
-                        parent,
-                        x - 16.0 + col as f32 * 6.0,
-                        29.0 - row as f32 * 6.0,
-                        0.5,
-                        6.0,
-                        6.0,
-                        Color::rgb(0.98, 0.92, 0.74),
-                    );
-                }
-            }
-        }
-        label(
-            parent,
-            &case.title,
-            x + 2.0,
-            -29.0,
-            58.0,
-            10.0,
-            &font,
-            Color::WHITE,
-        );
+        // Missing or invalid artwork gets a readable title, never a guessed icon.
+        block(parent, -5.0 + motion * 22.0, 7.0, 0.4, 74.0, 76.0,
+            Color::rgb_u8(24, 31, 44));
+        parent.spawn(Text2dBundle {
+            text: Text::from_section(&case.title, TextStyle {
+                font: font.clone(), font_size: 14.0, color: Color::WHITE,
+            }).with_alignment(TextAlignment::Center),
+            text_2d_bounds: bevy::text::Text2dBounds { size: Vec2::new(66.0, 68.0) },
+            transform: Transform::from_xyz(-5.0 + motion * 22.0, 7.0, 0.6),
+            ..default()
+        });
     }
     let caption = if status.is_empty() { "UP NEXT".to_string() } else { format!("UP NEXT Â· {status}") };
     label(parent, &caption, -5.0, -37.0, 76.0, 6.0, &font,
@@ -260,34 +245,6 @@ pub(super) fn spawn_shelf(
             &font,
             Color::WHITE,
         );
-    }
-}
-
-fn motif(id: &str) -> [&'static str; 7] {
-    if id.contains("tank") {
-        [
-            "...#...", "...#...", ".#####.", "#######", "#######", ".#.#.#.", ".......",
-        ]
-    } else if id.contains("blast") || id.contains("bomb") {
-        [
-            "....##.", "...#...", "..###..", ".#####.", ".#####.", ".#####.", "..###..",
-        ]
-    } else if id.contains("neon") || id.contains("gun") {
-        [
-            "...#...", "..###..", ".#.#.#.", "#..#..#", "..###..", ".#...#.", ".......",
-        ]
-    } else if id.contains("pin") {
-        [
-            "..###..", ".#####.", ".#####.", "..###..", ".......", "##...##", ".##.##.",
-        ]
-    } else if id.contains("anti") || id.contains("paint") {
-        [
-            "...#...", "..###..", ".#####.", ".#####.", ".#####.", "..###..", ".......",
-        ]
-    } else {
-        [
-            "..###..", ".#...#.", "#.#.#.#", "#.....#", ".#####.", "..#.#..", ".#...#.",
-        ]
     }
 }
 
