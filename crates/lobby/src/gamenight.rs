@@ -3750,7 +3750,7 @@ fn sync_next_game_tv_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (status, button, upcoming, next_ready, can_skip, cases) = {
+    let (status, button, upcoming, next_ready, can_skip, cases, controller_colors) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (
             bridge.next_game_status(),
@@ -3759,6 +3759,15 @@ fn sync_next_game_tv_system(
             bridge.next_game_is_ready(),
             bridge.can_skip_next_game(),
             game_cases::queue(&bridge),
+            {
+                let mut seats: Vec<_> = bridge.latest_seats.iter().collect();
+                seats.sort_by_key(|seat| seat.index);
+                seats.into_iter().filter_map(|seat| {
+                    let id = seat.occupant.player_id()?;
+                    let player = bridge.latest_players.iter().find(|player| player.id == id)?;
+                    Some(player.color.clone().unwrap_or_else(|| "#7c5cff".into()))
+                }).collect::<Vec<_>>()
+            },
         )
     };
 
@@ -3838,7 +3847,7 @@ fn sync_next_game_tv_system(
         _ => String::new(),
     };
     let case_fingerprint = game_cases::fingerprint(&cases);
-    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}");
+    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}|{controller_colors:?}");
     if let Some((entity, tv, mut transform)) = existing.iter_mut().next() {
         transform.translation = Vec3::new(pos.x, pos.y, LOBBY_FURNITURE_Z);
         if tv.0 == fingerprint {
@@ -3874,6 +3883,9 @@ fn sync_next_game_tv_system(
                 transform: Transform::from_xyz(tv_x, -10.0, 0.0),
                 ..default()
             });
+            // Pads sit just in front of the cabinet, never on top of its screen.
+            station_art::controllers(parent, &controller_colors, tv_x,
+                -10.0 - (cabinet.y + 16.0) / 2.0);
             // State line: UP NEXT when ready, LOADING… while on its way.
             parent.spawn(Text2dBundle {
                 text: Text::from_section(

@@ -25,3 +25,48 @@ pub(super) fn front_door(parent: &mut ChildBuilder, floor: f32) {
     r(0.,3.,66.,6.,8.,[195,149,87]);
     r(0.,97.,68.,6.,8.,[195,149,87]);
 }
+
+/// Twenty-by-twelve pixel pads, resting on the same floor as the TV cabinet.
+/// Body tint follows the seated player's clothing; controls keep their contrast.
+pub(super) fn controllers(parent: &mut ChildBuilder, colors: &[String], x: f32, floor: f32) {
+    const PIXELS: [&str; 12] = [
+        "    OOOOOOOOOOOO    ",
+        "  OOHHHHHHHHHHHHOO  ",
+        " OHHBBBBBBBBBBBBHHO ",
+        " OHBBBDBBBBBBYBBHBO ",
+        " OHBBDDDBBBBGBRBBBO ",
+        " OBBBBDBBBBBBABBBBO ",
+        "OBBBBBBBWWBBBBBBBBBO",
+        "OBBBSSBBBBBBBBSSBBBO",
+        "OBBSSSBOOOOBBBSSSBBO",
+        "OBSSSBO    OBSSSSBO ",
+        " OSSSO      OSSSSO  ",
+        "  OOO        OOOO   ",
+    ];
+    for (index, hex) in colors.iter().enumerate() {
+        let rgba = Color::hex(hex).unwrap_or(Color::rgb_u8(124, 92, 255)).as_rgba_f32();
+        let body = [rgba[0], rgba[1], rgba[2]].map(|v| (v * 255.0).round() as u8);
+        let highlight = body.map(|v| (v as u16 + (255 - v as u16) / 3) as u8);
+        let shade = body.map(|v| (v as f32 * 0.6) as u8);
+        let center = x + (index as f32 - (colors.len() - 1) as f32 / 2.0) * 24.0;
+        rect(parent, center, floor + 0.5, 22.0, 1.0, 0.2, [30, 25, 30]);
+        for (row, pixels) in PIXELS.iter().enumerate() {
+            // Merge adjacent pixels of the same color into one sprite.
+            let bytes = pixels.as_bytes();
+            let mut column = 0;
+            while column < bytes.len() {
+                let start = column;
+                let key = bytes[column];
+                while column < bytes.len() && bytes[column] == key { column += 1; }
+                let rgb = match key {
+                    b'O' => [25, 27, 38], b'B' => body, b'H' => highlight, b'S' => shade,
+                    b'D' => [32, 35, 48], b'W' => [225, 225, 235],
+                    b'Y' => [251, 208, 63], b'G' => [88, 183, 105],
+                    b'R' => [233, 91, 103], b'A' => [93, 154, 226], _ => continue,
+                };
+                rect(parent, center - 10.0 + (start + column) as f32 / 2.0,
+                    floor + 11.5 - row as f32, (column - start) as f32, 1.0, 0.3, rgb);
+            }
+        }
+    }
+}
