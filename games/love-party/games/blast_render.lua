@@ -22,12 +22,53 @@ local colors = {
 	speed = { 0.7, 1, 0.4 },
 	cross = { 0.8, 0.8, 0.9 },
 }
+-- Silhouettes remain distinct without relying on colour or initial letters.
+local symbols = {
+    remote={"...#...","...#...",".#####.",".#...#.",".#.#.#.",".#...#.",".#####."},
+    kick={".##....",".##....",".##....",".#####.",".######",".######","......."},
+    diagonal={"#.....#",".#...#.","..#.#..","...#...","..#.#..",".#...#.","#.....#"},
+    beam={"...#...","..###..","...#...","...#...","...#...","..###..","...#..."},
+    star={"#..#..#",".#.#.#.","..###..","#######","..###..",".#.#.#.","#..#..#"},
+    range={"...#...","..##...",".###.#.",".######","#######",".#####.","..###.."},
+    capacity={"..#....",".###.#.","#####..","#####..",".###.#.","....###",".....#."},
+    speed={"....##.","...##..","..##...",".#####.","...##..","..##...",".##...."},
+    cross={"...#...","...#...","...#...","#######","...#...","...#...","...#..."},
+}
+local names = {remote="Remote bombs",kick="Kick bombs",diagonal="Diagonal blast",
+    beam="Beam blast",star="Eight-way blast",range="Longer blast",capacity="Extra bomb",
+    speed="Move faster",cross="Cross blast"}
 local function icon(g, fonts, power, x, y, size)
-	g.setColor(colors[power])
-	g.rectangle("fill", x - size / 2, y - size / 2, size, size, 6, 6)
-	g.setColor(0.04, 0.065, 0.10)
-	g.setFont(fonts.body)
-	g.printf(glyphs[power], x - size / 2, y - 11, size, "center")
+    g.setColor(colors[power])
+    g.rectangle("fill", x-size/2, y-size/2, size, size, 4, 4)
+    g.setColor(0.04, 0.065, 0.10)
+    local pixel = size / 10
+    for row, line in ipairs(symbols[power]) do
+        for col=1,#line do
+            if line:sub(col,col)=="#" then
+                g.rectangle("fill", x+(col-4.5)*pixel, y+(row-4.5)*pixel, pixel, pixel)
+            end
+        end
+    end
+end
+function M.drawUpgrades(s, g, fonts)
+    local positions = {28,1280*0.23,1280*0.59,1280-248}
+    for i,p in ipairs(s.players) do
+        local x=positions[i]+15
+        for n,upgrade in ipairs(B.upgrades(p)) do
+            local bx=x+(n-1)*30
+            icon(g,fonts,upgrade.id,bx+9,64,20)
+            if upgrade.amount>1 then
+                g.setColor(1,1,1)
+                g.setFont(fonts.small)
+                g.print(tostring(upgrade.amount),bx+15,65)
+            end
+        end
+        if (p.pickupNotice or 0)>0 and p.lastPickup then
+            g.setColor(1,1,1,math.min(1,p.pickupNotice))
+            g.setFont(fonts.small)
+            g.print("+ "..names[p.lastPickup],x,85)
+        end
+    end
 end
 function M.draw(s, g, fonts, playerColor)
 	local cell, ox, oy = 46, 203, 160

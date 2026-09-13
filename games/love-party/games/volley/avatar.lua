@@ -32,11 +32,11 @@ function Avatar.parse(payload)
 end
 function Avatar.image(payload)
   local art=Avatar.parse(payload); if not art then return end
-  -- Fit the drawing, not the studio's transparent accessory padding, to the head.
-  local w,h=art.maxx-art.minx+1,art.maxy-art.miny+1
+  -- Preserve the studio canvas: accessory padding is meaningful positioning.
+  local w,h=art.w,art.h
   local data=love.image.newImageData(w,h)
   for y=0,h-1 do for x=0,w-1 do
-    local c=art.px[(y+art.miny)*art.w+x+art.minx+1]
+    local c=art.px[y*w+x+1]
     if c then data:setPixel(x,y,c[1],c[2],c[3],1) end
   end end
   local image=love.graphics.newImage(data)

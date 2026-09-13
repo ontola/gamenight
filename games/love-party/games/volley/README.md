@@ -107,3 +107,5 @@ protocol tests check prewarming, repeat rounds, pause/resume and disconnect;
 Build with `python scripts/package-love-party.py --output dist/party` from the
 public repository. This produces `volley-trouble.love` alongside the other games.
 The simulation remains pure Lua with a fixed 120 Hz step.
+
+Current shared-runner controls: A or LB jumps; X, RB or RT smashes. Matches default to ten points. After a point the losing team bursts and the winners remain controllable through the short celebration. Avatar textures preserve their full studio canvas, including accessory padding.

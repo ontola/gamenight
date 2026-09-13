@@ -180,6 +180,29 @@ function tests.round_replaces_level_and_resets_powers_without_losing_score()
 	end
 	assert(s.round == 2 and p.alive and q.alive and not p.kick and p.score == 12)
 end
+function tests.pickup_badges_match_effective_upgrades_and_reset()
+ local s,p=arena()
+ assert(#B.upgrades(p)==0)
+ B.pickup(p,"range"); B.pickup(p,"range"); B.pickup(p,"kick")
+ B.pickup(p,"diagonal"); B.pickup(p,"beam")
+ local badges={}
+ for _,v in ipairs(B.upgrades(p)) do badges[v.id]=v.amount end
+ assert(badges.range==2 and badges.kick==1 and badges.beam==1 and not badges.diagonal)
+ assert(p.lastPickup=="beam" and p.pickupNotice>0)
+ s.intermission=0.01; B.update(s,0.02,idle)
+ assert(#B.upgrades(p)==0 and p.lastPickup==nil)
+end
+function tests.pickups_are_sparse_with_two_opening_prizes()
+ local crates,drops=0,0
+ for seed=1,100 do
+  local s=B.new({{score=0},{score=0}},U.rng(seed)); local opening=0
+  for _ in pairs(s.items) do opening=opening+1 end
+  assert(opening==2)
+  for _,kind in pairs(s.tiles) do if kind=="crate" then crates=crates+1 end end
+  for _ in pairs(s.drops) do drops=drops+1 end
+ end
+ assert(drops/crates<0.32 and drops/crates>0.18)
+end
 local count = 0
 for name, fn in pairs(tests) do
 	fn()

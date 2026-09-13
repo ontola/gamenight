@@ -12,9 +12,17 @@ local fonts={}
 local function color(c,a) love.graphics.setColor(c[1],c[2],c[3],a or 1) end
 local function box(c,x,y,w,h,r,a) color(c,a); love.graphics.rectangle("fill",x,y,w,h,r or 0) end
 local function text(s,x,y,size,c,w,align)
-  if not fonts[size] then fonts[size]=love.graphics.newFont(size) end
-  love.graphics.setFont(fonts[size]); color(c or cream)
-  if w then love.graphics.printf(s,x,y,w,align or "left") else love.graphics.print(s,x,y) end
+  local density=R.textDensity or 1
+  local pixels=math.floor(size*density+.5)
+  if not fonts[pixels] then
+    fonts[pixels]=love.graphics.newFont(pixels)
+    fonts[pixels]:setFilter("linear","linear")
+  end
+  love.graphics.setFont(fonts[pixels]); color(c or cream)
+  love.graphics.push(); love.graphics.scale(1/density)
+  if w then love.graphics.printf(s,x*density,y*density,w*density,align or "left")
+  else love.graphics.print(s,x*density,y*density) end
+  love.graphics.pop()
 end
 R.text=text
 local function line(c,x1,y1,x2,y2,width,a)
@@ -26,11 +34,22 @@ function R.background(g)
   box(ink,0,0,1280,800)
   -- The court fills the view; no surrounding application panels.
   local lava=S.lava(g)
-  -- A layered dusk skyline, all drawn locally: no asset downloads or shaders.
-  for i=0,30 do
-    local t=i/30
-    box(lava and {.19+t*.045,.12+t*.025,.17+t*.01} or {.10+t*.025,.18+t*.07,.24+t*.07},0,i*27,1280,28)
+  if not R.skyShader then
+    R.skyShader=love.graphics.newShader([[
+      extern vec3 skyTop;
+      extern vec3 skyBottom;
+      vec4 effect(vec4 color, Image tex, vec2 uv, vec2 screen) {
+        float noise=fract(sin(dot(screen,vec2(12.9898,78.233)))*43758.5453)-0.5;
+        return vec4(mix(skyTop,skyBottom,uv.y)+noise/255.0,1.0);
+      }
+    ]])
+    R.skyMesh=love.graphics.newMesh({{0,0,0,0},{1280,0,1,0},{1280,800,1,1},{0,800,0,1}},"fan","static")
   end
+  R.skyShader:send("skyTop",lava and {.19,.12,.17} or {.10,.18,.24})
+  R.skyShader:send("skyBottom",lava and {.235,.145,.18} or {.125,.25,.31})
+  local old=love.graphics.getShader()
+  love.graphics.setShader(R.skyShader); love.graphics.setColor(1,1,1)
+  love.graphics.draw(R.skyMesh); love.graphics.setShader(old)
   circle(lava and coral or gold,975,319,83,.88)
   for i=1,6 do box(lava and {.22,.135,.18} or {.12,.23,.30},880,335+i*12,200,3+i) end
   color(lava and {.12,.10,.16} or {.075,.17,.23})
@@ -73,6 +92,7 @@ function R.background(g)
   circle(gold,640,S.net,6)
 end
 local function player(p,g)
+  if p.defeated then return end
   local c=colors[p.team+(p.slot>=3 and 2 or 0)] or cream
   if p.out>0 then
     circle(c,p.x,635,26,.15)
@@ -87,9 +107,11 @@ local function player(p,g)
   if p.portrait==nil or p.renderedAvatar~=p.avatar then p.portrait=Avatar.image(p.avatar) or false; p.renderedAvatar=p.avatar end
   if p.portrait then
     local w,h=p.portrait:getDimensions()
-    local scale=48/math.max(w,h)
+    local scale=2
+    local ox=w==48 and 30 or w/2
+    local oy=h==48 and 31 or h/2
     color(cream); love.graphics.setColor(1,1,1,1)
-    love.graphics.draw(p.portrait,-w*scale/2,-h*scale/2,0,scale,scale)
+    love.graphics.draw(p.portrait,-ox*scale,-oy*scale,0,scale,scale)
   else
     -- Players without a drawing keep a readable default face.
     box(ink,-26,-14,52,8,3,.8)
@@ -194,6 +216,10 @@ function R.overlay(app)
   local g=app.game
   box(ink,0,0,1280,800,0,.45)
   if g.phase=="finished" then
+    local winners={}
+    for _,p in ipairs(g.players) do if p.team==g.winner then winners[#winners+1]=p.name end end
+    text(table.concat(winners," + "),220,260,36,cream,840,"center")
+    text(#winners==1 and "WINS!" or "WIN!",400,312,22,gold,480,"center")
     text(g.score[1].."  :  "..g.score[2],400,350,64,
       g.winner==1 and coral or mint,480,"center")
   else

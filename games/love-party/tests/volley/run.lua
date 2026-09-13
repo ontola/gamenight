@@ -20,15 +20,45 @@ return function()
     gate:update(.1,false); assert(not gate:press())
     gate:update(1,false); assert(gate:press()); assert(not gate:press())
   end)
+  test("LB jumps and X smashes; B is not smash",function()
+    local Input=require("shared.input"); local M=require("games.volley")
+    local previous=Input.pads[1]; local down="leftshoulder"
+    Input.pads[1]={isConnected=function() return true end,isGamepad=function() return true end,
+      isGamepadDown=function(_,...) for _,k in ipairs({...}) do if k==down then return true end end return false end,
+      getGamepadAxis=function() return 0 end}
+    assert(M.input(1).jump)
+    down="x"; assert(M.input(1).smash and not M.input(1).jump)
+    down="b"; assert(not M.input(1).smash)
+    Input.pads[1]=previous
+  end)
+  if love.audio and love.sound then
+    test("native sound plays after pause and lazy initialization",function()
+      local A=require("games.volley.audio")
+      A.play("hit"); assert(A.sources.hit:isPlaying())
+      A.stop(); A.play("serve"); assert(A.sources.serve:isPlaying()); A.stop()
+    end)
+  end
   local function empty(opts) opts=opts or {}; opts.seats={}; local g=S.new(opts); g.phase="play"; return g end
   local function ticks(g,n,input) for _=1,n do S.step(g,input or {},1/120); g.events={} end end
   test("aimed smashes: directions, timing, cooldown and obstacles",require("tests.volley.smash"))
   test("round rules, multiball scoring, gravity and lava saves",require("tests.volley.rules"))
-  test("floor scores for opponent; first to seven ends match",function()
-    local g=empty(); g.score[2]=6; g.ball.x=100; g.ball.y=670; g.ball.vy=200
+  test("floor scores for opponent; first to ten celebrates then ends match",function()
+    local g=empty(); g.score[2]=9; g.ball.x=100; g.ball.y=670; g.ball.vy=200
     S.step(g,{},1/120)
-    assert(g.score[2]==7 and g.winner==2 and g.phase=="finished")
-    ticks(g,240); assert(g.score[2]==7,"finished score must be immutable")
+    assert(g.score[2]==10 and g.winner==2 and g.phase=="point")
+    ticks(g,240); assert(g.phase=="finished" and g.score[2]==10,"finished score must be immutable")
+  end)
+  test("losing team bursts while winners can still move",function()
+    local g=S.new({seats={{slot=1},{slot=2},{slot=3},{slot=4}}})
+    g.phase="play"; g.ball.x=80; g.ball.y=680
+    S.step(g,{},1/120)
+    assert(g.players[1].defeated and g.players[3].defeated)
+    assert(not g.players[2].defeated and not g.players[4].defeated)
+    local bursts=0; for _,e in ipairs(g.events) do if e.kind=="defeat" then bursts=bursts+1 end end
+    assert(bursts==2)
+    local before=g.players[2].x
+    ticks(g,20,{[2]={move=-1,jump=true}})
+    assert(g.players[2].x<before and g.players[2].y<S.floor-S.radius)
   end)
   test("point reset clears bomb and respawns players",function()
     local g=S.new({bomb=true}); g.phase="play"; g.ball.x=80; g.ball.y=680
@@ -103,7 +133,7 @@ return function()
     for _,face in ipairs(require("tests.volley.faces")) do
       local art=Avatar.parse(face); assert(art and art.w==48 and art.maxx-art.minx<15)
       if love and love.graphics then
-        local img=Avatar.image(face); assert(img and img:getWidth()<15)
+        local img=Avatar.image(face); assert(img and img:getWidth()==48)
         local min,mag=img:getFilter(); assert(min=="nearest" and mag=="nearest")
       end
     end

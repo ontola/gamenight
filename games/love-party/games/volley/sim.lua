@@ -58,13 +58,15 @@ function S.serve(g, team)
     p.x,p.y,p.vx,p.vy,p.out,p.grounded,p.cooldown = spawn(g,p),S.floor-S.radius,0,0,0,true,0
     p.jumpWas,p.coyote,p.buffer,p.support = false,.1,0,nil
     p.botJumpUntil,p.botNextJump=0,0
+    p.botInput,p.botThinkAt=nil,0
+    p.defeated=false
     p.swing,p.smashCooldown,p.smashWas,p.aimDisplay=0,0,false,0
     p.aimX,p.aimY=p.team==1 and .79 or -.79,-.61
   end
 end
 function S.new(opts)
   opts = opts or {}
-  local g = {arena=opts.arena or "beach", bomb=opts.bomb or false, target=opts.target or 7,
+  local g = {arena=opts.arena or "beach", bomb=opts.bomb or false, target=opts.target or 10,
     score={0,0}, players={}, time=0, events={}, phase="serve", timer=0,variety=opts.variety or false,fixedRule=opts.rule}
   local seats = opts.seats or {{slot=1,name="YOU",bot=false},{slot=2,name="RIVAL",bot=true}}
   for i,s in ipairs(seats) do
@@ -93,7 +95,9 @@ local function forecast(g)
   return path
 end
 function S.bot(g,p)
-  if p.out>0 then return {} end
+  if p.out>0 or p.defeated then return {} end
+  if p.botInput and g.time<(p.botThinkAt or 0) then return p.botInput end
+  p.botThinkAt=g.time+.18
   local direction=p.team==1 and 1 or -1
   local low,high=p.team==1 and 42 or 681,p.team==1 and 599 or 1238
   local path=forecast(g)
@@ -149,14 +153,16 @@ function S.bot(g,p)
     p.botJumpUntil=g.time+.42; p.botNextJump=g.time+.65
   end
   -- Braking uses velocity, avoiding the old left/right oscillation under a falling ball.
+  target=clamp(target+math.sin(g.time*1.7+p.slot*2)*24,low,high)
   local error=target-p.x
   local move=clamp((error*7-p.vx*.7)/260,-1,1)
   if math.abs(error)<5 and math.abs(p.vx)<20 then move=0 end
   local b=g.ball
   local near=(b.x-p.x)^2+(b.y-p.y)^2<72^2
-  return {move=move,jump=g.time<(p.botJumpUntil or 0),
+  p.botInput={move=move*.88,jump=g.time<(p.botJumpUntil or 0),
     smash=chaser==p and near and (p.smashCooldown or 0)<=0 and g.phase=="play",
     aimX=direction,aimY=b.y<S.net-65 and .35 or -.95}
+  return p.botInput
 end
 local function playerStep(g,p,input,dt,platforms,oldPlatforms)
   p.cooldown = math.max(0,p.cooldown-dt)
@@ -248,7 +254,10 @@ local function point(g,team,b)
   g.score[team]=g.score[team]+1
   event(g,"point",b.x,S.floor,team)
   g.phase,g.timer,g.pointTeam="point",1.65,team
-  if g.score[team]>=g.target then g.phase,g.winner="finished",team; event(g,"win",640,320,team) end
+  for _,p in ipairs(g.players) do
+    if p.team~=team then p.defeated=true; event(g,"defeat",p.x,p.y,p.team) end
+  end
+  if g.score[team]>=g.target then g.winner=team; event(g,"win",640,320,team) end
 end
 local function smashReach(g,p,b,platforms)
   local obstacles={{x=632,y=S.net,w=16,h=S.floor-S.net}}
@@ -350,7 +359,12 @@ function S.step(g,inputs,dt)
   local platforms=S.platforms(g)
   if g.phase=="point" then
     g.timer=g.timer-dt
-    if g.timer<=0 then S.serve(g,g.pointTeam) end
+    for _,p in ipairs(g.players) do
+      if not p.defeated then playerStep(g,p,p.bot and S.bot(g,p) or (inputs or {})[p.slot],dt,platforms,oldPlatforms) end
+    end
+    if g.timer<=0 then
+      if g.winner then g.phase="finished" else S.serve(g,g.pointTeam) end
+    end
     return
   end
   local primary=g.ball

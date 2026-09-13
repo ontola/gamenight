@@ -164,6 +164,7 @@ function R.game(mode, s, remaining, finished, managed)
 			"right"
 		)
 	end
+	if mode.id == "blast-party" then BlastRender.drawUpgrades(s, G, R.fonts) end
 	if mode.coop then
 		centered(
 			s.teamScore .. "   /   x" .. (mode.id == "neon-siege" and require("games.siege").multiplier(s) or 1),

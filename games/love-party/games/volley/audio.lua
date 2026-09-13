@@ -1,6 +1,7 @@
 -- Short synthesized arcade cues; no external audio assets.
 local A={enabled=true,sources={}}
 function A.load()
+  if next(A.sources) then return end
   if not love.sound or not love.audio then return end
   local defs={hit={370,.085},spike={175,.14},swing={310,.045},smash={125,.19},jump={230,.055},point={610,.26},explode={70,.3},serve={520,.12},win={780,.45},lava={110,.16},reform={440,.15}}
   for name,d in pairs(defs) do
@@ -17,6 +18,8 @@ function A.load()
   end
 end
 function A.play(name)
+  if not next(A.sources) then A.load() end
+  if name=="defeat" then name="explode" end
   if A.enabled and A.sources[name] then A.sources[name]:stop(); A.sources[name]:play() end
 end
 function A.stop() love.audio.stop() end

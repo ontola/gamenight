@@ -54,7 +54,7 @@ function M.generate(rng)
 					kind = "crate"
 				end
 				tiles[k] = kind
-				if kind == "crate" and rng() < 0.55 then
+				if kind == "crate" and rng() < 0.25 then
 					drops[k] = M.powers[rng(1, #M.powers)]
 				end
 			end
@@ -81,6 +81,7 @@ local function reset(s)
 		p.moveClock = 0
 		p.actionHeld, p.secondaryHeld = false, false
 		p.botClock = 0
+		p.lastPickup, p.pickupNotice = nil, 0
 	end
 	-- Visible opening prizes encourage leaving the safe spawn pockets.
 	local available = {}
@@ -91,7 +92,7 @@ local function reset(s)
 			end
 		end
 	end
-	for _, power in ipairs({ "remote", "kick", "diagonal", "beam", "star" }) do
+	for _, power in ipairs({ "range", "capacity" }) do
 		if #available > 0 then
 			local v = table.remove(available, s.rng(1, #available))
 			s.items[M.key(v[1], v[2])] = power
@@ -165,6 +166,7 @@ function M.placeBomb(s, p)
 	return b
 end
 function M.pickup(p, power)
+	p.lastPickup, p.pickupNotice = power, 2.5
 	if power == "remote" then
 		p.remote = true
 	elseif power == "kick" then
@@ -281,6 +283,7 @@ function M.update(s, dt, inputs)
 	end
 	for i, p in ipairs(s.players) do
 		local c = inputs[i]
+		p.pickupNotice = math.max(0, (p.pickupNotice or 0) - dt)
 		killInFlame(s, p)
 		if p.alive then
 			if c.action and not p.actionHeld then
@@ -392,6 +395,20 @@ function M.bot(s, p)
 	c.secondary = not danger[M.key(p.x, p.y)] and s.rng() < 0.15
 	p.botInput = c
 	return c
+end
+-- Only effective upgrades: replacing a blast pattern removes the old badge.
+function M.upgrades(p)
+    local result = {}
+    local function add(id, amount)
+        if amount > 0 then result[#result + 1] = { id = id, amount = amount } end
+    end
+    add("capacity", p.capacity - 2)
+    add("range", p.range - 2)
+    add("speed", p.speed - 6)
+    add("kick", p.kick and 1 or 0)
+    add("remote", p.remote and 1 or 0)
+    if p.shape ~= "cross" then add(p.shape, 1) end
+    return result
 end
 function M.describe(p)
 	if not p.alive then

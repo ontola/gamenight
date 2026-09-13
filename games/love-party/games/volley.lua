@@ -3,13 +3,13 @@ local R=require("games.volley.render")
 local A=require("games.volley.audio")
 local Input=require("shared.input")
 local M={id="volley-trouble",title="Volley Trouble",tagline="Good friends. Terrible teamwork.",
- controls="A jump / B or RB smash / right stick aim",duration=math.huge,coop=true}
-local settings={arena="beach",bomb=false,target=7,variety=true}
+ controls="A / LB jump / X or RB smash / right stick aim",duration=math.huge,coop=true}
+local settings={arena="beach",bomb=false,target=10,variety=true}
 M.settings={
  {key="arena",label="Court",kind="choice",default="beach",options={"beach","scaffolding","elevator","lava"}},
  {key="bomb",label="Exploding ball",kind="toggle",default=false},
  {key="variety",label="Rotating round rules",kind="toggle",default=true},
- {key="target",label="Points to win",kind="number",default=7,min=1,max=21}}
+ {key="target",label="Points to win",kind="number",default=10,min=1,max=21}}
 function M.setting(key,value)
  if key=="arena" then for _,a in ipairs(S.arenas) do if a.id==value then settings.arena=value end end
  elseif (key=="bomb" or key=="variety") and type(value)=="boolean" then settings[key]=value
@@ -39,8 +39,8 @@ function M.input(slot)
  local jump=love.keyboard and love.keyboard.isDown(k[3]) or false
  local smash=love.keyboard and love.keyboard.isDown(k[5]) or false
  if pad and pad:isConnected() then
-  jump=jump or pad:isGamepadDown("a")
-  smash=smash or pad:isGamepadDown("b","rightshoulder") or pad:getGamepadAxis("triggerright")>.35
+  jump=jump or pad:isGamepadDown("a","leftshoulder")
+  smash=smash or pad:isGamepadDown("x","rightshoulder") or pad:getGamepadAxis("triggerright")>.35
  end
  local ax,ay=raw.aimX,raw.aimY
  if smash and ax==0 and ay==0 then ax,ay=raw.x,raw.y end
@@ -62,14 +62,16 @@ local function effects(app,dt)
   end
   for _,e in ipairs(app.game.events) do
     A.play(e.kind)
-    local big=e.kind=="explode" or e.kind=="point" or e.kind=="win" or e.kind=="smash"
+    local big=e.kind=="explode" or e.kind=="defeat" or e.kind=="lava" or e.kind=="point" or e.kind=="win" or e.kind=="smash"
     local count=big and 38 or 10
     for _=1,count do
       local a=love.math.random()*math.pi*2; local speed=love.math.random(60,big and 390 or 180)
       local life=love.math.random()*.35+.25
       fx.particles[#fx.particles+1]={x=e.x,y=e.y,vx=math.cos(a)*speed,vy=math.sin(a)*speed-60,life=life,max=life,r=love.math.random(2,5),team=e.extra}
     end
-    fx.rings[#fx.rings+1]={x=e.x,y=e.y,life=big and .55 or .25,max=big and .55 or .25,radius=e.kind=="explode" and 245 or 65,kind=e.kind}
+    if e.kind=="spike" or e.kind=="smash" then
+      fx.rings[#fx.rings+1]={x=e.x,y=e.y,life=.55,max=.55,radius=120,kind=e.kind}
+    end
     if e.kind=="spike" then app.toast="POWER HIT!"; app.toastLife=.7 end
     if e.kind=="explode" then app.toast="BOOM!  THE BALL RETURNS..."; app.toastLife=.8 end
   end
@@ -88,6 +90,7 @@ function M.finish(s) s.phase="finished"; s.winner=s.winner or (s.score[1]>=s.sco
 function M.render(s)
  local w,h=love.graphics.getDimensions()
  local scale=math.min(w/1216,h/584)
+ R.textDensity=math.max(1,math.ceil(scale*(love.graphics.getDPIScale and love.graphics.getDPIScale() or 1)))
  love.graphics.clear(.10,.18,.24)
  love.graphics.push(); love.graphics.translate((w-1280*scale)/2,h-(S.floor+20)*scale); love.graphics.scale(scale)
  R.scene(s,s.presentation.fx); R.hud(s,s.presentation)
