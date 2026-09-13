@@ -39,7 +39,6 @@
 <nav class="site-nav" aria-label="Main navigation" aria-busy={$busy}>
   <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a>
   <div class="site-links">
-    <a href="/" aria-current={$route==='/'?'page':undefined}>Home</a>
     <a href="/catalog" aria-current={$route.startsWith('/catalog')?'page':undefined}>Games</a>
     <a href="/studio" aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>You</a>
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
