@@ -221,6 +221,7 @@ pub struct GameNightBridge {
     /// together must not overwrite each other. Drained, never read twice.
     exit_requests: Vec<(u8, f32)>,
     pub(crate) interact_pressed: HashSet<u32>,
+    pub(crate) interaction_tick_processed: bool,
     pub(crate) interaction_hints: HashMap<u32, (String, Vec2)>,
 }
 
@@ -617,6 +618,7 @@ pub fn game_plugin(game: &mut Game) {
         claim_mark: None,
         exit_requests: Vec::new(),
         interact_pressed: default(),
+        interaction_tick_processed: false,
         interaction_hints: default(),
     });
 
@@ -1583,7 +1585,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         .after(bevy::render::camera::CameraUpdateSystem)
         .before(bevy::ui::UiSystem::Layout));
     app.add_systems(bevy::prelude::PostUpdate,
-        (sleep_visual::pose, sync_player_skin_system, sync_player_avatar_system,
+        (interaction_visual::finish_input, sleep_visual::pose, sync_player_skin_system, sync_player_avatar_system,
             sync_name_tags_system, bevy::ecs::schedule::apply_deferred,
             position_player_avatar_system, position_name_tags_system).chain()
             .before(interaction_visual::sync).before(position_player_menus_system)
@@ -4191,6 +4193,7 @@ mod next_game_status_tests {
             claim_mark: None,
             exit_requests: Vec::new(),
         interact_pressed: default(),
+        interaction_tick_processed: false,
         interaction_hints: default(),
         };
         bridge.active_session = Some(session("duo", SessionPhase::Paused));

@@ -298,7 +298,8 @@ macro_rules! install_plugins {
             session
                 .stages
                 .add_system_to_stage(CoreStage::First, handle_out_of_bounds_items)
-                .add_system_to_stage(CoreStage::First, clear_interaction_hints);
+                .add_system_to_stage(CoreStage::First, clear_interaction_hints)
+                .add_system_to_stage(CoreStage::Last, mark_interaction_tick_processed);
 
             $(
                 session.install_plugin($module::session_plugin);
@@ -422,6 +423,12 @@ pub fn player_landed_on(
             feet.min.x < right && feet.max.x > left && (feet.min.y - top).abs() <= LANDING_SLOP
         })
         .map(|(_, (idx, ..))| idx.0)
+}
+
+// Expire unconsumed input after a simulation tick, never after a render frame.
+// Pressing Y away from a station must not activate a station reached later.
+fn mark_interaction_tick_processed(bridge: Option<ResMut<crate::gamenight::GameNightBridge>>) {
+    if let Some(mut bridge) = bridge { bridge.interaction_tick_processed = true; }
 }
 
 fn clear_interaction_hints(bridge: Option<ResMut<crate::gamenight::GameNightBridge>>) {

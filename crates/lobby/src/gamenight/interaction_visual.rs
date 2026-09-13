@@ -6,17 +6,63 @@ use bones_bevy_renderer::BonesGame;
 pub(super) fn capture(game: Res<BonesGame>, input: Res<super::GlobalInput>,
     buttons: Res<Input<GamepadButton>>, windows: Query<&Window>) {
     let mut bridge = game.0.shared_resource_mut::<super::GameNightBridge>();
-    bridge.interact_pressed.clear();
-    if bridge.lobby_away || !windows.iter().any(|w| w.focused) { return; }
+    if bridge.lobby_away || !windows.iter().any(|w| w.focused) {
+        bridge.interact_pressed.clear();
+        return;
+    }
+    let mut eligible=std::collections::HashSet::new();
+    let mut pressed=std::collections::HashSet::new();
     for (&pad, &player) in &input.pad_player {
         if input.open_menus.contains_key(&player) { continue; }
-        if buttons.just_pressed(GamepadButton::new(Gamepad::new(pad as usize), GamepadButtonType::North)) {
-            if let Some(seat) = bridge.latest_seats.iter().find(|s| s.occupant.player_id() == Some(player)).map(|s| s.index) {
-                bridge.interact_pressed.insert(seat as u32);
+        if let Some(seat) = bridge.latest_seats.iter().find(|s| s.occupant.player_id() == Some(player)).map(|s| s.index as u32) {
+            eligible.insert(seat);
+            if buttons.just_pressed(GamepadButton::new(Gamepad::new(pad as usize), GamepadButtonType::North)) {
+                pressed.insert(seat);
             }
         }
     }
+    buffer_interaction_presses(&mut bridge.interact_pressed, &eligible, pressed);
 }
+
+// Let both simulation stations and the frame-based profile pickup see the
+// press before discarding unused input. Do not discard on frames without a tick.
+pub(super) fn finish_input(game: Res<BonesGame>) {
+    let mut bridge = game.0.shared_resource_mut::<super::GameNightBridge>();
+    if bridge.interaction_tick_processed {
+        bridge.interact_pressed.clear();
+        bridge.interaction_tick_processed = false;
+    }
+}
+
+fn buffer_interaction_presses(pending: &mut std::collections::HashSet<u32>, eligible: &std::collections::HashSet<u32>, pressed: std::collections::HashSet<u32>) {
+    // Render frames can outnumber simulation ticks. Preserve each edge until
+    // the simulation consumes it, but cancel it when a player opens a menu.
+    pending.retain(|seat| eligible.contains(seat));
+    pending.extend(pressed.intersection(eligible).copied());
+}
+
+#[cfg(test)]
+mod input_tests {
+    use super::buffer_interaction_presses;
+    use std::collections::HashSet;
+    #[test]
+    fn interaction_press_survives_render_frames_until_simulation() {
+        let eligible=HashSet::from([0,1]);
+        let mut pending=HashSet::new();
+        buffer_interaction_presses(&mut pending,&eligible,HashSet::from([0]));
+        for _ in 0..4 { buffer_interaction_presses(&mut pending,&eligible,HashSet::new()); }
+        assert!(pending.remove(&0), "Y must reach Play or Leave on the next simulation tick");
+        buffer_interaction_presses(&mut pending,&eligible,HashSet::new());
+        assert!(pending.is_empty(), "holding Y does not trigger another action");
+    }
+    #[test]
+    fn opening_menu_or_departing_cancels_buffered_press() {
+        let mut pending=HashSet::from([0,1]);
+        buffer_interaction_presses(&mut pending,&HashSet::from([1]),HashSet::new());
+        assert_eq!(pending,HashSet::from([1]));
+    }
+}
+
 #[derive(Component)]
 pub(super) struct InteractionHint(u32, String);
 #[derive(Component)]
