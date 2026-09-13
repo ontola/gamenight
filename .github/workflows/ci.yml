@@ -84,6 +84,7 @@ jobs:
           python -m pip install Pillow PyYAML
           python crates/lobby/tools/reskin/verify_themes.py
           python crates/lobby/tools/layout_lobby.py --check
+          python crates/lobby/tools/test_layout_lobby.py
           python scripts/test-dev-assets.py
       - run: cargo build --manifest-path crates/lobby/Cargo.toml --locked --profile ci
 

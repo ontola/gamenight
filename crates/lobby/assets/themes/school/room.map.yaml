@@ -864,21 +864,6 @@ layers:
     - 11
     idx: 46
     collision: JumpThrough
-  - pos:
-    - 2
-    - 4
-    idx: 44
-    collision: JumpThrough
-  - pos:
-    - 2
-    - 6
-    idx: 44
-    collision: JumpThrough
-  - pos:
-    - 3
-    - 6
-    idx: 46
-    collision: JumpThrough
   elements: []
 - id: gamenight
   tilemap: null

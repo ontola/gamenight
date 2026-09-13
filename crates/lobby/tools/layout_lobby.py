@@ -21,8 +21,7 @@ def build():
     # the engine's existing one-way collision (rise through, land from above).
     for start, end, row in [(34, 36, 4), (33, 35, 6), (28, 30, 8), (24, 26, 10),
                             (27, 33, 12), (13, 24, 8), (10, 12, 9), (5, 9, 7),
-                            (22, 24, 14), (16, 19, 15), (10, 12, 13), (6, 8, 11),
-                            (2, 2, 4), (2, 3, 6)]:
+                            (22, 24, 14), (16, 19, 15), (10, 12, 13), (6, 8, 11)]:
         for x in range(start, end + 1):
             tiles.append(dict(pos=[x, row], idx=44 if x == start else 46 if x == end else 45,
                               collision='JumpThrough'))
@@ -60,14 +59,28 @@ def validate(room, anchors):
     # Keep the room-code wall plaque (including its shadow) clear of shelves.
     assert not any(overlaps((500, 582, 284, 110), (t['pos'][0]*32, t['pos'][1]*32, 32, 32))
                    for t in tiles), 'Platform overlaps room-code plaque'
+    # One-way shelves still hide the artwork and interrupt walking into a door.
+    furniture = [(t['pos'][0]*32, t['pos'][1]*32, 32, 32) for t in tiles
+                 if t['pos'][0] not in (1, 38) and t['pos'][1] > 2]
+    exit_element = next(e for e in room['layers'][1]['elements']
+                        if Path(e['element']).name.split('.')[0] == 'exit_door')
+    exit_meta = yaml.safe_load((ROOT / 'assets/elements/environment/exit_door/exit_door.yaml').read_text())
+    exit_x, exit_y = exit_element['pos']
+    exit_floor = exit_y - exit_meta['body_size'][1] / 2
+    # station_art::front_door has a 68px-wide frame and a 100px-high lintel.
+    # Include eight pixels of approach space around it; shell walls are behind
+    # the frame, while the player-sized threshold must remain physically clear.
+    assert not any(overlaps((exit_x-42, exit_floor, 84, 108), t) for t in furniture), 'Blocked Leave door'
+    assert not any(overlaps((exit_x-16, exit_floor, 32, 48), s) for s in solids), 'Blocked Leave threshold'
     for x in anchors:
-        assert not any(overlaps((x-48, 96, 96, 110), s) for s in solids), 'Blocked doorway'
+        assert not any(overlaps((x-48, 96, 96, 110), t) for t in furniture), 'Blocked profile doorway'
+        assert not any(overlaps((x-16, 96, 32, 48), s) for s in solids), 'Blocked profile threshold'
     assert all(b-a >= 96 for a, b in zip(anchors, anchors[1:])), 'Overlapping doors'
     platforms = [(t['pos'][0]*32, (t['pos'][1]+1)*32, 32) for t in tiles
                  if t['collision'] == 'JumpThrough']
     # Both feet need a supported landing at the stairs and the three stations.
     for x, y in [(1120,160), (1088,224), (944,288), (816,352), (880,416),
-                 (752,480), (592,512), (368,448), (240,384), (224,256), (80,160), (96,224),
+                 (752,480), (592,512), (368,448), (240,384), (224,256),
                  (368,320), (500,288), (620,288), (740,288)]:
         assert all(any(left <= foot <= left+width and top == y for left, top, width in platforms)
                    for foot in (x-15, x+15)), 'Missing landing support'
@@ -83,8 +96,7 @@ def validate(room, anchors):
              ((752,480),(624,512)), ((544,512),(400,448)),
              ((368,448),(272,384)), ((272,384),(368,320)),
              ((368,320),(288,256)), ((832,352),(736,288)),
-             ((448,288),(368,320)), ((80,96),(80,160)),
-             ((80,160),(96,224)), ((96,224),(224,256)),
+             ((448,288),(368,320)),
              ((288,256),(368,320)), ((368,320),(272,384)),
              ((272,384),(368,448)), ((400,448),(544,512))]
     for (x, y), (u, v) in edges:

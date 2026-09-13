@@ -5,7 +5,7 @@ door anchors together. It requires PyYAML. `--check` verifies the checked-in
 outputs without writing; CI runs this check.
 
 The ground floor is a clear corridor: Leave at the left and eight reserved
-profile door bays. Decorative furniture must not occupy those bays. The
+profile door bays. Neither solid furniture nor jump-through platforms may occupy those bays or the full Leave-door frame and approach. The short steps in front of Leave have been removed; the upper left shelves remain reachable through the connected upper loop. The
 TV and playlist controls stand on the spawn floor, so entering the next game needs no jump. The right-hand steps lead to the music shelves.
 All shelf tiles are jump-through: players rise through them and land from above.
 Only the floor and outside walls are solid. The QR is a
