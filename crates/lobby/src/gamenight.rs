@@ -163,6 +163,7 @@ pub struct GameNightBridge {
     /// already running — so the TV sat on "Loading…" for a game that had
     /// in fact already started.
     latest_warming: Option<gamenight_protocol::PlaylistEntry>,
+    optimistic_next: Option<(GameId, std::time::Instant)>,
     /// The playlist, straight from the snapshot. Kept so the TV's SKIP pad
     /// can name what comes *after* whatever is warming — the daemon takes a
     /// game id, not "the next one", and only this list says what that is.
@@ -312,23 +313,29 @@ impl GameNightBridge {
     /// because the daemon deals in titles: the playlist is the only place
     /// that knows what "the one after this" means, and this is the side
     /// holding it.
-    pub fn skip_next_game(&self) {
+    pub fn skip_next_game(&mut self) {
         let Some(game) = self.game_after_next() else {
             return;
         };
-        let _ = self.join_tx.try_send(ClientMessage::QueueNext { game });
+        if self.join_tx.try_send(ClientMessage::QueueNext { game: game.clone() }).is_ok() {
+            self.optimistic_next = Some((game, std::time::Instant::now()));
+        }
     }
 
     /// The playlist entry after whatever is currently up next, skipping the
     /// lobby itself (its launch spec has to live in the playlist somewhere,
     /// but it is furniture, not a game the party can pick) and whatever is
     /// already being played.
+    fn optimistic_game(&self) -> Option<&GameId> {
+        self.optimistic_next.as_ref().filter(|(_, at)| at.elapsed() < Duration::from_secs(5)).map(|(id, _)| id)
+    }
+
     fn game_after_next(&self) -> Option<gamenight_protocol::GameId> {
-        let up_next = self
+        let up_next = self.optimistic_game().cloned().or_else(|| self
             .latest_warm
             .as_ref()
             .map(|w| w.game.clone())
-            .or_else(|| self.latest_warming.as_ref().map(|e| e.game.clone()));
+            .or_else(|| self.latest_warming.as_ref().map(|e| e.game.clone())));
         let entries = &self.latest_playlist;
         if entries.is_empty() {
             return None;
@@ -400,6 +407,11 @@ impl GameNightBridge {
     }
 
     pub fn upcoming_game_status(&self) -> NextGameStatus {
+        if let Some(id) = self.optimistic_game() {
+            let title = self.latest_library.iter().find(|m| &m.id == id).map(|m|m.title.clone()).unwrap_or_else(||id.0.clone());
+            return NextGameStatus::Loading(title, None);
+        }
+
         if let Some(warm) = &self.latest_warm {
             let title = self
                 .latest_library
@@ -581,6 +593,7 @@ pub fn game_plugin(game: &mut Game) {
         latest_library: Vec::new(),
         latest_warm: None,
         latest_warming: None,
+        optimistic_next: None,
         latest_playlist: Vec::new(),
         vote_open: false,
         latest_installs: Vec::new(),
@@ -684,6 +697,10 @@ fn gamenight_bridge_system(
         bridge.latest_presence = party.presence;
         bridge.latest_players = party.players;
         bridge.latest_library = party.library;
+        if bridge.optimistic_next.as_ref().is_some_and(|(id, at)|
+            party.warm_session.as_ref().is_some_and(|w| &w.game == id)
+            || party.warming.as_ref().is_some_and(|w| &w.game == id)
+            || at.elapsed() >= Duration::from_secs(5)) { bridge.optimistic_next = None; }
         bridge.latest_warm = party.warm_session;
         bridge.latest_warming = party.warming;
         bridge.latest_playlist = party.playlist.entries;
@@ -4284,6 +4301,7 @@ mod next_game_status_tests {
             latest_library: Vec::new(),
             latest_warm: None,
             latest_warming: None,
+        optimistic_next: None,
             latest_playlist: Vec::new(),
             vote_open: false,
             latest_installs: Vec::new(),
@@ -4315,6 +4333,12 @@ mod next_game_status_tests {
         assert!(
             matches!(commands.try_recv().unwrap(), ClientMessage::QueueNext { game } if game == GameId::new("third"))
         );
+        assert_eq!(bridge.optimistic_game(), Some(&GameId::new("third")));
+        assert!(matches!(bridge.upcoming_game_status(), NextGameStatus::Loading(_, None)));
+        // The pending view expires if the host does not accept the command.
+        bridge.optimistic_next.as_mut().unwrap().1 = std::time::Instant::now() - Duration::from_secs(6);
+        assert!(bridge.optimistic_game().is_none());
+        bridge.optimistic_next = None;
         bridge.play_next_game();
         assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
         bridge.press_tv_button();

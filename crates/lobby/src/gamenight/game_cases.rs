@@ -12,11 +12,11 @@ pub(super) struct Case {
 }
 
 pub(super) fn queue(bridge: &GameNightBridge) -> Vec<Case> {
-    let next = bridge
+    let next = bridge.optimistic_game().or_else(|| bridge
         .latest_warm
         .as_ref()
         .map(|s| &s.game)
-        .or_else(|| bridge.latest_warming.as_ref().map(|s| &s.game));
+        .or_else(|| bridge.latest_warming.as_ref().map(|s| &s.game)));
     let lobby = GameId::new(std::env::var("GAMENIGHT_GAME_ID").unwrap_or_else(|_| "lobby".into()));
     ordered_cases(
         &bridge.latest_playlist,
