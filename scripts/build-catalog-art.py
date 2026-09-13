@@ -2,6 +2,7 @@
 
 Usage: python scripts/build-catalog-art.py --captures <LOVE save directory>
 The checked-in PNGs are the source for republishing; --embed refreshes metadata.
+Illustrated masters are exported to runtime sizes when present; screenshots stay real.
 Requires Pillow. Outputs fit the protocol's 256 KiB / 1024px artwork limits.
 """
 import argparse, base64, json
@@ -57,7 +58,16 @@ def main():
    for i,line in enumerate(lines):d.text((12,216+i*25),line,font=font,fill='#f4f7ff')
    cover.save(out/'cover.png',optimize=True);icon(game).save(out/'icon.png',optimize=True)
   for field in ('cover','icon','screenshot'):
-   data=(out/f'{field}.png').read_bytes();assert len(data)<=256*1024
+   asset=out/f'{field}.png'
+   master=out/f'{field}-illustrated-source.png'
+   if field != 'screenshot' and master.exists():
+    asset=out/f'{field}-illustrated.png'
+    size=(288,384) if field=='cover' else (64,64)
+    with Image.open(master) as original:
+     exported=ImageOps.contain(original.convert('RGB'),size,method=Image.Resampling.LANCZOS)
+     exported.save(asset,optimize=True)
+   data=asset.read_bytes();assert len(data)<=256*1024
+   with Image.open(asset) as check: assert max(check.size)<=1024
    meta[field]='data:image/png;base64,'+base64.b64encode(data).decode()
   meta.pop('color',None)
   meta_path.write_text(json.dumps(meta,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
