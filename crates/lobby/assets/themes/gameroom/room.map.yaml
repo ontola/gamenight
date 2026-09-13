@@ -4,7 +4,7 @@ background:
   - 0.0
   - 0.0
   layers:
-  - image: /themes/gameroom/room.png
+  - image: /themes/clubhouse/wall.png
     size:
     - 640
     - 384

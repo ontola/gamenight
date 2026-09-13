@@ -3021,6 +3021,7 @@ struct LobbyExitDoor;
 /// The exit is a visible front door; acceptance still belongs to the controller.
 fn sync_exit_door_system(
     mut commands: bevy::prelude::Commands,
+    asset_server: bevy::prelude::Res<bevy::prelude::AssetServer>,
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
     mut existing: bevy::prelude::Query<(bevy::prelude::Entity, &LobbyExitDoor, &mut bevy::prelude::Transform)>,
 ) {
@@ -3036,7 +3037,13 @@ fn sync_exit_door_system(
         return;
     }
     commands.spawn((LobbyExitDoor,SpatialBundle {transform:Transform::from_translation(translation),..default()}))
-        .with_children(|parent|station_art::front_door(parent,-size.y/2.));
+        .with_children(|parent| {
+            parent.spawn(SpriteBundle {
+                texture: asset_server.load("themes/clubhouse/door.png"),
+                sprite: Sprite { custom_size: Some(Vec2::new(64.,100.)), ..default() },
+                transform: Transform::from_xyz(0., -size.y/2. + 50., 0.), ..default()
+            });
+        });
 }
 
 /// Marks the top-of-screen "removing inactive players in Ns..." banner shown
@@ -3805,7 +3812,7 @@ fn sync_next_game_tv_system(
     let cabinet = screen + Vec2::splat(SCREEN_FRAME * 2.0);
     // Keep the image alive while status changes replace the TV entity.
     let texture = tv_texture.get_or_insert_with(||
-        asset_server.load("elements/environment/next_game/pixellab-tv.png")
+        asset_server.load("themes/clubhouse/tv.png")
     ).clone();
 
     commands
@@ -3874,7 +3881,7 @@ fn sync_next_game_tv_system(
                 ..default()
             }).with_children(|cabinet| {
                 game_cases::spawn_shelf(cabinet, &cases, &next_line, animation,
-                    font.clone(), &mut cover_cache, &mut cover_images);
+                    font.clone(), &mut cover_cache, &mut cover_images, &asset_server);
             });
 
         });

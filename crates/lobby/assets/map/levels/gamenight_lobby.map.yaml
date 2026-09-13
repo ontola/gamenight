@@ -4,7 +4,7 @@ background:
   - 0.0
   - 0.0
   layers:
-  - image: /map/resources/bg_room.png
+  - image: /themes/clubhouse/wall.png
     size:
     - 640
     - 384

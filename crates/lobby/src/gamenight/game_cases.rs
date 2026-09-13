@@ -163,21 +163,15 @@ pub(super) fn spawn_shelf(
     font: Handle<Font>,
     cache: &mut CoverCache,
     images: &mut Assets<Image>,
+    assets: &AssetServer,
 ) {
-    let wood = Color::rgb(0.46, 0.26, 0.16);
-    // Solid wooden cabinet: recessed back, full-height stiles, crown and plinth.
-    // The plinth's bottom is -51; the caller places it exactly on the floor.
-    block(parent, 60.0, 0.0, -0.3, 224.0, 102.0, Color::rgb(0.16, 0.09, 0.07));
-    block(parent, 60.0, 0.0, -0.2, 204.0, 88.0, Color::rgb(0.25, 0.15, 0.10));
-    block(parent, -47.0, 0.0, 0.0, 10.0, 96.0, wood);
-    block(parent, 167.0, 0.0, 0.0, 10.0, 96.0, wood);
-    block(parent, 35.0, 0.0, 0.0, 6.0, 88.0, wood);
-    block(parent, 60.0, 49.0, 0.1, 228.0, 8.0, wood);
-    block(parent, 60.0, 52.0, 0.2, 228.0, 2.0, Color::rgb(0.70, 0.45, 0.25));
-    block(parent, 60.0, -47.0, 0.1, 228.0, 8.0, wood);
-    block(parent, 60.0, -43.0, 0.2, 220.0, 2.0, Color::rgb(0.70, 0.45, 0.25));
-    block(parent, -50.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
-    block(parent, 164.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
+    // Modular oak frame: artwork stays separate and updates with the queue.
+    parent.spawn(SpriteBundle {
+        texture: assets.load("themes/clubhouse/cabinet-wide.png"),
+        sprite: Sprite { custom_size: Some(Vec2::new(228.,104.)), ..default() },
+        transform: Transform::from_xyz(60.,1.,-0.3), ..default()
+    });
+    block(parent, 35., 0., 0., 6., 92., Color::rgb_u8(155,91,36));
     if cases.is_empty() {
         label(
             parent,
@@ -252,7 +246,7 @@ pub(super) fn spawn_shelf(
             Color::WHITE,
         );
     }
-    let caption = if status.is_empty() { "UP NEXT".to_string() } else { format!("UP NEXT · {status}") };
+    let caption = if status.is_empty() { "UP NEXT".to_string() } else { format!("UP NEXT Â· {status}") };
     label(parent, &caption, -5.0, -37.0, 76.0, 6.0, &font,
         if status=="READY" {Color::rgb(0.6,1.0,0.7)} else {Color::rgb(1.0,0.83,0.48)});
     if cases.len() > 6 {
