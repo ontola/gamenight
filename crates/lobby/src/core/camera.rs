@@ -227,6 +227,8 @@ fn camera_parallax(
     parallax_bg_sprites: Comp<ParallaxBackgroundSprite>,
     cameras: Comp<Camera>,
     map: Res<LoadedMap>,
+    window: Res<Window>,
+    lobby_mode: ResMutInit<crate::core::scoring::LobbyMode>,
 ) {
     // TODO: This constant represents that maximum camera-visible distance, and should be moved
     // somewhere more appropriate.
@@ -237,14 +239,24 @@ fn camera_parallax(
     let camera_transform = entities
         .iter_with((&transforms, &cameras))
         .next()
-        .map(|x| x.1 .0)
-        .copied()
+        .map(|x| (*x.1.0, x.1.1.clone()))
         .unwrap();
+    let (camera_transform, camera) = camera_transform;
+    let viewport = camera.viewport.option().map(|v| v.size.as_vec2()).unwrap_or(window.size);
+    let (_, view_height) = lobby_frame(map_size, viewport);
+    let view_size = Vec2::new(view_height * viewport.x.max(1.0) / viewport.y.max(1.0), view_height);
     let camera_offset = map_size / 2.0 - camera_transform.translation.truncate();
 
     for (_ent, (transform, bg)) in entities.iter_with((&mut transforms, &parallax_bg_sprites)) {
-        transform.scale.x = bg.meta.scale;
-        transform.scale.y = bg.meta.scale;
+        // Keep the gameplay camera's full-room framing. Only enlarge the artwork
+        // (uniformly, like CSS cover), so no clear-color border is exposed.
+        let center = Vec2::new(bg.meta.offset.x, map_size.y / 2.0 + bg.meta.offset.y);
+        let scale = if lobby_mode.0 {
+            background_cover_scale(bg.meta.size, bg.meta.scale, view_size,
+                center - camera_transform.translation.truncate())
+        } else { bg.meta.scale };
+        transform.scale.x = scale;
+        transform.scale.y = scale;
         let display_size = transform.scale.truncate() * bg.meta.size;
         transform.translation.x = bg.idx as f32 * display_size.x;
         transform.translation.y = map_size.y / 2.0;
@@ -253,5 +265,35 @@ fn camera_parallax(
 
         transform.translation.x -= camera_offset.x * bg.meta.depth * map.background.speed.x;
         transform.translation.y += camera_offset.y * bg.meta.depth * map.background.speed.y;
+    }
+}
+
+/// Cover the camera rectangle even when artwork is offset from its center.
+/// A small overscan avoids a one-pixel seam after projection/rounding.
+fn background_cover_scale(image: Vec2, minimum: f32, view: Vec2, offset: Vec2) -> f32 {
+    let required = view + offset.abs() * 2.0 + Vec2::splat(2.0);
+    minimum.max(required.x / image.x.max(1.0)).max(required.y / image.y.max(1.0))
+}
+
+#[cfg(test)]
+mod background_cover_tests {
+    use super::*;
+
+    #[test]
+    fn background_covers_every_edge_on_wide_tall_and_offset_views() {
+        let image = Vec2::new(640.0, 384.0);
+        let room = image * 2.0;
+        for viewport in [Vec2::new(3840.0, 2160.0), Vec2::new(3440.0, 1440.0),
+            Vec2::new(1024.0, 768.0), Vec2::new(800.0, 1200.0), Vec2::ZERO] {
+            let (_, h) = lobby_frame(room, viewport);
+            let view = Vec2::new(h * viewport.x.max(1.0) / viewport.y.max(1.0), h);
+            for offset in [Vec2::ZERO, Vec2::new(20.0, -12.0)] {
+                let scale = background_cover_scale(image, 2.0, view, offset);
+                let half_image = image * scale / 2.0;
+                assert!(scale.is_finite() && scale >= 2.0);
+                assert!(half_image.x > view.x / 2.0 + offset.x.abs());
+                assert!(half_image.y > view.y / 2.0 + offset.y.abs());
+            }
+        }
     }
 }
