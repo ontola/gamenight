@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "features": {
     "protocol.lifecycle": {
       "required": true,
@@ -17,9 +17,17 @@
       "required": true,
       "description": "Physical controllers retain unique player ownership across reconnect and reversed join order"
     },
-    "profile.appearance": {
+    "profile.identity": {
       "required": true,
-      "description": "Name, clothing, skin and drawn face/hat reach the correct character, including live updates"
+      "description": "Player name reaches the correct character, including live updates"
+    },
+    "profile.colors": {
+      "required": true,
+      "description": "Skin and clothing colours reach the correct character, including live updates"
+    },
+    "profile.face": {
+      "required": true,
+      "description": "Drawn face and hat reach the correct character, including live updates"
     },
     "presentation.prewarm": {
       "required": true,

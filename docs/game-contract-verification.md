@@ -65,7 +65,7 @@ feature, failed check, stale commit, wrong platform, changed requirements, chang
 package, or missing/modified evidence. There is no override for a catalog label.
 
 **Current intentional consequence:** publication is blocked. We do not yet have
-complete executable evidence for the entire catalog and all eight requirements.
+complete executable evidence for the entire catalog and all ten requirements.
 This is exposed work, not a reason to silently mark those rows successful.
 
 ## Extending coverage
@@ -81,3 +81,5 @@ do not relabel an entire shared test suite as proof of every game feature.
 When a requirement changes, change `requirements.json`. Old reports then fail the
 gate automatically. Add a regression to `scripts/test-game-contract.py` for every
 new way an incomplete integration could accidentally be accepted.
+
+Contract v2 separates player-name sync, skin/clothing colour sync, and drawn face/hat sync. Previous combined appearance evidence does not satisfy any of these independently.
