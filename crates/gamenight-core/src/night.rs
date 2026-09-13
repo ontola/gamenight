@@ -732,7 +732,7 @@ impl GameNight {
                             .iter()
                             .find(|m| m.id == s.game)
                             .and_then(|m| m.max_players)
-                            .map_or(true, |max| self.seated_count() < max))
+                            .is_none_or(|max| self.seated_count() < max))
             });
             if !can_join {
                 return;
