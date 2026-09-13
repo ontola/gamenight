@@ -21,6 +21,7 @@
 //! Not built for wasm: the daemon and its native TCP/WebSocket connection
 //! have no meaning in the browser build.
 
+mod sleep_visual;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -1535,6 +1536,8 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     // `step_bones_game` applies movement for the frame — otherwise blocking
     // a menu-open player's controls would always be a frame late.
     use bevy::prelude::IntoSystemConfigs as _;
+    app.init_resource::<sleep_visual::PoseBackup>();
+    app.add_systems(bevy::prelude::PreUpdate, sleep_visual::restore);
     app.add_systems(bevy::prelude::PreUpdate, gate_gamepad_input_system);
     app.add_systems(bevy::prelude::PreUpdate, interaction_visual::capture
         .after(gate_gamepad_input_system).after(bevy::input::InputSystem));
@@ -1547,7 +1550,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         .after(bevy::render::camera::CameraUpdateSystem)
         .before(bevy::ui::UiSystem::Layout));
     app.add_systems(bevy::prelude::PostUpdate,
-        (sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
+        (sleep_visual::pose, sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
             position_player_avatar_system).chain()
             .before(bevy::transform::TransformSystem::TransformPropagate));
     app.add_systems(
@@ -2933,7 +2936,7 @@ fn sync_name_tags_system(
     let label = |id| {
         let name = name_of(&seated, id);
         match presence.iter().find(|p| p.player_id == id).map(|p| p.state) {
-            Some(gamenight_protocol::PresenceState::Sleeping) => format!("{name}  zZz"),
+            Some(gamenight_protocol::PresenceState::Sleeping) => name,
             Some(gamenight_protocol::PresenceState::Warning) => format!("{name}  — move to stay awake"),
             _ => name,
         }
