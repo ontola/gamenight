@@ -464,7 +464,7 @@ pub async fn certify(config: Config) -> Result<Report, String> {
         if current.is_some() {
             let finished = overlay
                 .wait_for(config.match_timeout, |p| {
-                    active_of(p, &game).is_some_and(|s| s.phase == SessionPhase::Finished)
+                    active_of(p, &game).is_some() && p.vote.open
                 })
                 .await;
             match finished {
@@ -473,7 +473,7 @@ pub async fn certify(config: Config) -> Result<Report, String> {
                     record(
                         &mut report,
                         "match reaches a stopping point",
-                        Ok("`finished` sent — vote opened".into()),
+                        Ok("round reported — game keeps running".into()),
                     );
                 }
                 Err(()) => {

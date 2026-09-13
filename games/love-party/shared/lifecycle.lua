@@ -55,8 +55,6 @@ function Lifecycle:update()
 end
 function Lifecycle:finish()
 	if self.phase == "running" then
-		self.phase = "finished"
-		self.hooks.hide()
 		self.transport:send({ type = "finished", session = self.session })
 	end
 end

@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "groups": {
     "essential": {
       "label": "Plays smoothly",
@@ -83,7 +83,7 @@
     "party.round_end": {
       "group": "extras",
       "required": false,
-      "description": "Automatic round completion"
+      "description": "Reports round completion without ending the session"
     },
     "party.results": {
       "group": "extras",
@@ -99,6 +99,11 @@
       "group": "extras",
       "required": false,
       "description": "Live game settings"
+    },
+    "gameplay.continuous": {
+      "group": "essential",
+      "required": true,
+      "description": "Rounds repeat until players explicitly switch games"
     }
   }
 }

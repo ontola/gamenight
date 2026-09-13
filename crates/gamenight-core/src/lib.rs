@@ -110,14 +110,25 @@ mod night_tests {
     fn queue_next_stays_in_lobby_when_replacement_becomes_ready() {
         let mut night = GameNight::default();
         night.set_lobby_game(Some(GameId::new("lobby")));
-        for id in ["a", "b"] { night.handle(Command::GameConnected { game: GameId::new(id) }); }
-        night.handle(Command::SetPlaylist { entries: vec![entry("a"),entry("b")] });
-        night.handle(Command::QueueNext { game: GameId::new("b") });
+        for id in ["a", "b"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(id),
+            });
+        }
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b")],
+        });
+        night.handle(Command::QueueNext {
+            game: GameId::new("b"),
+        });
         let warm = night.snapshot().warm_session.unwrap();
         assert_eq!(warm.game, GameId::new("b"));
         night.handle(Command::SessionReady { session: warm.id });
         assert!(night.snapshot().active_session.is_none());
-        assert_eq!(night.snapshot().warm_session.unwrap().phase, SessionPhase::Ready);
+        assert_eq!(
+            night.snapshot().warm_session.unwrap().phase,
+            SessionPhase::Ready
+        );
     }
 
     #[test]
@@ -440,39 +451,24 @@ mod night_tests {
     }
 
     #[test]
-    fn finishing_hides_the_game_and_returns_focus_to_lobby() {
-        let mut night = GameNight::default();
-        night.set_lobby_game(Some(GameId::new("lobby")));
-        night.handle(join_cmd("one", None, None));
-        night.handle(Command::GameConnected {
-            game: GameId::new("tank"),
-        });
-        let fx = night.handle(Command::SetPlaylist {
-            entries: vec![entry("tank")],
-        });
-        let (_, session) = prepared_session(&fx).unwrap();
-        night.handle(Command::SessionReady { session });
-        night.handle(Command::Next);
-        let fx = night.handle(Command::SessionFinished { session });
-        assert!(night.snapshot().overlay_open);
-        assert!(fx.iter().any(|e| matches!(
-            e,
-            Effect::ToGame {
-                command: GameCommand::Pause,
-                ..
-            }
-        )));
-        assert!(fx
-            .iter()
-            .any(|e| matches!(e, Effect::LobbyFocus { active: true, .. })));
-        let fx = night.handle(Command::OverlayClosed);
-        assert!(!fx.iter().any(|e| matches!(
-            e,
-            Effect::ToGame {
-                command: GameCommand::Resume,
-                ..
-            }
-        )));
+    fn round_completion_keeps_current_game_and_preloaded_next() {
+        let (mut night, session) = night_in_progress();
+        let before = night.snapshot();
+        for _ in 0..3 {
+            let fx = night.handle(Command::SessionFinished { session });
+            let after = night.snapshot();
+            assert_eq!(after.active_session.as_ref().unwrap().id, session);
+            assert_eq!(
+                after.active_session.as_ref().unwrap().phase,
+                SessionPhase::Running
+            );
+            assert_eq!(
+                after.warm_session.as_ref().map(|s| s.id),
+                before.warm_session.as_ref().map(|s| s.id)
+            );
+            assert_eq!(after.overlay_open, before.overlay_open);
+            assert!(fx.iter().all(|e| matches!(e, Effect::StateChanged)));
+        }
     }
 
     #[test]
@@ -698,8 +694,8 @@ mod night_tests {
     }
 
     #[test]
-    fn no_seated_players_means_autoplay() {
-        // Bots-only demo mode: finishing just rolls to the next game.
+    fn round_completion_without_players_does_not_autoplay() {
+        // Even bots-only rounds must wait for an explicit game switch.
         let mut night = GameNight::default();
         night.handle(Command::GameConnected {
             game: GameId::new("g1"),
@@ -716,7 +712,8 @@ mod night_tests {
         night.handle(Command::SessionReady { session: s2 });
 
         let fx = night.handle(Command::SessionFinished { session: s1 });
-        assert_eq!(started_session(&fx), Some(s2));
+        assert_eq!(started_session(&fx), None);
+        assert_eq!(night.snapshot().active_session.unwrap().id, s1);
     }
 
     #[test]
@@ -855,7 +852,7 @@ mod night_tests {
     }
 
     #[test]
-    fn finished_while_overlay_paused_opens_the_vote() {
+    fn round_completion_during_pause_preserves_resume() {
         // The game reported finished in the same instant the overlay pause
         // was in flight: the finish wins and the vote opens.
         let (mut night, s1) = night_in_progress();
@@ -864,11 +861,11 @@ mod night_tests {
         assert!(!matches!(fx[0], Effect::Reject { .. }));
         assert_eq!(
             night.snapshot().active_session.unwrap().phase,
-            SessionPhase::Finished
+            SessionPhase::Paused
         );
-        // Nothing left to resume when the overlay closes.
+        // Closing the lobby resumes the same game, including its results screen.
         let fx = night.handle(Command::OverlayClosed);
-        assert!(!resume_effect(&fx));
+        assert!(resume_effect(&fx));
     }
 
     #[test]

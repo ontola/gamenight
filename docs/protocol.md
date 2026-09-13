@@ -71,8 +71,6 @@ Sessions are disposable. They move strictly forward:
 
 ```
 created → preparing → ready → running ⇄ paused
-                                 ↓
-                              finished
    (any live phase) ──────────→ disposed
 ```
 
@@ -133,7 +131,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | message | meaning |
 |---|---|
 | `ready` | assets loaded, inputs mapped — this session can start instantly |
-| `finished` *(optional)* | the match is over — open the vote / start the transition |
+| `finished` *(optional)* | a round ended — keep session, focus and pause state unchanged |
 | `progress` *(optional)* | how far along warming is, so screens can stay truthful while the party waits |
 | `request_overlay` *(optional)* | "get me back to the party" — a player asked to leave your game |
 | `request_start` *(optional)* | "a player just switched to my window" — treat it as a go signal |
@@ -195,14 +193,12 @@ it's read as intent rather than fought.
 `ready` is the whole mandatory surface for a game. Target: integrate an
 existing game in under an hour.
 
-`finished` is a nicety, not a requirement. Sending it opens the party vote
-the instant a match ends, while the scoreboard's still up — nobody has to
-notice and reach for the overlay. A game that never sends it works fine too:
-the party's **Skip** button always disposes the active session on demand,
-independent of whether the game ever reports itself finished. Round-based
-games that are happy to keep playing indefinitely (best-of-forever, endless
-waves) are not obligated to define a "match" boundary at all — let the
-players decide when they're done, from the overlay.
+`finished` is an optional round notification. It never advances the playlist,
+opens the lobby, pauses the game or hides its window. The game owns its score
+screen and starts the next round itself. Players can keep playing indefinitely.
+Back/Select pauses and opens the lobby; Resume continues. Play next explicitly
+switches games, while Skip changes only the queued next game. A prepared next
+session stays ready across rounds. Pausing also freezes the game's results timer.
 
 ## Party commands (overlay → daemon)
 
@@ -236,7 +232,7 @@ snapshot), so every screen shows the same thing. The rules:
   explicit `pause` stays paused.
 - A transition (skip, vote consensus, auto-start) closes the overlay: the new
   game starts running and everyone is dropped straight into it.
-- A `finished` racing an in-flight overlay pause wins: the vote opens.
+- A `finished` racing an in-flight overlay pause preserves that pause.
 
 ```json
 { "type": "set_playlist", "entries": [
@@ -455,8 +451,8 @@ daemon → towerfall: start          (nothing was playing: auto-start)
 daemon → duck-game: prepare        (warm the next one behind it)
 duck-game → daemon: ready          (the party is now skip-proof)
 
-towerfall → daemon: finished       (match over → vote opens)
-players stand on "next_game"       (consensus!)
+towerfall → daemon: finished       (round reported; game shows results and repeats)
+players explicitly choose next_game
 daemon → towerfall: dispose
 daemon → duck-game: start          (instant transition)
 daemon → towerfall: prepare        (playlist wraps; warm again)
@@ -476,7 +472,7 @@ daemon → towerfall: prepare        (playlist wraps; warm again)
   is `ready` becomes pending and fires on its `ready`.
 - **Voting is consensus of the seated**: everyone holding a seat must stand on
   the same option. Spectators don't vote. If the last holdout leaves, the vote
-  resolves. If nobody is seated, finished games auto-advance (demo mode).
+  resolves. Round completion never auto-advances, even with no seated players.
 - **Crashes don't end the night**: if the active game's process dies, the
   daemon transitions to the warm session as soon as it can.
 - `error` messages are informational; the connection stays open (except after

@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             tokio::select! {
                 _ = sleep(ends_at.saturating_duration_since(Instant::now())) => {
                     println!("[{game_id}] match over! reporting finished");
-                    playing = None;
+                    playing = Some((session, Instant::now() + Duration::from_secs(match_seconds)));
                     gn.finished(session).await?;
                 }
                 event = gn.next_event() => {

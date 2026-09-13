@@ -279,7 +279,8 @@ impl GameNight {
         self.send(&ClientMessage::Ready { session }).await
     }
 
-    /// The match is over. The daemon takes it from here (vote / transition).
+    /// A round ended. Show results briefly, then start another round locally.
+    /// This does not pause, hide, dispose or advance the session.
     pub async fn finished(&mut self, session: SessionId) -> Result<(), SdkError> {
         self.send(&ClientMessage::Finished { session }).await
     }

@@ -103,3 +103,15 @@ release. Claiming an optional feature also makes its passing proof mandatory.
 Unclaimed optional failures remain visible but do not block compatibility.
 Changes to requirements or policy invalidate release reports. The registry is
 explicit: ownership is not guessed from a developer's display name.
+
+## Continuous play
+
+`gameplay.continuous` is essential. Round endings do not end a host session.
+Games show their results briefly (normally three seconds) and start a fresh round
+in the same session with the current roster and settings. Pause freezes both the
+simulation and this results countdown. `finished` is an optional round notification;
+it must not hide the window, request the lobby or advance the playlist.
+Back/Select opens the lobby and pauses; Resume continues the same round or results.
+Play next explicitly switches games. Skip only replaces the upcoming game.
+The host retains the preloaded next session across round notifications, even with
+no seated human players. Test multiple round endings and a pause during results.

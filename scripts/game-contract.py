@@ -77,6 +77,8 @@ def run_games(report, pack, love, certifier, output):
                                    {**env, 'GNLOVE_HEADLESS': '1', 'GNLOVE_MATCH_SECONDS': '1'}),
             'presentation.frame': ([sys.executable, str(ROOT/'scripts/test-love-party-render.py'),
                                     '--love', str(love), '--pack', str(pack), '--game', artifact.stem], env),
+            'gameplay.continuous': ([sys.executable, str(ROOT/'scripts/test-love-party.py'),
+                                    '--continuous', '--love', str(love), '--pack', str(pack), '--game', artifact.stem], env),
             'process.disconnect': ([sys.executable, str(ROOT/'scripts/test-love-party.py'),
                                     '--love', str(love), '--pack', str(pack), '--game', artifact.stem], env),
         }

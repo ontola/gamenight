@@ -105,7 +105,9 @@ pub enum Command {
         game: GameId,
     },
     /// Change the upcoming game without starting or resuming gameplay.
-    QueueNext { game: GameId },
+    QueueNext {
+        game: GameId,
+    },
     Pause,
     Resume,
     /// The party overlay came up: pause the active game.
@@ -1204,7 +1206,9 @@ impl GameNight {
                 insert_at
             }
         };
-        if !start_if_idle { self.pending_transition = false; }
+        if !start_if_idle {
+            self.pending_transition = false;
+        }
         self.set_next_up(index, fx);
         // Queue-only selection must not start an idle night.
         if start_if_idle && self.active.is_none() {
@@ -1405,26 +1409,10 @@ impl GameNight {
                 if a.id == session
                     && matches!(a.phase, SessionPhase::Running | SessionPhase::Paused) =>
             {
-                a.advance(SessionPhase::Finished).expect("checked");
-                // A finished session has nothing left to resume.
-                self.overlay_paused = false;
-                if self.voters().is_empty() {
-                    // Nobody seated to vote (demo mode / bots): just roll on.
-                    self.pending_transition = true;
-                    self.try_transition(fx);
-                } else {
-                    self.vote.open();
-                    self.overlay_open = true;
-                    // Finished games still own a window: pause tells the SDK
-                    // to hide it while the lobby takes over for the next pick.
-                    if let Some(active) = &self.active {
-                        fx.push(Effect::ToGame {
-                            game: active.game.clone(),
-                            session: active.id,
-                            command: GameCommand::Pause,
-                        });
-                    }
-                }
+                // Round completion is informational. The game owns its results
+                // screen and next round; keep focus, pause state and warm game.
+                // Explicit party votes may still request a transition.
+                self.vote.open();
                 fx.push(Effect::StateChanged);
             }
             _ => fx.push(Effect::Reject {

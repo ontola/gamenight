@@ -768,7 +768,9 @@ pub enum ClientMessage {
         game: GameId,
     },
     /// Change the upcoming game without starting or resuming gameplay.
-    QueueNext { game: GameId },
+    QueueNext {
+        game: GameId,
+    },
     Pause,
     Resume,
     /// The party overlay came up: the active game pauses.
@@ -801,7 +803,7 @@ pub enum ClientMessage {
     Ready {
         session: SessionId,
     },
-    /// The match is over; the daemon opens the vote / starts the transition.
+    /// A round ended. Informational: keep playing; no focus or playlist change.
     Finished {
         session: SessionId,
     },

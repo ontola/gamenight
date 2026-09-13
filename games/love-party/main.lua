@@ -14,6 +14,7 @@ local Screen = require("shared.window")
 local backGate = require("shared.back_gate").new()
 local Audio = require("shared.audio")
 local state, bridge, mode, remaining, finished, accumulator
+local roundRoster, resultsTime
 local selected, count, menu = 1, 2, true
 local managed = os.getenv("GAMENIGHT") == "1"
 local activityClock, activitySent = 0, {}
@@ -27,6 +28,8 @@ end
 local function prepare(seats, players)
 	local roster = U.players(seats, players)
 	Input.bind(roster, pads())
+	roundRoster = roster
+	resultsTime = 0
 	state = mode.new(roster, U.rng(tonumber(os.getenv("GNLOVE_SEED")) or os.time()))
 	remaining, finished, accumulator = duration or mode.duration or 60, false, 0
 	menu = false
@@ -113,6 +116,7 @@ function love.load(args)
 				party = function(seats, players, presence)
 					if state then
 						local roster = require("shared.participation").apply(mode, state, seats, players, presence)
+                        roundRoster = roster
 						Input.bind(roster, pads())
 					end
 				end,
@@ -152,9 +156,17 @@ function love.update(dt)
 			end
 		end
 	end
-	if not state or finished or (bridge and bridge.phase ~= "running") then
+	if not state or (bridge and bridge.phase ~= "running") then
 		return
 	end
+	if finished then
+        resultsTime = resultsTime + math.min(dt, 0.1)
+        if resultsTime >= 3 then
+            state = mode.new(roundRoster, U.rng(os.time()))
+            remaining, finished, accumulator, resultsTime = duration or mode.duration or 60, false, 0, 0
+        end
+        return
+    end
 	if mode.resize and love.graphics then
 		mode.resize(state, love.graphics.getDimensions())
 	end
