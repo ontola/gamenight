@@ -1,18 +1,45 @@
 name: GameNight Gameroom
 background:
   speed:
-  - 0.0
-  - 0.0
+  - 0.12
+  - 0.08
   layers:
-  - image: /themes/clubhouse/wall.png
+  - image: /themes/clubhouse/skyline.png
     size:
     - 640
     - 384
-    depth: 1.0
+    depth: 2.0
     scale: 2.0
     offset:
     - 640.0
     - 0.0
+  - image: /themes/clubhouse/wall.png
+    size:
+    - 640
+    - 384
+    depth: 0.0
+    scale: 2.0
+    offset:
+    - 640.0
+    - 0.0
+  - image: /themes/clubhouse/roof.png
+    size:
+    - 624
+    - 48
+    depth: 0.0
+    scale: 2.0
+    offset:
+    - 640.0
+    - 400.0
+  - image: /themes/clubhouse/ground.png
+    size:
+    - 2048
+    - 128
+    depth: 0.0
+    scale: 2.0
+    offset:
+    - 640.0
+    - -464.0
 background_color: rgba(91, 87, 114, 255)
 grid_size:
 - 40

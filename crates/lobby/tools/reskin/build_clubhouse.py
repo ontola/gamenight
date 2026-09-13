@@ -37,7 +37,27 @@ extract((250,10,585,518),(64,100),'door.png')
 ledge=extract((805,220,1395,360),(96,24),'ledge.png')
 extract((155,610,710,950),(208,128),'tv.png')
 extract((930,495,1275,985),(96,128),'cupboard.png')
-Image.open(SRC/'wall-source.png').convert('RGB').resize((640,384),NEAREST).save(OUT/'wall.png')
+wall=Image.open(SRC/'wall-source-v2.png').convert('RGBA')
+# Place extracted window frames inside the playable room, not behind its side
+# colliders. Restore the original frame locations with quiet wall from the same
+# export; this is deterministic compositing of reviewed artwork.
+for box,position in [((33,400,127,530),(195,590)),((1492,400,1585,530),(1320,590))]:
+    frame=wall.crop(box)
+    frame.paste((0,0,0,0),(15,16,box[2]-box[0]-14,107))
+    wall.paste(wall.crop((box[0],340,box[2],390)).resize(frame.size,NEAREST),(box[0],box[1]))
+    wall.paste(frame,position)
+wall=wall.resize((640,384),NEAREST)
+# House exterior matches solid side walls x=32..1248 and y=32..736.
+# Keep outside pixels transparent: the landscape, not enlarged wallpaper,
+# fills the surrounding screen. Use the approved oak ledge as a roof fascia.
+house=Image.new('RGBA',(640,384))
+house.paste(wall.crop((16,16,624,368)),(16,16))
+fascia=ledge.crop((4,0,92,7)).resize((608,7),NEAREST)
+house.alpha_composite(fascia,(16,16))
+house.save(OUT/'wall.png')
+sky=Image.open(SRC/'skyline-source.png').convert('RGB')
+# Frame the roofline through the small windows, not just empty upper sky.
+sky.resize((640,384),NEAREST).save(OUT/'skyline.png')
 # Keep the exact 17x5 grid. Make a separate atlas, used only by the clubhouse.
 original = ROOT/'crates/lobby/assets/map/resources/ground_rock.png'
 atlas=Image.open(original).convert('RGBA')
@@ -71,3 +91,17 @@ for y in range(3):
         patch=cab.crop((sx[x],sy[y],sx[x+1],sy[y+1]))
         wide.paste(patch.resize((dx[x+1]-dx[x],dy[y+1]-dy[y]),NEAREST),(dx[x],dy[y]))
 wide.save(OUT/'cabinet-wide.png')
+
+# Exterior sprites retain generated alpha. Black-matte fallback is restricted
+# to export-background pixels (the art uses blue/umber, never pure black).
+def exterior(name):
+    im=Image.open(SRC/(name+'-source.png')).convert('RGBA')
+    a=np.array(im)
+    a[(a[:,:,:3].max(2)<8),3]=0
+    im=Image.fromarray(a)
+    return im.crop(im.getbbox())
+exterior('roof').resize((624,48),NEAREST).save(OUT/'roof.png')
+ground=exterior('ground').resize((512,128),NEAREST)
+strip=Image.new('RGBA',(2048,128))
+for x in range(0,2048,512): strip.paste(ground,(x,0))
+strip.save(OUT/'ground.png')

@@ -203,6 +203,8 @@ fn spawn_map(
     // Spawn parallax backgrounds
     for layer in &map.background.layers {
         for i in -1..=1 {
+            // A depth-zero layer is fixed architecture, not repeating scenery.
+            if layer.depth == 0.0 && i != 0 { continue; }
             let ent = entities.create();
             sprites.insert(
                 ent,

@@ -159,7 +159,7 @@ fn camera_controller(
 
     // With nobody in the room, show the room. Previously `min`/`max` were left
     // at their sentinels, so `size` came out negative and clamped to
-    // `min_camera_size` — the camera sat zoomed right in on a corner of an
+    // `min_camera_size` â€” the camera sat zoomed right in on a corner of an
     // empty lobby, which is the least useful thing it could be looking at.
     let (mut middle_point, size) = if subject_count == 0 {
         (map_size * 0.5, map_size)
@@ -194,7 +194,8 @@ fn camera_controller(
 /// Fit the whole room with a small border, preserving geometry on any display.
 fn lobby_frame(map_size: Vec2, viewport: Vec2) -> (Vec2, f32) {
     let aspect = viewport.x.max(1.0) / viewport.y.max(1.0);
-    let padded = map_size + Vec2::splat(24.0);
+    // Leave room for the roof and soil beyond the playable interior.
+    let padded = map_size + Vec2::new(24.0, 192.0);
     (map_size * 0.5, padded.y.max(padded.x / aspect))
 }
 
@@ -250,8 +251,11 @@ fn camera_parallax(
     for (_ent, (transform, bg)) in entities.iter_with((&mut transforms, &parallax_bg_sprites)) {
         // Keep the gameplay camera's full-room framing. Only enlarge the artwork
         // (uniformly, like CSS cover), so no clear-color border is exposed.
+        // Depth-zero architecture is anchored to map geometry. Its transparent
+        // exterior/windows reveal the covering landscape instead of stretching
+        // the house beyond its colliders.
         let center = Vec2::new(bg.meta.offset.x, map_size.y / 2.0 + bg.meta.offset.y);
-        let scale = if lobby_mode.0 {
+        let scale = if lobby_mode.0 && bg.meta.depth > 0.0 {
             background_cover_scale(bg.meta.size, bg.meta.scale, view_size,
                 center - camera_transform.translation.truncate())
         } else { bg.meta.scale };
