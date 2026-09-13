@@ -186,6 +186,12 @@ async fn one_continuous_night() {
 
     // Match over: the vote opens on the overlay.
     towerfall.gn.finished(s1).await.unwrap();
+    // Finishing returns to the lobby and pauses before the later disposal.
+    match towerfall.gn.next_event().await.unwrap() {
+        Some(GameEvent::Pause { session }) => assert_eq!(session, s1),
+        other => panic!("expected pause after finishing, got {other:?}"),
+    }
+
     overlay
         .wait_for(|p| p.active_session.as_ref().map(|s| s.phase) == Some(SessionPhase::Finished))
         .await;
