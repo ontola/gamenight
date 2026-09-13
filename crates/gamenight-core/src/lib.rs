@@ -107,6 +107,20 @@ mod night_tests {
     }
 
     #[test]
+    fn queue_next_stays_in_lobby_when_replacement_becomes_ready() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        for id in ["a", "b"] { night.handle(Command::GameConnected { game: GameId::new(id) }); }
+        night.handle(Command::SetPlaylist { entries: vec![entry("a"),entry("b")] });
+        night.handle(Command::QueueNext { game: GameId::new("b") });
+        let warm = night.snapshot().warm_session.unwrap();
+        assert_eq!(warm.game, GameId::new("b"));
+        night.handle(Command::SessionReady { session: warm.id });
+        assert!(night.snapshot().active_session.is_none());
+        assert_eq!(night.snapshot().warm_session.unwrap().phase, SessionPhase::Ready);
+    }
+
+    #[test]
     fn inactivity_warns_then_sleeps_and_input_wakes_the_same_identity() {
         use gamenight_protocol::PresenceState::*;
         let mut night = GameNight::default();

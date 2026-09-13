@@ -767,6 +767,8 @@ pub enum ClientMessage {
     PlayNext {
         game: GameId,
     },
+    /// Change the upcoming game without starting or resuming gameplay.
+    QueueNext { game: GameId },
     Pause,
     Resume,
     /// The party overlay came up: the active game pauses.

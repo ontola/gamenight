@@ -104,6 +104,8 @@ pub enum Command {
     PlayNext {
         game: GameId,
     },
+    /// Change the upcoming game without starting or resuming gameplay.
+    QueueNext { game: GameId },
     Pause,
     Resume,
     /// The party overlay came up: pause the active game.
@@ -602,6 +604,7 @@ impl GameNight {
                 fx.push(Effect::StateChanged);
             }
             Command::PlayNext { game } => self.on_play_next(game, &mut fx),
+            Command::QueueNext { game } => self.select_next(game, false, &mut fx),
             Command::Pause => self.on_pause(&mut fx),
             Command::Resume => self.on_resume(&mut fx),
             Command::OverlayOpened => self.on_overlay_opened(&mut fx),
@@ -1163,6 +1166,10 @@ impl GameNight {
     /// Make `game` the next one up. If it's already in the playlist, aim the
     /// warm slot at it; otherwise insert it right after the current entry.
     fn on_play_next(&mut self, game: GameId, fx: &mut Vec<Effect>) {
+        self.select_next(game, true, fx);
+    }
+
+    fn select_next(&mut self, game: GameId, start_if_idle: bool, fx: &mut Vec<Effect>) {
         if !self.game_has_capacity(&game) {
             fx.push(Effect::Reject {
                 reason: "this game cannot fit everyone in the party".into(),
@@ -1197,9 +1204,10 @@ impl GameNight {
                 insert_at
             }
         };
+        if !start_if_idle { self.pending_transition = false; }
         self.set_next_up(index, fx);
-        // With nothing playing yet this doubles as "start the night here".
-        if self.active.is_none() {
+        // Queue-only selection must not start an idle night.
+        if start_if_idle && self.active.is_none() {
             self.pending_transition = true;
             self.try_transition(fx);
         }

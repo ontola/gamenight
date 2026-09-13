@@ -157,7 +157,7 @@ impl Shared {
         // earlier in the evening. A guard against the daemon acting on its own
         // must never override the party acting on purpose.
         match &command {
-            Command::PlayNext { game } | Command::RequestStart { game } => {
+            Command::PlayNext { game } | Command::QueueNext { game } | Command::RequestStart { game } => {
                 if self.quit_games.remove(game) {
                     info!(%game, "the party asked for it again — it may start");
                 }
@@ -168,7 +168,7 @@ impl Shared {
             }
             _ => {}
         }
-        if let Command::PlayNext { game } = &command {
+        if let Command::PlayNext { game } | Command::QueueNext { game } = &command {
             if !self.launch_specs.contains_key(game) {
                 if let Some(prewarm) = &self.prewarm {
                     info!(%game, "playing an uninstalled catalogue game — bumping the prewarm queue");
@@ -1287,6 +1287,7 @@ fn message_to_command(
         }
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
+        ClientMessage::QueueNext { game } => Command::QueueNext { game },
         ClientMessage::Pause => Command::Pause,
         ClientMessage::Resume => Command::Resume,
         ClientMessage::OpenOverlay => Command::OverlayOpened,

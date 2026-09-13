@@ -307,7 +307,8 @@ impl GameNightBridge {
     /// way to express — the only control was START, so a shelf you didn't
     /// fancy could only be changed from the overlay on somebody's phone.
     ///
-    /// Sent as `PlayNext` for the game we land on rather than as a "skip",
+    /// Sent as `QueueNext` so selecting a replacement never starts playback.
+    /// The chosen title comes from the playlist,
     /// because the daemon deals in titles: the playlist is the only place
     /// that knows what "the one after this" means, and this is the side
     /// holding it.
@@ -315,7 +316,7 @@ impl GameNightBridge {
         let Some(game) = self.game_after_next() else {
             return;
         };
-        let _ = self.join_tx.try_send(ClientMessage::PlayNext { game });
+        let _ = self.join_tx.try_send(ClientMessage::QueueNext { game });
     }
 
     /// The playlist entry after whatever is currently up next, skipping the
@@ -1537,7 +1538,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     // a menu-open player's controls would always be a frame late.
     use bevy::prelude::IntoSystemConfigs as _;
     app.init_resource::<sleep_visual::PoseBackup>();
-    app.add_systems(bevy::prelude::PreUpdate, sleep_visual::restore);
+    app.add_systems(bevy::prelude::PreUpdate, sleep_visual::restore.before(gate_gamepad_input_system));
     app.add_systems(bevy::prelude::PreUpdate, gate_gamepad_input_system);
     app.add_systems(bevy::prelude::PreUpdate, interaction_visual::capture
         .after(gate_gamepad_input_system).after(bevy::input::InputSystem));
@@ -1552,6 +1553,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.add_systems(bevy::prelude::PostUpdate,
         (sleep_visual::pose, sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
             position_player_avatar_system).chain()
+            .before(interaction_visual::sync).before(position_player_menus_system)
             .before(bevy::transform::TransformSystem::TransformPropagate));
     app.add_systems(
         bevy::prelude::Update,
@@ -4311,7 +4313,7 @@ mod next_game_status_tests {
         ));
         bridge.skip_next_game();
         assert!(
-            matches!(commands.try_recv().unwrap(), ClientMessage::PlayNext { game } if game == GameId::new("third"))
+            matches!(commands.try_recv().unwrap(), ClientMessage::QueueNext { game } if game == GameId::new("third"))
         );
         bridge.play_next_game();
         assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
