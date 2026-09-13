@@ -1,45 +1,104 @@
 {
-  "version": 2,
+  "version": 3,
+  "groups": {
+    "essential": {
+      "label": "Plays smoothly",
+      "description": "Required for reliable play"
+    },
+    "personalisation": {
+      "label": "Your player follows you",
+      "description": "Optional for compatibility; required for GameNight games"
+    },
+    "extras": {
+      "label": "Party extras",
+      "description": "Optional extras for game night"
+    }
+  },
   "features": {
-    "protocol.lifecycle": {
+    "protocol.handshake": {
+      "group": "essential",
       "required": true,
-      "description": "Handshake, prepare/ready, start, pause/resume, dispose and repeated sessions (wire-level only)"
+      "description": "Connects to GameNight"
+    },
+    "gameplay.start": {
+      "group": "essential",
+      "required": true,
+      "description": "Starts promptly in gameplay"
     },
     "gameplay.pause": {
+      "group": "essential",
       "required": true,
-      "description": "Simulation, timers and audio actually stop while paused"
+      "description": "Pauses simulation, timers and audio"
+    },
+    "gameplay.resume": {
+      "group": "essential",
+      "required": true,
+      "description": "Resumes the paused game correctly"
     },
     "input.back": {
+      "group": "essential",
       "required": true,
-      "description": "Back/Select requires release and cannot bounce on focus or resume"
+      "description": "Back / Select without bouncing"
     },
     "input.identity": {
+      "group": "essential",
       "required": true,
-      "description": "Physical controllers retain unique player ownership across reconnect and reversed join order"
-    },
-    "profile.identity": {
-      "required": true,
-      "description": "Player name reaches the correct character, including live updates"
-    },
-    "profile.colors": {
-      "required": true,
-      "description": "Skin and clothing colours reach the correct character, including live updates"
-    },
-    "profile.face": {
-      "required": true,
-      "description": "Drawn face and hat reach the correct character, including live updates"
+      "description": "Correct controller per player"
     },
     "presentation.prewarm": {
+      "group": "essential",
       "required": true,
-      "description": "Hidden and silent before start; first prepared frame is ready before ready"
+      "description": "Hidden, silent and ready before playing"
     },
     "presentation.frame": {
+      "group": "essential",
       "required": true,
-      "description": "Packaged game draws a real frame"
+      "description": "Game renders successfully"
+    },
+    "gameplay.switch": {
+      "group": "essential",
+      "required": true,
+      "description": "Switches games without stray focus, audio or processes"
     },
     "process.disconnect": {
+      "group": "essential",
       "required": true,
-      "description": "Packaged game exits cleanly when its host disconnects"
+      "description": "Closes when the host disconnects"
+    },
+    "profile.identity": {
+      "group": "personalisation",
+      "required": false,
+      "description": "Player name sync"
+    },
+    "profile.colors": {
+      "group": "personalisation",
+      "required": false,
+      "description": "Skin and clothing colour sync"
+    },
+    "profile.face": {
+      "group": "personalisation",
+      "required": false,
+      "description": "Drawn face and hat sync"
+    },
+    "party.round_end": {
+      "group": "extras",
+      "required": false,
+      "description": "Automatic round completion"
+    },
+    "party.results": {
+      "group": "extras",
+      "required": false,
+      "description": "Scores and results"
+    },
+    "party.replay": {
+      "group": "extras",
+      "required": false,
+      "description": "Replay voting"
+    },
+    "party.settings": {
+      "group": "extras",
+      "required": false,
+      "description": "Live game settings"
     }
   }
 }

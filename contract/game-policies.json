@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "games": {
+    "blast-party": {
+      "first_party": true,
+      "claims": []
+    },
+    "bubble-buddies": {
+      "first_party": true,
+      "claims": []
+    },
+    "demo-game": {
+      "first_party": true,
+      "claims": []
+    },
+    "growing-guns": {
+      "first_party": true,
+      "claims": []
+    },
+    "lobby": {
+      "first_party": true,
+      "claims": []
+    },
+    "neon-siege": {
+      "first_party": true,
+      "claims": []
+    },
+    "neon-trails": {
+      "first_party": true,
+      "claims": []
+    },
+    "paint-rush": {
+      "first_party": true,
+      "claims": []
+    },
+    "pinpals": {
+      "first_party": true,
+      "claims": []
+    },
+    "ricochet-club": {
+      "first_party": true,
+      "claims": []
+    },
+    "stack-together": {
+      "first_party": true,
+      "claims": []
+    },
+    "volley-trouble": {
+      "first_party": true,
+      "claims": []
+    }
+  }
+}

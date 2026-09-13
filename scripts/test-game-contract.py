@@ -42,6 +42,21 @@ class ContractTests(unittest.TestCase):
             self.check['status'] = status
             self.assertTrue(self.errors(), status)
 
+    def test_optional_features_do_not_block_unclaimed_third_party_games(self):
+        self.rules['features']['pause'].update(required=False,group='personalisation')
+        for status in ('untested','not_applicable','failed'):
+            self.check['status']=status
+            self.assertEqual(self.errors(),[])
+
+    def test_first_party_personalisation_and_explicit_claims_require_proof(self):
+        self.rules['features']['pause'].update(required=False,group='personalisation')
+        self.check['status']='untested'
+        for policy in ({'first_party':True,'claims':[]},{'first_party':False,'claims':['pause']}):
+            policies={'version':1,'games':{'game':policy}}
+            self.report['policies']=policies
+            self.assertTrue(m.release_errors(self.report,self.entries,self.rules,'sha','windows',self.output,self.pack,policies))
+        self.assertTrue(self.errors()) # changed policy must invalidate old evidence
+
     def test_new_catalog_game_blocks_release(self):
         self.entries.append({'id':'new', 'title':'New'})
         self.assertTrue(self.errors())

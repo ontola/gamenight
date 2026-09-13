@@ -28,9 +28,14 @@ def revision(root=ROOT):
     return subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
 
 
-def new_report(entries, requirements, commit, os_name):
+def required_feature(rule, feature, policy):
+    return (rule['required'] or (policy.get('first_party') is True and rule.get('group') == 'personalisation')
+            or feature in policy.get('claims', []))
+
+
+def new_report(entries, requirements, commit, os_name, policies=None):
     return {"schema_version": 1, "commit": commit, "platform": os_name,
-            "worktree_dirty": False, "created_at": datetime.now(timezone.utc).isoformat(), "requirements": requirements,
+            "policies": policies or {"version":1,"games":{}}, "worktree_dirty": False, "created_at": datetime.now(timezone.utc).isoformat(), "requirements": requirements,
             "games": [{"id": e['id'], "title": e['title'], "artifact_sha256": None, "artifact": None,
                        "checks": {f: {"status": "untested", "evidence": [],
                                       "detail": "No executable verification for this artifact"}
@@ -67,7 +72,7 @@ def run_games(report, pack, love, certifier, output):
         game['artifact'] = artifact.name
         raw = output / (artifact.stem + '.protocol.json')
         commands = {
-            'protocol.lifecycle': ([str(certifier), artifact.stem, '--timeout', '45', '--match-timeout', '5',
+            'protocol.handshake': ([str(certifier), artifact.stem, '--timeout', '45', '--match-timeout', '5',
                                     '--report', str(raw), '--', str(love), str(artifact)],
                                    {**env, 'GNLOVE_HEADLESS': '1', 'GNLOVE_MATCH_SECONDS': '1'}),
             'presentation.frame': ([sys.executable, str(ROOT/'scripts/test-love-party-render.py'),
@@ -79,13 +84,13 @@ def run_games(report, pack, love, certifier, output):
             log = output / f'{artifact.stem}.{feature}.log'
             passed = run_check(command, check_env, log)
             files = [evidence(log, output)]
-            if feature == 'protocol.lifecycle':
+            if feature == 'protocol.handshake':
                 if raw.exists():
                     try:
                         protocol = json.loads(raw.read_text(encoding='utf-8'))
                         passed = (passed and protocol.get('schema_version') == 1 and protocol.get('scope') == 'protocol'
                                   and protocol.get('game') == artifact.stem and protocol.get('passed') is True
-                                  and bool(protocol.get('checks')))
+                                  and any(c.get('name') == 'process connects and says hello' and c.get('status') == 'passed' for c in protocol.get('checks', [])))
                         game['protocol_checks'] = protocol.get('checks', [])
                     except (ValueError, OSError):
                         passed = False
@@ -99,24 +104,35 @@ def run_games(report, pack, love, certifier, output):
 
 def write_report(report, output):
     (output/'matrix.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
-    features = list(report['requirements']['features'])
-    lines = [f"# Game contract — {report['platform']}", '', f"Build: `{report['commit']}`", '',
-             '| Game | ' + ' | '.join(features) + ' |', '|---|' + '---|'*len(features)]
-    for game in report['games']:
-        lines.append('| ' + game['id'] + ' | ' + ' | '.join(game['checks'][f]['status'] for f in features) + ' |')
-    lines += ['', 'Protocol success does not certify simulation, graphics, audio or physical input.',
-              'Missing runners remain untested. Required untested checks block publication.', '']
+    lines = [f"# Game contract — {report['platform']}", '', f"Build: `{report['commit']}`", '']
+    groups=report['requirements'].get('groups', {'all':{'label':'Checks'}})
+    for group, info in groups.items():
+        features=[f for f,r in report['requirements']['features'].items() if r.get('group','all')==group]
+        lines += ['## '+info['label'], '', '| Game | '+' | '.join(features)+' |', '|---|'+'---|'*len(features)]
+        for game in report['games']:
+            lines.append('| '+game['id']+' | '+' | '.join(game['checks'][f]['status'] for f in features)+' |')
+        lines.append('')
+    lines += ['Essential checks are mandatory. Personalisation is mandatory for GameNight games.',
+              'Optional features do not reduce playability; claimed features require passing evidence.',
+              'Protocol success alone does not certify gameplay, graphics, audio or physical input.', '']
     (output/'matrix.md').write_text('\n'.join(lines), encoding='utf-8')
 
 
-def release_errors(report, entries, requirements, commit, os_name, output, pack):
+def release_errors(report, entries, requirements, commit, os_name, output, pack, policies=None):
     errors = []
+    policies = policies or {"version":1,"games":{}}
+    if report.get('policies') != policies:
+        errors.append('Game requirements or claimed features changed since verification')
     if report.get('schema_version') != 1 or report.get('commit') != commit or report.get('platform') != os_name:
         errors.append('Wrong report schema, commit or platform')
     if report.get('worktree_dirty') is not False:
         errors.append('Evidence was produced from uncommitted source changes')
     if report.get('requirements') != requirements:
         errors.append('Contract changed since verification')
+    for game_id, policy in policies.get('games', {}).items():
+        unknown=set(policy.get('claims', []))-requirements['features'].keys()
+        if unknown:
+            errors.append(f'{game_id}: unknown claimed features: {sorted(unknown)}')
     rows = report.get('games', [])
     games = {g['id']: g for g in rows}
     if len(games) != len(rows) or set(games) != {e['id'] for e in entries}:
@@ -129,10 +145,11 @@ def release_errors(report, entries, requirements, commit, os_name, output, pack)
         artifact = (pack/(game.get('artifact') or '__missing__')).resolve()
         if not artifact.is_relative_to(pack.resolve()) or not artifact.is_file() or digest(artifact) != game.get('artifact_sha256'):
             errors.append(f"{game['id']}: missing or changed artifact")
+        policy=policies.get('games', {}).get(game['id'], {})
         for feature, rule in requirements['features'].items():
             check = game.get('checks', {}).get(feature, {})
             status = check.get('status')
-            if status not in STATUSES or status == 'failed' or (rule['required'] and status != 'passed'):
+            if status not in STATUSES or (required_feature(rule, feature, policy) and status != 'passed'):
                 errors.append(f"{game['id']}/{feature}: {status or 'missing'}")
             if status == 'passed':
                 refs = check.get('evidence', [])
@@ -158,14 +175,15 @@ def main():
     output = args.output.resolve()
     requirements = json.loads((ROOT/'contract/requirements.json').read_text())
     entries = catalog()
+    policies = json.loads((ROOT/"contract/game-policies.json").read_text())
     if args.gate:
         if not args.pack:
             parser.error('--gate requires --pack for artifact verification')
         report = json.loads((output/'matrix.json').read_text())
-        errors = release_errors(report, entries, requirements, revision(), args.platform, output, args.pack.resolve())
+        errors = release_errors(report, entries, requirements, revision(), args.platform, output, args.pack.resolve(), policies)
         print('\n'.join(errors) if errors else 'All required contract checks passed')
         return bool(errors)
-    report = new_report(entries, requirements, revision(), args.platform)
+    report = new_report(entries, requirements, revision(), args.platform, policies)
     report['worktree_dirty'] = bool(subprocess.check_output(
         ['git', '-C', str(ROOT), 'status', '--porcelain', '--untracked-files=normal'], text=True).strip())
     output.mkdir(parents=True, exist_ok=False)  # never reuse stale evidence

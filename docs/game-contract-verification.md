@@ -61,11 +61,11 @@ The Windows publication workflow calls the same LÖVE workflow at the same revis
 downloads that run's packages and evidence, and runs the strict gate **before**
 creating the release draft. PR builds remain usable for development even when
 features are untested. Publication fails on any missing game, required untested
-feature, failed check, stale commit, wrong platform, changed requirements, changed
+feature, failed mandatory/claimed check, stale commit, wrong platform, changed requirements, changed
 package, or missing/modified evidence. There is no override for a catalog label.
 
 **Current intentional consequence:** publication is blocked. We do not yet have
-complete executable evidence for the entire catalog and all ten requirements.
+complete executable evidence for the entire catalog and all mandatory requirements.
 This is exposed work, not a reason to silently mark those rows successful.
 
 ## Extending coverage
@@ -83,3 +83,23 @@ gate automatically. Add a regression to `scripts/test-game-contract.py` for ever
 new way an incomplete integration could accidentally be accepted.
 
 Contract v2 separates player-name sync, skin/clothing colour sync, and drawn face/hat sync. Previous combined appearance evidence does not satisfy any of these independently.
+
+## Grouped ratings (contract v3)
+
+The catalog playability rating uses only ten essential requirements. A current
+matching build is Ready to play only when all ten pass; partial evidence is
+Partially verified, a failing essential check is Integration issues, and no
+current proof is Not verified. Development/old-build results do not increase it.
+
+The three personalisation checks (name, colours, face/hat) and four party extras
+(round end, scores, replay voting, live settings) have independent scores. Missing
+optional features never reduce the essential rating. Actual start, resume and
+cross-game switching are distinct from the wire handshake, so old aggregate
+lifecycle evidence is not promoted to these checks.
+
+`contract/game-policies.json` records first-party ownership and explicit feature
+claims. First-party games require personalisation as well as essentials for
+release. Claiming an optional feature also makes its passing proof mandatory.
+Unclaimed optional failures remain visible but do not block compatibility.
+Changes to requirements or policy invalidate release reports. The registry is
+explicit: ownership is not guessed from a developer's display name.
