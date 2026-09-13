@@ -30,7 +30,7 @@ use gamenight_protocol::LaunchSpec;
 fn usage() -> ! {
     eprintln!(
         "usage: gamenight-certify <game-id> [--cycles N] [--match-timeout SECS] \
-         [--players N] [--timeout SECS] [--port N] [-- <command> [args…]]"
+         [--players N] [--timeout SECS] [--port N] [--report PATH] [-- <command> [args…]]"
     );
     std::process::exit(2);
 }
@@ -42,12 +42,16 @@ async fn main() {
         usage()
     };
     let mut config = Config::new(&game_id);
+    let mut report_path: Option<std::path::PathBuf> = None;
     config.catalog_entry = gamenight_catalog::load_dir(&gamenight_catalog::workspace_catalog_dir())
         .ok()
         .and_then(|entries| entries.into_iter().find(|e| e.id == game_id));
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
+            "--report" => {
+                report_path = Some(args.next().map(Into::into).unwrap_or_else(|| usage()))
+            }
             "--cycles" => match args.next().and_then(|v| v.parse().ok()) {
                 Some(n) => config.cycles = n,
                 None => usage(),
@@ -88,11 +92,26 @@ async fn main() {
 
     match certify(config).await {
         Ok(report) => {
+            if let Some(path) = &report_path {
+                let mut evidence = report.json();
+                evidence["game"] = serde_json::json!(game_id);
+                if let Err(error) =
+                    std::fs::write(path, serde_json::to_vec_pretty(&evidence).unwrap())
+                {
+                    eprintln!("cannot write evidence: {error}");
+                    std::process::exit(2);
+                }
+            }
             print_summary(&gamenight_protocol::GameId::new(game_id), &report);
             let manual_ok = run_manual_checklist(&report).await;
             std::process::exit(if report.passed() && manual_ok { 0 } else { 1 });
         }
         Err(e) => {
+            if let Some(path) = &report_path {
+                let evidence = serde_json::json!({"schema_version":1,"game":game_id,
+                    "scope":"protocol","passed":false,"checks":[],"error":e});
+                let _ = std::fs::write(path, serde_json::to_vec_pretty(&evidence).unwrap());
+            }
             eprintln!("certification could not run: {e}");
             std::process::exit(2);
         }

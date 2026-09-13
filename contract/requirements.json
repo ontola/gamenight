@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "features": {
+    "protocol.lifecycle": {
+      "required": true,
+      "description": "Handshake, prepare/ready, start, pause/resume, dispose and repeated sessions (wire-level only)"
+    },
+    "gameplay.pause": {
+      "required": true,
+      "description": "Simulation, timers and audio actually stop while paused"
+    },
+    "input.back": {
+      "required": true,
+      "description": "Back/Select requires release and cannot bounce on focus or resume"
+    },
+    "input.identity": {
+      "required": true,
+      "description": "Physical controllers retain unique player ownership across reconnect and reversed join order"
+    },
+    "profile.appearance": {
+      "required": true,
+      "description": "Name, clothing, skin and drawn face/hat reach the correct character, including live updates"
+    },
+    "presentation.prewarm": {
+      "required": true,
+      "description": "Hidden and silent before start; first prepared frame is ready before ready"
+    },
+    "presentation.frame": {
+      "required": true,
+      "description": "Packaged game draws a real frame"
+    },
+    "process.disconnect": {
+      "required": true,
+      "description": "Packaged game exits cleanly when its host disconnects"
+    }
+  }
+}

@@ -67,3 +67,7 @@ Center names with a Text2d anchor, not half an arbitrary UI container width.
 Animate text using transform scale, not continuously changing font_size. Bevy
 caches an atlas per size; the sleeping Z animation exhausted graphics memory by
 rasterizing a new size every frame. Test idle sleeping players for several minutes.
+
+## Executable status and release gates
+
+See [Game contract verification](game-contract-verification.md) for the per-game, per-platform evidence matrix. This checklist is guidance; it is not a passing certificate. Missing evidence blocks publication.

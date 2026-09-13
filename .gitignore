@@ -12,3 +12,6 @@
 __pycache__/
 *.pyc
 /web-app/node_modules/
+
+/dist/
+/contract-audit/

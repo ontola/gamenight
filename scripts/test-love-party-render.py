@@ -8,8 +8,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--love", type=Path, required=True)
     parser.add_argument("--pack", type=Path, required=True)
+    parser.add_argument("--game", help="Test only this packaged game")
     args = parser.parse_args()
     games = sorted(args.pack.resolve().glob("*.love"))
+    if args.game:
+        games = [g for g in games if g.stem == args.game]
     if not games:
         raise SystemExit("No packaged games found")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("GAMENIGHT", "GNLOVE"))}

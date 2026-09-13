@@ -106,3 +106,18 @@ jobs:
         with:
           node-version: '22'
       - run: node scripts/generate-branding.cjs --check
+
+  contract-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/test-game-contract.py
+      - run: python scripts/game-contract.py --output contract-audit
+      - run: cat contract-audit/matrix.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: game-contract-linux-inventory
+          path: contract-audit/

@@ -32,6 +32,8 @@ concurrency:
   group: windows-installer-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  contract:
+    uses: ./.github/workflows/love-party.yml
   package:
     runs-on: windows-latest
     timeout-minutes: 60
@@ -89,7 +91,7 @@ jobs:
           path: ${{ runner.temp }}/installer/releases/*
           if-no-files-found: error
   release:
-    needs: package
+    needs: [package, contract]
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.publish
     runs-on: ubuntu-latest
     permissions:
@@ -99,6 +101,19 @@ jobs:
         with:
           name: gamenight-windows-installer
           path: release
+      - uses: actions/checkout@v4
+        with:
+          path: source
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-contract-windows
+          path: evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: gamenight-love-party
+          path: games
+      - name: Require complete game contract evidence for this release
+        run: python source/scripts/game-contract.py --gate --platform windows --output evidence --pack games
       - name: Create reviewable release draft
         env:
           GH_TOKEN: ${{ github.token }}

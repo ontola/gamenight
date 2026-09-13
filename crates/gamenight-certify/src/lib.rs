@@ -123,6 +123,25 @@ impl Report {
         !self.checks.is_empty() && !self.checks.iter().any(|c| c.outcome == Outcome::Fail)
     }
 
+    /// Machine-readable protocol evidence, deliberately not a gameplay certificate.
+    pub fn json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": 1,
+            "scope": "protocol",
+            "passed": self.passed(),
+            "checks": self.checks.iter().map(|c| serde_json::json!({
+                "name": c.name,
+                "status": match c.outcome {
+                    Outcome::Pass => "passed", Outcome::Fail => "failed", Outcome::Skipped => "untested"
+                },
+                "detail": c.detail,
+            })).collect::<Vec<_>>(),
+            "manual_checks": MANUAL_CHECKS.iter().map(|name| serde_json::json!({
+                "name": name, "status": "untested"
+            })).collect::<Vec<_>>()
+        })
+    }
+
     pub fn summary(&self) -> String {
         let pass = self
             .checks
@@ -789,7 +808,10 @@ fn skip(report: &mut Report, name: &'static str) {
 pub fn print_summary(game: &GameId, report: &Report) {
     println!("─────────────────────────────────────────────────────");
     if report.passed() {
-        println!(" {} — {game} is party-ready 🎉", report.summary());
+        println!(
+            " {} — {game}: protocol checks passed; gameplay verification still required",
+            report.summary()
+        );
     } else {
         println!(" {} — not there yet", report.summary());
     }
@@ -934,5 +956,50 @@ mod tests {
         let check = check_auto_downloadable(&entry);
         assert_eq!(check.outcome, Outcome::Skipped);
         assert!(check.detail.contains("no direct"));
+    }
+}
+
+#[cfg(test)]
+mod evidence_tests {
+    use super::*;
+    #[test]
+    fn wire_success_never_marks_manual_gameplay_checks_verified() {
+        let report = Report {
+            checks: vec![
+                Check {
+                    name: "wire",
+                    outcome: Outcome::Pass,
+                    detail: "host acknowledged".into(),
+                },
+                Check {
+                    name: "optional",
+                    outcome: Outcome::Skipped,
+                    detail: "not exercised".into(),
+                },
+            ],
+            identities: vec![],
+        };
+        let json = report.json();
+        assert_eq!(json["scope"], "protocol");
+        assert_eq!(json["checks"][1]["status"], "untested");
+        assert!(json["manual_checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c["status"] == "untested"));
+    }
+    #[test]
+    fn failed_and_empty_protocol_runs_cannot_pass() {
+        assert_eq!(Report::default().json()["passed"], false);
+        let report = Report {
+            checks: vec![Check {
+                name: "wire",
+                outcome: Outcome::Fail,
+                detail: "timeout".into(),
+            }],
+            identities: vec![],
+        };
+        assert_eq!(report.json()["passed"], false);
+        assert_eq!(report.json()["checks"][0]["status"], "failed");
     }
 }

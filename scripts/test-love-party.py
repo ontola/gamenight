@@ -11,8 +11,15 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--love", required=True)
     parser.add_argument("--pack", type=Path, required=True)
+    parser.add_argument("--game", help="Test only this packaged game")
     args = parser.parse_args()
-    for game in ("neon-trails", "blast-party", "neon-siege", "ricochet-club", "paint-rush"):
+    artifacts = sorted(args.pack.glob("*.love"))
+    if args.game:
+        artifacts = [p for p in artifacts if p.stem == args.game]
+    if not artifacts:
+        parser.error("No matching packaged games")
+    for artifact in artifacts:
+        game = artifact.stem
         with socket.socket() as server:
             server.bind(("127.0.0.1", 0))
             server.listen()
