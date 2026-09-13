@@ -2976,8 +2976,8 @@ fn sync_name_tags_system(
     // FairfaxSM reads far clearer than the pixel font at name-tag size; a
     // 1px-offset black copy behind the white text fakes an outline/bold
     // weight bevy_ui's `TextStyle` has no field for on its own.
-    const NAME_TAG_FONT_SIZE: f32 = 26.0;
-    const NAME_TAG_OUTLINE: f32 = 2.0;
+    const NAME_TAG_FONT_SIZE: f32 = 18.0;
+    const NAME_TAG_OUTLINE: f32 = 1.0;
     let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
     for seat in &seats {
         let Some(player_id) = seat.occupant.player_id() else {
@@ -2996,6 +2996,7 @@ fn sync_name_tags_system(
                 NodeBundle {
                     style: Style {
                         position_type: PositionType::Absolute,
+                        width: Val::Px(300.0),
                         ..default()
                     },
                     ..default()
@@ -3011,6 +3012,7 @@ fn sync_name_tags_system(
                     parent.spawn(TextBundle {
                         style: Style {
                             position_type: PositionType::Absolute,
+                        width: Val::Px(300.0),
                             left: Val::Px(dx),
                             top: Val::Px(dy),
                             ..default()
@@ -3022,7 +3024,7 @@ fn sync_name_tags_system(
                                 font_size: NAME_TAG_FONT_SIZE,
                                 color: Color::BLACK,
                             },
-                        ),
+                        ).with_alignment(TextAlignment::Center),
                         ..default()
                     });
                 }
@@ -3033,7 +3035,7 @@ fn sync_name_tags_system(
                         font_size: NAME_TAG_FONT_SIZE,
                         color: Color::WHITE,
                     },
-                ));
+                ).with_text_alignment(TextAlignment::Center).with_style(Style {width:Val::Px(300.0),..default()}));
             });
     }
 }
@@ -3073,7 +3075,7 @@ fn position_name_tags_system(
         let anchor = world_pos + bevy::prelude::Vec3::new(0.0, OVERHEAD_ANCHOR, 0.0);
         if let Some(screen_pos) = camera.world_to_viewport(camera_transform, anchor) {
             style.display = bevy::prelude::Display::Flex;
-            style.left = bevy::prelude::Val::Px(screen_pos.x - 20.0);
+            style.left = bevy::prelude::Val::Px(screen_pos.x - 150.0);
             style.top = bevy::prelude::Val::Px(screen_pos.y);
         } else {
             // Off-camera: hide rather than clamp to an edge.
