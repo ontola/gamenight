@@ -68,7 +68,7 @@ pub(super) async fn control(source: &str, action: MediaAction) {
         let _apartment = Apartment::new()?;
         let manager = Manager::RequestAsync()?.get()?;
         for session in manager.GetSessions()? {
-            if session.SourceAppUserModelId()?.to_string() != source {
+            if session.SourceAppUserModelId()? != source {
                 continue;
             }
             let accepted = match action {
