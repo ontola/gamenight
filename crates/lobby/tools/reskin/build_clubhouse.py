@@ -78,8 +78,21 @@ for col,idx in enumerate((44,45,46)):
     tile.alpha_composite(ledge.crop((col*32,0,col*32+32,24)),(0,0))
     atlas.paste(tile,((idx%17)*32,(idx//17)*32))
 atlas.paste(Image.new('RGBA',(32,32)),((84%17)*32,(84//17)*32))
-atlas.save(OUT/'terrain.png')
-(OUT/'terrain.atlas.yaml').write_text('image: ./terrain.png\ntile_size: [32, 32]\ncolumns: 17\nrows: 5\n')
+# Thin floor cap, with all remaining collider art transparent.
+floor_tile=Image.new('RGBA',(32,32))
+floor_tile.paste(wood.crop((0,0,32,4)),(0,0))
+atlas.paste(floor_tile,((83%17)*32,(83//17)*32))
+# Duplicate each cell's edge texels into a one-pixel gutter. Smooth camera
+# scaling must never sample the orange timber from a neighbouring atlas cell.
+padded=Image.new('RGBA',(17*34,5*34))
+for i in range(85):
+    x,y=(i%17)*32,(i//17)*32
+    tile=atlas.crop((x,y,x+32,y+32))
+    a=np.array(tile)
+    gutter=Image.fromarray(np.pad(a,((1,1),(1,1),(0,0)),mode='edge'))
+    padded.paste(gutter,((i%17)*34,(i//17)*34))
+padded.save(OUT/'terrain.png')
+(OUT/'terrain.atlas.yaml').write_text('image: ./terrain.png\ntile_size: [32, 32]\ncolumns: 17\nrows: 5\npadding: [2, 2]\noffset: [1, 1]\n')
 print('Exported clubhouse wall, door, television, cupboard and terrain atlas')
 
 # Nine-slice the cupboard frame so its corners are never stretched to landscape.

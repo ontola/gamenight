@@ -15,7 +15,7 @@ pub fn session_plugin(session: &mut SessionBuilder) {
     session
         .stages
         .add_system_to_stage(CoreStage::First, hydrate)
-        .add_system_to_stage(CoreStage::First, update);
+        .add_system_to_stage(CoreStage::Last, update);
 }
 
 /// Marker component for player spawners.
@@ -45,6 +45,17 @@ fn choose_lobby_spawn(points: &[Vec3], previous: Option<Vec2>, occupied: &[Vec2]
         let score=|i:usize| previous.map_or(0.0,|p|p.distance_squared(points[i].truncate()));
         score(a).total_cmp(&score(b))
     }).unwrap_or(0)
+}
+
+// Check the entire standing body, with a little clearance around it. Filtering
+// precedes random/farthest selection so neither fallback can pick furniture.
+fn spawn_clear(point: Vec2, solids: &[Solid]) -> bool {
+    let half=Vec2::new(18.,24.);
+    solids.iter().all(|s| s.disabled || {
+        let delta=(point-s.pos).abs();
+        let extent=half+s.size/2.;
+        delta.x>=extent.x || delta.y>=extent.y
+    })
 }
 
 fn shuffled_spawn_order(count: usize) -> Vec<usize> {
@@ -87,6 +98,7 @@ fn hydrate(
 fn update(
     mut commands: Commands,
     player_layers: Comp<PlayerLayers>,
+    solids: Comp<Solid>,
     mut entities: ResMutInit<Entities>,
     mut current_spawner: ResMutInit<CurrentSpawner>,
     mut lobby_order: ResMutInit<LobbySpawnOrder>,
@@ -115,9 +127,11 @@ fn update(
         spawn_history.0[index.0 as usize]=Some(transform.translation.truncate());
         occupied.push(transform.translation.truncate());
     }
+    let obstacles=entities.iter_with(&solids).map(|(_,solid)|*solid).collect::<Vec<_>>();
     let spawn_points = entities
         .iter_with((&player_spawners, &transforms))
         .map(|(_ent, (_spawner, transform))| transform.translation)
+        .filter(|point| !lobby.0 || spawn_clear(point.truncate(), &obstacles))
         .collect::<Vec<_>>();
 
     if lobby.0 && lobby_order.0.len() != spawn_points.len() {
@@ -164,6 +178,15 @@ fn update(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn furniture_excludes_body_overlap_not_just_spawn_center() {
+        let stereo=Solid {pos:Vec2::new(1068.,126.),size:Vec2::new(168.,60.),..default()};
+        assert!(!spawn_clear(Vec2::new(1000.,122.),&[stereo]));
+        assert!(!spawn_clear(Vec2::new(980.,122.),&[stereo]));
+        assert!(spawn_clear(Vec2::new(860.,122.),&[stereo]));
+        assert!(spawn_clear(Vec2::new(1068.,180.),&[stereo]));
+        assert!(spawn_clear(Vec2::new(1000.,122.),&[Solid {disabled:true,..stereo}]));
+    }
     #[test]
     fn respawn_avoids_death_position_and_occupied_points() {
         let points=vec![Vec3::new(0.,0.,0.),Vec3::new(100.,0.,0.),Vec3::new(400.,0.,0.),Vec3::new(800.,0.,0.)];

@@ -48,7 +48,7 @@ pub(super) fn sync(mut commands:Commands, game:Res<BonesGame>, assets:Res<AssetS
         if input.open_menus.contains_key(&player) {continue;}
         let pressed=input.pad_player.iter().any(|(&pad,&id)| id==player && buttons.pressed(GamepadButton::new(Gamepad::new(pad as usize),GamepadButtonType::North)));
 
-        let width=(label.chars().count() as f32*6.5+30.).max(78.);
+        let width=(label.chars().count() as f32*6.5+34.).max(66.);
         let badge_x=-width/2.+12.;
         let translation=Vec3::new(player_position.x.round(),position.y.round()-13.,-70. + order as f32 * 4.);
         if let Some((_,_,mut transform))=old.iter_mut().find(|(_,hint,_)|hint.0==seat && hint.1==*label) {
@@ -56,7 +56,12 @@ pub(super) fn sync(mut commands:Commands, game:Res<BonesGame>, assets:Res<AssetS
             continue;
         }
         commands.spawn((InteractionHint(seat,label.clone()),SpatialBundle {transform:Transform::from_translation(translation),..default()})).with_children(|p|{
-            p.spawn(SpriteBundle {sprite:Sprite {color:Color::rgb_u8(18,23,34),custom_size:Some(Vec2::new(width,20.)),..default()},..default()});
+            // Pixel-rounded capsule: radius matches the ten-pixel outer badge.
+            for y in -9_i32..=9 {
+                let cap=(100-y*y) as f32;
+                let row_width=width-20.+2.*cap.sqrt().floor();
+                p.spawn(SpriteBundle {sprite:Sprite {color:Color::rgb_u8(18,23,34),custom_size:Some(Vec2::new(row_width,1.)),..default()},transform:Transform::from_xyz(0.,y as f32,0.),..default()});
+            }
             for y in -8_i32..=8 {
                 let width=((64-y*y) as f32).sqrt().floor()*2.+1.;
                 p.spawn((ButtonPixel {seat,y:y as f32,letter:false}, SpriteBundle {sprite:Sprite {color:if pressed && y>=5 {Color::rgb_u8(157,119,25)}else{Color::rgb_u8(248,205,52)},custom_size:Some(Vec2::new(width,1.)),..default()},transform:Transform::from_xyz(badge_x,y as f32,1.),..default()}));
@@ -69,7 +74,7 @@ pub(super) fn sync(mut commands:Commands, game:Res<BonesGame>, assets:Res<AssetS
                     }
                 }
             }
-            p.spawn(Text2dBundle {text:Text::from_section(label,TextStyle {font:font.clone(),font_size:11.,color:Color::WHITE}),transform:Transform::from_xyz(11.,0.,2.),..default()});
+            p.spawn(Text2dBundle {text:Text::from_section(label,TextStyle {font:font.clone(),font_size:11.,color:Color::WHITE}),text_anchor:bevy::sprite::Anchor::CenterLeft,transform:Transform::from_xyz(badge_x+12.,0.,2.),..default()});
         });
     }
 }

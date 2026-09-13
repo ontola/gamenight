@@ -39,7 +39,7 @@ background:
     scale: 2.0
     offset:
     - 640.0
-    - -416.0
+    - -406.0
 background_color: rgba(91, 87, 114, 255)
 grid_size:
 - 40
@@ -169,7 +169,7 @@ layers:
   - pos:
     - 2
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 3
@@ -179,7 +179,7 @@ layers:
   - pos:
     - 3
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 4
@@ -189,7 +189,7 @@ layers:
   - pos:
     - 4
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 5
@@ -199,7 +199,7 @@ layers:
   - pos:
     - 5
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 6
@@ -209,7 +209,7 @@ layers:
   - pos:
     - 6
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 7
@@ -219,7 +219,7 @@ layers:
   - pos:
     - 7
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 8
@@ -229,7 +229,7 @@ layers:
   - pos:
     - 8
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 9
@@ -239,7 +239,7 @@ layers:
   - pos:
     - 9
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 10
@@ -249,7 +249,7 @@ layers:
   - pos:
     - 10
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 11
@@ -259,7 +259,7 @@ layers:
   - pos:
     - 11
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 12
@@ -269,7 +269,7 @@ layers:
   - pos:
     - 12
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 13
@@ -279,7 +279,7 @@ layers:
   - pos:
     - 13
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 14
@@ -289,7 +289,7 @@ layers:
   - pos:
     - 14
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 15
@@ -299,7 +299,7 @@ layers:
   - pos:
     - 15
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 16
@@ -309,7 +309,7 @@ layers:
   - pos:
     - 16
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 17
@@ -319,7 +319,7 @@ layers:
   - pos:
     - 17
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 18
@@ -329,7 +329,7 @@ layers:
   - pos:
     - 18
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 19
@@ -339,7 +339,7 @@ layers:
   - pos:
     - 19
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 20
@@ -349,7 +349,7 @@ layers:
   - pos:
     - 20
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 21
@@ -359,7 +359,7 @@ layers:
   - pos:
     - 21
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 22
@@ -369,7 +369,7 @@ layers:
   - pos:
     - 22
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 23
@@ -379,7 +379,7 @@ layers:
   - pos:
     - 23
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 24
@@ -389,7 +389,7 @@ layers:
   - pos:
     - 24
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 25
@@ -399,7 +399,7 @@ layers:
   - pos:
     - 25
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 26
@@ -409,7 +409,7 @@ layers:
   - pos:
     - 26
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 27
@@ -419,7 +419,7 @@ layers:
   - pos:
     - 27
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 28
@@ -429,7 +429,7 @@ layers:
   - pos:
     - 28
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 29
@@ -439,7 +439,7 @@ layers:
   - pos:
     - 29
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 30
@@ -449,7 +449,7 @@ layers:
   - pos:
     - 30
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 31
@@ -459,7 +459,7 @@ layers:
   - pos:
     - 31
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 32
@@ -469,7 +469,7 @@ layers:
   - pos:
     - 32
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 33
@@ -479,7 +479,7 @@ layers:
   - pos:
     - 33
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 34
@@ -489,7 +489,7 @@ layers:
   - pos:
     - 34
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 35
@@ -499,7 +499,7 @@ layers:
   - pos:
     - 35
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 36
@@ -509,7 +509,7 @@ layers:
   - pos:
     - 36
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 37
@@ -519,7 +519,7 @@ layers:
   - pos:
     - 37
     - 2
-    idx: 84
+    idx: 83
     collision: Solid
   - pos:
     - 38
@@ -945,6 +945,6 @@ layers:
     - 122.0
     element: /elements/environment/player_spawner/player_spawner.element.yaml
   - pos:
-    - 1000.0
+    - 860.0
     - 122.0
     element: /elements/environment/player_spawner/player_spawner.element.yaml

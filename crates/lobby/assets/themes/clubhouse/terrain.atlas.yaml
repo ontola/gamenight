@@ -2,3 +2,5 @@ image: ./terrain.png
 tile_size: [32, 32]
 columns: 17
 rows: 5
+padding: [2, 2]
+offset: [1, 1]
