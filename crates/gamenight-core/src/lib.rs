@@ -251,25 +251,41 @@ mod night_tests {
     fn playlist_remove_keeps_active_and_updates_next_with_stale_guard() {
         let mut night = GameNight::default();
         for game in ["a", "b", "c"] {
-            night.handle(Command::GameConnected { game: GameId::new(game) });
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
         }
-        let fx = night.handle(Command::SetPlaylist { entries: vec![entry("a"), entry("b"), entry("c")] });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c")],
+        });
         let (_, active) = prepared_session(&fx).unwrap();
         night.handle(Command::SessionReady { session: active });
         let original = night.snapshot().playlist;
-        let fx = night.handle(Command::RemovePlaylistEntry { expected: original.clone(), index: 1 });
+        let fx = night.handle(Command::RemovePlaylistEntry {
+            expected: original.clone(),
+            index: 1,
+        });
         assert!(fx.iter().any(|e| matches!(e, Effect::StateChanged)));
         let after = night.snapshot();
         assert_eq!(after.active_session.as_ref().unwrap().id, active);
         assert_eq!(after.warm_session.as_ref().unwrap().game, GameId::new("c"));
         assert_eq!(after.playlist.current, Some(0));
-        let fx = night.handle(Command::RemovePlaylistEntry { expected: original, index: 0 });
+        let fx = night.handle(Command::RemovePlaylistEntry {
+            expected: original,
+            index: 0,
+        });
         assert!(matches!(fx.as_slice(), [Effect::Reject { .. }]));
         assert_eq!(night.snapshot(), after);
-        night.handle(Command::RemovePlaylistEntry { expected: after.playlist, index: 0 });
+        night.handle(Command::RemovePlaylistEntry {
+            expected: after.playlist,
+            index: 0,
+        });
         assert_eq!(night.snapshot().active_session.unwrap().id, active);
         assert_eq!(night.snapshot().playlist.current, None);
-        night.handle(Command::RemovePlaylistEntry { expected: night.snapshot().playlist, index: 0 });
+        night.handle(Command::RemovePlaylistEntry {
+            expected: night.snapshot().playlist,
+            index: 0,
+        });
         assert!(night.snapshot().playlist.entries.is_empty());
         assert!(night.snapshot().warm_session.is_none());
         assert_eq!(night.snapshot().active_session.unwrap().id, active);
@@ -278,16 +294,32 @@ mod night_tests {
     #[test]
     fn removing_current_from_middle_keeps_its_successor_next() {
         let mut night = GameNight::default();
-        for game in ["a", "b", "c"] { night.handle(Command::GameConnected { game: GameId::new(game) }); }
-        let fx = night.handle(Command::SetPlaylist { entries: vec![entry("a"), entry("b"), entry("c")] });
+        for game in ["a", "b", "c"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b"), entry("c")],
+        });
         let (_, active) = prepared_session(&fx).unwrap();
         night.handle(Command::SessionReady { session: active });
-        night.handle(Command::MovePlaylistEntry { expected: night.snapshot().playlist, from: 0, to: 1 });
+        night.handle(Command::MovePlaylistEntry {
+            expected: night.snapshot().playlist,
+            from: 0,
+            to: 1,
+        });
         let before = night.snapshot();
-        let invalid = night.handle(Command::RemovePlaylistEntry { expected: before.playlist.clone(), index: 99 });
+        let invalid = night.handle(Command::RemovePlaylistEntry {
+            expected: before.playlist.clone(),
+            index: 99,
+        });
         assert!(matches!(invalid.as_slice(), [Effect::Reject { .. }]));
         assert_eq!(night.snapshot(), before);
-        night.handle(Command::RemovePlaylistEntry { expected: before.playlist, index: 1 });
+        night.handle(Command::RemovePlaylistEntry {
+            expected: before.playlist,
+            index: 1,
+        });
         let after = night.snapshot();
         assert_eq!(after.playlist.entries, vec![entry("b"), entry("c")]);
         assert_eq!(after.active_session.unwrap().id, active);
@@ -434,10 +466,17 @@ mod night_tests {
         night.handle(join_cmd("Falcon", Some(1), None));
         let players = night.snapshot().players;
         for player in &players {
-            night.handle(Command::BindController { player_id: player.id, controller: "ordinal:0".into() });
+            night.handle(Command::BindController {
+                player_id: player.id,
+                controller: "ordinal:0".into(),
+            });
         }
         let party = night.snapshot();
-        let owners: Vec<_> = party.seats.iter().filter(|s| s.controller.as_deref() == Some("ordinal:0")).collect();
+        let owners: Vec<_> = party
+            .seats
+            .iter()
+            .filter(|s| s.controller.as_deref() == Some("ordinal:0"))
+            .collect();
         assert_eq!(owners.len(), 1);
         assert_eq!(owners[0].occupant.player_id(), Some(players[1].id));
     }
@@ -2137,14 +2176,26 @@ mod player_count_fit_tests {
         let mut night = GameNight::default();
         night.handle(join("Ada"));
         let id = night.snapshot().players[0].id;
-        night.handle(Command::SetPlayerSkinColor { player_id: id, skin_color: "#925c3b".into() });
-        night.handle(Command::SetPlayerColor { player_id: id, color: "#ff0000".into() });
+        night.handle(Command::SetPlayerSkinColor {
+            player_id: id,
+            skin_color: "#925c3b".into(),
+        });
+        night.handle(Command::SetPlayerColor {
+            player_id: id,
+            color: "#ff0000".into(),
+        });
         let player = &night.snapshot().players[0];
         assert_eq!(player.skin_color.as_deref(), Some("#925c3b"));
         assert_eq!(player.color.as_deref(), Some("#ff0000"));
-        let fx = night.handle(Command::SetPlayerSkinColor { player_id: id, skin_color: "invalid".into() });
+        let fx = night.handle(Command::SetPlayerSkinColor {
+            player_id: id,
+            skin_color: "invalid".into(),
+        });
         assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
-        assert_eq!(night.snapshot().players[0].skin_color.as_deref(), Some("#925c3b"));
+        assert_eq!(
+            night.snapshot().players[0].skin_color.as_deref(),
+            Some("#925c3b")
+        );
     }
 
     /// Prepare carries profiles, so a changed name must reach the warm game.

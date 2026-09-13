@@ -356,7 +356,8 @@ pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
     }
     if let Some(cover) = &entry.cover {
         check(
-            cover.starts_with("https://") || gamenight_protocol::artwork::decode_png_data_uri(cover).is_some(),
+            cover.starts_with("https://")
+                || gamenight_protocol::artwork::decode_png_data_uri(cover).is_some(),
             "cover must be an https URL or PNG data URI (up to 256 KiB and 1024×1024)",
         );
     }

@@ -8,8 +8,8 @@ use axum::{
 mod cloud;
 mod dev_catalog;
 mod dev_web;
-mod playlist;
 mod local_room;
+mod playlist;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;

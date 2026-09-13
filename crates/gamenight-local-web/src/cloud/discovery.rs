@@ -201,7 +201,7 @@ mod tests {
     fn discovery_never_exports_launch_instructions() {
         let mut party = gamenight_core::GameNight::default().snapshot();
         party.library.push(serde_json::from_value(json!({"id":"local","title":"Local","launch":{"command":"/private/game","args":[],"env":{"SECRET":"private"}}})).unwrap());
-        party.library[0].min_players=Some(2);
+        party.library[0].min_players = Some(2);
         let view = snapshot(&party, &None);
         assert_eq!(view["games"][0]["selectable"], true);
         assert!(!view.to_string().contains("private"));
@@ -228,7 +228,10 @@ mod tests {
         let addr = listener.local_addr().unwrap().to_string();
         let server = tokio::spawn(gamenight_daemon::run_with_library(
             listener,
-            vec![serde_json::from_value(json!({"id":"target","title":"Target","min_players":2,"max_players":4})).unwrap()],
+            vec![serde_json::from_value(
+                json!({"id":"target","title":"Target","min_players":2,"max_players":4}),
+            )
+            .unwrap()],
         ));
         let state = Arc::new(Mutex::new(ServerState::new(addr.clone())));
         let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))

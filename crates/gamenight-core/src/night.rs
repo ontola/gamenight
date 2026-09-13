@@ -453,15 +453,25 @@ impl GameNight {
             Command::RenamePlayer { player_id, name } => {
                 self.on_rename_player(player_id, name, &mut fx)
             }
-            Command::SetPlayerSkinColor { player_id, skin_color } => {
-                if skin_color.len() != 7 || !skin_color.starts_with('#') || !skin_color[1..].bytes().all(|b| b.is_ascii_hexdigit()) {
-                    fx.push(Effect::Reject { reason: "skin colour must be #rrggbb".into() });
+            Command::SetPlayerSkinColor {
+                player_id,
+                skin_color,
+            } => {
+                if skin_color.len() != 7
+                    || !skin_color.starts_with('#')
+                    || !skin_color[1..].bytes().all(|b| b.is_ascii_hexdigit())
+                {
+                    fx.push(Effect::Reject {
+                        reason: "skin colour must be #rrggbb".into(),
+                    });
                 } else if let Some(p) = self.players.iter_mut().find(|p| p.id == player_id) {
                     p.skin_color = Some(skin_color);
                     fx.push(Effect::StateChanged);
                     self.rewarm_if_misfit(&mut fx);
                 } else {
-                    fx.push(Effect::Reject { reason: "unknown player".into() });
+                    fx.push(Effect::Reject {
+                        reason: "unknown player".into(),
+                    });
                 }
             }
             Command::SetPlayerColor { player_id, color } => {
@@ -475,10 +485,15 @@ impl GameNight {
                 player_id,
                 controller,
             } => {
-                if self.seats.iter().any(|s| s.occupant.player_id() == Some(player_id)) {
+                if self
+                    .seats
+                    .iter()
+                    .any(|s| s.occupant.player_id() == Some(player_id))
+                {
                     for seat in &mut self.seats {
                         if seat.occupant.player_id() != Some(player_id)
-                            && seat.controller.as_deref() == Some(&controller) {
+                            && seat.controller.as_deref() == Some(&controller)
+                        {
                             seat.controller = None;
                         }
                     }
@@ -554,7 +569,10 @@ impl GameNight {
             }
             Command::RemovePlaylistEntry { expected, index } => {
                 if self.playlist.snapshot() != expected || index >= expected.entries.len() {
-                    fx.push(Effect::Reject { reason: "playlist changed or invalid position; refresh and try again".into() });
+                    fx.push(Effect::Reject {
+                        reason: "playlist changed or invalid position; refresh and try again"
+                            .into(),
+                    });
                 } else {
                     let mut entries = expected.entries;
                     entries.remove(index);
@@ -564,7 +582,9 @@ impl GameNight {
                     if let Some(current) = expected.current.filter(|current| *current != index) {
                         let current = current - usize::from(current > index);
                         self.playlist.set_current(current);
-                        if let Some(active) = &mut self.active { active.playlist_index = current; }
+                        if let Some(active) = &mut self.active {
+                            active.playlist_index = current;
+                        }
                     }
                     // Keep its successor up next even when the current case
                     // itself is removed from the middle of the shelf.
@@ -979,7 +999,9 @@ impl GameNight {
                 let fits = self.game_has_capacity(&active.game);
                 self.dispose_warm(fx);
                 self.dispose_active(fx);
-                if fits { self.on_play_next(game, fx); }
+                if fits {
+                    self.on_play_next(game, fx);
+                }
                 self.pending_transition = true;
                 self.maybe_warm(fx);
                 self.try_transition(fx);
