@@ -2922,19 +2922,12 @@ fn sync_name_tags_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (seats, seated, presence) = {
+    let (seats, seated) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
-        (bridge.latest_seats.clone(), bridge.latest_players.clone(), bridge.latest_presence.clone())
+        (bridge.latest_seats.clone(), bridge.latest_players.clone())
     };
 
-    let label = |id| {
-        let name = name_of(&seated, id);
-        match presence.iter().find(|p| p.player_id == id).map(|p| p.state) {
-            Some(gamenight_protocol::PresenceState::Sleeping) => name,
-            Some(gamenight_protocol::PresenceState::Warning) => format!("{name}  — move to stay awake"),
-            _ => name,
-        }
-    };
+    let label = |id| name_of(&seated, id);
 
     // Drop tags whose player left, or whose name has since changed — the
     // latter get rebuilt below with the new text.
@@ -3552,7 +3545,7 @@ fn sync_jukebox_system(
             ellipsize(&t.title, 44),
             match t.artist.as_str() {
                 "" => format!("from {}", t.source),
-                artist => format!("{artist} — from {}", t.source),
+                artist => artist.to_string(),
             },
         ),
         None => (
@@ -3600,20 +3593,20 @@ fn sync_jukebox_system(
             }
             let display=lines.into_iter().take(2).collect::<Vec<_>>().join("\n");
             parent.spawn(Text2dBundle {
-                text: Text::from_section(display,TextStyle {font:font.clone(),font_size:6.5,color:Color::rgb_u8(248,226,177)})
+                text: Text::from_section(display,TextStyle {font:font.clone(),font_size:9.,color:Color::rgb_u8(248,226,177)})
                     .with_alignment(TextAlignment::Center),
                 text_2d_bounds: bevy::text::Text2dBounds {size:Vec2::new(142.,16.)},
                 transform:Transform::from_xyz(0.,21.,0.2), ..default()
             });
             parent.spawn(Text2dBundle {
-                text:Text::from_section(ellipsize(&byline,40),TextStyle {font:font.clone(),font_size:5.,color:Color::rgb_u8(174,192,181)})
+                text:Text::from_section(ellipsize(&byline,40),TextStyle {font:font.clone(),font_size:7.,color:Color::rgb_u8(174,192,181)})
                     .with_alignment(TextAlignment::Center),
                 text_2d_bounds:bevy::text::Text2dBounds {size:Vec2::new(142.,7.)},
                 transform:Transform::from_xyz(0.,9.,0.2), ..default()
             });
             // Button glyphs sit on the two physical knobs. Y interaction
             // remains owned by the existing music zones and nearby prompts.
-            for (x,glyph,skips) in [(-48.,if track.as_ref().is_some_and(|t|t.playing) {"Ⅱ"} else {"▶"},false),(48.,"▶|",true)] {
+            for (x,glyph,skips) in [(-64.,"|◀",false),(0.,if track.as_ref().is_some_and(|t|t.playing) {"Ⅱ"} else {"▶"},false),(64.,"▶|",true)] {
                 parent.spawn((PadFace {pad:PadButton::Music {skips},home_y:-5.},Text2dBundle {
                     text:Text::from_section(glyph,TextStyle {font:font.clone(),font_size:8.,color:Color::rgb_u8(37,32,27)})
                         .with_alignment(TextAlignment::Center),

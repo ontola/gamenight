@@ -51,7 +51,7 @@ wall=wall.resize((640,384),NEAREST)
 # Keep outside pixels transparent: the landscape, not enlarged wallpaper,
 # fills the surrounding screen. Use the approved oak ledge as a roof fascia.
 house=Image.new('RGBA',(640,384))
-house.paste(wall.crop((16,16,624,368)),(16,16))
+house.paste(wall.crop((16,16,624,336)),(16,16))
 fascia=ledge.crop((4,0,92,7)).resize((608,7),NEAREST)
 house.alpha_composite(fascia,(16,16))
 house.save(OUT/'wall.png')
@@ -77,6 +77,7 @@ for col,idx in enumerate((44,45,46)):
     tile=Image.new('RGBA',(32,32))
     tile.alpha_composite(ledge.crop((col*32,0,col*32+32,24)),(0,0))
     atlas.paste(tile,((idx%17)*32,(idx//17)*32))
+atlas.paste(Image.new('RGBA',(32,32)),((84%17)*32,(84//17)*32))
 atlas.save(OUT/'terrain.png')
 (OUT/'terrain.atlas.yaml').write_text('image: ./terrain.png\ntile_size: [32, 32]\ncolumns: 17\nrows: 5\n')
 print('Exported clubhouse wall, door, television, cupboard and terrain atlas')

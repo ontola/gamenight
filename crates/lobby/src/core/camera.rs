@@ -47,7 +47,7 @@ pub struct CameraState {
 
 /// Persistent framing avoids jumps when the set of subjects changes.
 #[derive(Clone, Debug, Default, HasSchema)]
-struct LobbyFollow { center: Vec2, initialized: bool }
+struct LobbyFollow { center: Vec2, height: f32, initialized: bool }
 
 /// Implemenets the camera controller.
 fn camera_controller(
@@ -84,17 +84,27 @@ fn camera_controller(
         let (center, height) = lobby_frame(map_size, viewport);
         let mut total = Vec2::ZERO;
         let mut count = 0;
+        let mut lo=Vec2::MAX; let mut hi=Vec2::MIN;
         for (_, (_, transform, _)) in entities.iter_with((&camera_subjects, &transforms, &bodies)) {
-            total += transform.translation.truncate();
+            let position=transform.translation.truncate();
+            lo=lo.min(position); hi=hi.max(position);
+            total += position;
             count += 1;
         }
         let subject = (count > 0).then(|| total / count as f32);
         if !follow.initialized {
             follow.center = center;
+            follow.height = height;
             follow.initialized = true;
         }
         follow.center = lobby_follow_step(follow.center, center, subject, time.delta_seconds());
-        camera.size = CameraSize::FixedHeight(height);
+        let aspect=viewport.x.max(1.)/viewport.y.max(1.);
+        let target_height=if count==0 {height} else {
+            (height*0.84).max((hi.x-lo.x+160.)/aspect).max(hi.y-lo.y+200.).min(height)
+        };
+        let blend=1.-(-time.delta_seconds().clamp(0.,0.1)/0.8).exp();
+        follow.height += (target_height-follow.height)*blend;
+        camera.size = CameraSize::FixedHeight(follow.height);
         camera_shake.center.x = follow.center.x;
         camera_shake.center.y = follow.center.y;
         return;
@@ -211,7 +221,7 @@ fn camera_controller(
 fn lobby_follow_step(current: Vec2, home: Vec2, subject: Option<Vec2>, dt: f32) -> Vec2 {
     let delta = subject.unwrap_or(home) - home;
     let beyond = (delta.abs() - Vec2::new(48., 32.)).max(Vec2::ZERO) * delta.signum();
-    let target = home + (beyond * 0.15).clamp(Vec2::new(-40., -24.), Vec2::new(40., 24.));
+    let target = home + (beyond * 0.35).clamp(Vec2::new(-96., -64.), Vec2::new(96., 64.));
     let blend = 1.0 - (-dt.clamp(0., 0.1) / 0.8).exp();
     current.lerp(target, blend)
 }
@@ -282,7 +292,7 @@ fn camera_parallax(
         let center = Vec2::new(bg.meta.offset.x, map_size.y / 2.0 + bg.meta.offset.y);
         let scale = if lobby_mode.0 && bg.meta.depth > 0.0 {
             background_cover_scale(bg.meta.size, bg.meta.scale, view_size,
-                (center - camera_transform.translation.truncate()).abs().max(Vec2::new(64.,48.)))
+                (center - camera_transform.translation.truncate()).abs().max(Vec2::new(128.,96.)))
         } else { bg.meta.scale };
         transform.scale.x = scale;
         transform.scale.y = scale;
@@ -334,13 +344,13 @@ mod follow_tests {
     fn spawn_and_leave_ease_without_snapping() {
         let home=Vec2::new(640.,384.);
         let first=lobby_follow_step(home,home,Some(Vec2::new(100.,100.)),1./60.);
-        assert!(first.distance(home)>0. && first.distance(home)<2.);
+        assert!(first.distance(home)>0. && first.distance(home)<3.);
         let mut current=first;
         for _ in 0..600 { current=lobby_follow_step(current,home,Some(Vec2::new(100.,100.)),1./60.); }
-        assert!((current.x-home.x).abs()<=40. && (current.y-home.y).abs()<=24.);
+        assert!((current.x-home.x).abs()<=96. && (current.y-home.y).abs()<=64.);
         let left=lobby_follow_step(current,home,None,1./60.);
         assert!(left.distance(home)<current.distance(home));
-        assert!(left.distance(current)<2.);
+        assert!(left.distance(current)<3.);
     }
     #[test]
     fn small_motion_is_quiet_and_easing_is_frame_rate_independent() {
