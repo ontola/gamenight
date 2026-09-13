@@ -267,3 +267,11 @@ end
 -- Window activation can also happen while the host is moving focus to the
 -- lobby. Never interpret it as permission to unpause or start a warm game;
 -- only the host's explicit Start/Resume commands change the running phase.
+
+-- CI must fail with a useful traceback instead of waiting on the interactive error screen.
+if os.getenv("GNLOVE_RENDER_SMOKE") == "1" then
+    function love.errorhandler(message)
+        io.stderr:write(debug.traceback(tostring(message), 2) .. "\n")
+        return function() return 1 end
+    end
+end

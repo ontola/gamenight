@@ -45,7 +45,10 @@ def main():
     shutil.copy2(repo / 'docs/windows-preview.md', stage / 'README.md')
     shutil.copy2(repo / 'docs/windows-distribution.md', stage / 'windows-distribution.md')
     (stage / 'catalog/games').mkdir(parents=True)
-    shutil.copy2(repo / 'catalog/games/pinpals.json', stage / 'catalog/games/pinpals.json')
+    for entry in sorted((repo / 'catalog/games').glob('*.json')):
+        import json
+        if 'windows' in json.loads(entry.read_text(encoding='utf-8')).get('downloads', {}):
+            shutil.copy2(entry, stage / 'catalog/games' / entry.name)
     shutil.copy2(repo / 'catalog/schema.json', stage / 'catalog/schema.json')
     archive = Path(shutil.make_archive(str(args.output / stage.name), 'zip', args.output, stage.name))
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()

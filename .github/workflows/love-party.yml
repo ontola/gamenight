@@ -44,11 +44,6 @@ jobs:
           python scripts/package-love-party.py --output dist/repeated
           if ($LASTEXITCODE -ne 0) { throw 'Repeat packaging failed' }
           if ((Get-FileHash dist/party/gamenight-love-party.zip).Hash -ne (Get-FileHash dist/repeated/gamenight-love-party.zip).Hash) { throw 'Non-deterministic package' }
-      - name: Render every packaged game
-        shell: pwsh
-        run: |
-          python scripts/test-love-party-render.py --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --pack dist/party
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged game rendering failed' }
       - name: Certify every packaged game against GameNight
         shell: pwsh
         run: |
@@ -69,3 +64,16 @@ jobs:
         with:
           name: gamenight-love-party
           path: dist/party/*
+
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install renderer with software OpenGL
+        run: sudo apt-get update && sudo apt-get install -y love xvfb libgl1-mesa-dri
+      - run: python3 scripts/package-love-party.py --output dist/party
+      - name: Render every packaged game
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: xvfb-run -a python3 scripts/test-love-party-render.py --love /usr/bin/love --pack dist/party
