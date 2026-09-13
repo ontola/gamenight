@@ -1583,8 +1583,9 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         .after(bevy::render::camera::CameraUpdateSystem)
         .before(bevy::ui::UiSystem::Layout));
     app.add_systems(bevy::prelude::PostUpdate,
-        (sleep_visual::pose, sync_player_avatar_system, bevy::ecs::schedule::apply_deferred,
-            position_player_avatar_system).chain()
+        (sleep_visual::pose, sync_player_skin_system, sync_player_avatar_system,
+            sync_name_tags_system, bevy::ecs::schedule::apply_deferred,
+            position_player_avatar_system, position_name_tags_system).chain()
             .before(interaction_visual::sync).before(position_player_menus_system)
             .before(bevy::transform::TransformSystem::TransformPropagate));
     app.add_systems(
@@ -1593,9 +1594,6 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             global_input_system,
             sync_player_menus_system,
             apply_player_colors_system,
-            sync_player_skin_system,
-            sync_name_tags_system,
-            position_name_tags_system,
             swap_player_faces_system,
             deal_player_faces_system,
             sync_prune_countdown_system,
@@ -1606,7 +1604,6 @@ pub fn install_global_input(app: &mut bevy::app::App) {
             sync_next_game_tv_system,
             press_pads_system,
             fill_the_screen_system,
-            reached_for_the_lobby_system,
         )
             // Chained, not parallel. Every one of these reaches into the
             // bones world and several take mutable borrows of the same
@@ -1620,46 +1617,8 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     );
 }
 
-/// Cmd+Tabbing to the lobby while a game is playing means "back to the
-/// party" — the mirror of a game reporting that it was reached for
-/// (`ClientMessage::RequestStart`).
-///
-/// Window focus is the one thing the party can always express and GameNight
-/// cannot override, so it's read as intent rather than fought: whoever the
-/// couch just switched to is who they want. Sends the same `open_overlay` the
-/// Select button does, so the game pauses and hands the screen over properly
-/// rather than the lobby ending up in front of a game that is still running.
-///
-/// Only on the *edge* into focus, and only while something else is actually
-/// playing: the lobby is focused for most of the night, and re-announcing
-/// that every frame would pause a game for every stray activation.
-fn reached_for_the_lobby_system(
-    bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
-    windows: bevy::prelude::Query<
-        &bevy::prelude::Window,
-        bevy::prelude::With<bevy::window::PrimaryWindow>,
-    >,
-    mut was_focused: bevy::prelude::Local<Option<bool>>,
-) {
-    let focused = windows.get_single().map(|w| w.focused).unwrap_or(false);
-    // The *first* observation is not an edge. A window that opens focused
-    // would otherwise read as the party reaching for the lobby the instant it
-    // launches — which, mid-match, would pause the game they're playing
-    // because their lobby happened to restart.
-    let gained = was_focused.is_some_and(|before| focused && !before);
-    *was_focused = Some(focused);
-    if !gained {
-        return;
-    }
-    let bridge = bones_game.0.shared_resource::<GameNightBridge>();
-    // Nothing playing means the lobby already has the screen — there is
-    // nothing to ask for, and asking would open an overlay over ourselves.
-    if !bridge.something_else_is_playing() {
-        return;
-    }
-    info!("gamenight: the party reached for the lobby — asking for the screen");
-    let _ = bridge.join_tx.try_send(ClientMessage::OpenOverlay);
-}
+// Window focus changes are not controller intent. Showing/preloading a game can
+// briefly reactivate the lobby on Windows; only explicit Back/Select opens it.
 
 /// Keeps the lobby filling the screen — as a borderless window, deliberately
 /// *not* as a native fullscreen one.
@@ -2806,6 +2765,7 @@ fn sync_player_avatar_system(
             continue;
         };
         let face_size = Vec2::new(image.texture_descriptor.size.width as f32 / 4.0, image.texture_descriptor.size.height as f32 / 4.0);
+        info!(?player_id, ?face_size, "lobby: custom player artwork loaded");
         let handle = images.add(image);
         commands.spawn((
             PlayerAvatarPortrait(player_id, avatar),
@@ -2988,113 +2948,49 @@ fn sync_name_tags_system(
         }
     }
 
-    // FairfaxSM reads far clearer than the pixel font at name-tag size; a
-    // 1px-offset black copy behind the white text fakes an outline/bold
-    // weight bevy_ui's `TextStyle` has no field for on its own.
-    const NAME_TAG_FONT_SIZE: f32 = 18.0;
-    const NAME_TAG_OUTLINE: f32 = 1.0;
     let font: Handle<Font> = asset_server.load("ui/FairfaxSM.ttf");
     for seat in &seats {
-        let Some(player_id) = seat.occupant.player_id() else {
-            continue;
-        };
+        let Some(player_id) = seat.occupant.player_id() else { continue; };
         let name = label(player_id);
-        if tags
-            .iter()
-            .any(|(_, tag)| tag.0 == player_id && tag.1 == name)
-        {
-            continue; // already showing the right name; only position updates
-        }
-        commands
-            .spawn((
-                PlayerNameTag(player_id, name.clone()),
-                NodeBundle {
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        width: Val::Px(300.0),
-                        ..default()
-                    },
-                    ..default()
-                },
-            ))
+        if tags.iter().any(|(_, tag)| tag.0 == player_id && tag.1 == name) { continue; }
+        // A centered world-space label shares the player's camera and DPI scale.
+        // UI text alignment centers glyphs in their measured bounds, not in the
+        // old 300px parent, which left short names displaced by half that width.
+        commands.spawn((PlayerNameTag(player_id, name.clone()), SpatialBundle::default()))
             .with_children(|parent| {
-                for (dx, dy) in [
-                    (-NAME_TAG_OUTLINE, 0.0),
-                    (NAME_TAG_OUTLINE, 0.0),
-                    (0.0, -NAME_TAG_OUTLINE),
-                    (0.0, NAME_TAG_OUTLINE),
+                for (dx, dy, z, color) in [
+                    (-0.5, 0.0, 0.0, Color::BLACK), (0.5, 0.0, 0.0, Color::BLACK),
+                    (0.0, -0.5, 0.0, Color::BLACK), (0.0, 0.5, 0.0, Color::BLACK),
+                    (0.0, 0.0, 0.01, Color::WHITE),
                 ] {
-                    parent.spawn(TextBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                        width: Val::Px(300.0),
-                            left: Val::Px(dx),
-                            top: Val::Px(dy),
-                            ..default()
-                        },
-                        text: Text::from_section(
-                            name.clone(),
-                            TextStyle {
-                                font: font.clone(),
-                                font_size: NAME_TAG_FONT_SIZE,
-                                color: Color::BLACK,
-                            },
-                        ).with_alignment(TextAlignment::Center),
+                    parent.spawn(Text2dBundle {
+                        text: Text::from_section(name.clone(), TextStyle {
+                            font: font.clone(), font_size: 9.0, color,
+                        }).with_alignment(TextAlignment::Center),
+                        text_anchor: bevy::sprite::Anchor::Center,
+                        transform: bevy::prelude::Transform::from_xyz(dx, dy, z),
                         ..default()
                     });
                 }
-                parent.spawn(TextBundle::from_section(
-                    name.clone(),
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: NAME_TAG_FONT_SIZE,
-                        color: Color::WHITE,
-                    },
-                ).with_text_alignment(TextAlignment::Center).with_style(Style {width:Val::Px(300.0),..default()}));
             });
     }
 }
 
 fn position_name_tags_system(
     bones_game: bevy::prelude::Res<bones_bevy_renderer::BonesGame>,
-    cameras: bevy::prelude::Query<(&bevy::prelude::Camera, &bevy::prelude::GlobalTransform)>,
-    mut tags: bevy::prelude::Query<(&PlayerNameTag, &mut bevy::prelude::Style)>,
+    mut tags: bevy::prelude::Query<(&PlayerNameTag, &mut bevy::prelude::Transform,
+        &mut bevy::prelude::Visibility)>,
 ) {
-    if tags.is_empty() {
-        return;
-    }
-    let Some((camera, camera_transform)) = cameras.iter().next() else {
-        return;
-    };
-    let seats = bones_game
-        .0
-        .shared_resource::<GameNightBridge>()
-        .latest_seats
-        .clone();
-
-    for (tag, mut style) in &mut tags {
-        // A tag is only meaningful once its player has a body to sit above.
-        // A seat can be occupied with nothing spawned — someone who joined
-        // from the web has no gamepad, so `match_plugin_for_seats` leaves
-        // them inactive — and without this the label would strand itself at
-        // whatever screen position it was last given.
-        let world_pos = seats
-            .iter()
-            .find(|s| s.occupant.player_id() == Some(tag.0))
-            .map(|s| s.index)
-            .and_then(|seat_index| seat_world_position(&bones_game.0, seat_index));
-        let Some(world_pos) = world_pos else {
-            style.display = bevy::prelude::Display::None;
-            continue;
-        };
-        let anchor = world_pos + bevy::prelude::Vec3::new(0.0, OVERHEAD_ANCHOR, 0.0);
-        if let Some(screen_pos) = camera.world_to_viewport(camera_transform, anchor) {
-            style.display = bevy::prelude::Display::Flex;
-            style.left = bevy::prelude::Val::Px(screen_pos.x - 150.0);
-            style.top = bevy::prelude::Val::Px(screen_pos.y);
+    let seats = bones_game.0.shared_resource::<GameNightBridge>().latest_seats.clone();
+    for (tag, mut transform, mut visibility) in &mut tags {
+        let position = seats.iter().find(|s| s.occupant.player_id() == Some(tag.0))
+            .and_then(|s| seat_world_position(&bones_game.0, s.index));
+        if let Some(position) = position {
+            transform.translation = bevy::prelude::Vec3::new(position.x,
+                position.y + OVERHEAD_ANCHOR, -50.0);
+            *visibility = bevy::prelude::Visibility::Visible;
         } else {
-            // Off-camera: hide rather than clamp to an edge.
-            style.display = bevy::prelude::Display::None;
+            *visibility = bevy::prelude::Visibility::Hidden;
         }
     }
 }

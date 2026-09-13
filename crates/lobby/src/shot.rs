@@ -14,6 +14,7 @@
 //! `LOBBY_SHOT_AFTER` sets how many seconds to wait first (default 6). It needs
 //! to be long enough for assets to finish loading and for the camera to settle,
 //! or you photograph a half-built room.
+//! Optional LOBBY_SHOT_INTERVAL captures repeatedly without exiting.
 
 use bevy::prelude::*;
 use bevy::render::view::screenshot::ScreenshotManager;
@@ -30,6 +31,7 @@ struct Shot {
     path: String,
     at: f32,
     taken: Option<f32>,
+    interval: Option<f32>,
 }
 
 pub fn install(app: &mut App) {
@@ -40,11 +42,13 @@ pub fn install(app: &mut App) {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_DELAY);
-    info!(%path, at, "lobby: will photograph itself and quit");
+    info!(%path, at, "lobby: self-capture enabled");
     app.insert_resource(Shot {
         path,
         at,
         taken: None,
+        // Optional repeated self-capture leaves the live lobby running.
+        interval: std::env::var("LOBBY_SHOT_INTERVAL").ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| *v >= 1.0),
     });
     app.add_systems(Update, capture);
 }
@@ -59,10 +63,12 @@ fn capture(
     let now = time.elapsed_seconds();
 
     if let Some(taken) = shot.taken {
-        if now - taken > WRITE_GRACE {
-            exit.send(bevy::app::AppExit);
+        if let Some(interval) = shot.interval {
+            if now - taken < interval { return; }
+        } else {
+            if now - taken > WRITE_GRACE { exit.send(bevy::app::AppExit); }
+            return;
         }
-        return;
     }
 
     if now < shot.at {

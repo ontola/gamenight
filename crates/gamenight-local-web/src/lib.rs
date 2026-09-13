@@ -436,6 +436,7 @@ async fn join_session_inner(
             };
             let mut target = seat_target.or(req.claim);
             if let Some(target) = target {
+                if !existing.contains(&target) { return Err(StatusCode::NOT_FOUND); }
                 let revision = state
                     .lock()
                     .unwrap()
@@ -529,10 +530,6 @@ async fn join_session_inner(
                 ),
             };
 
-            if let Some(pid) = player_id {
-                state.lock().unwrap().bindings.insert(id.clone(), pid);
-            }
-
             if let Some(player_id) = player_id {
                 ws_stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(
@@ -546,10 +543,13 @@ async fn join_session_inner(
                     .map_err(|_| StatusCode::BAD_GATEWAY)?;
             }
 
-            // Close politely rather than dropping the socket mid-flight. The
-            // sends above are flushed, but an abrupt drop shows up daemon-side
-            // as a connect/disconnect pair with no explanation, which is a
-            // miserable thing to debug.
+            if let Some(pid) = player_id {
+                daemon::wait_for_profile(&mut ws_stream, pid, &profile)
+                    .await.map_err(StatusCode::from)?;
+                state.lock().unwrap().bindings.insert(id.clone(), pid);
+            }
+
+            // All fields are now acknowledged by the host, not merely flushed.
             let _ = ws_stream.close(None).await;
 
             Ok(Json(serde_json::json!({

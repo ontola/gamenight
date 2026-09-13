@@ -51,3 +51,19 @@ and host disconnect must clean up their process.
 Run lifecycle/input regressions and a real render preview, then test transitions
 with two physical controllers. Compilation or a passing simulation test cannot prove
 focus behavior, display resolution, or physical controller identity is correct.
+## Profile pickup and render regressions
+
+A flushed websocket write is not host confirmation. Closing immediately after
+rename/avatar/skin messages can leave only the rename applied, especially with
+48x48 drawings. Keep the connection open until PartyState acknowledges all
+three fields, then publish the binding and close. The large-profile claim test
+checks a fresh host snapshot immediately after HTTP success and a repeated save.
+
+The lobby follows the same focus rule as games: focus alone must not request a
+pause. Windows can transiently reactivate the lobby during a launch.
+
+Apply skin, artwork and names after the final pose, before transform propagation.
+Center names with a Text2d anchor, not half an arbitrary UI container width.
+Animate text using transform scale, not continuously changing font_size. Bevy
+caches an atlas per size; the sleeping Z animation exhausted graphics memory by
+rasterizing a new size every frame. Test idle sleeping players for several minutes.

@@ -68,3 +68,19 @@ pub(crate) async fn wait_for_new_player(
     })
     .await
 }
+
+/// A socket flush is not an acknowledgement: a closing websocket may stop the
+/// daemon reader after the first command. Observe the complete profile before
+/// reporting a pickup/save as successful.
+pub(crate) async fn wait_for_profile(
+    ws: &mut DaemonWs, id: PlayerId, profile: &crate::Profile,
+) -> Result<(), DaemonError> {
+    read_matching(ws, |message| match message {
+        ServerMessage::PartyState { party } => party.players.iter().any(|player|
+            player.id == id && player.name == profile.username
+                && player.avatar.as_deref().unwrap_or("") == profile.avatar
+                && player.skin_color.as_deref() == Some(profile.skin_color.as_str())
+        ).then_some(()),
+        _ => None,
+    }).await
+}

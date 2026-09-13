@@ -63,8 +63,10 @@ pub(super) fn pose(mut commands: Commands, game: Res<bones_bevy_renderer::BonesG
             let phase = (time.elapsed_seconds()*0.45 + i as f32/3.).fract();
             let alpha = (phase*5.).min(1.) * ((1.-phase)*3.).min(1.);
             commands.spawn((SleepEffect,Text2dBundle {
-                text:Text::from_section("Z",TextStyle {font:assets.load("ui/FairfaxSM.ttf"),font_size:9.+phase*5.,color:Color::rgba(0.85,0.9,1.,alpha)}),
-                transform:Transform::from_xyz(head.x+facing*(10.+phase*14.),head.y+12.+phase*26.,-80.),..default()
+                text:Text::from_section("Z",TextStyle {font:assets.load("ui/FairfaxSM.ttf"),font_size:12.,color:Color::rgba(0.85,0.9,1.,alpha)}),
+                // Scale the quad, not the rasterized font: each font size allocates an atlas.
+                transform:Transform::from_xyz(head.x+facing*(10.+phase*14.),head.y+12.+phase*26.,-80.)
+                    .with_scale(Vec3::splat((9.+phase*5.)/12.)),..default()
             }));
         }
     }
