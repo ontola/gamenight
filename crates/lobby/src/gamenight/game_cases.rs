@@ -178,16 +178,6 @@ pub(super) fn spawn_shelf(
     block(parent, 60.0, -43.0, 0.2, 220.0, 2.0, Color::rgb(0.70, 0.45, 0.25));
     block(parent, -50.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
     block(parent, 164.0, 0.0, 0.1, 2.0, 88.0, Color::rgb(0.60, 0.35, 0.20));
-    label(
-        parent,
-        "UP NEXT",
-        -2.0,
-        -28.0,
-        100.0,
-        9.0,
-        &font,
-        Color::rgb(1.0, 0.83, 0.48),
-    );
     if cases.is_empty() {
         label(
             parent,
@@ -220,36 +210,19 @@ pub(super) fn spawn_shelf(
     }
     let case = &cases[0];
     let x = -3.0 + motion * 22.0;
-    let accent = Color::rgb(0.16, 0.19, 0.25);
-    block(
-        parent,
-        x + 2.0,
-        2.0,
-        0.2,
-        72.0,
-        90.0,
-        Color::rgb(0.055, 0.07, 0.12),
-    );
-    block(
-        parent,
-        x,
-        3.0,
-        0.3,
-        68.0,
-        88.0,
-        Color::rgb(0.10, 0.13, 0.19),
-    );
-    block(parent, x - 29.0, 3.0, 0.4, 4.0, 84.0, accent);
-    // The illustrated cover includes its title; use the whole case face.
-    block(parent, x + 2.0, 11.0, 0.4, 48.0, 64.0, accent);
     if let Some(texture) = cache.image(case.cover.as_deref(), images) {
+        // Keep the title at the top of portrait artwork when filling the slot.
+        let mut crop = fill_rect(&texture, images, Vec2::new(74.0, 76.0));
+        crop.max.y -= crop.min.y;
+        crop.min.y = 0.0;
         parent.spawn(SpriteBundle {
             texture: texture.clone(),
             sprite: Sprite {
-                custom_size: Some(fit_art(&texture, images, Vec2::new(48.0, 64.0))),
+                custom_size: Some(Vec2::new(74.0, 76.0)),
+                rect: Some(crop),
                 ..default()
             },
-            transform: Transform::from_xyz(x + 2.0, 11.0, 0.5),
+            transform: Transform::from_xyz(-5.0 + motion * 22.0, 7.0, 0.5),
             ..default()
         });
     } else {
@@ -279,19 +252,9 @@ pub(super) fn spawn_shelf(
             Color::WHITE,
         );
     }
-    let hint = status;
-    if !hint.is_empty() {
-        label(
-            parent,
-            hint,
-            -2.0,
-            -39.0,
-            78.0,
-            7.0,
-            &font,
-            if status=="READY" {Color::rgb(0.6,1.0,0.7)} else {Color::rgb(1.0, 0.83, 0.48)},
-        );
-    }
+    let caption = if status.is_empty() { "UP NEXT".to_string() } else { format!("UP NEXT · {status}") };
+    label(parent, &caption, -5.0, -37.0, 76.0, 6.0, &font,
+        if status=="READY" {Color::rgb(0.6,1.0,0.7)} else {Color::rgb(1.0,0.83,0.48)});
     if cases.len() > 6 {
         label(
             parent,
@@ -425,4 +388,13 @@ pub(super) fn fit_art(texture: &Handle<Image>, images: &Assets<Image>, bounds: V
     let Some(image) = images.get(texture) else { return bounds; };
     let size = Vec2::new(image.texture_descriptor.size.width as f32, image.texture_descriptor.size.height as f32);
     size * (bounds.x / size.x).min(bounds.y / size.y)
+}
+
+/// Crop centrally to fill a display without stretching or letterboxing.
+pub(super) fn fill_rect(texture: &Handle<Image>, images: &Assets<Image>, bounds: Vec2) -> Rect {
+    let image = images.get(texture).expect("cached artwork exists");
+    let size = Vec2::new(image.texture_descriptor.size.width as f32, image.texture_descriptor.size.height as f32);
+    let scale = (bounds.x / size.x).max(bounds.y / size.y);
+    let crop = bounds / scale;
+    Rect::from_center_size(size / 2.0, crop)
 }

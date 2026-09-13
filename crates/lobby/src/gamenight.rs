@@ -3896,25 +3896,25 @@ fn sync_next_game_tv_system(
             // Pads sit just in front of the cabinet, never on top of its screen.
             station_art::controllers(parent, &controller_colors, tv_x,
                 -10.0 - (cabinet.y + 16.0) / 2.0);
-            // State line: UP NEXT when ready, LOADING… while on its way.
+            // Center the pause overlay on the full screen; both bars share its ink.
+            let paused = kicker == "PAUSED";
             parent.spawn(Text2dBundle {
-                text: Text::from_section(
-                    kicker,
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 11.0,
-                        color: kicker_color,
-                    },
-                ),
-                transform: Transform::from_xyz(tv_x, size.y / 2.0 - 16.0, 0.1),
-                ..default()
+                text: Text::from_section(kicker, TextStyle {font:font.clone(),font_size:11.,color:kicker_color})
+                    .with_alignment(TextAlignment::Center),
+                transform:Transform::from_xyz(tv_x, if paused {-9.} else {size.y/2.-16.}, 0.4),..default()
             });
+            if paused {
+                for offset in [-4.,4.] {
+                    parent.spawn(SpriteBundle {sprite:Sprite {color:kicker_color,custom_size:Some(Vec2::new(4.,13.)),..default()},
+                        transform:Transform::from_xyz(tv_x+offset,7.,0.4),..default()});
+                }
+            }
             // A captured gameplay image belongs to the active game, never to
             // the next game's cover. Keep loading/paused text above the screen.
             let screenshot_texture = cover_cache.image(screenshot.as_deref(), &mut cover_images);
             if let Some(texture) = screenshot_texture {
                 parent.spawn(SpriteBundle {
-                    sprite: Sprite { custom_size: Some(game_cases::fit_art(&texture, &cover_images, Vec2::new(screen.x - 12.0, screen.y - 30.0))), ..default() },
+                    sprite: Sprite { custom_size: Some(screen), rect: Some(game_cases::fill_rect(&texture, &cover_images, screen)), ..default() },
                     texture,
                     transform: Transform::from_xyz(tv_x, -9.0, 0.1), ..default()
                 });
