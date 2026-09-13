@@ -240,15 +240,16 @@ pub(super) fn spawn_shelf(
         Color::rgb(0.10, 0.13, 0.19),
     );
     block(parent, x - 29.0, 3.0, 0.4, 4.0, 84.0, accent);
-    block(parent, x + 2.0, 12.0, 0.4, 54.0, 62.0, accent);
+    // The illustrated cover includes its title; use the whole case face.
+    block(parent, x + 2.0, 3.0, 0.4, 60.0, 80.0, accent);
     if let Some(texture) = cache.image(case.cover.as_deref(), images) {
         parent.spawn(SpriteBundle {
             texture: texture.clone(),
             sprite: Sprite {
-                custom_size: Some(fit_art(&texture, images, Vec2::new(54.0, 62.0))),
+                custom_size: Some(fit_art(&texture, images, Vec2::new(60.0, 80.0))),
                 ..default()
             },
-            transform: Transform::from_xyz(x + 2.0, 12.0, 0.5),
+            transform: Transform::from_xyz(x + 2.0, 3.0, 0.5),
             ..default()
         });
     } else {
@@ -267,17 +268,17 @@ pub(super) fn spawn_shelf(
                 }
             }
         }
+        label(
+            parent,
+            &case.title,
+            x + 2.0,
+            -29.0,
+            58.0,
+            10.0,
+            &font,
+            Color::WHITE,
+        );
     }
-    label(
-        parent,
-        &case.title,
-        x + 2.0,
-        -29.0,
-        58.0,
-        10.0,
-        &font,
-        Color::WHITE,
-    );
     let hint = status;
     if !hint.is_empty() {
         label(
