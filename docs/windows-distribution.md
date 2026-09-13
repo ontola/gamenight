@@ -106,3 +106,27 @@ and publish only complete versions. Old versions and game saves are retained.
 Failures do not prevent the lobby from opening; restart to retry failed downloads.
 `GAMENIGHT_INSTALL_DIR` overrides the standalone install cache; the desktop
 launcher sets it to `%LOCALAPPDATA%\GameNight\games` (or its test data override).
+
+
+## Release acceptance
+
+The package includes every catalog entry with a Windows download, not just
+Pinpals. Game archives stay outside the installer and use immutable HTTPS URLs
+plus SHA-256 checksums. Test against an empty `GAMENIGHT_DATA_DIR`; a developer
+shelf containing local `.love` paths is not download acceptance.
+
+After launching the extracted release with the isolated data directory, run:
+
+```
+node scripts/test-installed-downloads.mjs ws://127.0.0.1:7912 download-e2e.json
+```
+
+This checks all eight party games appearing in the installed library, preparing,
+starting, pausing and resuming through the real host. It refuses a party with
+existing user profiles. It uses AI seats and does not replace a physical
+controller/focus test or visual inspection. Keep the JSON and daemon logs.
+
+The LÖVE pack CI renders real frames under Xvfb with Mesa software OpenGL;
+Windows CI still runs simulation, authentication, certification and disconnect
+checks against the official Windows LÖVE runtime. Interactive LÖVE error screens
+must not hide failures in automated rendering jobs.
