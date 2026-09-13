@@ -37,3 +37,9 @@ Skyline generated with built-in image_gen. Prompt: Production pixel-art full-ble
 ## Roof and ground
 
 Separate fixed sprites complete the cutaway house: a low slate-blue gabled roof (624x48 at 2x, eaves at world y=736) and a repeating grass/soil strip beneath the foundation. They add no collision surfaces. The lobby camera reserves 192 world pixels of vertical overscan for roof and ground. Roof/ground sources are retained; built-in image_gen prompts requested flat side/front elevation, muted slate/oak for the roof and moss-green/umber for soil, crisp low-resolution pixel clusters, transparent exterior, no perspective, text or extra furniture. Ground was requested horizontally seamless with level grass top and soil extending to the bottom. The exporter preserves alpha and removes pure-black export matte only when present.
+
+## Camera follow and stereo
+
+Camera follows the centroid of actual camera subjects with a 48x32 dead zone, 15% influence, maximum +/-40x24 world-pixel pan and exponential easing (0.8 seconds). Joining/leaving changes only the target; framing scale remains fixed. Landscape uses stable overscan so the pan does not make it breathe/resize. Tests cover spawn/leave continuity, dead zone, bounded movement and frame-rate independence.
+
+Jukebox: built-in image_gen produced jukebox-source.png, a front-facing oak stereo with matching speakers, blank navy display and two amber knobs. Prompt requested a compact vintage hi-fi, chunky pixels, no lettering/background/perspective, matching the clubhouse palette. Export is 280x80 with alpha. Runtime overlays bounded title/artist lines and physical pause/play/next glyphs; the existing Y proximity controls remain authoritative.

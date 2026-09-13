@@ -45,9 +45,15 @@ pub struct CameraState {
     pub disable_controller: bool,
 }
 
+/// Persistent framing avoids jumps when the set of subjects changes.
+#[derive(Clone, Debug, Default, HasSchema)]
+struct LobbyFollow { center: Vec2, initialized: bool }
+
 /// Implemenets the camera controller.
 fn camera_controller(
     meta: Root<GameMeta>,
+    time: Res<Time>,
+    mut follow: ResMutInit<LobbyFollow>,
     entities: Res<Entities>,
     map: Res<LoadedMap>,
     mut cameras: CompMut<Camera>,
@@ -71,16 +77,26 @@ fn camera_controller(
         return;
     }
 
-    // The hangout is a room, not a camera target formed by its occupants.
-    // Seat changes rebuild subjects; using map bounds prevents join/leave zooms
-    // and also keeps the empty lobby framed exactly like the occupied lobby.
+    // Keep the room's scale stable; a small eased pan reveals exterior depth.
     if lobby_mode.0 {
         let viewport = camera.viewport.option().map(|v| v.size.as_vec2()).unwrap_or(window.size);
         let map_size = map.grid_size.as_vec2() * map.tile_size;
         let (center, height) = lobby_frame(map_size, viewport);
+        let mut total = Vec2::ZERO;
+        let mut count = 0;
+        for (_, (_, transform, _)) in entities.iter_with((&camera_subjects, &transforms, &bodies)) {
+            total += transform.translation.truncate();
+            count += 1;
+        }
+        let subject = (count > 0).then(|| total / count as f32);
+        if !follow.initialized {
+            follow.center = center;
+            follow.initialized = true;
+        }
+        follow.center = lobby_follow_step(follow.center, center, subject, time.delta_seconds());
         camera.size = CameraSize::FixedHeight(height);
-        camera_shake.center.x = center.x;
-        camera_shake.center.y = center.y;
+        camera_shake.center.x = follow.center.x;
+        camera_shake.center.y = follow.center.y;
         return;
     }
 
@@ -191,6 +207,15 @@ fn camera_controller(
     *camera_pos -= dist.extend(0.0);
 }
 
+/// Dead zone filters small jumps; bounded travel preserves the whole house.
+fn lobby_follow_step(current: Vec2, home: Vec2, subject: Option<Vec2>, dt: f32) -> Vec2 {
+    let delta = subject.unwrap_or(home) - home;
+    let beyond = (delta.abs() - Vec2::new(48., 32.)).max(Vec2::ZERO) * delta.signum();
+    let target = home + (beyond * 0.15).clamp(Vec2::new(-40., -24.), Vec2::new(40., 24.));
+    let blend = 1.0 - (-dt.clamp(0., 0.1) / 0.8).exp();
+    current.lerp(target, blend)
+}
+
 /// Fit the whole room with a small border, preserving geometry on any display.
 fn lobby_frame(map_size: Vec2, viewport: Vec2) -> (Vec2, f32) {
     let aspect = viewport.x.max(1.0) / viewport.y.max(1.0);
@@ -257,7 +282,7 @@ fn camera_parallax(
         let center = Vec2::new(bg.meta.offset.x, map_size.y / 2.0 + bg.meta.offset.y);
         let scale = if lobby_mode.0 && bg.meta.depth > 0.0 {
             background_cover_scale(bg.meta.size, bg.meta.scale, view_size,
-                center - camera_transform.translation.truncate())
+                (center - camera_transform.translation.truncate()).abs().max(Vec2::new(64.,48.)))
         } else { bg.meta.scale };
         transform.scale.x = scale;
         transform.scale.y = scale;
@@ -299,5 +324,29 @@ mod background_cover_tests {
                 assert!(half_image.y > view.y / 2.0 + offset.y.abs());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod follow_tests {
+    use super::*;
+    #[test]
+    fn spawn_and_leave_ease_without_snapping() {
+        let home=Vec2::new(640.,384.);
+        let first=lobby_follow_step(home,home,Some(Vec2::new(100.,100.)),1./60.);
+        assert!(first.distance(home)>0. && first.distance(home)<2.);
+        let mut current=first;
+        for _ in 0..600 { current=lobby_follow_step(current,home,Some(Vec2::new(100.,100.)),1./60.); }
+        assert!((current.x-home.x).abs()<=40. && (current.y-home.y).abs()<=24.);
+        let left=lobby_follow_step(current,home,None,1./60.);
+        assert!(left.distance(home)<current.distance(home));
+        assert!(left.distance(current)<2.);
+    }
+    #[test]
+    fn small_motion_is_quiet_and_easing_is_frame_rate_independent() {
+        let home=Vec2::new(640.,384.);
+        assert_eq!(lobby_follow_step(home,home,Some(home+Vec2::splat(20.)),0.1),home);
+        let run=|fps:u32| {let mut c=home; for _ in 0..fps*2 {c=lobby_follow_step(c,home,Some(Vec2::ZERO),1./fps as f32);} c};
+        assert!(run(30).distance(run(120))<0.01);
     }
 }

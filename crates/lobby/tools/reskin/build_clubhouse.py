@@ -105,3 +105,5 @@ ground=exterior('ground').resize((512,128),NEAREST)
 strip=Image.new('RGBA',(2048,128))
 for x in range(0,2048,512): strip.paste(ground,(x,0))
 strip.save(OUT/'ground.png')
+
+exterior('jukebox').resize((280,80),NEAREST).save(OUT/'jukebox.png')

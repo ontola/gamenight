@@ -3528,13 +3528,13 @@ fn sync_jukebox_system(
         .now_playing()
         .cloned();
 
-    let Some((anchor, screen, slab)) = lobby_music_screen(&bones_game.0) else {
+    let Some((anchor, _screen, _slab)) = lobby_music_screen(&bones_game.0) else {
         for (entity, _, _) in &existing {
             commands.entity(entity).despawn_recursive();
         }
         return;
     };
-    let pads = lobby_music_pads(&bones_game.0);
+
 
     // Classical releases in particular carry titles that are really a
     // catalogue entry ("…, Op. 56: No. 4, Innig (Arr. for Piano 4 Hands)").
@@ -3581,82 +3581,46 @@ fn sync_jukebox_system(
             },
         ))
         .with_children(|parent| {
-            // Warmer than the next-game TV's blue: this is the room's music,
-            // not the party's queue, and at a glance across a living room
-            // colour is the only thing telling them apart. Dark when quiet.
-            spawn_screen_slab(
-                parent,
-                slab,
-                if track.is_some() {
-                    Color::rgb(0.145, 0.055, 0.098)
-                } else {
-                    Color::rgb(0.075, 0.035, 0.055)
-                },
-            );
-
-            parent.spawn(Text2dBundle {
-                text: Text::from_section(
-                    format!("♪ {heading}"),
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 10.0,
-                        color: if heading == "NOW PLAYING" {
-                            Color::rgba(1.0, 0.75, 0.95, 0.95)
-                        } else {
-                            Color::rgba(1.0, 1.0, 1.0, 0.55)
-                        },
-                    },
-                ),
-                transform: Transform::from_xyz(0.0, screen.y / 2.0 - 7.0, 0.1),
-                ..default()
+            parent.spawn(SpriteBundle {
+                texture: asset_server.load("themes/clubhouse/jukebox.png"),
+                sprite: Sprite { custom_size: Some(Vec2::new(280.,80.)), ..default() },
+                transform: Transform::from_xyz(0.,19.,0.), ..default()
             });
+            // Display area is 146x25 world pixels; reserve separate lines for
+            // title and artist instead of letting either overrun the speakers.
+            let title = ellipsize(&title, 44);
+            let mut lines = vec![String::new()];
+            for word in title.split_whitespace() {
+                if !lines.last().unwrap().is_empty() && lines.last().unwrap().chars().count()+word.chars().count()+1>24 {
+                    lines.push(String::new());
+                }
+                let line=lines.last_mut().unwrap();
+                if !line.is_empty() { line.push(' '); }
+                line.push_str(word);
+            }
+            let display=lines.into_iter().take(2).collect::<Vec<_>>().join("\n");
             parent.spawn(Text2dBundle {
-                text: Text::from_section(
-                    title,
-                    TextStyle {
-                        font: font.clone(),
-                        font_size: 13.0,
-                        color: if track.is_some() {
-                            Color::WHITE
-                        } else {
-                            Color::rgba(1.0, 1.0, 1.0, 0.65)
-                        },
-                    },
-                )
-                .with_alignment(TextAlignment::Center),
-                text_2d_bounds: bevy::text::Text2dBounds {
-                    size: Vec2::new(screen.x - 10.0, screen.y - 26.0),
-                },
-                transform: Transform::from_xyz(0.0, -1.0, 0.1),
-                ..default()
-            });
-            if !byline.is_empty() {
-                parent.spawn(Text2dBundle {
-                    text: Text::from_section(
-                        ellipsize(&byline, 34),
-                        TextStyle {
-                            font: font.clone(),
-                            font_size: 9.0,
-                            color: Color::rgba(1.0, 1.0, 1.0, 0.6),
-                        },
-                    )
+                text: Text::from_section(display,TextStyle {font:font.clone(),font_size:6.5,color:Color::rgb_u8(248,226,177)})
                     .with_alignment(TextAlignment::Center),
-                    transform: Transform::from_xyz(0.0, -screen.y / 2.0 + 7.0, 0.1),
-                    ..default()
-                });
+                text_2d_bounds: bevy::text::Text2dBounds {size:Vec2::new(142.,16.)},
+                transform:Transform::from_xyz(0.,21.,0.2), ..default()
+            });
+            parent.spawn(Text2dBundle {
+                text:Text::from_section(ellipsize(&byline,40),TextStyle {font:font.clone(),font_size:5.,color:Color::rgb_u8(174,192,181)})
+                    .with_alignment(TextAlignment::Center),
+                text_2d_bounds:bevy::text::Text2dBounds {size:Vec2::new(142.,7.)},
+                transform:Transform::from_xyz(0.,9.,0.2), ..default()
+            });
+            // Button glyphs sit on the two physical knobs. Y interaction
+            // remains owned by the existing music zones and nearby prompts.
+            for (x,glyph,skips) in [(-48.,if track.as_ref().is_some_and(|t|t.playing) {"Ⅱ"} else {"▶"},false),(48.,"▶|",true)] {
+                parent.spawn((PadFace {pad:PadButton::Music {skips},home_y:-5.},Text2dBundle {
+                    text:Text::from_section(glyph,TextStyle {font:font.clone(),font_size:8.,color:Color::rgb_u8(37,32,27)})
+                        .with_alignment(TextAlignment::Center),
+                    transform:Transform::from_xyz(x,-5.,0.2), ..default()
+                }));
             }
 
-            // The buttons standing on the slab's top surface — the element is
-            // only a collider, so without this the thing you're told to jump
-            // on isn't there. None of them while there's nothing to control.
-            for (pos, size, skips) in track.is_some().then_some(&pads).into_iter().flatten() {
-                let label = match (skips, track.as_ref().is_some_and(|t| t.playing)) {
-                    (true, _) => "SKIP ⏭",
-                    (false, true) => "PAUSE ⏸",
-                    (false, false) => "PLAY ▶",
-                };
-
-            }
         });
 }
 
