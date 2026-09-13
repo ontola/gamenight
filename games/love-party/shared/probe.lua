@@ -18,7 +18,7 @@ function P.install()
       getGamepadAxis=function(_,axis) return axis=="leftx" and (index==1 and -1 or 1) or 0 end,
       isGamepadDown=function(_,key) return index==1 and (key=="a" or key=="leftshoulder") or index==2 and (key=="b" or key=="rightshoulder") end}
   end
-  love.joystick.getJoysticks=function() return pads end
+  P.devices=pads
   love.keyboard.isDown=function() return false end
   if not love.graphics then return end
   local avatar=require("games.volley.avatar")
@@ -55,6 +55,9 @@ function P.step(inputs)
   P.inputs=inputs
 end
 function P.observe(phase,state)
+  local now=love.timer.getTime()
+  if P.lastPhase==phase and P.lastWrite and now-P.lastWrite<.05 then return end
+  P.lastPhase,P.lastWrite=phase,now
   local players={}
   for i,p in ipairs(state and state.players or {}) do
     local pad=require("shared.input").pads[p.slot]
@@ -65,6 +68,7 @@ function P.observe(phase,state)
   local snapshot={frames=P.frames,phase=phase,players=players,steps=P.steps,inputs=P.inputs,rendered=P.rendered,
     visible=love.window and love.window.isVisible() or false,
     audio=love.audio and love.audio.getActiveSourceCount() or 0}
-  local f=assert(io.open(path,"w")); f:write(json.encode(snapshot)); f:close()
+  local encoded=json.encode(snapshot)
+  local f=io.open(path,"w"); if f then f:write(encoded); f:close() end
 end
 return P

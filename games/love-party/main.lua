@@ -28,7 +28,7 @@ if duration then
 	duration = U.clamp(duration, 1, 600)
 end
 local function pads()
-	return love.joystick and love.joystick.getJoysticks() or {}
+	return Probe.devices or (love.joystick and love.joystick.getJoysticks() or {})
 end
 local function prepare(seats, players)
 	local roster = U.players(seats, players)
