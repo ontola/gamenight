@@ -27,12 +27,12 @@ layers:
   - pos:
     - 1
     - 1
-    idx: 62
+    idx: 84
     collision: Solid
   - pos:
     - 1
     - 2
-    idx: 62
+    idx: 83
     collision: Solid
   - pos:
     - 1
@@ -497,12 +497,12 @@ layers:
   - pos:
     - 38
     - 1
-    idx: 62
+    idx: 84
     collision: Solid
   - pos:
     - 38
     - 2
-    idx: 62
+    idx: 83
     collision: Solid
   - pos:
     - 38

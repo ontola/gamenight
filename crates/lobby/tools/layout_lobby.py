@@ -18,7 +18,7 @@ def build():
     # Keep the room shell. Furniture must never become an accidental barrier.
     tiles[:] = [t for t in tiles if t['pos'][0] in (1, 38) or t['pos'][1] <= 2]
     for tile in tiles:
-        if tile['pos'][1] <= 2 and tile['pos'][0] not in (1,38): tile['idx']=83 if tile['pos'][1]==2 else 84
+        if tile['pos'][1] <= 2: tile['idx']=83 if tile['pos'][1]==2 else 84
     # Separate station landings, not one continuous ceiling. All shelves use
     # the engine's existing one-way collision (rise through, land from above).
     for start, end, row in [(34, 36, 4), (33, 35, 6), (28, 30, 8), (24, 26, 10),
