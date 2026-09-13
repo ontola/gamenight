@@ -1,6 +1,6 @@
 # GameNight LÖVE Party Pack
 
-Five original local multiplayer prototypes for 2–4 people. MIT licensed.
+Six original local multiplayer prototypes for 2–4 people. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
@@ -10,20 +10,21 @@ Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 | Paint Rush | Cover the most territory in your colour | Move, A paint burst |
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
+| Volley Trouble | Win volleyball rounds across four courts, with rotating rules | Move, A jump, B/RB/RT smash, right stick aim |
 | Neon Siege | Survive together; shared score and combo, no friendly fire | Move, right stick to aim, A to dash, B for pulse |
 
-Competitive matches last 60 seconds. Ties share victory. Neon Siege is a
-90-second cooperative survival match, ending early if the entire team falls. Every game supports 2, 3 or 4
-players, bots for automated testing, and consistent seat colours (using GameNight player colours when supplied).
-Scores are displayed by the game; protocol v1 reports match completion but
-has no cross-game score submission message.
+Games own their round rules and score screens. Rounds repeat automatically after
+results; only an explicit game switch ends the host session. Back/Select pauses
+and opens the lobby. All six games use the same lifecycle, controller ownership,
+prewarming, focus and continuous-play implementation. Volley Trouble adds its
+own simulation, full-screen renderer, sounds and live setting declarations.
 
 ## Play
 
 Run `love games/love-party` from the repository. Choose a game with 1–8 or
 the controller D-pad, Enter/A to start, F2 to choose 2–4 players.
 A packaged `.love` file opens its game directly. Escape/Back returns to the
-standalone menu; Enter/A starts a rematch after the result screen.
+standalone menu; rounds otherwise restart automatically.
 
 Controllers use the left stick or D-pad and A. Keyboard seats:
 

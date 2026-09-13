@@ -5,6 +5,7 @@ local modes = {
 	require("games.siege"),
 	require("games.ricochet"),
 	require("games.paint"),
+    require("games.volley"),
 }
 local U = require("shared.util")
 local Input = require("shared.input")
@@ -27,6 +28,7 @@ local function pads()
 end
 local function prepare(seats, players)
 	local roster = U.players(seats, players)
+    if mode.roster then roster = mode.roster(roster) end
 	Input.bind(roster, pads())
 	roundRoster = roster
 	resultsTime = 0
@@ -94,6 +96,7 @@ function love.load(args)
 		Render.load()
 	end
 	Audio.load()
+    if mode.load then mode.load() end
 	if managed then
 		bridge = Lifecycle.new(
 			require("shared.transport").new(
@@ -104,6 +107,7 @@ function love.load(args)
 			{
 				hide = function()
 					Audio.mute()
+                    if mode.mute then mode.mute() end
 					Screen.hide()
 				end,
 				show = function()
@@ -112,6 +116,8 @@ function love.load(args)
 					Screen.show()
 				end,
 				prepare = prepare,
+                settings = mode.settings,
+                setting = mode.setting,
 				instantJoin = mode.join ~= nil,
 				party = function(seats, players, presence)
 					if state then
@@ -175,7 +181,7 @@ function love.update(dt)
 		local inputs = {}
 		for i, p in ipairs(state.players) do
 			inputs[i] = (p.bot or p.presence == "sleeping") and mode.bot(state, p)
-				or Input.sample(p.slot, mode.fireWithShoulder)
+				or (mode.input and mode.input(p.slot) or Input.sample(p.slot, mode.fireWithShoulder))
 		end
 		local before = {}
 		for i, p in ipairs(state.players) do
@@ -206,6 +212,7 @@ function love.update(dt)
 		accumulator = accumulator - 1 / 120
 		if remaining == 0 or state.over then
 			finished = true
+            if mode.finish then mode.finish(state) end
 			Audio.play("finish")
 			if bridge then
 				bridge:finish()

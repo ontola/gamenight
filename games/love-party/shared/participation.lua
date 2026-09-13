@@ -22,6 +22,7 @@ function M.apply(mode, state, seats, identities, presence)
 		if player then
 			player.name, player.color, player.controller = incoming.name, incoming.color, incoming.controller
 			player.slot, player.id, player.bot = incoming.slot, incoming.id, incoming.bot
+            player.avatar, player.skin_color = incoming.avatar, incoming.skin_color
 			player.presence = "active"
 			for _, status in ipairs(presence) do
 				if status.player_id == player.id then

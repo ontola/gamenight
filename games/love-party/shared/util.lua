@@ -19,11 +19,12 @@ function M.players(seats, identities)
 	local out = {}
 	for _, seat in ipairs(seats) do
 		if seat.occupant.kind ~= "empty" then
-			local name, color = "P" .. (seat.index + 1), nil
+			local name, color, avatar, skin_color = "P" .. (seat.index + 1), nil, nil, nil
 			for _, identity in ipairs(identities) do
 				if identity.id == seat.occupant.player_id then
 					name = identity.name
 					color = identity.color
+                    avatar, skin_color = identity.avatar, identity.skin_color
 				end
 			end
 			out[#out + 1] = {
@@ -32,6 +33,7 @@ function M.players(seats, identities)
 				name = name,
 				bot = seat.occupant.kind == "ai",
 				color = color,
+                avatar = avatar, skin_color = skin_color,
 				score = 0,
 				controller = seat.controller,
 			}

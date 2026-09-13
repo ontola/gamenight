@@ -59,6 +59,7 @@ function R.menu(modes, index, count)
 	R.finish()
 end
 function R.game(mode, s, remaining, finished, managed)
+    if mode.render then return mode.render(s, remaining, finished, managed) end
 	R.begin(mode.id == "neon-siege" and s.width or nil)
 	-- Keep world coordinates stable; enlarge the arena independently of the HUD.
 	G.push()

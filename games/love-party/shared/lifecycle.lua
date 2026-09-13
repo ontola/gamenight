@@ -12,6 +12,9 @@ end
 function Lifecycle:receive(m)
 	if m.type == "welcome" then
 		assert(m.protocol_version == 1, "Unsupported GameNight protocol")
+        if self.hooks.settings then self.transport:send({type="declare_settings", settings=self.hooks.settings}) end
+    elseif m.type == "setting_changed" and self.hooks.setting then
+        self.hooks.setting(m.key, m.value)
 	elseif m.type == "prepare" and m.game == self.game and m.session ~= self.session then
 		self:dispose()
 		self.session = m.session

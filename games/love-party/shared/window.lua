@@ -55,7 +55,7 @@ end
 function M.prepare()
 	if not love.window then return end
 	local width, height = love.window.getDesktopDimensions()
-	love.window.setMode(width, height, {borderless=true, resizable=false, vsync=1, x=-10000, y=-10000})
+	love.window.setMode(width, height, {borderless=true, resizable=false, highdpi=true, vsync=1, x=-10000, y=-10000})
 	M.hide()
 end
 

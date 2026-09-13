@@ -45,8 +45,8 @@ def main():
                                                    "seats": [{"index": 0, "occupant": {"kind": "ai"}},
                                                              {"index": 2, "occupant": {"kind": "ai"}}], "players": []})+"\n").encode())
                         reply = json.loads(stream.readline())
-                        if reply.get("type") == "participation":
-                            assert reply["session"] == "session-one"
+                        while reply.get("type") in ("participation", "declare_settings"):
+                            if reply["type"] == "participation": assert reply["session"] == "session-one"
                             reply = json.loads(stream.readline())
                         assert reply == {"type": "ready", "session": "session-one"}, reply
                         stream.write(b'{"type":"start","session":"session-one"}\n')

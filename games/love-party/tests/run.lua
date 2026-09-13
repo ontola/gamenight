@@ -272,3 +272,5 @@ for name, test in pairs(tests) do
 	print("PASS " .. name)
 end
 print("PASS " .. n .. " party pack tests")
+
+require("tests.volley.run")()

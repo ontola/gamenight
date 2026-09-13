@@ -23,6 +23,8 @@
 --
 
 local json = { _version = "0.1.2" }
+-- Preserve array positions for transparent avatar pixels. Object nulls stay nil.
+json.null = {}
 
 -------------------------------------------------------------------------------
 -- Encode
@@ -122,6 +124,7 @@ local type_func_map = {
 
 
 encode = function(val, stack)
+  if val == json.null then return "null" end
   local t = type(val)
   local f = type_func_map[t]
   if f then
@@ -291,7 +294,7 @@ local function parse_array(str, i)
     end
     -- Read token
     x, i = parse(str, i)
-    res[n] = x
+    res[n] = x == nil and json.null or x
     n = n + 1
     -- Next token
     i = next_char(str, i, space_chars, true)
