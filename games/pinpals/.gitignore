@@ -1,0 +1,28 @@
+# Build output (`make clean` removes this)
+build/
+*.love
+
+# Visual-check captures: `make shot` / `make coords` write into LÖVE's save
+# directory, but they get copied here often enough to be worth ignoring.
+shot-*.png
+coords-*.png
+
+# Lua tooling
+*.rock
+.luarocks/
+lua_modules/
+luacov.stats.out
+luacov.report.out
+.luacheckcache
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+
+# Local agent settings (the shared .claude/ config stays tracked)
+.claude/settings.local.json

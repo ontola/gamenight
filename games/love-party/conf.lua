@@ -18,7 +18,7 @@ function love.conf(t)
     local id = os.getenv("GNLOVE_GAME") or (ok and game.id)
     t.window.fullscreen = id == "volley-trouble" and os.getenv("GAMENIGHT") ~= "1"
     t.window.fullscreentype = "desktop"
-	t.modules.physics, t.modules.video, t.modules.touch = false, false, false
+	t.modules.physics, t.modules.video, t.modules.touch = true, false, false
 	if os.getenv("GAMENIGHT") == "1" then
 		t.window.borderless = true
 		t.window.x, t.window.y = -10000, -10000

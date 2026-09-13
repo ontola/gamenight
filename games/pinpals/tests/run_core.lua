@@ -1,0 +1,15 @@
+--- Bare-interpreter runner for core/. No LÖVE involved.
+package.path = "./?.lua;./?/init.lua;" .. package.path
+local H = require("tests.harness")
+require("tests.core.spec")(H)
+require("tests.core.mission_spec")(H)
+require("tests.core.geometry_spec")(H)
+require("tests.core.curve_spec")(H)
+require("tests.data.reload_spec")(H)
+require("tests.app.fx_spec")(H)
+require("tests.app.record_spec")(H)
+require("tests.app.inspect_spec")(H)
+require("tests.app.render_spec")(H)
+require("tests.app.input_spec")(H)
+  require("tests.app.gamenight_input_spec")(H)
+os.exit(H.report("core") and 0 or 1)

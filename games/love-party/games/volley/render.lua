@@ -84,7 +84,7 @@ local function player(p,g)
   love.graphics.push(); love.graphics.translate(p.x,p.y); love.graphics.scale(1-stretch,1+stretch)
   circle(ink,0,3,32); circle(c,0,0,29)
   circle(cream,-9,-10,7,.20)
-  if p.portrait==nil then p.portrait=Avatar.image(p.avatar) or false end
+  if p.portrait==nil or p.renderedAvatar~=p.avatar then p.portrait=Avatar.image(p.avatar) or false; p.renderedAvatar=p.avatar end
   if p.portrait then
     local w,h=p.portrait:getDimensions()
     local scale=48/math.max(w,h)

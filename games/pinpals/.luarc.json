@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime.version": "LuaJIT",
+  "runtime.path": ["?.lua", "?/init.lua"],
+  "workspace.checkThirdParty": false,
+  "workspace.ignoreDir": ["build", ".git"],
+  "diagnostics.globals": ["love"],
+  "diagnostics.disable": ["ambiguity-1"]
+}

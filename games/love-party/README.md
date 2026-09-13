@@ -1,6 +1,6 @@
 # GameNight LÖVE Party Pack
 
-Six original local multiplayer prototypes for 2–4 people. MIT licensed.
+Nine local multiplayer games sharing one GameNight integration. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
@@ -11,17 +11,20 @@ Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
 | Volley Trouble | Win volleyball rounds across four courts, with rotating rules | Move, A jump, B/RB/RT smash, right stick aim |
+| Stack Together | Build a tower together | Move, A rotate, B drop |
+| Bubble Buddies | Clear bubbles cooperatively | Move, A fire |
+| Pinpals | Cooperative pinball across two boards | LB/RB flippers, A gate, B paddle |
 | Neon Siege | Survive together; shared score and combo, no friendly fire | Move, right stick to aim, A to dash, B for pulse |
 
 Games own their round rules and score screens. Rounds repeat automatically after
 results; only an explicit game switch ends the host session. Back/Select pauses
-and opens the lobby. All six games use the same lifecycle, controller ownership,
+and opens the lobby. All nine games use the same lifecycle, controller ownership,
 prewarming, focus and continuous-play implementation. Volley Trouble adds its
 own simulation, full-screen renderer, sounds and live setting declarations.
 
 ## Play
 
-Run `love games/love-party` from the repository. Choose a game with 1–8 or
+Run `love games/love-party` from the repository. Choose a game with 1–9 or
 the controller D-pad, Enter/A to start, F2 to choose 2–4 players.
 A packaged `.love` file opens its game directly. Escape/Back returns to the
 standalone menu; rounds otherwise restart automatically.
@@ -48,7 +51,7 @@ resumes; reports Finished once; and disposes without leaving a window.
 Back/Escape requests the lobby. Daemon disconnection exits the game.
 
 Use each game's ID in the table's source module or generated shelf. The
-existing Pinpals catalogue entry remains independent of this pack.
+Pinpals package includes its board simulation and authoring source from `games/pinpals`; its managed lifecycle uses this runner.
 
 ## Build
 
@@ -56,7 +59,7 @@ existing Pinpals catalogue entry remains independent of this pack.
 python scripts/package-love-party.py --output dist/party --love /path/to/love
 ```
 
-Produces eight deterministic `.love` files, checksums, a collection ZIP and
+Produces nine deterministic `.love` files, checksums, a collection ZIP and
 an optional `shelf.json` with absolute local paths. Merge those shelf entries
 with your lobby entry when configuring `GAMENIGHT_LIBRARY`. The build never
 changes the Windows installer's contents or assumes an unpublished download URL.
@@ -177,3 +180,20 @@ collisions, shield timing, paint ownership, core damage and 95-second simulation
 at each supported player count. They remain prototypes pending human playtesting.
 
 Bumper Royale, Anticonception and Meteor Dash have been retired after playtesting. Their source remains in version control for reference, but they are excluded from the playable collection and release packages.
+
+## Executable integration observations
+
+`python scripts/test-love-integration.py --love /path/to/love --pack dist/party --output dist/observations`
+launches two real packaged processes per game. It checks silent hidden preparation,
+frozen simulation on pause, switching/resuming/disposal, reversed controller ordinals,
+and separately names, outfit/skin colours, and drawn faces. Profile data must both
+reach the simulation and appear in actual rendering calls to pass.
+
+The controller fixture is synthetic: physical Windows/Linux/macOS device enumeration
+still needs hardware testing. Visibility is measured, not foreground focus ownership.
+Missing renderer support is a failed check, never inferred from accepting protocol fields.
+`game-contract.py` imports each result with hashed raw observations into catalog evidence.
+
+Pinpals keeps its own board authoring tools and physics tests. Run `make check` in
+`games/pinpals` as well as the shared runner tests. Its upstream provenance is recorded
+in `games/pinpals/UPSTREAM.json`.

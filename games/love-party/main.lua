@@ -1,3 +1,4 @@
+local Probe = require("shared.probe")
 local artCaptured = false
 local modes = {
 	require("games.trails"),
@@ -6,6 +7,9 @@ local modes = {
 	require("games.ricochet"),
 	require("games.paint"),
     require("games.volley"),
+    require("games.coop")(require("games.coop.stack")),
+    require("games.coop")(require("games.coop.bubbles")),
+    require("games.pinpals"),
 }
 local U = require("shared.util")
 local Input = require("shared.input")
@@ -32,6 +36,7 @@ local function prepare(seats, players)
 	Input.bind(roster, pads())
 	roundRoster = roster
 	resultsTime = 0
+	if state and mode.dispose then mode.dispose(state) end
 	state = mode.new(roster, U.rng(tonumber(os.getenv("GNLOVE_SEED")) or os.time()))
 	remaining, finished, accumulator = duration or mode.duration or 60, false, 0
 	menu = false
@@ -60,6 +65,7 @@ local function standalone()
 	Audio.enabled = true
 end
 function love.load(args)
+    Probe.install()
 	if os.getenv("GNLOVE_TEST") == "1" then
 		local ok, err = pcall(function()
 			require("tests.run")
@@ -127,6 +133,7 @@ function love.load(args)
 					end
 				end,
 				dispose = function()
+                    if state and mode.dispose then mode.dispose(state) end
 					state = nil
 					Input.bind({}, {})
 				end,
@@ -162,12 +169,14 @@ function love.update(dt)
 			end
 		end
 	end
+	Probe.observe(bridge and bridge.phase or "standalone", state)
 	if not state or (bridge and bridge.phase ~= "running") then
 		return
 	end
 	if finished then
         resultsTime = resultsTime + math.min(dt, 0.1)
         if resultsTime >= 3 then
+            if mode.dispose then mode.dispose(state) end
             state = mode.new(roundRoster, U.rng(os.time()))
             remaining, finished, accumulator, resultsTime = duration or mode.duration or 60, false, 0, 0
         end
@@ -192,6 +201,7 @@ function love.update(dt)
 			events[name] = value
 		end
 		local blasts = state.blastCount or 0
+		Probe.step(inputs)
 		mode.update(state, 1 / 120, inputs)
 		if (state.blastCount or 0) > blasts then
 			Audio.play("blast")
@@ -307,8 +317,10 @@ end
 -- only the host's explicit Start/Resume commands change the running phase.
 
 -- CI must fail with a useful traceback instead of waiting on the interactive error screen.
-if os.getenv("GNLOVE_RENDER_SMOKE") == "1" then
+if os.getenv("GNLOVE_RENDER_SMOKE") == "1" or os.getenv("GNLOVE_PROBE_FILE") then
     function love.errorhandler(message)
+        local path=os.getenv("GNLOVE_PROBE_FILE")
+        if path then local f=io.open(path..".error","w"); if f then f:write(debug.traceback(tostring(message),2));f:close() end end
         io.stderr:write(debug.traceback(tostring(message), 2) .. "\n")
         return function() return 1 end
     end

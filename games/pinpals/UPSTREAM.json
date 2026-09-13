@@ -1,0 +1,5 @@
+{
+  "repository": "https://github.com/joepio/pinpals",
+  "commit": "a1308590e0eab21fda9d67ad38af17c26f271067",
+  "notes": "Gameplay and authoring tools preserved. Managed integration is replaced by the shared LOVE runner; source checkout remains independent."
+}

@@ -1,0 +1,20 @@
+--- Headless LÖVE runner. Invoked from main.lua under `love . --test`.
+return function()
+  local H = require("tests.harness")
+  require("tests.core.spec")(H)
+require("tests.core.mission_spec")(H)
+  require("tests.core.geometry_spec")(H)
+  require("tests.core.curve_spec")(H)
+  require("tests.data.reload_spec")(H)
+  require("tests.app.fx_spec")(H)
+  require("tests.app.record_spec")(H)
+  require("tests.app.inspect_spec")(H)
+  require("tests.app.render_spec")(H)
+  require("tests.app.input_spec")(H)
+  require("tests.app.gamenight_input_spec")(H)
+  local core_ok = H.report("core")
+  H.reset()
+  require("tests.sim.spec")(H)
+  local sim_ok = H.report("sim (headless love.physics)")
+  return core_ok and sim_ok
+end

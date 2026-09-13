@@ -82,6 +82,23 @@ def run_games(report, pack, love, certifier, output):
             'process.disconnect': ([sys.executable, str(ROOT/'scripts/test-love-party.py'),
                                     '--love', str(love), '--pack', str(pack), '--game', artifact.stem], env),
         }
+        observed = output / (artifact.stem + '.integration')
+        probe_log = output / (artifact.stem + '.integration.log')
+        run_check([sys.executable, str(ROOT/'scripts/test-love-integration.py'),
+                   '--love', str(love), '--pack', str(pack), '--game', artifact.stem,
+                   '--output', str(observed)], env, probe_log)
+        try:
+            checks = json.loads((observed/'checks.json').read_text())[artifact.stem]
+        except (OSError, ValueError, KeyError):
+            checks = {}
+        observation = observed / (artifact.stem + '.observations.json')
+        for feature in ('profile.identity', 'profile.colors', 'profile.face', 'input.identity', 'gameplay.switch'):
+            result = checks.get(feature, {})
+            passed = result.get('status') == 'passed' and observation.is_file()
+            refs = [evidence(probe_log, output)]
+            if observation.is_file(): refs.append(evidence(observation, output))
+            game['checks'][feature] = {'status': 'passed' if passed else 'failed',
+                                      'evidence': refs, 'detail': result.get('detail', 'Executable observations missing')}
         for feature, (command, check_env) in commands.items():
             log = output / f'{artifact.stem}.{feature}.log'
             passed = run_check(command, check_env, log)

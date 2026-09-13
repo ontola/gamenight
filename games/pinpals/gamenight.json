@@ -1,0 +1,28 @@
+{
+  "id": "pinpals",
+  "title": "Pinpals",
+  "tagline": "Two pinball tables, one ball — trade flippers and operator duties.",
+  "developer": "Polle Pas",
+  "players": {
+    "min": 2,
+    "max": 2,
+    "best": 2
+  },
+  "price": "free",
+  "tags": [
+    "co-op",
+    "pinball",
+    "arcade",
+    "open-source",
+    "love2d"
+  ],
+  "emoji": "🎱",
+  "color": "#f5a742",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "links": {
+    "source": "https://github.com/Polleps/pinpals"
+  }
+}
