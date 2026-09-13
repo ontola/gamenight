@@ -91,7 +91,7 @@ before promoting a preview to stable.
 
 ## Starter downloads
 
-The Windows package ships `catalog/games/pinpals.json`, not game or LÖVE bytes.
+The Windows package ships the catalog entries with Windows downloads, not game or LÖVE bytes.
 The desktop daemon uses the same installer queue as the standalone host and
 forwards download progress to the lobby. A finished install joins the playable
 shelf immediately without restarting. GameNight can open offline; playing a

@@ -1,7 +1,15 @@
 // Run only against a fresh, isolated Windows installation. Requires Node 22+.
 import fs from 'node:fs';
 const ids=['neon-trails','blast-party','neon-siege','ricochet-club','paint-rush','volley-trouble','stack-together','bubble-buddies'];
-const results=[]; let party; let failure; const ws=new WebSocket(process.argv[2] || 'ws://127.0.0.1:7912');
+const results=[]; let party; let failure; let ws;
+const endpoint=process.argv[2] || 'ws://127.0.0.1:7912';
+const deadline=Date.now()+30000;
+while(Date.now()<deadline){
+ ws=new WebSocket(endpoint);
+ const opened=await new Promise(resolve=>{const timer=setTimeout(()=>resolve(false),2000);ws.addEventListener('open',()=>{clearTimeout(timer);resolve(true);},{once:true});ws.addEventListener('error',()=>{clearTimeout(timer);resolve(false);},{once:true});});
+ if(opened)break;
+ ws.close();await new Promise(resolve=>setTimeout(resolve,250));
+}
 ws.addEventListener('message', e=>{ const m=JSON.parse(e.data); if(m.party) party=m.party; if(m.type==='error') failure=m.message; });
 const send=m=>ws.send(JSON.stringify(m));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
