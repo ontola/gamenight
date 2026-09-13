@@ -164,6 +164,7 @@ pub struct GameNightBridge {
     /// in fact already started.
     latest_warming: Option<gamenight_protocol::PlaylistEntry>,
     optimistic_next: Option<(GameId, std::time::Instant)>,
+    skip_pending: bool,
     /// The playlist, straight from the snapshot. Kept so the TV's SKIP pad
     /// can name what comes *after* whatever is warming — the daemon takes a
     /// game id, not "the next one", and only this list says what that is.
@@ -317,8 +318,19 @@ impl GameNightBridge {
         let Some(game) = self.game_after_next() else {
             return;
         };
-        if self.join_tx.try_send(ClientMessage::QueueNext { game: game.clone() }).is_ok() {
-            self.optimistic_next = Some((game, std::time::Instant::now()));
+        self.optimistic_next = Some((game, std::time::Instant::now()));
+        self.skip_pending = true;
+    }
+
+    fn flush_skip(&mut self, now: std::time::Instant) {
+        let Some((game, tapped)) = self.optimistic_next.as_ref() else { return; };
+        if self.skip_pending && now.saturating_duration_since(*tapped) >= Duration::from_millis(400) {
+            if self.join_tx.try_send(ClientMessage::QueueNext { game: game.clone() }).is_ok() {
+                self.skip_pending = false;
+            } else {
+                self.optimistic_next = None;
+                self.skip_pending = false;
+            }
         }
     }
 
@@ -594,6 +606,7 @@ pub fn game_plugin(game: &mut Game) {
         latest_warm: None,
         latest_warming: None,
         optimistic_next: None,
+        skip_pending: false,
         latest_playlist: Vec::new(),
         vote_open: false,
         latest_installs: Vec::new(),
@@ -697,7 +710,7 @@ fn gamenight_bridge_system(
         bridge.latest_presence = party.presence;
         bridge.latest_players = party.players;
         bridge.latest_library = party.library;
-        if bridge.optimistic_next.as_ref().is_some_and(|(id, at)|
+        if !bridge.skip_pending && bridge.optimistic_next.as_ref().is_some_and(|(id, at)|
             party.warm_session.as_ref().is_some_and(|w| &w.game == id)
             || party.warming.as_ref().is_some_and(|w| &w.game == id)
             || at.elapsed() >= Duration::from_secs(5)) { bridge.optimistic_next = None; }
@@ -710,6 +723,8 @@ fn gamenight_bridge_system(
         bridge.now_playing = party.now_playing;
         bridge.release_claim_if_taken();
     }
+
+    bridge.flush_skip(std::time::Instant::now());
 
     while let Ok(event) = bridge.incoming.try_recv() {
         match event {
@@ -3803,7 +3818,8 @@ fn sync_next_game_tv_system(
         return;
     };
 
-    let animation = case_motion.update(&cases, time.delta_seconds());
+    let motion = case_motion.update(&cases, time.delta_seconds());
+    let animation = if bones_game.0.shared_resource::<GameNightBridge>().optimistic_game().is_some() { 0.0 } else { motion };
     // The screen's two lines: what state we're in, and what it's about.
     let (kicker, kicker_color, title) = match &status {
         // A game the party can walk straight back into. Says PAUSED rather
@@ -4304,6 +4320,7 @@ mod next_game_status_tests {
             latest_warm: None,
             latest_warming: None,
         optimistic_next: None,
+        skip_pending: false,
             latest_playlist: Vec::new(),
             vote_open: false,
             latest_installs: Vec::new(),
@@ -4332,9 +4349,19 @@ mod next_game_status_tests {
             NextGameStatus::Ready(_)
         ));
         bridge.skip_next_game();
-        assert!(
-            matches!(commands.try_recv().unwrap(), ClientMessage::QueueNext { game } if game == GameId::new("third"))
-        );
+        assert!(commands.try_recv().is_err(), "preloading waits until tapping stops");
+        bridge.skip_next_game();
+        assert_eq!(bridge.optimistic_game(), Some(&GameId::new("quad")));
+        bridge.skip_next_game();
+        assert_eq!(bridge.optimistic_game(), Some(&GameId::new("third")));
+        assert!(commands.try_recv().is_err(), "rapid taps only update the local cover");
+        let tapped = bridge.optimistic_next.as_ref().unwrap().1;
+        bridge.flush_skip(tapped + Duration::from_millis(399));
+        assert!(commands.try_recv().is_err());
+        bridge.flush_skip(tapped + Duration::from_millis(400));
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::QueueNext { game } if game == GameId::new("third")));
+        bridge.flush_skip(tapped + Duration::from_secs(1));
+        assert!(commands.try_recv().is_err(), "only send once");
         assert_eq!(bridge.optimistic_game(), Some(&GameId::new("third")));
         assert!(matches!(bridge.upcoming_game_status(), NextGameStatus::Loading(_, None)));
         // The pending view expires if the host does not accept the command.
