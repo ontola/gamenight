@@ -380,11 +380,16 @@ pub struct GameMeta {
     /// One-line pitch shown under the title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tagline: Option<String>,
-    /// Single PNG icon/cover: HTTPS URL, PNG data URI, or (in shelf files)
-    /// relative PNG path resolved by the daemon. Absent = overlays generate a cover from
-    /// `color` + `emoji`.
+    /// Portrait cover: PNG data URI, or a shelf-relative PNG resolved by the
+    /// daemon. Web clients also support HTTPS artwork URLs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
+    /// Square game icon (favicon), used on case spines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Gameplay screenshot, displayed on the lobby TV.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screenshot: Option<String>,
     /// Accent color (`#rrggbb`) for generated covers and highlights.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,

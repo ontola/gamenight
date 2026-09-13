@@ -576,6 +576,8 @@ pub fn bundled_lobby_meta() -> Option<GameMeta> {
         title: "GameNight Lobby".into(),
         tagline: Some("The couch you gather on.".into()),
         cover: None,
+        icon: None,
+        screenshot: None,
         color: Some("#6366f1".into()),
         emoji: Some("🛋️".into()),
         players: Some("1–4".into()),
@@ -635,6 +637,8 @@ pub fn demo_library() -> Vec<GameMeta> {
         title: "Demo Game".into(),
         tagline: Some("A tiny SDK game, warm and waiting.".into()),
         cover: None,
+        icon: None,
+        screenshot: None,
         color: Some("#3ddc97".into()),
         emoji: Some("🎲".into()),
         players: Some("1–4".into()),
@@ -658,35 +662,36 @@ pub fn load_library(path: &str) -> std::io::Result<Vec<GameMeta>> {
         .parent()
         .unwrap_or(std::path::Path::new("."));
     for game in &mut library {
-        if let Some(cover) = game
-            .cover
-            .clone()
-            .filter(|cover| !cover.contains("://") && !cover.starts_with("data:"))
-        {
-            let relative = std::path::Path::new(&cover);
-            let safe = !relative.is_absolute()
-                && relative.components().all(|part| {
-                    matches!(
-                        part,
-                        std::path::Component::Normal(_) | std::path::Component::CurDir
-                    )
-                });
-            game.cover = if safe {
-                std::fs::File::open(root.join(relative))
-                    .ok()
-                    .and_then(|file| {
-                        use std::io::Read;
-                        let mut bytes = Vec::new();
-                        file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64)
-                            .read_to_end(&mut bytes)
-                            .ok()?;
-                        gamenight_protocol::artwork::png_data_uri(&bytes)
-                    })
-            } else {
-                None
-            };
-            if game.cover.is_none() {
-                tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback");
+        for artwork in [&mut game.cover, &mut game.icon, &mut game.screenshot] {
+            if let Some(cover) = artwork
+                .clone()
+                .filter(|cover| !cover.contains("://") && !cover.starts_with("data:"))
+            {
+                let relative = std::path::Path::new(&cover);
+                let safe = !relative.is_absolute()
+                    && relative.components().all(|part| {
+                        matches!(
+                            part,
+                            std::path::Component::Normal(_) | std::path::Component::CurDir
+                        )
+                    });
+                *artwork = if safe {
+                    std::fs::File::open(root.join(relative))
+                        .ok()
+                        .and_then(|file| {
+                            use std::io::Read;
+                            let mut bytes = Vec::new();
+                            file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64)
+                                .read_to_end(&mut bytes)
+                                .ok()?;
+                            gamenight_protocol::artwork::png_data_uri(&bytes)
+                        })
+                } else {
+                    None
+                };
+                if artwork.is_none() {
+                    tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback");
+                }
             }
         }
     }
@@ -1339,12 +1344,14 @@ mod local_artwork_tests {
         png[16..20].copy_from_slice(&128u32.to_be_bytes());
         png[20..24].copy_from_slice(&128u32.to_be_bytes());
         std::fs::write(root.join("icon.png"), &png).unwrap();
-        std::fs::write(root.join("shelf.json"), r##"[{"id":"one","title":"One","cover":"icon.png","color":"#44CCAA"},{"id":"two","title":"Two","cover":"missing.png"},{"id":"three","title":"Three","cover":"../icon.png"}]"##).unwrap();
+        std::fs::write(root.join("shelf.json"), r##"[{"id":"one","title":"One","cover":"icon.png","icon":"icon.png","screenshot":"icon.png","color":"#44CCAA"},{"id":"two","title":"Two","cover":"missing.png"},{"id":"three","title":"Three","cover":"../icon.png"}]"##).unwrap();
         let games = super::load_library(root.join("shelf.json").to_str().unwrap()).unwrap();
         assert_eq!(
             gamenight_protocol::artwork::decode_png_data_uri(games[0].cover.as_ref().unwrap()),
             Some(png)
         );
+        assert_eq!(games[0].icon, games[0].cover);
+        assert_eq!(games[0].screenshot, games[0].cover);
         assert_eq!(games[0].color.as_deref(), Some("#44CCAA"));
         assert!(games[1].cover.is_none());
         assert!(games[2].cover.is_none());

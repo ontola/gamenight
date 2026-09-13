@@ -290,6 +290,8 @@ pub async fn certify(config: Config) -> Result<Report, String> {
         title: game.0.clone(),
         tagline: None,
         cover: None,
+        icon: None,
+        screenshot: None,
         color: None,
         emoji: None,
         players: None,

@@ -3750,7 +3750,7 @@ fn sync_next_game_tv_system(
     use bevy::hierarchy::{BuildChildren, DespawnRecursiveExt};
     use bevy::prelude::*;
 
-    let (status, button, upcoming, next_ready, can_skip, cases, controller_colors) = {
+    let (status, button, upcoming, next_ready, can_skip, cases, controller_colors, screenshot) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
         (
             bridge.next_game_status(),
@@ -3768,6 +3768,7 @@ fn sync_next_game_tv_system(
                     Some(player.color.clone().unwrap_or_else(|| "#7c5cff".into()))
                 }).collect::<Vec<_>>()
             },
+            bridge.active_game().and_then(|id| bridge.latest_library.iter().find(|m| &m.id == id)).and_then(|m| m.screenshot.clone()),
         )
     };
 
@@ -3847,7 +3848,13 @@ fn sync_next_game_tv_system(
         _ => String::new(),
     };
     let case_fingerprint = game_cases::fingerprint(&cases);
-    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}|{controller_colors:?}");
+    let screenshot_fingerprint = {
+        use std::hash::{Hash, Hasher};
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        screenshot.hash(&mut hasher);
+        hasher.finish()
+    };
+    let fingerprint = format!("{kicker}|{title}|{button:?}|{next_line}|{next_ready}|{can_skip}|{case_fingerprint}|{animation:.3}|{controller_colors:?}|{screenshot_fingerprint}");
     if let Some((entity, tv, mut transform)) = existing.iter_mut().next() {
         transform.translation = Vec3::new(pos.x, pos.y, LOBBY_FURNITURE_Z);
         if tv.0 == fingerprint {
@@ -3899,7 +3906,16 @@ fn sync_next_game_tv_system(
                 transform: Transform::from_xyz(tv_x, size.y / 2.0 - 16.0, 0.1),
                 ..default()
             });
-            // The game itself
+            // A captured gameplay image belongs to the active game, never to
+            // the next game's cover. Keep loading/paused text above the screen.
+            let screenshot_texture = cover_cache.image(screenshot.as_deref(), &mut cover_images);
+            if let Some(texture) = screenshot_texture {
+                parent.spawn(SpriteBundle {
+                    sprite: Sprite { custom_size: Some(game_cases::fit_art(&texture, &cover_images, Vec2::new(screen.x - 12.0, screen.y - 30.0))), ..default() },
+                    texture,
+                    transform: Transform::from_xyz(tv_x, -9.0, 0.1), ..default()
+                });
+            } else {
             parent.spawn(Text2dBundle {
                 text: Text::from_section(
                     ellipsize(&title, 32),
@@ -3916,6 +3932,7 @@ fn sync_next_game_tv_system(
                 transform: Transform::from_xyz(tv_x, -9.0, 0.1),
                 ..default()
             });
+            }
             parent.spawn(SpatialBundle {
                 transform: Transform::from_xyz(0.0, -17.0, 0.0),
                 ..default()
@@ -4210,6 +4227,8 @@ mod next_game_status_tests {
             title: title.into(),
             tagline: None,
             cover: None,
+            icon: None,
+            screenshot: None,
             color: None,
             emoji: None,
             players: None,

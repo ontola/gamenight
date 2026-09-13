@@ -127,6 +127,8 @@ pub fn game_meta(entry: &CatalogEntry, installed: &InstalledGame) -> GameMeta {
         title: entry.title.clone(),
         tagline: entry.tagline.clone(),
         cover: entry.cover.clone(),
+        icon: entry.icon.clone(),
+        screenshot: entry.screenshot.clone(),
         color: entry.color.clone(),
         emoji: entry.emoji.clone(),
         players: Some(match entry.players.best {

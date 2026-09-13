@@ -1,3 +1,4 @@
+local artCaptured = false
 local modes = {
 	require("games.trails"),
 	require("games.blast"),
@@ -61,7 +62,14 @@ function love.load(args)
 		if not ok then
 			print(err)
 		end
-		love.event.quit(ok and 0 or 1)
+		if ok and os.getenv("GNLOVE_CAPTURE_ART") == "1" then
+            love.graphics.captureScreenshot(function(data)
+                data:encode("png", "catalog-" .. mode.id .. ".png")
+                love.event.quit(0)
+            end)
+        else
+            love.event.quit(ok and 0 or 1)
+        end
 		return
 	end
 	local game = os.getenv("GAMENIGHT_GAME_ID") or os.getenv("GNLOVE_GAME")
@@ -195,9 +203,20 @@ function love.update(dt)
 end
 function love.draw()
 	if os.getenv("GNLOVE_RENDER_SMOKE") == "1" and state then
-		local ok, err = pcall(Render.game, mode, state, remaining, finished, managed)
+		if os.getenv("GNLOVE_CAPTURE_ART") == "1" and not artCaptured then
+            artCaptured = true
+            for _ = 1, 600 do love.update(1 / 120) end
+        end
+        local ok, err = pcall(Render.game, mode, state, remaining, finished, managed)
 		print(ok and ("PASS rendered " .. mode.id) or tostring(err))
-		love.event.quit(ok and 0 or 1)
+		if ok and os.getenv("GNLOVE_CAPTURE_ART") == "1" then
+            love.graphics.captureScreenshot(function(data)
+                data:encode("png", "catalog-" .. mode.id .. ".png")
+                love.event.quit(0)
+            end)
+        else
+            love.event.quit(ok and 0 or 1)
+        end
 		return
 	end
 	if os.getenv("GNLOVE_TEST") == "1" then

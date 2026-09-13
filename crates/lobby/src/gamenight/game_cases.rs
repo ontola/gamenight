@@ -7,7 +7,7 @@ use gamenight_protocol::{GameId, GameMeta, PlaylistEntry};
 pub(super) struct Case {
     id: GameId,
     title: String,
-    color: String,
+    icon: Option<String>,
     cover: Option<String>,
 }
 
@@ -53,9 +53,7 @@ fn ordered_cases(
             id: entry.game.clone(),
             title: entry.title.clone(),
             cover: meta.and_then(|m| m.cover.clone()),
-            color: meta
-                .and_then(|m| m.color.clone())
-                .unwrap_or_else(|| "#5fb8ad".into()),
+            icon: meta.and_then(|m| m.icon.clone()),
         });
     }
     cases
@@ -123,7 +121,7 @@ fn label(
 #[derive(Default)]
 pub(super) struct CoverCache(std::collections::HashMap<String, Option<Handle<Image>>>);
 impl CoverCache {
-    fn image(&mut self, cover: Option<&str>, images: &mut Assets<Image>) -> Option<Handle<Image>> {
+    pub(super) fn image(&mut self, cover: Option<&str>, images: &mut Assets<Image>) -> Option<Handle<Image>> {
         let cover = cover?;
         self.0
             .entry(cover.to_string())
@@ -151,8 +149,8 @@ pub(super) fn fingerprint(cases: &[Case]) -> u64 {
     for c in cases {
         c.id.hash(&mut h);
         c.title.hash(&mut h);
-        c.color.hash(&mut h);
         c.cover.hash(&mut h);
+        c.icon.hash(&mut h);
     }
     h.finish()
 }
@@ -208,18 +206,21 @@ pub(super) fn spawn_shelf(
     for (index, case) in cases.iter().take(6).enumerate().skip(1).rev() {
         let x = 102.0;
         let y = 37.0 - (index - 1) as f32 * 18.0 + motion * 18.0;
-        let accent = Color::hex(case.color.trim_start_matches('#'))
-            .unwrap_or(Color::rgb(0.37, 0.72, 0.68));
         block(parent, x, y, 0.1, 122.0, 17.0, Color::rgb(0.055, 0.07, 0.12));
         block(parent, x, y, 0.2, 118.0, 14.0, Color::rgb(0.10, 0.13, 0.19));
-        block(parent, x - 56.0, y, 0.3, 3.0, 12.0, accent);
-        label(parent, &super::ellipsize(&case.title, 20), x + 2.0, y,
-            110.0, 9.0, &font, Color::WHITE);
+        if let Some(texture) = cache.image(case.icon.as_deref(), images) {
+            parent.spawn(SpriteBundle {
+                texture,
+                sprite: Sprite { custom_size: Some(Vec2::splat(12.0)), ..default() },
+                transform: Transform::from_xyz(x - 49.0, y, 0.5), ..default()
+            });
+        }
+        label(parent, &super::ellipsize(&case.title, 20), x + 10.0, y,
+            94.0, 9.0, &font, Color::WHITE);
     }
     let case = &cases[0];
     let x = -3.0 + motion * 22.0;
-    let accent =
-        Color::hex(case.color.trim_start_matches('#')).unwrap_or(Color::rgb(0.37, 0.72, 0.68));
+    let accent = Color::rgb(0.16, 0.19, 0.25);
     block(
         parent,
         x + 2.0,
@@ -242,9 +243,9 @@ pub(super) fn spawn_shelf(
     block(parent, x + 2.0, 12.0, 0.4, 54.0, 62.0, accent);
     if let Some(texture) = cache.image(case.cover.as_deref(), images) {
         parent.spawn(SpriteBundle {
-            texture,
+            texture: texture.clone(),
             sprite: Sprite {
-                custom_size: Some(Vec2::new(54.0, 62.0)),
+                custom_size: Some(fit_art(&texture, images, Vec2::new(54.0, 62.0))),
                 ..default()
             },
             transform: Transform::from_xyz(x + 2.0, 12.0, 0.5),
@@ -416,4 +417,11 @@ mod tests {
         assert_eq!(motion.update(&reversed, 0.5), 0.0);
         assert_eq!(motion.update(&reversed, 0.01), 0.0);
     }
+}
+
+/// Fit artwork inside its frame without stretching or cropping gameplay.
+pub(super) fn fit_art(texture: &Handle<Image>, images: &Assets<Image>, bounds: Vec2) -> Vec2 {
+    let Some(image) = images.get(texture) else { return bounds; };
+    let size = Vec2::new(image.texture_descriptor.size.width as f32, image.texture_descriptor.size.height as f32);
+    size * (bounds.x / size.x).min(bounds.y / size.y)
 }

@@ -24,7 +24,7 @@
       ]
     },
     "cover": {
-      "description": "Single cover/icon: HTTPS URL or small embedded PNG data URI.\n`emoji` + `color` are the generated-poster fallback.",
+      "description": "Portrait cover art. Use a small embedded PNG for offline lobby rendering.",
       "type": [
         "string",
         "null"
@@ -44,6 +44,13 @@
       }
     },
     "emoji": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "icon": {
+      "description": "Square game icon (favicon), used on case spines.",
       "type": [
         "string",
         "null"
@@ -86,6 +93,13 @@
         {
           "type": "null"
         }
+      ]
+    },
+    "screenshot": {
+      "description": "Gameplay screenshot, displayed on the lobby TV.",
+      "type": [
+        "string",
+        "null"
       ]
     },
     "tagline": {

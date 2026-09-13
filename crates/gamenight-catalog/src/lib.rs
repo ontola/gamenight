@@ -35,10 +35,15 @@ pub struct CatalogEntry {
     pub integration: Integration,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub requirements: Option<Requirements>,
-    /// Single cover/icon: HTTPS URL or small embedded PNG data URI.
-    /// `emoji` + `color` are the generated-poster fallback.
+    /// Portrait cover art. Use a small embedded PNG for offline lobby rendering.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
+    /// Square game icon (favicon), used on case spines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Gameplay screenshot, displayed on the lobby TV.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screenshot: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub emoji: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -354,12 +359,20 @@ pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
             &format!("link '{url}' must be https"),
         );
     }
-    if let Some(cover) = &entry.cover {
-        check(
-            cover.starts_with("https://")
-                || gamenight_protocol::artwork::decode_png_data_uri(cover).is_some(),
-            "cover must be an https URL or PNG data URI (up to 256 KiB and 1024×1024)",
-        );
+    for (kind, art) in [
+        ("cover", &entry.cover),
+        ("icon", &entry.icon),
+        ("screenshot", &entry.screenshot),
+    ] {
+        if let Some(cover) = art {
+            check(
+                cover.starts_with("https://")
+                    || gamenight_protocol::artwork::decode_png_data_uri(cover).is_some(),
+                &format!(
+                    "{kind} must be an https URL or PNG data URI (up to 256 KiB and 1024×1024)"
+                ),
+            );
+        }
     }
     problems
 }
@@ -492,6 +505,20 @@ mod tests {
         let mut entry = minimal("art-test");
         entry.cover = Some("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jL1kAAAAASUVORK5CYII=".into());
         assert!(validate(&entry, "art-test.json").is_empty());
+        assert!(entry.color.is_none());
+        entry.icon = entry.cover.clone();
+        entry.screenshot = entry.cover.clone();
+        assert!(validate(&entry, "art-test.json").is_empty());
+        entry.icon = Some("data:image/png;base64,broken".into());
+        assert!(validate(&entry, "art-test.json")
+            .iter()
+            .any(|e| e.contains("icon must")));
+        entry.icon = None;
+        entry.screenshot = Some("file:///private.png".into());
+        assert!(validate(&entry, "art-test.json")
+            .iter()
+            .any(|e| e.contains("screenshot must")));
+        entry.screenshot = None;
         entry.cover = Some("data:image/png;base64,broken".into());
         assert!(!validate(&entry, "art-test.json").is_empty());
     }

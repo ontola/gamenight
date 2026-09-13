@@ -98,7 +98,10 @@ Field rules (enforced by `cargo test -p gamenight-catalog`):
   `shelf.json` entry required.
 - `bundled` — for games that live in the GameNight repo itself (the demo
   games), a repo-relative path instead of downloads.
-- `cover` — real cover art URL; `emoji` + `color` are the fallback poster
+- `cover` — portrait cover artwork for the catalog and Up next.
+- `icon` — square game favicon shown on case spines.
+- `screenshot` — real gameplay capture for the active game on the lobby TV.
+- `color` — optional legacy web accent; never required for identifying a game.
   the overlay generates.
 
 ### When upstream ships no download
@@ -215,3 +218,20 @@ game names and cover art remain their owners'.
 cargo run -p gamenight-catalog          # table of everything
 cargo run -p gamenight-catalog -- --level certified
 ```
+
+### Offline lobby artwork
+
+Supply `cover`, `icon` and `screenshot` as PNG data URIs for the shipped catalog,
+or as safe relative PNG paths in local shelf files. Each image must be at most
+256 KiB and 1024×1024. HTTP artwork is not fetched by the lobby renderer.
+Recommended proportions: portrait cover, square icon, landscape screenshot.
+The renderer preserves proportions and never substitutes an upcoming cover for
+the current game's screenshot. Missing artwork remains compatible with older
+games: neutral cases and title text, without requiring a game color.
+
+`catalog/art/<id>/` keeps the editable PNG assets. Run
+`python scripts/build-catalog-art.py --embed` after editing them to refresh the
+embedded catalog metadata. `--captures <LOVE save directory>` rebuilds the
+initial screenshot-based covers and game-specific icons. Capture party games
+with `GNLOVE_RENDER_SMOKE=1 GNLOVE_CAPTURE_ART=1 GNLOVE_DEMO=1 GNLOVE_SEED=42`
+and `GNLOVE_GAME=<id>`. Screenshots depict actual gameplay, not generated mockups.
