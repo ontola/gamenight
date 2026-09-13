@@ -24,8 +24,21 @@
     "level": "integrated",
     "protocol": 1
   },
-  "bundled": "games/love-party",
   "links": {
     "source": "https://github.com/ontola/gamenight/tree/main/games/love-party"
+  },
+  "downloads": {
+    "windows": {
+      "url": "https://gamenight.ontola.io/games/cd7790a97c704807d5a225c646ac352935e3f9770c94bbf92a71db2718d04175/ricochet-club.love",
+      "sha256": "cd7790a97c704807d5a225c646ac352935e3f9770c94bbf92a71db2718d04175",
+      "entrypoint": "ricochet-club.love",
+      "runtime": {
+        "id": "love-11-5",
+        "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
+        "sha256": "ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369",
+        "entrypoint": "love-11.5-win64/love.exe",
+        "argument": "entry_point"
+      }
+    }
   }
 }

@@ -1,0 +1,46 @@
+{
+  "$schema": "../schema.json",
+  "id": "stack-together",
+  "title": "Stack Together",
+  "tagline": "Two minds, one stack. Build your half and clear rows together.",
+  "developer": "GameNight contributors",
+  "players": {
+    "min": 2,
+    "max": 2,
+    "best": 2
+  },
+  "match_minutes": 4,
+  "price": "free",
+  "tags": [
+    "co-op",
+    "puzzle",
+    "falling-blocks",
+    "love2d"
+  ],
+  "emoji": "🧩",
+  "color": "#5ce6ba",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "requirements": {
+    "disk_mb": 5,
+    "ram_mb": 128,
+    "cpu": "LÖVE 11.5",
+    "gpu": "OpenGL 2.1"
+  },
+  "downloads": {
+    "windows": {
+      "url": "https://gamenight.ontola.io/games/c6f0b01659c3492e75c1b7be9e70daa9fb0699c689a10e725eb6bd1df0c652c0/stack-together.love",
+      "sha256": "c6f0b01659c3492e75c1b7be9e70daa9fb0699c689a10e725eb6bd1df0c652c0",
+      "entrypoint": "stack-together.love",
+      "runtime": {
+        "id": "love-11-5",
+        "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
+        "sha256": "ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369",
+        "entrypoint": "love-11.5-win64/love.exe",
+        "argument": "entry_point"
+      }
+    }
+  }
+}

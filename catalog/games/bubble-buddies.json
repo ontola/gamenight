@@ -1,0 +1,46 @@
+{
+  "$schema": "../schema.json",
+  "id": "bubble-buddies",
+  "title": "Bubble Buddies",
+  "tagline": "Pop, split, dodge, repeat. Five waves and one shared pool of hearts.",
+  "developer": "GameNight contributors",
+  "players": {
+    "min": 2,
+    "max": 4,
+    "best": 2
+  },
+  "match_minutes": 4,
+  "price": "free",
+  "tags": [
+    "co-op",
+    "arcade",
+    "bubble-popper",
+    "love2d"
+  ],
+  "emoji": "🫧",
+  "color": "#57c9e8",
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "requirements": {
+    "disk_mb": 5,
+    "ram_mb": 128,
+    "cpu": "LÖVE 11.5",
+    "gpu": "OpenGL 2.1"
+  },
+  "downloads": {
+    "windows": {
+      "url": "https://gamenight.ontola.io/games/c15361a26791d5d2f2345425d9de344b865ec2742320626a0f8c7ab16780a283/bubble-buddies.love",
+      "sha256": "c15361a26791d5d2f2345425d9de344b865ec2742320626a0f8c7ab16780a283",
+      "entrypoint": "bubble-buddies.love",
+      "runtime": {
+        "id": "love-11-5",
+        "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
+        "sha256": "ba6e56be2685e53c817749c4a5007f51137136fe5a3ab64920508babc2e74369",
+        "entrypoint": "love-11.5-win64/love.exe",
+        "argument": "entry_point"
+      }
+    }
+  }
+}
