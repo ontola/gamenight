@@ -399,6 +399,17 @@ impl Shared {
     }
 }
 
+// Games need party identity and settings, not the lobby's embedded catalog art.
+// Keep Welcome within lightweight clients' frame limits as the catalog grows.
+fn game_welcome_snapshot(mut party: gamenight_protocol::PartySnapshot) -> gamenight_protocol::PartySnapshot {
+    for game in &mut party.library {
+        game.cover = None;
+        game.icon = None;
+        game.screenshot = None;
+    }
+    party
+}
+
 fn send(tx: &Tx, msg: &ServerMessage) {
     // A closed channel means the peer is gone; its reader task cleans up.
     let _ = tx.send(msg.to_json());
@@ -1046,7 +1057,7 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
-                    party: s.night.snapshot(),
+                    party: game_welcome_snapshot(s.night.snapshot()),
                 },
             );
             s.dispatch(
@@ -1356,5 +1367,31 @@ mod local_artwork_tests {
         assert!(games[1].cover.is_none());
         assert!(games[2].cover.is_none());
         std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod welcome_artwork_tests {
+    use super::*;
+
+    #[test]
+    fn game_welcome_omits_large_catalog_art_but_preserves_metadata() {
+        let mut night = GameNight::default();
+        let art = "x".repeat(400_000);
+        let game: GameMeta = serde_json::from_value(serde_json::json!({
+            "id": "test", "title": "Test", "cover": art,
+            "icon": art, "screenshot": art, "min_players": 2
+        })).unwrap();
+        night.set_library(vec![game]);
+        let original = night.snapshot();
+        assert!(serde_json::to_vec(&original).unwrap().len() > 1024 * 1024);
+        let compact = game_welcome_snapshot(original.clone());
+        assert!(serde_json::to_vec(&compact).unwrap().len() < 1024 * 1024);
+        assert_eq!(compact.library[0].title, original.library[0].title);
+        assert_eq!(compact.library[0].min_players, original.library[0].min_players);
+        assert!(compact.library[0].cover.is_none());
+        assert!(compact.library[0].icon.is_none());
+        assert!(compact.library[0].screenshot.is_none());
+        assert!(original.library[0].cover.is_some());
     }
 }

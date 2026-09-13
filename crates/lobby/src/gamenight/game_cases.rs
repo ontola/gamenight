@@ -182,9 +182,9 @@ pub(super) fn spawn_shelf(
         parent,
         "UP NEXT",
         -2.0,
-        84.0,
+        -28.0,
         100.0,
-        11.0,
+        9.0,
         &font,
         Color::rgb(1.0, 0.83, 0.48),
     );
@@ -241,15 +241,15 @@ pub(super) fn spawn_shelf(
     );
     block(parent, x - 29.0, 3.0, 0.4, 4.0, 84.0, accent);
     // The illustrated cover includes its title; use the whole case face.
-    block(parent, x + 2.0, 3.0, 0.4, 60.0, 80.0, accent);
+    block(parent, x + 2.0, 11.0, 0.4, 48.0, 64.0, accent);
     if let Some(texture) = cache.image(case.cover.as_deref(), images) {
         parent.spawn(SpriteBundle {
             texture: texture.clone(),
             sprite: Sprite {
-                custom_size: Some(fit_art(&texture, images, Vec2::new(60.0, 80.0))),
+                custom_size: Some(fit_art(&texture, images, Vec2::new(48.0, 64.0))),
                 ..default()
             },
-            transform: Transform::from_xyz(x + 2.0, 3.0, 0.5),
+            transform: Transform::from_xyz(x + 2.0, 11.0, 0.5),
             ..default()
         });
     } else {
@@ -285,9 +285,9 @@ pub(super) fn spawn_shelf(
             parent,
             hint,
             -2.0,
-            65.0,
-            140.0,
-            9.0,
+            -39.0,
+            78.0,
+            7.0,
             &font,
             if status=="READY" {Color::rgb(0.6,1.0,0.7)} else {Color::rgb(1.0, 0.83, 0.48)},
         );
