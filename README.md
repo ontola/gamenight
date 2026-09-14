@@ -1,124 +1,77 @@
 <p align="center"><img src="site/icon.png" width="96" alt="GameNight"></p>
-<h1 align="center">One party. Many games.</h1>
-<p align="center">An open local multiplayer runtime for game developers.</p>
+<h1 align="center">Get to the next game.</h1>
+<p align="center">Open-source couch multiplayer. Less setup between games.</p>
 
-GameNight keeps your players together between games. A game prepares quietly
-in the background, takes the screen when the party starts it, and gives the
-screen back when paused. Players keep their seats, names and avatars.
+GameNight lets you play a whole evening of couch games from your controller.
+Pick a game. Play a round. Try something else.
 
-**Early developer preview.** The local runtime works today. This repository
-includes a playable lobby, Rust/C/Godot SDKs, and a conformance tool. It does
-not require an account, subscription or cloud service. Online matchmaking and
-cross-game controller identity are not finished features.
+The next game loads in the background while you play. Back/Select returns to
+the lobby; press it again to resume. Your controllers stay assigned to the same
+players across integrated games.
 
-[Get started](#try-it-locally) · [Integrate a game](docs/integrating-your-game.md) ·
-[Protocol](docs/protocol.md) · [Contribute](CONTRIBUTING.md)
+[Download the Windows preview](https://github.com/ontola/gamenight/releases) ·
+[Browse games](https://gamenight.ontola.io/catalog) ·
+[Integrate your game](docs/integrating-your-game.md)
 
-Working on the lobby? See the [fast development loop](docs/development-loop.md)
-for native Windows restarts, component builds and web edits without recompiling.
+## Play
 
-## Windows preview
+Install the Windows preview and connect your controllers. Join the lobby,
+walk to a game and press Y to play. The lobby shows download and loading
+progress. Downloaded games are cached for later sessions.
 
-A native Windows preview includes the lobby and automatically downloads Pinpals
-and its shared LÖVE runtime on first launch. Cached games work offline.
-[Downloads](https://github.com/ontola/gamenight/releases) ·
-[Preview instructions and source versions](docs/windows-preview.md).
-For releases with a `Setup.exe`, run it once to install GameNight and receive
-updates automatically after closing the lobby. The portable ZIP remains available;
-extract it and run `GameNight.exe`. No development tools are needed.
+Scan the lobby QR code to open the character editor on your phone. Draw a face
+and change the playlist. Games can use your profile too; the catalog lists
+which parts of the integration have been checked.
 
-## Try it locally
+This is an early preview. Game support varies, and controller, audio and window
+behaviour still need testing across machines. See the
+[Windows preview guide](docs/windows-preview.md) for installation details.
 
-Install a current stable Rust toolchain and Python 3. On Windows, use the
-native Windows Rust toolchain with Visual Studio C++ Build Tools. On Ubuntu,
-install the build dependencies listed in [development setup](docs/development.md).
+## Open protocol. Open source.
 
-```sh
-python scripts/run-local.py
-```
+The local runtime works without an account or cloud service. You can run it,
+change it and add your own games.
 
-This builds and opens the GameNight lobby. Press a controller button to join.
-The included **SDK Demo** is a terminal simulation for testing transitions,
-not a pinball or arcade game. Walk onto the lobby's Start button and jump to
-start it. Back/Select opens the lobby again.
+GameNight runs each game as a separate process. The host tells it when to
+prepare, start, pause, resume and release a session. The game owns its rules,
+score screen and subsequent rounds. Players choose when to switch games.
 
-To test a graphical game, provide a shelf with its executable and working
-directory; the launcher adds the lobby automatically:
+Use the [Rust SDK](crates/gamenight-sdk), [Godot SDK](sdk/godot),
+[C/C++ SDK](sdk/c), or implement the [JSON protocol](docs/protocol.md) directly.
+The [JavaScript example](examples/tiny-game.mjs) is a small reference.
 
-```sh
-python scripts/run-local.py --shelf /path/to/games.json
-```
+Start with the [integration guide](docs/integrating-your-game.md).
+Automated checks cover the game lifecycle; test controller input, sound and
+window focus on each platform you ship. Profile colours and drawn faces are
+separate capabilities.
 
-The optional local character studio is enabled with `--studio`. It serves QR
-pairing and temporary avatars on your LAN, for trusted local networks only.
-Its Playlist tab shows the live game order and what is playing or up next.
-Drag entries or use the up/down buttons to reorder them without interrupting
-play. Changes appear on other devices automatically; conflicting edits ask
-for a refresh. The host still chooses games that fit the current party.
-No store, payments, cloud accounts or ownership database are included.
+## Build from source
 
-## Build a GameNight game
-
-A game implements a small lifecycle:
-
-```text
-prepare → ready → start → finished → dispose
-                    ↕
-               pause / resume
-```
-
-- Prepare without showing a window or playing audio.
-- Bind players to the seats received from the host.
-- Show the game on start; freeze and mute it on pause.
-- Dispose session state so the process can prepare another match.
-- Keep normal standalone play when `GAMENIGHT=1` is absent.
-
-Start with the [integration guide](docs/integrating-your-game.md), then choose
-[Rust](crates/gamenight-sdk), [Godot 4](sdk/godot), or [C/C++](sdk/c).
-[The JavaScript example](examples/tiny-game.mjs) shows the wire protocol without
-a framework. Other engines can speak the same JSON protocol directly.
-
-## Test your integration
+Install stable Rust and Python 3. Windows builds need Visual Studio C++ Build
+Tools. See [development setup](docs/development.md) for Linux dependencies.
 
 ```sh
-cargo build --workspace
-cargo run -p gamenight-certify -- demo-game -- target/debug/demo-game 1
+python scripts/run-local.py --studio --shelf /path/to/games.json
 ```
 
-On Windows, the executable is `target/debug/demo-game.exe`. Substitute your
-game ID and executable to check a real integration. Automated checks exercise
-the lifecycle; also test controller input, sound and focus on your target OS.
+The shelf lists your games and their launch commands. GameNight adds the lobby.
+Without a shelf, the script uses a terminal SDK demo for testing the protocol.
 
-## What's inside
+The [shared LÖVE games](games/love-party/README.md) include Neon Siege,
+Blast Party and Volley Trouble. Build their packages with
+`scripts/package-love-party.py`.
 
-| Component | Purpose |
-|---|---|
-| `gamenight-protocol` | JSON messages and the compatibility contract |
-| `gamenight-core` | Parties, seats, sessions, playlists and voting |
-| `gamenight-daemon` | Local process host and background preparation |
-| `gamenight-sdk`, `sdk/` | Game-facing integration helpers |
-| `gamenight-certify` | Automated conformance checks |
-| `gamenight-catalog`, `gamenight-installer` | Metadata and verified downloads |
-| `gamenight-local-web` | Optional LAN character editor and QR seat claims |
-| `gamenight-mcp` | Local party controls for MCP clients |
-| `crates/lobby` | Controller-driven reference lobby |
+For quick changes to the lobby, use the [development loop](docs/development-loop.md).
+It separates restarting, building and packaging, and serves web files directly
+while you work.
 
-## Contributing
+## Contribute
 
-Small integrations and reproducible bug reports are welcome. You do not need
-to adopt our engine or use our hosted services to contribute. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) for builds, tests and the integration checklist.
+Add a game, improve an integration or report a bug we can reproduce.
+[CONTRIBUTING.md](CONTRIBUTING.md) covers setup and checks.
 
-## License and credits
+## License
 
-GameNight's original code is MIT-licensed; see [LICENSE](LICENSE).
-The lobby and vendored Bones retain their own upstream notices. See
-[THIRD_PARTY.md](THIRD_PARTY.md) for source revisions, modifications and media credits.
-
-### LÖVE party games
-
-The [LÖVE Party Pack](games/love-party/README.md) contains eight original local
-multiplayer games for 2–4 players: Bumper Royale, Neon Trails, Meteor Dash, Blast Party Neon Siege, Ricochet Club, Paint Rush and Orbit Guard.
-Run `love games/love-party` or build individual `.love` files with
-`scripts/package-love-party.py`. The pack shares one GameNight adapter and
-includes simulation tests plus native Windows protocol certification in CI.
+GameNight's original code is MIT-licensed. See [LICENSE](LICENSE).
+The lobby and vendored dependencies retain their upstream notices.
+[THIRD_PARTY.md](THIRD_PARTY.md) lists source revisions and asset credits.
