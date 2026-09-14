@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Join a room · GameNight</title><link rel="icon" href="/web/icon.svg"><link rel="stylesheet" href="/web/site.css"><link rel="stylesheet" href="/web/studio.css"><link rel="stylesheet" href="/web/join.css"><script src="/web/shell.js" defer></script></head>
+<body><div id="site-shell"></div><main class="join-page"><h1>Join a room</h1><p>Enter the code on the TV or scan its QR code.</p><form id="join-code-form"><label for="join-code">Room code</label><input id="join-code" name="room" maxlength="6" minlength="6" required pattern="[A-Za-z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" aria-describedby="join-error"><button type="submit" class="btn-primary">Continue</button></form><p id="join-error" role="alert"></p><button type="button" id="qr-open" class="btn-primary">Scan QR</button><p class="join-note">Your room code is kept if you need to sign in.</p></main>
+<dialog id="qr-scanner" aria-labelledby="qr-title">
+  <div class="scanner-heading"><h2 id="qr-title">Scan lobby QR</h2><button type="button" id="qr-close" class="tool-btn" aria-label="Close scanner">✕</button></div>
+  <div class="scanner-preview"><span aria-hidden="true">Camera preview</span><video id="qr-video" autoplay muted playsinline hidden></video></div>
+  <p id="qr-status" role="status" aria-live="polite"></p>
+  <a id="qr-result" class="tool-btn" hidden></a>
+  <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>
+  <label class="tool-btn" for="qr-photo">Scan a photo<input id="qr-photo" type="file" accept="image/*" capture="environment" hidden></label></div>
+  <p class="scanner-privacy">Images stay on your device.</p>
+</dialog><script src="/assets/jsQR.js"></script><script src="/assets/qr-scanner.js"></script><script src="/web/join.js"></script></body></html>

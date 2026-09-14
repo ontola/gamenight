@@ -30,6 +30,7 @@
     finally{leaving=false;}
   }
   async function join() {
+    if(document.body.dataset.local!=='true'){window.location.assign('/join');return;}
     await navigate('/studio#join');
     const button=document.getElementById('qr-open');
     const dialog=document.getElementById('qr-scanner') as HTMLDialogElement;
