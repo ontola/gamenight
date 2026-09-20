@@ -141,7 +141,7 @@ impl GameNight {
             "ws://{}",
             addr.or(env_addr.as_deref()).unwrap_or(DEFAULT_ADDR)
         );
-        let (mut ws, _) = tokio_tungstenite::connect_async(&url).await?;
+        let (mut ws, _) = tokio_tungstenite::connect_async_with_config(&url, None, true).await?;
         let hello = ClientMessage::Hello {
             role: Role::Game,
             game: Some(GameId::new(game_id)),
@@ -230,6 +230,7 @@ impl GameNight {
                             self.party = party;
                             continue;
                         }
+                        ServerMessage::ControllerFrame { .. } => continue,
                         ServerMessage::Error { message } => {
                             return Err(SdkError::Rejected(message))
                         }
@@ -272,6 +273,11 @@ impl GameNight {
             controller,
         })
         .await
+    }
+
+    /// Publish physical input from the resident lobby. Other games are rejected.
+    pub async fn controller_frame(&mut self, controllers: Vec<gamenight_protocol::ControllerState>) -> Result<(), SdkError> {
+        self.send(&ClientMessage::ControllerFrame { controllers }).await
     }
 
     /// Assets loaded, controllers mapped: the session can start instantly.

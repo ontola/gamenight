@@ -1,7 +1,7 @@
 """Observe real packaged LOVE renderers and switch two native processes.
 
-Synthetic pads are injected only with GNLOVE_PROBE_FILE. This verifies ordinal
-ownership and input consumption, not physical OS/controller enumeration.
+Synthetic host frames exercise the production input adapter with sparse device
+IDs. This verifies ownership and consumption, not physical controller hardware.
 """
 import argparse
 import json
@@ -11,6 +11,7 @@ import socket
 import subprocess
 import tempfile
 import time
+import threading
 
 
 def wait_until(read, predicate, timeout=12):
@@ -30,6 +31,8 @@ def wait_until(read, predicate, timeout=12):
 class Game:
     def __init__(self, love, artifact, folder, tag):
         self.file = folder / f'{tag}.json'
+        self.stop_input = threading.Event()
+        self.send_lock = threading.Lock()
         self.log = open(folder / f'{tag}.log', 'wb')
         self.server = socket.socket()
         self.server.bind(('127.0.0.1', 0))
@@ -38,7 +41,7 @@ class Game:
         env = {k: v for k, v in os.environ.items() if not k.startswith(('GAMENIGHT', 'GNLOVE'))}
         env.update(GAMENIGHT='1', GAMENIGHT_GAME_ID=artifact.stem,
                    GAMENIGHT_ADDR=f'127.0.0.1:{self.server.getsockname()[1]}',
-                   GAMENIGHT_TOKEN='probe', GNLOVE_PROBE_FILE=str(self.file), GNLOVE_MATCH_SECONDS='600')
+                   GAMENIGHT_TOKEN='probe', GNLOVE_PROBE_FILE=str(self.file), GNLOVE_PROBE_HOST_INPUT='1', GNLOVE_MATCH_SECONDS='600')
         self.child = subprocess.Popen([str(love), str(artifact)], env=env, stdout=self.log, stderr=self.log)
         try:
             self.peer = self.server.accept()[0]
@@ -47,12 +50,22 @@ class Game:
             hello = json.loads(self.stream.readline())
             assert hello['type'] == 'hello' and hello['token'] == 'probe'
             self.send('welcome', protocol_version=1)
+            def stream_input():
+                while not self.stop_input.wait(.04):
+                    try:
+                        self.send('controller_frame', controllers=[
+                            dict(controller='ordinal:7', axes=[-32767,0,0,0,0,0], buttons=17),
+                            dict(controller='ordinal:2', axes=[32767,0,0,0,0,0], buttons=34)])
+                    except (OSError,ValueError): break
+            self.input_thread=threading.Thread(target=stream_input,daemon=True)
+            self.input_thread.start()
         except BaseException:
             self.close()
             raise
 
     def send(self, kind, **values):
-        self.stream.write((json.dumps(dict(type=kind, session='probe-session', **values))+'\n').encode())
+        with self.send_lock:
+            self.stream.write((json.dumps(dict(type=kind, session='probe-session', **values))+'\n').encode())
 
     def read(self):
         return json.loads(self.file.read_text())
@@ -61,6 +74,8 @@ class Game:
         return wait_until(self.read, lambda s: s['phase'] == value)
 
     def close(self):
+        self.stop_input.set()
+        if getattr(self, 'input_thread', None): self.input_thread.join(timeout=1)
         if getattr(self, 'peer', None):
             try: self.peer.shutdown(socket.SHUT_RDWR)
             except OSError: pass
@@ -85,8 +100,8 @@ def check(love, artifact, output):
                dict(id='beta', name='BetaProbe', color='#9d43cb', skin_color='#784f32')]
     for i, p in enumerate(players):
         p['avatar'] = json.dumps(dict(v=1, w=2, h=2, px=[None, '#12abef' if i == 0 else '#efab12', '#ffffff', None]))
-    # Deliberately reverse physical pad ordinals relative to the roster.
-    seats = [dict(index=i, controller=f'ordinal:{1-i}', occupant=dict(kind='local', player_id=p['id']))
+    # Deliberately reorder sparse host IDs relative to the roster.
+    seats = [dict(index=i, controller=f'ordinal:{(2,7)[i]}', occupant=dict(kind='local', player_id=p['id']))
              for i, p in enumerate(players)]
     def verdict(feature, passed, detail):
         results[feature] = dict(status='passed' if passed else 'failed', detail=detail)
@@ -134,9 +149,9 @@ def check(love, artifact, output):
                 if 'flip_left' in v:
                     return -1 if v['flip_left'] else 1 if v['flip_right'] else 0
                 return v.get('x', v.get('move', 0))
-            verdict('input.identity', len(actual)==2 and [p.get('pad') for p in actual]==[1,0]
+            verdict('input.identity', len(actual)==2 and [p.get('controller') for p in actual]==['ordinal:2','ordinal:7']
                     and len(inputs)==2 and direction(inputs[0])>0 and direction(inputs[1])<0,
-                    'Reversed synthetic pad ordinals map uniquely to profiles and consumed game inputs')
+                    'Sparse host IDs retain profile ownership and consumed game inputs, independent of SDL enumeration')
             first.send('pause')
             paused = first.phase('paused')
             time.sleep(.15)

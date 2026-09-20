@@ -89,6 +89,7 @@ pub struct LoadingProgress {
 /// Commands the bridge system sends back to the background connection
 /// thread, to be relayed to the daemon.
 enum OutgoingMessage {
+    Controllers(Vec<gamenight_protocol::ControllerState>),
     Ready(SessionId),
     Finished(SessionId),
 }
@@ -676,6 +677,11 @@ async fn connection_loop(
             }
             msg = outgoing.recv() => {
                 match msg {
+                    Ok(OutgoingMessage::Controllers(controllers)) => {
+                        if let Err(e) = gn.controller_frame(controllers).await {
+                            error!("gamenight: controller stream failed: {e}");
+                        }
+                    }
                     Ok(OutgoingMessage::Ready(session)) => {
                         if let Err(e) = gn.ready(session).await {
                             error!("gamenight: failed to send ready: {e}");
@@ -1574,6 +1580,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     app.init_resource::<sleep_visual::PoseBackup>();
     app.add_systems(bevy::prelude::PreUpdate, sleep_visual::restore.before(gate_gamepad_input_system));
     app.add_systems(bevy::prelude::PreUpdate, gate_gamepad_input_system);
+    app.add_systems(bevy::prelude::PreUpdate, stream_controller_input.after(bevy::input::InputSystem));
     app.add_systems(bevy::prelude::PreUpdate, interaction_visual::capture
         .after(gate_gamepad_input_system).after(bevy::input::InputSystem));
     app.add_systems(bevy::prelude::PostUpdate,
@@ -1735,6 +1742,43 @@ fn gate_gamepad_input_system(
     });
 }
 
+
+// Sample once in the resident lobby. Device enumeration order differs between
+// gilrs/WGI and SDL, so games consume these host-tagged snapshots instead.
+fn stream_controller_input(
+    gamepads: bevy::prelude::Res<bevy::input::gamepad::Gamepads>,
+    buttons: bevy::prelude::Res<bevy::prelude::Input<bevy::input::gamepad::GamepadButton>>,
+    axes: bevy::prelude::Res<bevy::prelude::Axis<bevy::input::gamepad::GamepadAxis>>,
+    button_axes: bevy::prelude::Res<bevy::prelude::Axis<bevy::input::gamepad::GamepadButton>>,
+    bones: bevy::prelude::ResMut<bones_bevy_renderer::BonesGame>,
+    mut previous: bevy::prelude::Local<Vec<gamenight_protocol::ControllerState>>,
+    mut last: bevy::prelude::Local<Option<std::time::Instant>>,
+) {
+    use bevy::input::gamepad::{GamepadButton as B, GamepadButtonType as BT, GamepadAxis as A, GamepadAxisType as AT};
+    let mut controllers: Vec<_> = gamepads.iter().map(|pad| {
+        let values = [AT::LeftStickX, AT::LeftStickY, AT::RightStickX, AT::RightStickY]
+            .map(|axis| axes.get(A::new(pad, axis)).unwrap_or(0.0));
+        let mut packed = [0i16; 6];
+        for i in 0..4 { packed[i] = (values[i].clamp(-1.0,1.0)*32767.0) as i16; }
+        // Bevy uses up-positive Y; SDL gamepad axes use down-positive Y.
+        packed[1] = -packed[1]; packed[3] = -packed[3];
+        for (i, button) in [BT::LeftTrigger2, BT::RightTrigger2].iter().enumerate() {
+            packed[i+4] = (button_axes.get(B::new(pad,*button)).unwrap_or(0.0).clamp(0.0,1.0)*32767.0) as i16;
+        }
+        let mapping = [BT::South,BT::East,BT::West,BT::North,BT::LeftTrigger,BT::RightTrigger,
+            BT::Select,BT::Start,BT::LeftThumb,BT::RightThumb,BT::DPadUp,BT::DPadDown,BT::DPadLeft,BT::DPadRight];
+        let bits = mapping.iter().enumerate().fold(0u32, |bits,(i,b)| bits | if buttons.pressed(B::new(pad,*b)) {1<<i} else {0});
+        gamenight_protocol::ControllerState { controller: format!("ordinal:{}",pad.id), axes: packed, buttons: bits }
+    }).collect();
+    controllers.sort_by(|a,b| a.controller.cmp(&b.controller));
+    if *previous != controllers || last.is_none_or(|at| at.elapsed() >= Duration::from_millis(50)) {
+        let bridge = bones.0.shared_resource::<GameNightBridge>();
+        if bridge.outgoing.len() < 2 && bridge.outgoing.try_send(OutgoingMessage::Controllers(controllers.clone())).is_ok() {
+            *previous = controllers; *last = Some(std::time::Instant::now());
+        }
+    }
+}
+
 fn global_input_system(
     links: bevy::prelude::Res<crate::player_links::PlayerLinks>,
     mut input: bevy::prelude::ResMut<GlobalInput>,
@@ -1778,7 +1822,8 @@ fn global_input_system(
     // Held input counts as activity; neutral sticks and connection events do not.
     let mut connected: Vec<_> = gamepads.iter().collect();
     connected.sort_by_key(|g| g.id);
-    for (ordinal, pad) in connected.iter().enumerate() {
+    for pad in &connected {
+        let ordinal = pad.id;
         use bevy::input::gamepad::{GamepadAxis, GamepadAxisType};
         let held = buttons.get_pressed().any(|b| b.gamepad == *pad)
             || [GamepadAxisType::LeftStickX, GamepadAxisType::LeftStickY,
@@ -1801,7 +1846,7 @@ fn global_input_system(
         for seat in bridge.latest_seats.clone() {
             if let (Some(id), Some(ordinal)) = (seat.occupant.player_id(), seat.controller.as_deref()
                 .and_then(|c| c.strip_prefix("ordinal:")).and_then(|c| c.parse::<usize>().ok())) {
-                if let Some(pad) = connected.get(ordinal) {
+                if let Some(pad) = connected.iter().find(|pad| pad.id == ordinal) {
                     if input.adopt_controller_binding(pad.id as u32, id) {
                         // Rebuild the inverse mapping below; inserting alone leaves stale owners.
                     }
@@ -1916,9 +1961,9 @@ fn global_input_system(
             bridge.player_gamepad.insert(player_id, pad);
             let mut connected: Vec<_> = gamepads.iter().map(|g| g.id).collect();
             connected.sort_unstable();
-            if let Some(index) = connected.iter().position(|id| *id == pad as usize) {
+            if connected.contains(&(pad as usize)) {
                 let _ = join_tx.try_send(ClientMessage::BindController {
-                    player_id, controller: format!("ordinal:{index}"),
+                    player_id, controller: format!("ordinal:{pad}"),
                 });
             }
         }

@@ -9,7 +9,45 @@ local M = {
 		{ "f", "h", "t", "g", "r", "y" },
 	},
 }
+
+-- Managed games read the resident lobby's input, never SDL list positions.
+-- A lost stream releases everything rather than leaving a player running.
+M.hostPads = {}
+local axisIndex={leftx=1,lefty=2,rightx=3,righty=4,triggerleft=5,triggerright=6}
+local buttonIndex={a=0,b=1,x=2,y=3,leftshoulder=4,rightshoulder=5,back=6,start=7,
+    leftstick=8,rightstick=9,dpup=10,dpdown=11,dpleft=12,dpright=13}
+function M.updateHost(controllers)
+    local previous={}
+    for _,pad in ipairs(M.hostPads) do previous[pad.controller]=pad;pad.connected=false end
+    local nextPads,seen={},{}
+    for _,state in ipairs(controllers or {}) do
+        if type(state.controller)=='string' and not seen[state.controller] then
+            seen[state.controller]=true
+            local pad=previous[state.controller] or {controller=state.controller}
+            pad.axes,pad.buttons,pad.at,pad.connected=state.axes or {},state.buttons or 0,love.timer.getTime(),true
+            function pad:isConnected() return self.connected and love.timer.getTime()-self.at < .25 end
+            function pad:isGamepad() return true end
+            function pad:getGamepadAxis(axis)
+                if not self:isConnected() then return 0 end
+                return (self.axes[axisIndex[axis]] or 0)/32767
+            end
+            function pad:isGamepadDown(...)
+                if not self:isConnected() then return false end
+                for _,button in ipairs({...}) do
+                    local index=buttonIndex[button]
+                    if index and math.floor(self.buttons/2^index)%2==1 then return true end
+                end
+                return false
+            end
+            nextPads[#nextPads+1]=pad
+        end
+    end
+    M.hostPads=nextPads
+    if M.players then M.bind(M.players,nextPads) end
+end
+
 function M.bind(players, pads)
+    M.players=players
 	M.pads, M.active, M.keyboardOnly = {}, {}, {}
 	local claimed, explicit = {}, false
 	for _, p in ipairs(players) do
@@ -20,7 +58,15 @@ function M.bind(players, pads)
 		M.active[p.slot] = not p.bot
 		if not p.bot then
 			local ordinal = p.controller and tonumber(p.controller:match("^ordinal:(%d+)$"))
-			local pad = ordinal and pads[ordinal + 1] or (not explicit and pads[p.slot] or nil)
+			local tagged=false
+            local pad
+            for _,candidate in ipairs(pads) do
+                if candidate.controller then
+                    tagged=true
+                    if candidate.controller==p.controller then pad=candidate end
+                end
+            end
+            if not tagged then pad = ordinal and pads[ordinal + 1] or (not explicit and pads[p.slot] or nil) end
 			if pad and not claimed[pad] then
 				M.pads[p.slot], claimed[pad] = pad, true
 			end

@@ -936,6 +936,7 @@ type BoxError = Box<dyn std::error::Error + Send + Sync>;
 /// the plain form exists so a game whose engine has no WebSocket library
 /// (most C/C++ engines) can still integrate with a socket and `printf`.
 async fn handle_connection(stream: TcpStream, shared: Arc<Mutex<Shared>>) -> Result<(), BoxError> {
+    stream.set_nodelay(true)?;
     let mut probe = [0u8; 4];
     let mut seen = 0;
     while seen < probe.len() {
@@ -1100,6 +1101,18 @@ async fn serve(
                     continue;
                 }
             };
+            if let ClientMessage::ControllerFrame { controllers } = &parsed {
+                if !valid_controller_frame(&registration, controllers) {
+                    send(&tx, &ServerMessage::Error { message: "only the lobby publishes controller frames".into() });
+                    continue;
+                }
+                let s = shared.lock().await;
+                let frame = ServerMessage::ControllerFrame { controllers: controllers.clone() };
+                for (id, game_tx) in &s.games {
+                    if id.0 != "lobby" { send(game_tx, &frame); }
+                }
+                continue;
+            }
             let command = match message_to_command(parsed, &registration) {
                 Ok(Some(c)) => c,
                 Ok(None) => continue,
@@ -1163,6 +1176,22 @@ enum Registration {
     Overlay(u64),
 }
 
+fn valid_controller_frame(registration: &Registration, controllers: &[gamenight_protocol::ControllerState]) -> bool {
+    if !matches!(registration, Registration::Game(id) if id.0 == "lobby") || controllers.len() > 16 { return false; }
+    let mut ids = std::collections::HashSet::new();
+    controllers.iter().all(|c| c.controller.strip_prefix("ordinal:").and_then(|id| id.parse::<u32>().ok()).is_some()
+        && ids.insert(&c.controller))
+}
+
+#[test]
+fn controller_frames_only_accept_unique_host_devices_from_lobby() {
+    let frame = gamenight_protocol::ControllerState { controller: "ordinal:7".into(), axes: [0;6], buttons: 1 };
+    assert!(valid_controller_frame(&Registration::Game(GameId::new("lobby")), &[frame.clone()]));
+    assert!(!valid_controller_frame(&Registration::Game(GameId::new("blast-party")), &[frame.clone()]));
+    assert!(!valid_controller_frame(&Registration::Overlay(0), &[frame.clone()]));
+    assert!(!valid_controller_frame(&Registration::Game(GameId::new("lobby")), &[frame.clone(),frame]));
+}
+
 /// Translate a wire message into a state-machine command, enforcing that each
 /// role only sends its own kind of message.
 fn message_to_command(
@@ -1171,6 +1200,7 @@ fn message_to_command(
 ) -> Result<Option<Command>, String> {
     let is_game = matches!(registration, Registration::Game(_));
     let command = match msg {
+        ClientMessage::ControllerFrame { .. } => return Err("controller frames require lobby routing".into()),
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
         ClientMessage::Participation {
             session,

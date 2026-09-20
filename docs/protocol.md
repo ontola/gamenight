@@ -521,8 +521,9 @@ Report real human activity from **all** controllers, including unassigned device
 {"type":"controller_input","session":"<active session UUID>","controller":"ordinal:0"}
 ```
 
-`ordinal:N` is the zero-based physical controller index used by `seats[].controller`.
-Use the same enumeration when binding gameplay input. Apply a 0.25 stick/trigger
+`ordinal:N` identifies a device in the resident host, as used by `seats[].controller`.
+Treat it as an opaque token. Do not index an SDL or engine-local device list with it.
+Bundled games consume the host controller frames described below. Apply a 0.25 stick/trigger
 deadzone, ignore device-connect events, and throttle held input to once per second
 per controller. Bots, animation, repeated network heartbeats and simulated input must
 never report activity. A game may report only while its own session is running and
@@ -557,3 +558,28 @@ fixed round rosters. Custom clients can send the JSON directly.
 The character studio saves `skin_color` with the player profile and never changes
 `Player.color` on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.
+
+
+### Bundled games: authoritative controller input
+
+The resident lobby samples physical controllers and publishes `controller_frame`
+on its authenticated game connection. The daemon forwards it to connected games.
+Only the lobby may publish frames; overlays and other games cannot inject them.
+Each frame contains the full connected-device list, including released buttons.
+
+`controllers` contains `{controller, axes, buttons}` records. `controller` is an
+opaque host token matching `seats[].controller`, not an index into SDL's joystick
+list. The lobby keeps device IDs stable when another controller disconnects.
+`axes` contains left X/Y, right X/Y, and left/right trigger, scaled by 32767.
+Y is down-positive. Button bits 0 through 13 are A, B, X, Y, LB, RB, Back, Start,
+left stick, right stick, D-pad up, down, left, right.
+
+The shared LÖVE adapter uses these frames in managed sessions and never matches
+local SDL enumeration against lobby ordinals. Standalone games still read local
+controllers. Frames are sent on change, with a 50 ms heartbeat. After 250 ms
+without input, controls become neutral. TCP_NODELAY is enabled on both hops.
+
+Regression checks: `host_controller_identity_survives_reordering_and_disconnects`
+in the shared Lua suite, the daemon socket test
+`lobby_controller_frames_keep_device_ids_across_the_real_socket`, and
+`scripts/test-love-integration.py` with sparse, reversed host device IDs.

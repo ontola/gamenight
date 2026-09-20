@@ -56,6 +56,36 @@ function tests.back_does_not_bounce_after_resume()
 	assert(gate:press())
 	assert(not gate:press())
 end
+function tests.host_controller_identity_survives_reordering_and_disconnects()
+    local input=require("shared.input")
+    local oldLove=love
+    local time=0
+    love={timer={getTime=function()return time end}}
+    local ok,err=pcall(function()
+        local players={{slot=1,controller="ordinal:7"},{slot=2,controller="ordinal:2"}}
+        input.bind(players,{})
+        local left={controller="ordinal:7",axes={-32767,0,0,0,0,0},buttons=1}
+        local right={controller="ordinal:2",axes={32767,0,0,0,0,0},buttons=2}
+        input.updateHost({right,left})
+        equal(input.sample(1).x,-1);equal(input.sample(2).x,1)
+        assert(input.sample(1).action and not input.sample(2).action)
+        input.updateHost({left,right})
+        equal(input.sample(1).x,-1);equal(input.sample(2).x,1)
+        input.updateHost({right}) -- Removing the first device cannot renumber the second.
+        equal(input.sample(1).x,0);equal(input.sample(2).x,1)
+        input.updateHost({right,right,left}) -- Duplicate IDs never create a second controller.
+        equal(#input.hostPads,2);assert(input.pads[1]~=input.pads[2])
+        time=.3
+        equal(input.sample(1).x,0);equal(input.sample(2).x,0)
+        assert(not input.sample(1).action)
+        input.updateHost({left,right})
+        equal(input.sample(1).x,-1)
+        input.updateHost({});equal(input.sample(1).x,0)
+    end)
+    love=oldLove;input.bind({},{});input.hostPads={}
+    assert(ok,err)
+end
+
 function tests.controllers_are_never_shared_between_players()
     local input = require("shared.input")
     local a, b = {}, {}

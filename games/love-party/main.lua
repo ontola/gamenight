@@ -28,7 +28,7 @@ if duration then
 	duration = U.clamp(duration, 1, 600)
 end
 local function pads()
-	return Probe.devices or (love.joystick and love.joystick.getJoysticks() or {})
+	return Probe.devices or (managed and Input.hostPads) or (love.joystick and love.joystick.getJoysticks() or {})
 end
 local function prepare(seats, players)
 	local roster = U.players(seats, players)
@@ -111,7 +111,8 @@ function love.load(args)
 				os.getenv("GAMENIGHT_TOKEN")
 			),
 			{
-				hide = function()
+				input = Input.updateHost,
+                hide = function()
 					Audio.mute()
                     if mode.mute then mode.mute() end
 					Screen.hide()
@@ -165,7 +166,7 @@ function love.update(dt)
 		if bridge.phase == "running" then
 			for i, pad in ipairs(pads()) do
 				if Input.meaningful(pad) and (not activitySent[i] or activityClock - activitySent[i] >= 1) then
-					bridge:activity("ordinal:" .. (i - 1))
+					bridge:activity(pad.controller or ("ordinal:" .. (i - 1)))
 					activitySent[i] = activityClock
 				end
 			end
@@ -302,10 +303,10 @@ function love.gamepadpressed(_, button)
 	end
 end
 function love.joystickadded(pad)
-	Input.attach(pad)
+	if not managed then Input.attach(pad) end
 end
 function love.joystickremoved(pad)
-	Input.detach(pad)
+	if not managed then Input.detach(pad) end
 end
 function love.quit()
 	if bridge then

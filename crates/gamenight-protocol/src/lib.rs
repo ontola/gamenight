@@ -666,9 +666,22 @@ pub enum Role {
     Overlay,
 }
 
+/// Physical input sampled by the lobby. Controller IDs are opaque host IDs,
+/// never indexes into another process's device enumeration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ControllerState {
+    pub controller: String,
+    /// left x/y, right x/y, left/right trigger; signed values / 32767.
+    pub axes: [i16; 6],
+    /// A B X Y LB RB Back Start LS RS Up Down Left Right (bits 0..13).
+    pub buttons: u32,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
+    /// Only the authenticated lobby may publish physical input.
+    ControllerFrame { controllers: Vec<ControllerState> },
     /// Opt into presence and live roster notifications for this prepared session.
     Participation {
         session: SessionId,
@@ -857,6 +870,8 @@ pub enum ClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
+    /// Full controller snapshot, including neutral/released state.
+    ControllerFrame { controllers: Vec<ControllerState> },
     /// Full authoritative roster/presence for an opted-in session. Apply without
     /// resetting the match. Unknown fields/messages remain optional for old games.
     PartyUpdated {

@@ -18,7 +18,7 @@ function P.install()
       getGamepadAxis=function(_,axis) return axis=="leftx" and (index==1 and -1 or 1) or 0 end,
       isGamepadDown=function(_,key) return index==1 and (key=="a" or key=="leftshoulder") or index==2 and (key=="b" or key=="rightshoulder") end}
   end
-  P.devices=pads
+  if os.getenv("GNLOVE_PROBE_HOST_INPUT") ~= "1" then P.devices=pads end
   love.keyboard.isDown=function() return false end
   if not love.graphics then return end
   local avatar=require("games.volley.avatar")
