@@ -86,11 +86,12 @@
         panel.append(close,title,text,rememberLabel,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
         try{
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
+          rememberPair.checked=!!info.remembered;
           text.textContent='Your saved character will connect to player '+(info.seat+1)+' in the room you scanned.';
           button.disabled=false;
           button.onclick=async()=>{
             if(accepting)return;accepting=true;button.disabled=true;close.disabled=true;text.textContent='Joining room…';
-            try{await request('/v1/pairing/claim','POST',{ticket,...(rememberPair.checked?{remember:true}:{})});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();window.showToast('Connected to the room.');await checkRoom();document.getElementById('room-leave').focus();}
+            try{await request('/v1/pairing/claim','POST',{ticket,remember:rememberPair.checked});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();window.showToast('Connected to the room.');await checkRoom();document.getElementById('room-leave').focus();}
             catch(error){window.showToast(error.message);text.textContent='Could not connect. You can try again or close this screen.';button.disabled=false;close.disabled=false;}
             finally{accepting=false;}
           };
