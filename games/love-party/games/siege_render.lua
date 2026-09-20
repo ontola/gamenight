@@ -33,6 +33,7 @@ function M.draw(s, G, fonts, playerColor)
         for x=0,s.width+20,20 do local wx,wy=Gravity.warp(s,x,y);line[#line+1]=wx;line[#line+1]=wy end
         G.line(line)
     end
+    Gravity.drawFlow(s,G)
     Gravity.draw(s,G)
 	for _, r in ipairs(s.rings) do
 		tint(r.color, r.ttl / 0.35 * 0.7)

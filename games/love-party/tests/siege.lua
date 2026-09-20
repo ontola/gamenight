@@ -270,6 +270,19 @@ function tests.special_ammo_expires_into_standard_fire()
  M.update(s,0.2,{{x=0,y=0,aimX=1,aimY=0}})
  assert(s.shots[#s.shots].special==nil)
 end
+function tests.flow_moves_inward_and_resets_while_invisible()
+ local G=require('games.siege_gravity');local s=fresh(1);s.wave=4;s.time=10
+ local f={x=600,y=400,mass=1600000,r=19};local rate=0.8
+ s.time=8.2/rate;local x1,y1,a1=G.flowSample(s,f,500,400,0)
+ s.time=8.7/rate;local x2,y2,a2=G.flowSample(s,f,500,400,0)
+ assert(x2>x1 and x2<600 and y1==400 and y2==400 and a1>0 and a2>0)
+ s.time=9/rate;local _,_,alpha=G.flowSample(s,f,500,400,0);assert(alpha<0.000001)
+ local _,_,far=G.flowSample(s,f,0,0,0);assert(far==0)
+ -- At the same cycle age a stronger source pulls farther.
+ s.time=8.5/rate;local weak=G.flowSample(s,f,500,400,0)
+ f.mass=3200000;s.time=8.5/1.28;local strong=G.flowSample(s,f,500,400,0)
+ assert(strong>weak)
+end
 for name, test in pairs(tests) do
 	test()
 	print("PASS siege " .. name)

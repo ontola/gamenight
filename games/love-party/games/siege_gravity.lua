@@ -33,6 +33,56 @@ function M.warp(s,x,y)
  end
  return x+ox,y+oy
 end
+-- Three staggered generations disappear before their coordinates reset.
+-- One phase per source keeps each grid coherent; local falloff increases
+-- displacement near the core without introducing phase seams along a line.
+function M.flowSample(s,f,x,y,layer)
+ local strength=M.strength(s)
+ local ramp=f.lethal and s.wave==5 and math.min(1,math.max(0,(s.waveClock-1)/3)) or 1
+ local intensity=math.min(2.5,f.mass/1600000)*strength*ramp
+ local phase=(s.time*(0.32+intensity*0.48)+layer/3)%1
+ local dx,dy=f.x-x,f.y-y
+ local falloff=math.max(0,1-(dx*dx+dy*dy)/(260*260))^2
+ local pull=math.min(0.78,intensity*0.32)*phase*falloff
+ local alpha=math.sin(math.pi*phase)^2*falloff*math.min(1,intensity)*0.45
+ return x+dx*pull,y+dy*pull,alpha
+end
+local flowMesh,flowCapacity
+function M.drawFlow(s,G)
+ local vertices={}
+ local function segment(f,x1,y1,x2,y2,layer)
+  local ax,ay,a=M.flowSample(s,f,x1,y1,layer)
+  local bx,by,b=M.flowSample(s,f,x2,y2,layer)
+  if a+b<0.003 then return end
+  local dx,dy=bx-ax,by-ay
+  local length=math.max(0.001,math.sqrt(dx*dx+dy*dy))
+  local nx,ny=-dy/length*0.55,dx/length*0.55
+  local c=f.lethal and {0.55,0.32,0.85} or {0.15,0.55,0.70}
+  local function v(x,y,alpha)return {x,y,0,0,c[1],c[2],c[3],alpha}end
+  local p1,p2,p3,p4=v(ax+nx,ay+ny,a),v(ax-nx,ay-ny,a),v(bx+nx,by+ny,b),v(bx-nx,by-ny,b)
+  for _,p in ipairs({p1,p2,p3,p3,p2,p4})do vertices[#vertices+1]=p end
+ end
+ for _,f in ipairs(M.fields(s)) do
+  local left,right=math.floor((f.x-260)/40)*40,math.ceil((f.x+260)/40)*40
+  local top,bottom=math.floor((f.y-260)/40)*40,math.ceil((f.y+260)/40)*40
+  for layer=0,2 do
+   for x=left,right,40 do
+    for y=top,bottom-20,20 do segment(f,x,y,x,y+20,layer) end
+   end
+   for y=top,bottom,40 do
+    for x=left,right-20,20 do segment(f,x,y,x+20,y,layer) end
+   end
+  end
+ end
+ if #vertices==0 then return end
+ if not flowMesh or #vertices>flowCapacity then
+  if flowMesh then flowMesh:release() end
+  flowCapacity=math.max(32768,#vertices)
+  flowMesh=G.newMesh(flowCapacity,'triangles','stream')
+ end
+ flowMesh:setVertices(vertices);flowMesh:setDrawRange(1,#vertices)
+ G.setColor(1,1,1);G.draw(flowMesh)
+end
 local function crossed(ax,ay,bx,by,x,y,r)
  local dx,dy=bx-ax,by-ay
  local t=math.max(0,math.min(1,((x-ax)*dx+(y-ay)*dy)/math.max(0.0001,dx*dx+dy*dy)))
