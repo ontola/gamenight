@@ -5,7 +5,6 @@ local modes = {
 	require("games.blast"),
 	require("games.siege"),
 	require("games.ricochet"),
-	require("games.paint"),
     require("games.volley"),
     require("games.coop")(require("games.coop.stack")),
     require("games.coop")(require("games.coop.bubbles")),

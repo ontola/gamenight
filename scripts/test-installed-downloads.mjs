@@ -1,6 +1,6 @@
 // Run only against a fresh, isolated Windows installation. Requires Node 22+.
 import fs from 'node:fs';
-const ids=['neon-trails','blast-party','neon-siege','ricochet-club','paint-rush','volley-trouble','stack-together','bubble-buddies'];
+const ids=['neon-trails','blast-party','neon-siege','ricochet-club','volley-trouble','stack-together','bubble-buddies'];
 const results=[]; let party; let failure; let ws;
 const endpoint=process.argv[2] || 'ws://127.0.0.1:7912';
 const deadline=Date.now()+30000;

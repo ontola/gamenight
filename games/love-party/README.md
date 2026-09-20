@@ -1,13 +1,12 @@
 # GameNight LÖVE Party Pack
 
-Nine local multiplayer games sharing one GameNight integration. MIT licensed.
+Eight local multiplayer games sharing one GameNight integration. MIT licensed.
 No assets or accounts to download, no internet connection during play.
 Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
 | Game | Goal | Controls |
 | --- | --- | --- |
 | Ricochet Club | Tank combat with bouncing shots and destructible cover | Move, right stick aim, RB/RT fire, B shield |
-| Paint Rush | Cover the most territory in your colour | Move, A paint burst |
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
 | Volley Trouble | Win volleyball rounds across four courts, with rotating rules | Move, A jump, B/RB/RT smash, right stick aim |
@@ -18,7 +17,7 @@ Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 
 Games own their round rules and score screens. Rounds repeat automatically after
 results; only an explicit game switch ends the host session. Back/Select pauses
-and opens the lobby. All nine games use the same lifecycle, controller ownership,
+and opens the lobby. All eight games use the same lifecycle, controller ownership,
 prewarming, focus and continuous-play implementation. Volley Trouble adds its
 own simulation, full-screen renderer, sounds and live setting declarations.
 
@@ -171,7 +170,6 @@ score below the arena and health indicators beside players.
   three hits destroy a crate, opening new routes. Cover resets each round. A hit earns
   +3 and costs the target 1; your own bounced shots cost you 1. B shields for
   0.6 seconds with a three-second cooldown. Hits grant brief invulnerability.
-- **Paint Rush** (`paint-rush`): move to colour tiles and steal opponents' territory.
   A paints a diamond-shaped burst every four seconds. Your score is the number
   of tiles currently owned. Simultaneous claims leave a tile unchanged.
 Both support 2–4 local players, shared keyboards, controllers and bots.
