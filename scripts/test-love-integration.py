@@ -1,4 +1,4 @@
-"""Observe real packaged LÃƒâ€“VE renderers and switch two native processes.
+"""Observe real packaged LOVE renderers and switch two native processes.
 
 Synthetic pads are injected only with GNLOVE_PROBE_FILE. This verifies ordinal
 ownership and input consumption, not physical OS/controller enumeration.
@@ -107,7 +107,7 @@ def check(love, artifact, output):
             def borderless(snapshot):
                 w = snapshot['window']
                 assert not w['flags']['fullscreen'] and w['flags']['borderless'], 'Game entered fullscreen display mode or has window borders'
-                assert (w['width'],w['height']) == (w['desktopWidth'],w['desktopHeight']), 'Game does not fill desktop resolution'
+                assert (w['width'],w['height']) == (w['desktopWidth'],w['desktopHeight'] + (1 if os.name == 'nt' else 0)), 'Game does not cover the desktop with the composition guard'
             borderless(sample)
             initial = sample
             for i,p in enumerate(players):

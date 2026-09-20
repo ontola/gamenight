@@ -21,10 +21,10 @@ function tests.window_presents_before_reveal_and_on_every_resume()
   SDL_HideWindow=function()record('hide')end,
   SDL_RaiseWindow=function()record('raise')end,
  }}
- love={timer={getTime=function()return 0 end},window={
+ love={system={getOS=function()return "Windows" end},timer={getTime=function()return 0 end},window={
   getDesktopDimensions=function()return 3840,2160 end,
   setMode=function(w,h,flags)
-   equal(w,3840);equal(h,2160);equal(flags.fullscreen,false)
+   equal(w,3840);equal(h,2161);equal(flags.fullscreen,false)
    equal(flags.fullscreentype,"desktop");assert(flags.borderless)
   end,
   setPosition=function(x)record(x==0 and 'reveal' or 'offscreen')end,
