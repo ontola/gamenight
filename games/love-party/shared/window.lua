@@ -55,25 +55,38 @@ end
 function M.prepare()
 	if not love.window then return end
 	local width, height = love.window.getDesktopDimensions()
-	love.window.setMode(width, height, {borderless=true, resizable=false, highdpi=true, vsync=1, x=-10000, y=-10000})
+	love.window.setMode(width, height, {fullscreen=false, fullscreentype="desktop", borderless=true, resizable=false, highdpi=true, vsync=1, x=-10000, y=-10000})
 	M.hide()
 end
 
-function M.show()
+function M.show(drawFrame)
 	if not love.window then
 		return
 	end
-	native_window()
-	-- The managed window already has its final dimensions and borderless
-	-- style. Moving and showing it must not recreate graphics resources.
-	love.window.setPosition(0, 0)
-	if sdl then sdl.SDL_ShowWindow(window) end
-	love.window.restore()
-	native_window()
-	if sdl then
-		sdl.SDL_RaiseWindow(window)
-	end
-	love.window.requestAttention()
+    -- Hidden/minimized swapchains may discard the warm frame. Restore off
+    -- screen and present current gameplay before putting it over the lobby.
+    local started=love.timer.getTime()
+    native_window()
+    love.window.setPosition(-10000,-10000)
+    if sdl then sdl.SDL_ShowWindow(window) end
+    love.window.restore()
+    local function present()
+        if drawFrame and love.graphics then
+            love.graphics.origin()
+            love.graphics.clear()
+            drawFrame()
+            love.graphics.present()
+        end
+    end
+    local ok,err=pcall(present)
+    if not ok then M.hide();error(err) end
+    love.window.setPosition(0,0)
+    -- Moving between monitors/DPI contexts can invalidate the drawable too.
+    ok,err=pcall(present)
+    if not ok then M.hide();error(err) end
+    native_window()
+    if sdl then sdl.SDL_RaiseWindow(window) end
+    print(string.format("GameNight window presented in %.3fs",love.timer.getTime()-started))
 end
 
 return M

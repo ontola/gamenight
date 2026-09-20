@@ -65,7 +65,11 @@ function P.observe(phase,state)
       slot=p.slot,controller=p.controller,pad=pad and pad.probeOrdinal}
   end
   P.frames=(P.frames or 0)+1
-  local snapshot={frames=P.frames,phase=phase,players=players,steps=P.steps,inputs=P.inputs,rendered=P.rendered,
+  local width,height,flags
+  if love.window then width,height,flags=love.window.getMode() end
+  local desktopWidth,desktopHeight
+  if love.window then desktopWidth,desktopHeight=love.window.getDesktopDimensions() end
+  local snapshot={window={width=width,height=height,flags=flags,desktopWidth=desktopWidth,desktopHeight=desktopHeight},frames=P.frames,phase=phase,players=players,steps=P.steps,inputs=P.inputs,rendered=P.rendered,
     visible=love.window and love.window.isVisible() or false,
     audio=love.audio and love.audio.getActiveSourceCount() or 0}
   local encoded=json.encode(snapshot)

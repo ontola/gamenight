@@ -119,7 +119,9 @@ function love.load(args)
 				show = function()
 					backGate:reset()
 					Audio.enabled = true
-					Screen.show()
+					Screen.show(function()
+                        if state then Render.game(mode,state,remaining,finished,managed) end
+                    end)
 				end,
 				prepare = prepare,
                 settings = mode.settings,

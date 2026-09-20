@@ -1,4 +1,4 @@
-"""Observe real packaged LÖVE renderers and switch two native processes.
+"""Observe real packaged LÃƒâ€“VE renderers and switch two native processes.
 
 Synthetic pads are injected only with GNLOVE_PROBE_FILE. This verifies ordinal
 ownership and input consumption, not physical OS/controller enumeration.
@@ -104,6 +104,11 @@ def check(love, artifact, output):
             first.send('start')
             sample = wait_until(first.read, lambda s: s['phase']=='running' and s['steps']>90)
             observations['initial'] = sample
+            def borderless(snapshot):
+                w = snapshot['window']
+                assert not w['flags']['fullscreen'] and w['flags']['borderless'], 'Game entered fullscreen display mode or has window borders'
+                assert (w['width'],w['height']) == (w['desktopWidth'],w['desktopHeight']), 'Game does not fill desktop resolution'
+            borderless(sample)
             initial = sample
             for i,p in enumerate(players):
                 p['name'] = ('AUpdated','BUpdated')[i]
@@ -146,6 +151,14 @@ def check(love, artifact, output):
             first.send('resume')
             wait_until(first.read, lambda s: s['phase']=='running' and s['visible'] and s['steps']>old['steps'])
             assert not second.read()['visible'] and second.read()['audio']==0
+            # Exercise repeated resumes, including rendering after each hide.
+            for _ in range(5):
+                first.send('pause')
+                first.phase('paused')
+                first.send('resume')
+                resumed = wait_until(first.read, lambda s: s['phase']=='running' and s['visible'])
+                borderless(resumed)
+            observations['borderless_resumes'] = 5
             first.send('dispose')
             disposed = first.phase('idle')
             assert not disposed['players'] and not disposed['visible'] and disposed['audio']==0

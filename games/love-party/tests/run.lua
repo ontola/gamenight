@@ -10,6 +10,39 @@ local function equal(a, b)
 	assert(a == b, tostring(a) .. " ~= " .. tostring(b))
 end
 local tests = {}
+function tests.window_presents_before_reveal_and_on_every_resume()
+ local oldLove,oldFfi=love,package.loaded.ffi
+ local loadWindow=assert(love.filesystem.load("shared/window.lua"))
+ local events={}
+ local function record(e)events[#events+1]=e end
+ package.loaded.ffi={cdef=function()end,C={
+  SDL_GL_GetCurrentWindow=function()return 1 end,
+  SDL_ShowWindow=function()record('show-offscreen')end,
+  SDL_HideWindow=function()record('hide')end,
+  SDL_RaiseWindow=function()record('raise')end,
+ }}
+ love={timer={getTime=function()return 0 end},window={
+  getDesktopDimensions=function()return 3840,2160 end,
+  setMode=function(w,h,flags)
+   equal(w,3840);equal(h,2160);equal(flags.fullscreen,false)
+   equal(flags.fullscreentype,"desktop");assert(flags.borderless)
+  end,
+  setPosition=function(x)record(x==0 and 'reveal' or 'offscreen')end,
+  restore=function()record('restore')end,
+ },graphics={origin=function()end,clear=function()record('clear')end,present=function()record('present')end}}
+ local ok,err=pcall(function()
+  local screen=loadWindow();screen.prepare()
+  for _=1,2 do
+   events={};screen.show(function()record('draw')end)
+   equal(table.concat(events,','),'offscreen,show-offscreen,restore,clear,draw,present,reveal,clear,draw,present,raise')
+  end
+  events={};assert(not pcall(function()screen.show(function()error('render failed')end)end))
+  equal(events[#events],'hide')
+  for _,event in ipairs(events)do assert(event~='raise' and event~='reveal')end
+ end)
+ love=oldLove;package.loaded.ffi=oldFfi
+ assert(ok,err)
+end
 function tests.back_does_not_bounce_after_resume()
 	local gate=require("shared.back_gate").new()
 	gate:update(1,false)
