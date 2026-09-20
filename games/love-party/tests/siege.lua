@@ -109,7 +109,7 @@ function tests.pulse_splitters_caps_and_cooldown()
 	end
 	assert(#s.enemies == M.limits.enemies)
 end
-function tests.powerups_stack_for_round_and_shots_do_not_hurt_friends()
+function tests.powerups_stack_without_time_expiry_and_shots_do_not_hurt_friends()
 	local s = fresh()
 	local p = s.players[1]
 	s.pickups = { { x = p.x, y = p.y, kind = "spread", ttl = 2 } }
@@ -118,7 +118,7 @@ function tests.powerups_stack_for_round_and_shots_do_not_hurt_friends()
 	s.shots = {}
 	p.fireClock = 0
 	M.update(s, 1 / 120, { { x = 0, y = 0, aimX = 1, aimY = 0 }, { x = 0, y = 0 } })
-	assert(#s.shots == 3)
+	assert(#s.shots == 5)
 	for _, kind in ipairs({ "pierce", "rapid", "spread" }) do
 		s.pickups = { { x = p.x, y = p.y, kind = kind, ttl = 2 } }
 		tick(s)
@@ -129,7 +129,7 @@ function tests.powerups_stack_for_round_and_shots_do_not_hurt_friends()
 	assert(p.powers.spread and p.powers.pierce and p.powers.rapid)
 	s.shots = {}; p.fireClock = 0
 	M.update(s, 1 / 120, { { x = 0, y = 0, aimX = 1, aimY = 0 }, { x = 0, y = 0 } })
-	assert(#s.shots == 3 and s.shots[1].hits == 3 and p.fireClock == 0.045)
+	assert(#s.shots == 5 and s.shots[1].hits == 5 and p.fireClock == 0.045)
 	p.invul = 0
 	s.shots = { { x = p.x - 25, y = p.y, vx = 6000, vy = 0, ttl = 1, hits = 1, hit = {}, owner = s.players[2] } }
 	tick(s)
@@ -245,6 +245,30 @@ function tests.fullscreen_bounds_resize_and_spawn_safety()
 	p.invul = 0
 	tick(s)
 	assert(e.warm > 0 and p.hp == 3, "warning must not activate on a player")
+end
+function tests.gravity_escalates_and_bends_projectiles()
+ local G=require('games.siege_gravity');local s=fresh(1);s.time=10
+ s.wave=1;assert(#G.fields(s)==1 and #G.portals(s)==0)
+ local f=G.fields(s)[1];local ax=G.force(s,f.x-90,f.y);assert(ax>0)
+ s.wave=3;assert(#G.portals(s)==2)
+ s.wave=5;s.waveClock=5;assert(#G.fields(s)==2)
+ s.shots={{x=s.width*0.73-100,y=s.height*0.67-60,vx=100,vy=0,ttl=1}}
+ G.step(s,1/60);assert(s.shots[1].vy>0)
+end
+function tests.wormholes_do_not_bounce_and_black_holes_kill()
+ local G=require('games.siege_gravity');local s=fresh(1);s.time=10;s.wave=3
+ local p=s.players[1];local portals=G.portals(s);p.x,p.y=portals[1].x,portals[1].y
+ G.step(s,1/60);assert(p.x>s.width/2 and p.portalCooldown>0)
+ G.step(s,1/60);assert(p.x>s.width/2)
+ s.wave=5;s.waveClock=5;local hole=G.fields(s)[2];p.x,p.y=hole.x,hole.y;p.spaceX,p.spaceY=p.x,p.y
+ G.step(s,1/60);assert(p.hp==0 and p.x<hole.x-50)
+end
+function tests.special_ammo_expires_into_standard_fire()
+ local s=fresh(1);s.waveRest=100;local p=s.players[1];p.powers.pierce=1
+ M.update(s,0.01,{{x=0,y=0,aimX=1,aimY=0}})
+ assert(p.powers.pierce==nil and s.shots[1].special=='pierce' and s.shots[1].damage==2)
+ M.update(s,0.2,{{x=0,y=0,aimX=1,aimY=0}})
+ assert(s.shots[#s.shots].special==nil)
 end
 for name, test in pairs(tests) do
 	test()

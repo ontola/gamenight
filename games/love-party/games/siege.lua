@@ -1,5 +1,6 @@
 local U = require("shared.util")
 local Waves = require("games.siege_waves")
+local Gravity = require("games.siege_gravity")
 local M = {
 	id = "neon-siege",
 	title = "NEON SIEGE",
@@ -18,6 +19,7 @@ local specs = {
 	shard = { hp = 1, r = 7, speed = 190, value = 8 },
 }
 M.specs = specs
+M.ammo = {spread=18,pierce=12,rapid=60}
 local function alive(p)
 	return p.hp > 0
 end
@@ -115,6 +117,7 @@ function M.new(players, rng)
 		p.aimX, p.aimY = 1, 0
 		p.powers = {}
 		p.revive = 0
+		p.gravityX,p.gravityY,p.spaceX,p.spaceY,p.portalCooldown=0,0,nil,nil,0
 		p.score = 0
 	end
 	return s
@@ -135,6 +138,7 @@ function M.resize(s, width, height)
 	for _, list in ipairs({ s.players, s.enemies, s.shots, s.hostile, s.pickups, s.particles, s.rings, s.waveQueue }) do
 		for _, v in ipairs(list) do
 			v.x = v.x * ratio
+            if v.spaceX then v.spaceX=v.spaceX*ratio end
 		end
 	end
 	s.width = newWidth
@@ -244,7 +248,7 @@ function M.segmentHit(ax, ay, bx, by, cx, cy, r)
 	end
 end
 local function shoot(s, p, dx, dy)
-	local angles = p.powers.spread and { -0.19, 0, 0.19 } or { 0 }
+	local angles = p.powers.spread and { -0.30, -0.15, 0, 0.15, 0.30 } or { 0 }
 	for _, a in ipairs(angles) do
 		if #s.shots >= M.limits.shots then
 			break
@@ -257,10 +261,18 @@ local function shoot(s, p, dx, dy)
 			vy = y * 860,
 			ttl = 1.35,
 			owner = p,
-			hits = p.powers.pierce and 3 or 1,
+			hits = p.powers.pierce and 5 or 1,
+            damage = p.powers.pierce and 2 or 1,
+            special = p.powers.pierce and "pierce" or p.powers.spread and "spread" or p.powers.rapid and "rapid",
 			hit = {},
 		}
 	end
+    for kind,capacity in pairs(M.ammo) do
+        if p.powers[kind] then
+            local remaining=(type(p.powers[kind])=="number" and p.powers[kind] or capacity)-1
+            p.powers[kind]=remaining>0 and remaining or nil
+        end
+    end
 	sound(s, "shot")
 end
 local function playerStep(s, p, c, dt)
@@ -428,7 +440,7 @@ local function shotsStep(s, dt)
 			end
 			b.hit[best] = true
 			b.hits = b.hits - 1
-			best.hp = best.hp - 1
+			best.hp = best.hp - (b.damage or 1)
 			best.flash = 0.09
 			burst(s, b.x + (x - b.x) * t, b.y + (y - b.y) * t, { 0.8, 0.9, 1 }, 3)
 			if best.hp <= 0 then
@@ -488,7 +500,7 @@ local function effectsStep(s, dt)
 			if q.kind == "repair" then
 				p.hp = math.min(3, p.hp + 1)
 			else
-				p.powers[q.kind] = true
+				p.powers[q.kind] = M.ammo[q.kind]
 			end
 			q.ttl = 0
 			sound(s, "pickup")
@@ -514,6 +526,7 @@ function M.update(s, dt, inputs)
 		playerStep(s, p, inputs[i], dt)
 	end
 	enemiesStep(s, dt)
+	Gravity.step(s, dt)
 	shotsStep(s, dt)
 	effectsStep(s, dt)
 	for i = #s.enemies, 1, -1 do
@@ -544,7 +557,7 @@ function M.describe(p)
 	end
 	local active = {}
 	for _, kind in ipairs({ "spread", "pierce", "rapid" }) do
-		if p.powers[kind] then active[#active + 1] = kind:upper() end
+		if p.powers[kind] then active[#active + 1] = kind:upper() .. " " .. tostring(p.powers[kind]) end
 	end
 	return (#active > 0 and table.concat(active, " + ") or "UNLIMITED FIRE")
 		.. " / B "
@@ -558,6 +571,10 @@ function M.bot(s, p)
 		local d=x*x+y*y
 		if d<110^2 then dx=dx+x/math.max(100,d)*150;dy=dy+y/math.max(100,d)*150 end
 	end
+	for _,f in ipairs(Gravity.fields(s)) do
+        local x,y=p.x-f.x,p.y-f.y;local d=x*x+y*y
+        if d<180^2 then dx=dx+x/math.max(100,d)*320;dy=dy+y/math.max(100,d)*320 end
+    end
 	local nearby = 0
 	for _, e in ipairs(s.enemies) do
 		if not e.dead then

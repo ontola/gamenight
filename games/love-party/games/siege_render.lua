@@ -1,4 +1,5 @@
 local M = {}
+local Gravity=require("games.siege_gravity")
 local Siege = require("games.siege")
 function M.draw(s, G, fonts, playerColor)
 	local function tint(c, a)
@@ -22,12 +23,17 @@ function M.draw(s, G, fonts, playerColor)
 	G.rectangle("fill", -10, -10, s.width + 20, s.height + 20)
 	G.setColor(0.055, 0.095, 0.13)
 	G.setLineWidth(1)
-	for x = 0, s.width, 40 do
-		G.line(x, 0, x, s.height)
-	end
-	for y = 0, s.height, 40 do
-		G.line(0, y, s.width, y)
-	end
+	for x=0,s.width,40 do
+        local line={}
+        for y=0,s.height+20,20 do local wx,wy=Gravity.warp(s,x,y);line[#line+1]=wx;line[#line+1]=wy end
+        G.line(line)
+    end
+    for y=0,s.height,40 do
+        local line={}
+        for x=0,s.width+20,20 do local wx,wy=Gravity.warp(s,x,y);line[#line+1]=wx;line[#line+1]=wy end
+        G.line(line)
+    end
+    Gravity.draw(s,G)
 	for _, r in ipairs(s.rings) do
 		tint(r.color, r.ttl / 0.35 * 0.7)
 		G.setLineWidth(2)
@@ -41,12 +47,12 @@ function M.draw(s, G, fonts, playerColor)
 		G.printf(({ spread = "S", pierce = "P", rapid = "R", repair = "+" })[q.kind], q.x - 12, q.y - 8, 24, "center")
 	end
 	for _, b in ipairs(s.shots) do
-		local c = playerColor(b.owner)
+		local c = ({pierce={1,0.45,0.85},spread={1,0.75,0.2},rapid={0.25,1,1}})[b.special] or playerColor(b.owner)
 		tint(c, 0.18)
-		G.setLineWidth(7)
+		G.setLineWidth(b.special and 12 or 7)
 		G.line(b.x - b.vx * 0.018, b.y - b.vy * 0.018, b.x, b.y)
 		tint(c)
-		G.setLineWidth(2)
+		G.setLineWidth(b.special=="pierce" and 5 or b.special and 3 or 2)
 		G.line(b.x - b.vx * 0.014, b.y - b.vy * 0.014, b.x, b.y)
 	end
 	for _, b in ipairs(s.hostile) do
@@ -140,7 +146,7 @@ function M.draw(s, G, fonts, playerColor)
 			tint(c)
 			local upgrades = {}
 			for _, kind in ipairs({ "spread", "pierce", "rapid" }) do
-				if p.powers[kind] then upgrades[#upgrades + 1] = kind:upper() end
+				if p.powers[kind] then upgrades[#upgrades + 1] = kind:upper() .. " " .. tostring(p.powers[kind]) end
 			end
 			if #upgrades > 0 then
 				G.setFont(fonts.small)
