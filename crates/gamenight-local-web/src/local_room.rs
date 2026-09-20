@@ -34,6 +34,12 @@ impl Room {
             attempts: (Instant::now(), 0),
         }
     }
+    pub fn restore(&mut self, profile: &str) {
+        self.pending.insert(
+            profile.into(),
+            (uuid::Uuid::new_v4().to_string(), now() + 86400),
+        );
+    }
     pub fn waiting(&self, profile: &str) -> bool {
         self.pending
             .get(profile)
@@ -51,6 +57,8 @@ impl Room {
 pub struct Join {
     code: String,
     profile: String,
+    #[serde(default)]
+    remember: Option<bool>,
 }
 pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> StatusCode {
     let mut s = state.lock().unwrap();
@@ -78,6 +86,12 @@ pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> St
         .retain(|_, (_, expires)| *expires > now());
     if s.local_room.pending.len() >= 4 && !s.local_room.pending.contains_key(&req.profile) {
         return StatusCode::TOO_MANY_REQUESTS;
+    }
+    if let Some(remember) = req.remember {
+        let profile = s.profiles[&req.profile].clone();
+        if s.memory.set(&profile, remember).is_err() {
+            return StatusCode::INTERNAL_SERVER_ERROR;
+        }
     }
     s.local_room
         .pending
@@ -158,6 +172,7 @@ mod tests {
                 State(state.clone()),
                 Json(Join {
                     code: "wrong".into(),
+                    remember: None,
                     profile: "phone".into()
                 })
             )
@@ -169,6 +184,7 @@ mod tests {
                 State(state.clone()),
                 Json(Join {
                     code,
+                    remember: None,
                     profile: "phone".into()
                 })
             )
@@ -191,6 +207,7 @@ mod tests {
                 State(state.clone()),
                 Json(Join {
                     code: "wrong".into(),
+                    remember: None,
                     profile: "phone".into(),
                 }),
             )
@@ -201,11 +218,96 @@ mod tests {
                 State(state),
                 Json(Join {
                     code: "wrong".into(),
+                    remember: None,
                     profile: "phone".into()
                 })
             )
             .await,
             StatusCode::TOO_MANY_REQUESTS
         );
+    }
+}
+
+#[derive(Deserialize)]
+pub struct Remember {
+    remember: bool,
+}
+pub async fn remember(
+    Path(id): Path<String>,
+    State(state): State<SharedState>,
+    Json(req): Json<Remember>,
+) -> StatusCode {
+    let mut s = state.lock().unwrap();
+    if s.cloud.is_some() {
+        return StatusCode::NOT_FOUND;
+    }
+    if !s.bindings.contains_key(&id) && !s.local_room.waiting(&id) {
+        return StatusCode::FORBIDDEN;
+    }
+    let Some(profile) = s.profiles.get(&id).cloned() else {
+        return StatusCode::NOT_FOUND;
+    };
+    match s.memory.set(&profile, req.remember) {
+        Ok(()) => StatusCode::NO_CONTENT,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[cfg(test)]
+mod memory_access_tests {
+    use super::*;
+    #[tokio::test]
+    async fn only_waiting_or_linked_profiles_can_change_memory_without_leaving() {
+        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::ServerState::new(
+            "127.0.0.1:1".into(),
+        )));
+        state.lock().unwrap().profiles.insert(
+            "phone".into(),
+            Profile {
+                id: "phone".into(),
+                username: "Joep".into(),
+                skin_color: "#abcdef".into(),
+                avatar: "hat".into(),
+            },
+        );
+        assert_eq!(
+            remember(
+                Path("phone".into()),
+                State(state.clone()),
+                Json(Remember { remember: true })
+            )
+            .await,
+            StatusCode::FORBIDDEN
+        );
+        state.lock().unwrap().local_room.restore("phone");
+        assert_eq!(
+            remember(
+                Path("phone".into()),
+                State(state.clone()),
+                Json(Remember { remember: true })
+            )
+            .await,
+            StatusCode::NO_CONTENT
+        );
+        assert!(state.lock().unwrap().memory.profiles.contains_key("phone"));
+        let player = PlayerId(uuid::Uuid::new_v4());
+        state
+            .lock()
+            .unwrap()
+            .bindings
+            .insert("phone".into(), player);
+        state.lock().unwrap().local_room.pending.clear();
+        assert_eq!(
+            remember(
+                Path("phone".into()),
+                State(state.clone()),
+                Json(Remember { remember: false })
+            )
+            .await,
+            StatusCode::NO_CONTENT
+        );
+        let s = state.lock().unwrap();
+        assert!(!s.memory.profiles.contains_key("phone"));
+        assert_eq!(s.bindings["phone"], player);
     }
 }

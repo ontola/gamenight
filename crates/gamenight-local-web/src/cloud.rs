@@ -290,6 +290,7 @@ impl Bridge {
                 let Ok(response) = self
                     .http
                     .post(format!("{}/v1/lobbies/register", self.origin))
+                    .json(&serde_json::json!({"device":state.lock().unwrap().memory.device}))
                     .send()
                     .await
                 else {

@@ -19,12 +19,18 @@
       <input id="room-code" name="room-code" aria-label="Room code, six characters. Joins automatically when complete." placeholder="······" maxlength="6" minlength="6" pattern="[A-Za-z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
         <div id="room-code-slots" aria-hidden="true"><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span></div>
       </div>
+      <label class="preference-toggle"><input id="remember-join" type="checkbox"> Remember me on this GameNight</label>
+      <p class="identity-hint">Have your player waiting at the door next time.</p>
     </form>
     <button id="room-leave" class="nav-btn" type="button" hidden>Leave room</button>
   </header>
   <div class="room-feedback"><p id="room-status" role="status" aria-live="polite"></p><button id="room-cancel" class="tool-btn" type="button" hidden>Cancel pickup</button></div>
 
 <main>
+    <section class="card" id="remember-player-card" hidden>
+      <label class="preference-toggle"><input id="remember-player" type="checkbox"> Remember me on this GameNight</label>
+      <p class="identity-hint">Your player will be waiting at the door next time.</p>
+    </section>
     <div id="tab-playlist" class="tab-content">
       <section class="playlist-editor">
         <h2>Tonight’s playlist</h2><div class="playlist-heading-actions"><span id="playlist-saving" role="status" aria-live="polite" hidden>↻<span class="sr-only"> Saving changes</span></span></div>

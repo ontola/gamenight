@@ -179,3 +179,11 @@ html{scrollbar-gutter:stable}
 #site-shell .leave-room-dialog-actions button{border-radius:10px;padding:12px 18px;min-height:46px;font:inherit;cursor:pointer;border:1px solid #424961;background:#252c40;color:#fff}
 #site-shell .leave-room-dialog-actions .btn-primary{background:#6555e8}
 #site-shell .leave-room-dialog button:disabled{opacity:.6;cursor:wait}
+
+/* Keep the remember option distinct from the six-character room-code input. */
+.studio-page .room-code-form input[type="checkbox"], .preference-toggle input[type="checkbox"] {
+  appearance:auto; flex:0 0 20px; width:20px; height:20px; min-height:20px;
+  padding:0; margin:0; background:none; accent-color:#b6acff; cursor:pointer;
+}
+#qr-scanner .preference-toggle { margin-top:16px; color:var(--text); }
+#remember-player-card .identity-hint { margin-bottom:0; }

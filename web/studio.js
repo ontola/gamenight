@@ -778,6 +778,7 @@ let initializing = true;
         const response = await fetch('/api/profiles/' + encodeURIComponent(profileId) + '/session', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
         if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
         const session = await response.json();
+        window.dispatchEvent(new CustomEvent("gamenight-local-session",{detail:session}));
         if(session.linked && session.player_id){
           boundPlayerId=session.player_id;claimPlayerId=session.player_id;claimSeat=null;
           claimRevision=session.link_revision||0;

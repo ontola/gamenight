@@ -9,6 +9,7 @@ mod cloud;
 mod dev_catalog;
 mod dev_web;
 mod local_room;
+mod memory;
 mod playlist;
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
@@ -59,6 +60,7 @@ pub struct JoinSessionRequest {
 
 pub struct ServerState {
     local_room: local_room::Room,
+    memory: memory::Memory,
     cloud: Option<cloud::Bridge>,
     pub profiles: HashMap<String, Profile>,
     pub daemon_addr: String,
@@ -81,6 +83,7 @@ impl ServerState {
     pub fn new(daemon_addr: String) -> Self {
         Self {
             local_room: local_room::Room::new(),
+            memory: memory::Memory::default(),
             cloud: None,
             profiles: HashMap::new(),
             daemon_addr,
@@ -152,6 +155,7 @@ pub fn create_router(state: SharedState) -> Router {
         )
         .route("/api/player-links", get(player_links))
         .route("/api/local-room/join", post(local_room::join))
+        .route("/api/profiles/:id/remember", post(local_room::remember))
         .route("/api/local-room/cancel/:id", post(local_room::cancel))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
@@ -170,6 +174,15 @@ pub async fn run_server(
     addr: std::net::SocketAddr,
     state: SharedState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let memory = memory::Memory::load(memory::path())?;
+    {
+        let mut local = state.lock().unwrap();
+        for profile in memory.profiles.values() {
+            local.profiles.insert(profile.id.clone(), profile.clone());
+            local.local_room.restore(&profile.id);
+        }
+        local.memory = memory;
+    }
     if let Some(bridge) = cloud::Bridge::configured() {
         state.lock().unwrap().cloud = Some(bridge.clone());
         tokio::spawn(bridge.run(state.clone()));
@@ -208,7 +221,7 @@ async fn profile_session(
         let current = party.active_session.as_ref().map(|session| serde_json::json!({"title": title(&session.game), "phase": session.phase}));
         let next = party.warm_session.as_ref().map(|session| title(&session.game)).or_else(|| party.warming.as_ref().map(|entry| entry.title.clone()));
         let local = state.lock().unwrap();
-        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
+        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "remembered":local.memory.profiles.contains_key(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
     }).await.map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
 }
 
@@ -336,10 +349,13 @@ async fn get_profile(
 async fn save_profile(
     State(state): State<SharedState>,
     Json(profile): Json<Profile>,
-) -> Json<Profile> {
+) -> Result<Json<Profile>, StatusCode> {
     let mut state = state.lock().unwrap();
+    if state.memory.profiles.contains_key(&profile.id) {
+        state.memory.set(&profile, true).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
     state.profiles.insert(profile.id.clone(), profile.clone());
-    Json(profile)
+    Ok(Json(profile))
 }
 
 mod daemon;

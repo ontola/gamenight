@@ -82,14 +82,15 @@
         const dismiss=()=>{if(accepting)return;sessionStorage.removeItem('gamenight_pair');box.close();box.remove();document.getElementById('qr-open').focus();};
         close.onclick=dismiss;
         box.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
-        panel.append(close,title,text,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
+        const rememberPair=document.createElement('input');rememberPair.type='checkbox';const rememberLabel=document.createElement('label');rememberLabel.className='preference-toggle';rememberLabel.append(rememberPair,document.createTextNode(' Remember me on this GameNight'));
+        panel.append(close,title,text,rememberLabel,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
         try{
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
           text.textContent='Your saved character will connect to player '+(info.seat+1)+' in the room you scanned.';
           button.disabled=false;
           button.onclick=async()=>{
             if(accepting)return;accepting=true;button.disabled=true;close.disabled=true;text.textContent='Joining room…';
-            try{await request('/v1/pairing/claim','POST',{ticket});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();window.showToast('Connected to the room.');await checkRoom();document.getElementById('room-leave').focus();}
+            try{await request('/v1/pairing/claim','POST',{ticket,...(rememberPair.checked?{remember:true}:{})});sessionStorage.removeItem('gamenight_pair');box.close();box.remove();window.showToast('Connected to the room.');await checkRoom();document.getElementById('room-leave').focus();}
             catch(error){window.showToast(error.message);text.textContent='Could not connect. You can try again or close this screen.';button.disabled=false;close.disabled=false;}
             finally{accepting=false;}
           };
@@ -99,11 +100,34 @@
     const roomForm=document.getElementById('room-form'), roomInput=document.getElementById('room-code');
     const roomStatus=document.getElementById('room-status'), roomCancel=document.getElementById('room-cancel');
     const roomLeave=document.getElementById("room-leave"), qrOpen=document.getElementById("qr-open");
+    const rememberJoin=document.getElementById('remember-join');
+    const rememberPlayer=document.getElementById('remember-player');
+    const rememberCard=document.getElementById('remember-player-card');
+    let memoryRoom=null, memoryBusy=false;
+    function showMemory(state) {
+      memoryRoom=state;
+      const available=state.status==='connected'||state.status==='waiting';
+      rememberCard.hidden=!available;
+      if(!memoryBusy && available)rememberJoin.checked=rememberPlayer.checked=!!state.remembered;
+    }
+    window.addEventListener('gamenight-local-session',event=>showMemory({...event.detail,status:event.detail.linked?'connected':event.detail.waiting?'waiting':'none'}));
+    rememberPlayer.onchange=async()=>{
+      if(memoryBusy||!memoryRoom)return;
+      const remember=rememberPlayer.checked, previous=!!memoryRoom.remembered;
+      memoryBusy=true;rememberPlayer.disabled=true;
+      try {
+        await request(cloud?'/v1/rooms/remember':'/api/profiles/'+encodeURIComponent(local.getItem('gamenight_profile_id'))+'/remember','POST',{remember,...(cloud?{code:memoryRoom.room_code}:{})});
+        memoryRoom.remembered=remember;rememberJoin.checked=remember;
+        window.showToast(remember?'Your player will be waiting here next time.':'Your player will no longer be remembered here.');
+      } catch(error) {rememberPlayer.checked=previous;window.showToast(error.message);}
+      finally {memoryBusy=false;rememberPlayer.disabled=false;}
+    };
     // Offline rooms are reached by their LAN QR; hosted room codes must not
     // unexpectedly navigate a local editing session to the hosted site.
     roomForm.hidden=false;
     let watching=false, roomTimer, roomEpoch=0;
     function showConnection(state) {
+      showMemory(state);
       const connected=state.status==="connected";
       window.updateRoomNavigation?.(connected);
       qrOpen.hidden=connected; roomForm.hidden=connected; roomLeave.hidden=!connected;
@@ -150,13 +174,13 @@
       joiningRoom=true;roomInput.readOnly=true;
       roomForm.setAttribute('aria-busy','true');window.showToast('Joining room…');
       try {
-        if(cloud)await request('/v1/rooms/join','POST',{code});
+        if(cloud)await request('/v1/rooms/join','POST',{code,...(rememberJoin.checked?{remember:true}:{})});
         else {
           const profile=local.getItem('gamenight_profile_id');
           const saved=local.getItem('gamenight_saved_profile');
           if(!profile || !saved)throw Error('Open You to create your player first.');
           await request('/api/profiles','POST',JSON.parse(saved));
-          await request('/api/local-room/join','POST',{code,profile});
+          await request('/api/local-room/join','POST',{code,profile,...(rememberJoin.checked?{remember:true}:{})});
           roomCancel.hidden=false;
           window.showToast('Walk your character to your profile door in the lobby to connect.');
         }
