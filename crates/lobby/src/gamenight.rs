@@ -3814,6 +3814,11 @@ fn sync_next_game_tv_system(
     let screen = Vec2::new(size.x / 3.0 - 8.0, size.y);
     let tv_x = -size.x / 3.0;
     let cabinet = screen + Vec2::splat(SCREEN_FRAME * 2.0);
+    let tv_size = cabinet + Vec2::new(12.0, 16.0);
+    // tv.png is 208x128. Its picture aperture is (9,9)..(199,105).
+    // Derive the picture from the furniture, not the trigger's old screen size.
+    let screen = tv_size * Vec2::new(190.0 / 208.0, 96.0 / 128.0);
+    let screen_y = -10.0 + tv_size.y * 7.0 / 128.0;
     // Keep the image alive while status changes replace the TV entity.
     let texture = tv_texture.get_or_insert_with(||
         asset_server.load("themes/clubhouse/tv.png")
@@ -3831,7 +3836,7 @@ fn sync_next_game_tv_system(
             parent.spawn(SpriteBundle {
                 texture,
                 sprite: Sprite {
-                    custom_size: Some(cabinet + Vec2::new(12.0, 16.0)),
+                    custom_size: Some(tv_size),
                     ..default()
                 },
                 transform: Transform::from_xyz(tv_x, -10.0, 0.0),
@@ -3845,24 +3850,32 @@ fn sync_next_game_tv_system(
             parent.spawn(Text2dBundle {
                 text: Text::from_section(kicker, TextStyle {font:font.clone(),font_size:11.,color:kicker_color})
                     .with_alignment(TextAlignment::Center),
-                transform:Transform::from_xyz(tv_x, if paused {-9.} else {size.y/2.-16.}, 0.4),..default()
+                transform:Transform::from_xyz(tv_x, if paused {screen_y - 9.0} else {screen_y + screen.y/2.0 - 10.0}, 0.4),..default()
             });
             if paused {
                 for offset in [-4.,4.] {
                     parent.spawn(SpriteBundle {sprite:Sprite {color:kicker_color,custom_size:Some(Vec2::new(4.,13.)),..default()},
-                        transform:Transform::from_xyz(tv_x+offset,7.,0.4),..default()});
+                        transform:Transform::from_xyz(tv_x+offset,screen_y + 7.0,0.4),..default()});
                 }
             }
             // A captured gameplay image belongs to the active game, never to
-            // the next game's cover. Keep loading/paused text above the screen.
+            // the next game's cover. Labels overlay the picture without shrinking it.
             let screenshot_texture = cover_cache.image(screenshot.as_deref(), &mut cover_images);
+            let has_picture = screenshot_texture.is_some();
             if let Some(texture) = screenshot_texture {
                 parent.spawn(SpriteBundle {
                     sprite: Sprite { custom_size: Some(screen), rect: Some(game_cases::fill_rect(&texture, &cover_images, screen)), ..default() },
                     texture,
-                    transform: Transform::from_xyz(tv_x, -9.0, 0.1), ..default()
+                    transform: Transform::from_xyz(tv_x, screen_y, 0.1), ..default()
                 });
-            } else {
+            }
+            let title_y = if has_picture { screen_y - screen.y / 2.0 + 9.0 } else { screen_y - 9.0 };
+            if has_picture {
+                parent.spawn(SpriteBundle {
+                    sprite: Sprite { color: Color::rgba(0.02,0.03,0.06,0.72), custom_size: Some(Vec2::new(screen.x,18.0)), ..default() },
+                    transform: Transform::from_xyz(tv_x,title_y,0.3), ..default()
+                });
+            }
             parent.spawn(Text2dBundle {
                 text: Text::from_section(
                     ellipsize(&title, 32),
@@ -3876,10 +3889,9 @@ fn sync_next_game_tv_system(
                 text_2d_bounds: bevy::text::Text2dBounds {
                     size: Vec2::new(screen.x - 8.0, screen.y - 22.0),
                 },
-                transform: Transform::from_xyz(tv_x, -9.0, 0.1),
+                transform: Transform::from_xyz(tv_x, title_y, 0.4),
                 ..default()
             });
-            }
             parent.spawn(SpatialBundle {
                 transform: Transform::from_xyz(0.0, -17.0, 0.0),
                 ..default()
