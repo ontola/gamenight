@@ -6,7 +6,8 @@ fn main() -> shadow_rs::SdResult<()> {
             .set_icon("branding/gamenight.ico")
             .set("ProductName", "GameNight")
             .set("FileDescription", "GameNight")
-            .set("InternalName", "GameNight Lobby")
+            .set("InternalName", "GameNight")
+            .set("CompanyName", "Ontola")
             .compile()
             .expect("compile GameNight Windows branding");
     }

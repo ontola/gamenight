@@ -16,15 +16,21 @@ if ($Channel -eq 'stable' -and ($Version.Contains('-') -or !$SigningMetadata)) {
 & (Join-Path $PSScriptRoot 'build-windows-preview.ps1') -OutputDir $OutputDir -TargetDir $TargetDir -BuildProfile $BuildProfile
 if ($LASTEXITCODE -ne 0) { throw 'Preview staging failed' }
 $stage = Join-Path $OutputDir 'package/gamenight-windows-preview'
+& (Join-Path $PSScriptRoot 'test-windows-branding.ps1') -Executable (Join-Path $stage 'GameNight.exe')
 $releaseDir = Join-Path $OutputDir 'releases'
+$icon = Join-Path (Split-Path -Parent $PSScriptRoot) 'crates/lobby/branding/gamenight.ico'
+if (!(Test-Path -LiteralPath $icon)) { throw 'GameNight installer icon is missing' }
 $packId = if ($Channel -eq 'stable') { 'Ontola.GameNight' } else { 'Ontola.GameNight.Preview' }
 $title = if ($Channel -eq 'stable') { 'GameNight' } else { 'GameNight Preview' }
 $vpkArgs = @('pack', '--packId', $packId, '--packVersion', $Version, '--packDir', $stage,
-    '--mainExe', 'GameNight.exe', '--packTitle', $title, '--packAuthors', 'Ontola',
+    '--mainExe', 'GameNight.exe', '--packTitle', $title, '--packAuthors', 'Ontola', '--icon', $icon,
     '--channel', "win-$Channel", '--runtime', 'win-x64', '--outputDir', $releaseDir)
 if ($SigningMetadata) { $vpkArgs += @('--azureTrustedSignFile', $SigningMetadata) }
 & $Vpk @vpkArgs
 if ($LASTEXITCODE -ne 0) { throw 'Velopack packaging failed' }
+foreach ($setup in Get-ChildItem -LiteralPath $releaseDir -Filter '*Setup.exe') {
+    & (Join-Path $PSScriptRoot 'test-windows-branding.ps1') -Executable $setup.FullName -ProductName $title
+}
 if ($SigningMetadata) {
     foreach ($file in Get-ChildItem -LiteralPath $releaseDir -Filter '*Setup.exe') {
         if ((Get-AuthenticodeSignature -LiteralPath $file.FullName).Status -ne 'Valid') { throw 'Installer signature is invalid' }

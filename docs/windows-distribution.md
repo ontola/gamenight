@@ -130,3 +130,16 @@ The LÖVE pack CI renders real frames under Xvfb with Mesa software OpenGL;
 Windows CI still runs simulation, authentication, certification and disconnect
 checks against the official Windows LÖVE runtime. Interactive LÖVE error screens
 must not hide failures in automated rendering jobs.
+
+## App and installer branding
+
+`web/icon.svg` is the editable logo. `scripts/generate-branding.cjs` produces the
+shared multi-size Windows icon used by the lobby, launcher and Velopack installer.
+Run it with Sharp available after changing the logo, then run its `--check` mode.
+The launcher embeds Windows product/description metadata as GameNight. Preview
+installers and their shortcuts use GameNight Preview; stable uses GameNight.
+Package IDs remain distinct to keep their update channels separate.
+
+The installer build checks executable and Setup icon resources and display names
+with `scripts/test-windows-branding.ps1`. A successful resource compile alone is
+not sufficient: the standalone launcher must link the resource into its EXE.
