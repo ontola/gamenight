@@ -48,7 +48,7 @@
         "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-macos.zip",
         "sha256": "6795bb3a1656af6a2fdfe741e150787b481886d3a280327a261a3fdded586913",
         "entrypoint": "love.app/Contents/MacOS/love",
-        "argument": "game_directory"
+        "argument": "entry_point"
       }
     }
   },

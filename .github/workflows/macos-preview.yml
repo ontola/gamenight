@@ -6,13 +6,19 @@ on:
         description: 'Numeric macOS bundle version'
         required: true
         default: '0.1.4'
+      binaries_run:
+        description: 'Optional previous run with successful native builds (packaging-only changes)'
+        required: false
+        default: ''
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: macos-installer-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   build:
+    if: inputs.binaries_run == ''
     strategy:
       fail-fast: false
       matrix:
@@ -47,24 +53,30 @@ jobs:
           if-no-files-found: error
   package:
     needs: build
+    if: always() && (needs.build.result == 'success' || needs.build.result == 'skipped')
     runs-on: macos-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.binaries_run || github.run_id }}
           pattern: binaries-*
           path: binaries
       - name: Assemble universal app with current assets
         env:
           VERSION: ${{ inputs.version }}
+          BINARY_RUN: ${{ inputs.binaries_run || github.run_id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p universal stage release
           for name in gamenight-launcher gamenight-daemon lobby; do
             lipo -create binaries/binaries-aarch64-apple-darwin/$name binaries/binaries-x86_64-apple-darwin/$name -output universal/$name
             lipo -verify_arch arm64 x86_64 universal/$name
           done
-          python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION"
+          binary_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BINARY_RUN" --jq .head_sha)
+          python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION" --binary-revision "$binary_revision"
           python3 scripts/test-macos-package.py stage/GameNight.app
       - name: Launch packaged host outside source directory
         run: |

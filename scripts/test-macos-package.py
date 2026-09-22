@@ -23,6 +23,11 @@ def verify(app):
     for name, digest in manifest["assets"].items():
         assert hashlib.sha256((resources / name).read_bytes()).hexdigest() == digest, name
     assert (resources / "catalog/games/pinpals.json").is_file()
+    for file in (resources / "catalog/games").glob("*.json"):
+        download = json.loads(file.read_text())["downloads"]["mac"]
+        if download["url"].endswith(".love"):
+            assert download["entrypoint"] == download["url"].rsplit("/", 1)[-1], file.name
+            assert download["runtime"]["argument"] == "entry_point", file.name
     assert (resources / "lobby/assets/game.yaml").is_file()
     print(f"Verified {len(manifest['assets'])} packaged assets and both Mac architectures: {manifest['commit']}")
 
