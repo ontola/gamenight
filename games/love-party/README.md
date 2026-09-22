@@ -9,7 +9,7 @@ Requires LÖVE 11.5; GameNight downloads this shared runtime separately.
 | Ricochet Club | Tank combat with bouncing shots and destructible cover | Move, right stick aim, RB/RT fire, B shield |
 | Neon Trails | Survive the trails; last rider earns +3, then everyone respawns | Turn; no reversing |
 | Blast Party | Destroy crates, collect powers and be the last alive | Move, A to place a bomb, B to detonate remote bombs |
-| Volley Trouble | Win volleyball rounds across four courts, with rotating rules | Move, A jump, B/RB/RT smash, right stick aim |
+| Volley Trouble | Win volleyball rounds across four courts, with rotating rules | Move, A/LB jump, X/RB/RT smash, right stick aim |
 | Stack Together | Build a tower together | Move, A rotate, B drop |
 | Bubble Buddies | Clear bubbles cooperatively | Move, A fire |
 | Pinpals | Cooperative pinball across two boards | LB/RB flippers, A gate, B paddle |
@@ -23,7 +23,7 @@ own simulation, full-screen renderer, sounds and live setting declarations.
 
 ## Play
 
-Run `love games/love-party` from the repository. Choose a game with 1–9 or
+Run `love games/love-party` from the repository. Choose a game with 1–8 or
 the controller D-pad, Enter/A to start, F2 to choose 2–4 players.
 A packaged `.love` file opens its game directly. Escape/Back returns to the
 standalone menu; rounds otherwise restart automatically.
@@ -35,9 +35,10 @@ Controllers use the left stick or D-pad and A. Keyboard seats:
 3. IJKL + U
 4. TFGH + R
 
-Controllers follow seat order. Unplugging one preserves the other seats;
-a new controller fills the first vacant active seat. Mixed controller APIs
-can enumerate devices differently, so verify seat order on your hardware.
+Managed games match opaque host controller IDs to seats and consume host input.
+They do not map SDL enumeration to seat order. Standalone mode uses local devices.
+Unplugging a device must preserve ownership of the others; verify this with
+physical controllers as well as synthetic input tests.
 Remote phone controls are not implemented. Games support local controllers
 and shared keyboard input; declared AI seats use bots.
 
@@ -46,7 +47,7 @@ and shared keyboard input; declared AI seats use bots.
 `GAMENIGHT=1` enables the shared adapter. It reads `GAMENIGHT_ADDR`,
 `GAMENIGHT_GAME_ID` and `GAMENIGHT_TOKEN`; authenticates; prepares hidden;
 reports ready; shows fullscreen on Start; freezes and hides on Pause;
-resumes; reports Finished once; and disposes without leaving a window.
+resumes; reports round completion; and disposes without leaving a window.
 Back/Escape requests the lobby. Daemon disconnection exits the game.
 
 Use each game's ID in the table's source module or generated shelf. The
@@ -58,7 +59,7 @@ Pinpals package includes its board simulation and authoring source from `games/p
 python scripts/package-love-party.py --output dist/party --love /path/to/love
 ```
 
-Produces nine deterministic `.love` files, checksums, a collection ZIP and
+Produces eight deterministic `.love` files, checksums, a collection ZIP and
 an optional `shelf.json` with absolute local paths. Merge those shelf entries
 with your lobby entry when configuring `GAMENIGHT_LIBRARY`. The build never
 changes the Windows installer's contents or assumes an unpublished download URL.

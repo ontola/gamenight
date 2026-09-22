@@ -26,9 +26,11 @@ The current automatic runners verify, per packaged LÖVE game:
 Protocol subchecks are included individually. Skipped subchecks remain untested.
 The protocol pause check only observes host state. It does **not** prove simulation
 or audio paused. First-frame rendering does **not** prove prewarming or correct
-player artwork. These stronger requirements remain untested until instrumented
-runners or hardware tests supply specific evidence. In particular, physical
-controller ownership cannot be inferred from a roster JSON assertion.
+player artwork. The instrumented `scripts/test-love-integration.py` runner also observes live
+names, colours and avatar draw calls, synthetic host controller ownership, and
+native process switching/cleanup. Its feature results can fail independently.
+Physical controller ownership still requires hardware testing; synthetic frames
+and roster assertions are not proof of hardware behavior.
 
 ## Running it
 
@@ -73,8 +75,8 @@ This is exposed work, not a reason to silently mark those rows successful.
 Add a narrowly scoped runner that executes the actual packaged game. Record a
 feature as passed only after it observes that feature, retaining logs/artifacts.
 The existing `run_games` adapter handles LÖVE; native/Godot games need their own
-artifact runner. Unavailable/private sources (such as Volley Trouble in the internal
-repository) stay untested in public CI until their tested package is supplied.
+artifact runner. Unavailable sources stay untested until their tested package is
+supplied. Volley Trouble is part of the public shared LÖVE package.
 Use a distinct feature when a unit test covers only part of a hardware behavior;
 do not relabel an entire shared test suite as proof of every game feature.
 
@@ -84,18 +86,20 @@ new way an incomplete integration could accidentally be accepted.
 
 Contract v2 separates player-name sync, skin/clothing colour sync, and drawn face/hat sync. Previous combined appearance evidence does not satisfy any of these independently.
 
-## Grouped ratings (contract v3)
+## Grouped ratings (contract v4)
 
-The catalog playability rating uses only ten essential requirements. A current
-matching build is Ready to play only when all ten pass; partial evidence is
-Partially verified, a failing essential check is Integration issues, and no
-current proof is Not verified. Development/old-build results do not increase it.
+The numeric catalog score runs from 0 to 5. It counts the eleven essential checks
+and three independent personalisation checks: names, colours and faces. Each
+verified check has equal weight. Party extras do not affect the score.
 
-The three personalisation checks (name, colours, face/hat) and four party extras
-(round end, scores, replay voting, live settings) have independent scores. Missing
-optional features never reduce the essential rating. Actual start, resume and
-cross-game switching are distinct from the wire handshake, so old aggregate
-lifecycle evidence is not promoted to these checks.
+The playability label is separate: all essentials must pass for Ready to play.
+A failing essential check means Integration issues. Partial or missing proof
+remains visible. Development, dirty-worktree or unmatched-build results do not
+increase the verified score or playability label.
+
+Start, resume and switching are distinct from a handshake. Old aggregate lifecycle
+or appearance evidence cannot satisfy granular checks. The source of truth for
+groups and counts is `contract/requirements.json`.
 
 `contract/game-policies.json` records first-party ownership and explicit feature
 claims. First-party games require personalisation as well as essentials for

@@ -18,14 +18,14 @@ their receptions, time jumps, and divide court coverage with a teammate.
 | P1 | A / D | W | Space |
 | P2 | Left / Right | Up | Right Ctrl |
 | P3 | J / L | I | U |
-| P4 | Numpad 4 / 6 | Numpad 8 | Numpad 0 |
-| Gamepad | Left stick / D-pad | A | RT, RB, or B |
+| P4 | F / H | T | R |
+| Gamepad | Left stick / D-pad | A or LB | X, RB, or RT |
 
 **Aim with the right stick, then press smash as the ball comes close.** An arrow
 shows the shot direction and a small ring shows the cooldown. Right-stick aim
 is independent of movement. With no aim input, smash defaults toward the other
 court: upward from low positions, downward from above the net. Keyboard players
-hold their movement keys to aim while pressing smash; S/Down/K/Numpad 5 aims
+hold their movement keys to aim while pressing smash; S/Down/K/G aims
 down and the jump key aims up. Releasing direction uses the default shot.
 
 Smashes have 80-unit reach, a 0.16-second timing window and a 0.85-second cooldown,
@@ -33,9 +33,10 @@ including misses. Release and press again for a new swing. Airborne and close
 contacts hit harder. Swings cannot reach through the net or platforms. Automatic
 body hits still work without the smash button; the CPU also uses aimed smashes.
 
-Menu: Up/Down selects, Left/Right changes, Enter/A starts. During a match,
-Escape/Start pauses; Q/B returns to court selection while paused. Enter/A
-replays a finished match. F11 toggles fullscreen; M toggles sound.
+The shared runner owns selection and Back/Escape behavior. In managed mode,
+Back/Select pauses and opens the lobby; Resume continues the match. In standalone
+mode Escape/Back returns to selection. Results lead to another round automatically.
+See the [runner controls](../../README.md).
 Four simultaneous keyboard players can encounter hardware key rollover limits;
 gamepads are recommended for four players.
 

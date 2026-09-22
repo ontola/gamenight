@@ -111,9 +111,10 @@ hang it off — so it carries just the flag:
 }
 ```
 
-Games receive **seats, not controller ids**. Seat indices are stable across
-games — player 2 is player 2 all night. Occupant kinds: `local`, `remote`
-(future, already on the wire), `ai`, `empty`.
+Games receive seats with occupant identities and optional opaque controller tokens.
+Preserve player ownership across games; do not map seats to engine device order.
+See [authoritative input](#bundled-games-authoritative-controller-input).
+Occupant kinds are `local`, `remote` (reserved for network play), `ai`, `empty`.
 
 If the party is smaller than the game's declared `min_players`, the daemon
 fills the empty seats with `ai` up to that minimum — one person warming up
@@ -134,7 +135,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `finished` *(optional)* | a round ended — keep session, focus and pause state unchanged |
 | `progress` *(optional)* | how far along warming is, so screens can stay truthful while the party waits |
 | `request_overlay` *(optional)* | "get me back to the party" — a player asked to leave your game |
-| `request_start` *(optional)* | "a player just switched to my window" — treat it as a go signal |
+| `request_start` *(optional)* | explicit player request to start or resume; never a focus callback |
 | `declare_settings` *(optional)* | the match settings this game exposes (see [Match settings](#match-settings)) |
 
 ```json
@@ -168,30 +169,21 @@ lobby the screen.
 { "type": "request_overlay" }
 ```
 
-`request_start` is its mirror, and takes no arguments either. Send it whenever
-your window gains focus: on a desktop that means the player reached for you
-directly — Cmd+Tab, a Dock click, a click on the window — instead of going
-through the party.
+`request_start` requests starting or resuming this game after an explicit user
+action. It takes no arguments:
 
 ```json
 { "type": "request_start" }
 ```
 
-Report it unconditionally; don't try to work out whether it *should* mean
-something. The daemon holds the session state and rules on it: warm and ready
-→ your session starts, paused → it resumes, anything else → nothing happens.
-A stray focus event can't reorder the playlist or launch anything.
+Never send it automatically when a window gains focus. Host focus changes can
+otherwise bounce straight back into the game. Only Start/Resume commands authorize
+gameplay. See the [integration guide](integrating-your-game.md) for Back release
+handling and borderless windows.
 
-The reason this exists: a warm game is a whole running process with a real
-window, and the window server will happily hand it focus without asking
-GameNight first. Treating that as a "go" is the difference between the party
-switching to a game and getting it, versus switching to a game that sits
-there refusing to start because nobody pressed the right button. Focus is the
-one signal the party can always express and the daemon cannot override — so
-it's read as intent rather than fought.
-
-`ready` is the whole mandatory surface for a game. Target: integrate an
-existing game in under an hour.
+Ready completes preparation. Release acceptance additionally requires the
+behaviors in [the contract](../contract/requirements.json), including pause,
+resume, input ownership, clean switching and continuous play.
 
 `finished` is an optional round notification. It never advances the playlist,
 opens the lobby, pauses the game or hides its window. The game owns its score
@@ -209,7 +201,7 @@ session stays ready across rounds. Pausing also freezes the game's results timer
 | `rename_player {player_id, name}` | change a player's display name |
 | `set_player_color {player_id, color}` | game-controlled clothing/team colour (`#rrggbb`); independent of skin |
 | `set_player_skin_color {player_id, skin_color}` | saved personal skin preference (`#rrggbb`); exposed as `Player.skin_color` |
-| `set_player_avatar {player_id, avatar}` | set their pixel-art face (opaque string — see [avatars](integrating-your-game.md#showing-player-avatars)) |
+| `set_player_avatar {player_id, avatar}` | set their pixel-art face (opaque string — see [avatars](faces.md)) |
 | `assign_seat {seat, occupant}` | re-seat a player / add a bot / empty a seat |
 | `swap_seats {a, b}` | two people trade controllers: swap the occupants of two seats |
 | `set_playlist {entries}` | set the night's queue; the next game starts warming |
@@ -412,8 +404,8 @@ The daemon owns a **game shelf**: presentation metadata for every title it
 knows, playable right now or not. Overlays render next-game options from it —
 this is what makes "what's next" feel like Netflix instead of a file picker.
 
-- `cover` is a URL or data URI for real art. When absent, overlays generate a
-  poster from `color` + `emoji`, so a shelf works with zero assets.
+- `cover` is portrait art; `icon` is the square case-spine image; `screenshot`
+  is gameplay imagery for the TV. Missing artwork uses a readable title fallback.
 - `connected_games` says which titles have a live process — overlays show the
   rest as offline (queueable, but they won't warm until their process
   appears).
@@ -486,9 +478,8 @@ daemon → towerfall: prepare        (playlist wraps; warm again)
 
 ## Future (kept off v1 on purpose)
 
-Downloads, remote seats over the network, voice, input routing, GPU/memory
-budgeting for multiple warm sessions. They will arrive as new message types —
-old games won't notice.
+Remote gameplay seats, voice and GPU/memory budgeting for multiple warm sessions
+are not implemented. Downloads and host controller routing are implemented.
 
 ### Ready crossing Dispose
 
@@ -503,7 +494,7 @@ Presence is host-authoritative and separate from player identity. A controller-b
 player warns after 60 seconds without meaningful input and sleeps after 75 seconds.
 Input wakes the same player immediately; their ID, name, controller binding and seat
 remain intact. Sleeping players do not block votes and cannot activate lobby TV pads.
-The lobby shows `zZz`, or a warning to move before sleep.
+The lobby shows animated `zZz` while sleeping, without a warning on the player name.
 
 After `prepare`, games opt in before replying `ready`:
 
@@ -544,7 +535,7 @@ Opted-in games receive a full snapshot on declaration and subsequent changes:
 The actual message contains the full seat/player arrays. Presence states are `active`,
 `warning`, and `sleeping`; absent presence means active/untracked. Overlays receive
 these records in `party_state.party.presence`. Preserve match state and scores when
-applying updates. Show the warning, then visually distinguish sleeping players.
+applying updates. Visually distinguish sleeping players without requiring warning text.
 Games choose how sleeping characters behave (neutral input, safe removal, or AI).
 Sleep is not a `leave_party`: never reassign the sleeping player's controller.
 

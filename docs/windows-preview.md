@@ -15,9 +15,11 @@ An internet connection is needed once; cached games work offline on later starts
 Failed downloads appear in the lobby and are retried the next time GameNight starts.
 
 Connect two controllers and press a button on each to join the lobby. Pinpals
-is the first game. Walk onto Start and jump to play. Back/Select returns to
-the lobby. Back always opens the lobby; repeated presses do not resume the game.
-Use the lobby Start interaction to return to play. The game should remain hidden and silent while preparing.
+is the starter game in the preview package. In current builds, approach Play and
+press Y. Back/Select pauses and returns to the lobby; another released press can
+resume the paused game after the transition guard. The TV also offers Resume.
+Games remain hidden and silent while preparing. Older downloaded previews may
+have different controls; these instructions describe the current source.
 
 Installed builds check the public GitHub releases for updates in the background.
 A downloaded update is applied only after the lobby and all game processes have

@@ -175,8 +175,8 @@ function R.menu(app)
   text("Jump into the ball. Get it over the net.\nMake it land on their floor.",76,343,18,muted)
   box({.13,.19,.23},76,448,490,157,16)
   text("SMALL CONTROLS. BIG CHAOS.",98,469,12,gold)
-  text("MOVE  Left stick      JUMP  A\nAIM     Right stick    SMASH  RT / RB / B\n\nKeyboard: A D + W jump + SPACE smash",98,497,16,cream)
-  text("P2  ARROWS     P3  J / L / I     P4  NUMPAD",76,627,11,muted)
+  text("MOVE  Left stick      JUMP  A / LB\nAIM     Right stick    SMASH  X / RB / RT\n\nKeyboard: A D + W jump + SPACE smash",98,497,16,cream)
+  text("P2  ARROWS     P3  J / L / I     P4  F / H / T",76,627,11,muted)
   text("UP / DOWN  SELECT     LEFT / RIGHT  CHANGE",680,90,11,muted)
   local arena=S.arenas[app.selection.arena]
   local modes={"PRACTICE  /  YOU + CPU","1 vs 1  /  TWO PLAYERS","2 vs 2  /  FOUR PLAYERS"}

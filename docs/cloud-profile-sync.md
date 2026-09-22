@@ -16,7 +16,9 @@ API contract: POST `/v1/lobbies/register` returns a bearer capability; authentic
 POST `/v1/lobbies/poll` takes `{seats:[{index,player,revision}]}` and returns profile
 updates for paired accounts; POST `/v1/lobbies/ticket` takes `{index}` and returns
 an expiring ticket. Browser pairing uses authenticated CSRF-protected account APIs.
-Only profiles are relayed; this does not expose game controls or purchases.
+The relay also carries catalog selections, playlist changes and device-memory
+preferences. It does not stream gameplay controls or process purchases. See
+[player memory](player-memory.md).
 
 Current alpha limits: connections expire after two minutes without a heartbeat
 and after 24 hours total. A cloud restart requires scanning a new QR, but not
@@ -28,9 +30,9 @@ per account on the same browser.
 ## Room codes and physical profile pickup
 
 A cloud-enabled host displays a six-character room code. Signed-in players enter
-it in Your player to offer their profile, without taking a controller seat. The
-lobby renders pending profiles at doors; an unlinked local player stands at the
-matching door for two seconds to accept. Linked players cannot accept. Pending
+it in the Join dialog to offer their profile without taking a controller seat.
+An unlinked local player approaches the matching pickup door and presses Y to
+accept the profile. Linked players cannot accept. Pending
 profiles expire after five minutes and may be cancelled on the phone.
 
 The outbound relay poll now includes `room_code` and `pending` (opaque pickup ID,
