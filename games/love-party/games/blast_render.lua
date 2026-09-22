@@ -1,5 +1,6 @@
 local B = require("games.blast")
 local M = {}
+local Face = require("shared.face")
 local glyphs = {
 	remote = "R",
 	kick = "K",
@@ -149,11 +150,7 @@ function M.draw(s, g, fonts, playerColor)
 			g.ellipse("fill", x, y + 17, 15, 6)
 			g.setColor(c)
 			g.rectangle("fill", x - 13, y - 14, 26, 29, 8, 8)
-			g.setColor(0.035, 0.055, 0.085)
-			g.rectangle("fill", x - 10, y - 5, 20, 10, 3, 3)
-			g.setColor(1, 1, 0.95)
-			g.rectangle("fill", x - 6 + p.dx * 2, y - 3 + p.dy, 3, 5)
-			g.rectangle("fill", x + 3 + p.dx * 2, y - 3 + p.dy, 3, 5)
+            Face.drawFace(p, x, y - 7, 11, {facing=p.dx<0 and -1 or 1})
 			if p.kick then
 				g.setColor(0.5, 1, 0.6)
 				g.rectangle("fill", x - 13, y + 11, 10, 6, 2, 2)

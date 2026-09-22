@@ -1,4 +1,5 @@
 local Input=require("shared.input")
+local Face=require("shared.face")
 local M={id="pinpals",title="Pinpals",tagline="Two boards. One shared ball.",controls="LB/RB flippers / A gate / B paddle",duration=math.huge,coop=true}
 local Match,Render,Audio,FX,Intents,defs
 function M.load()
@@ -46,5 +47,9 @@ function M.render(s)
  local labels={}
  for i=1,2 do local p=s.players[i]; labels[i]={name=p and p.name or "Empty",empty=p==nil,flip_left="LB",flip_right="RB",operator_gate="A",operator_paddle="B"} end
  Render.draw(s.match,labels)
+ local w=love.graphics.getWidth()
+ for i,p in ipairs(s.players) do
+  if i<=2 then Face.drawFace(p,(i-.5)*w/2,46,18,{outline=p.color}) end
+ end
 end
 return M

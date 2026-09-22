@@ -94,6 +94,9 @@ end
 local function player(p,g)
   if p.defeated then return end
   local c=colors[p.team+(p.slot>=3 and 2 or 0)] or cream
+  if p.color and p.color:match("^#%x%x%x%x%x%x$") then
+    c={tonumber(p.color:sub(2,3),16)/255,tonumber(p.color:sub(4,5),16)/255,tonumber(p.color:sub(6,7),16)/255}
+  end
   if p.out>0 then
     circle(c,p.x,635,26,.15)
     return
@@ -104,7 +107,7 @@ local function player(p,g)
   love.graphics.push(); love.graphics.translate(p.x,p.y); love.graphics.scale(1-stretch,1+stretch)
   circle(ink,0,3,32)
   Face.drawFace(p,0,0,S.radius,{facing=p.team==1 and 1 or -1})
-  box(ink,-20,24,14,8,4); box(ink,7,24,14,8,4)
+  box(c,-20,24,14,8,4); box(c,7,24,14,8,4)
   love.graphics.pop()
   if (p.smashCooldown or 0)>0 then
     color(c,.55); love.graphics.setLineWidth(2)

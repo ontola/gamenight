@@ -1,4 +1,4 @@
-local Avatar=require("games.volley.avatar")
+local Face=require("shared.face")
 local T=require("games.coop.stack")
 local B=require("games.coop.bubbles")
 local V={}
@@ -16,14 +16,7 @@ local function circle(c,x,y,r,a) color(c,a); love.graphics.circle("fill",x,y,r) 
 local function portrait(p,x,y,size)
   local c=p.slot%2==1 and C.orange or C.mint
   box(c,x,y,size,size,10)
-  if p.image==nil or p.renderedAvatar~=p.avatar then p.image=Avatar.image(p.avatar) or false; p.renderedAvatar=p.avatar end
-  if p.image then
-    local w,h=p.image:getDimensions(); local s=(size-8)/math.max(w,h)
-    love.graphics.setColor(1,1,1); love.graphics.draw(p.image,x+(size-w*s)/2,y+(size-h*s)/2,0,s,s)
-  else
-    circle(C.bg,x+size*.32,y+size*.43,size*.06); circle(C.bg,x+size*.68,y+size*.43,size*.06)
-    box(C.bg,x+size*.32,y+size*.69,size*.36,3)
-  end
+  Face.drawFace(p,x+size/2,y+size/2,size*.34,{outline=p.color})
 end
 local function header(app)
   text("GAMENIGHT  /  CO-OP CLUB",48,28,12,C.mint)

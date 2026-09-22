@@ -88,13 +88,10 @@ Empty seats do not receive players. No second joining flow runs under GameNight.
 Court, exploding ball, rotating round rules, and winning score settings apply
 to the next prepared match.
 
-Drawn profile faces from `players[].avatar` replace the default eyes and mouth
-on each player's head. Both the current studio format (including the 48x48
-canvas) and legacy drawings work. Transparent padding is trimmed to fit the
-head; nearest-neighbor sampling keeps the pixels sharp. Team-colored bodies
-and names remain visible. Blank/malformed/missing drawings use the default
-face. Profiles are supplied by GameNight at prepare; standalone play uses
-defaults. Edits in the studio appear on the next prepared match.
+The full player circle uses `skin_color`; `shared.face.drawFace` draws the
+transparent face and hat over it. The head anchor stays fixed when artwork
+changes. Hats are not cropped. Profile edits apply through `party_updated`.
+See the [face API](../../../../docs/faces.md) for centre, radius and mirroring.
 
 ## Checks and packaging
 

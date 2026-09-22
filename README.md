@@ -27,6 +27,24 @@ This is an early preview. Game support varies, and controller, audio and window
 behaviour still need testing across machines. See the
 [Windows preview guide](docs/windows-preview.md) for installation details.
 
+## Your player comes with you
+
+Draw a face on your phone, choose your colours and pick up your player with a
+controller. Integrated games can reuse your name, skin colour and artwork.
+Remember a player on a desktop to have them waiting at the door next time.
+
+The face API places a circular head by centre and radius:
+
+```lua
+local Face = require("shared.face")
+Face.drawFace(player, x, y, radius)
+```
+
+Hats keep their space around the head. See [player faces](docs/faces.md) for the
+shared coordinates, mirroring and Rust API. The catalog checks face rendering
+separately from colours and includes both in its integration score. Unknown or
+older-build evidence is not treated as verification of the current download.
+
 ## Open protocol. Open source.
 
 The local runtime works without an account or cloud service. You can run it,
@@ -57,9 +75,18 @@ python scripts/run-local.py --studio --shelf /path/to/games.json
 The shelf lists your games and their launch commands. GameNight adds the lobby.
 Without a shelf, the script uses a terminal SDK demo for testing the protocol.
 
-The [shared LÖVE games](games/love-party/README.md) include Neon Siege,
-Blast Party and Volley Trouble. Build their packages with
-`scripts/package-love-party.py`.
+The [shared LÖVE package](games/love-party/README.md) contains eight games:
+Neon Trails, Blast Party, Neon Siege, Ricochet Club, Volley Trouble,
+Stack Together, Bubble Buddies and Pinpals.
+
+```sh
+python scripts/package-love-party.py --output dist/party
+```
+
+The host prepares games in the background. Each game handles its own rounds
+and score screen. Use Back/Select to return to the lobby when you want to switch.
+On Windows, the current controller backend supports up to four Xbox/XInput
+controllers. Other controllers need an XInput-compatible mode or adapter.
 
 For quick changes to the lobby, use the [development loop](docs/development-loop.md).
 It separates restarting, building and packaging, and serves web files directly
@@ -75,7 +102,3 @@ Add a game, improve an integration or report a bug we can reproduce.
 GameNight's original code is MIT-licensed. See [LICENSE](LICENSE).
 The lobby and vendored dependencies retain their upstream notices.
 [THIRD_PARTY.md](THIRD_PARTY.md) lists source revisions and asset credits.
-
-### Player faces
-
-Use the [face renderer](docs/faces.md) to draw a player by head centre and radius, with their skin colour and artwork.

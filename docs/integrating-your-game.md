@@ -852,3 +852,15 @@ a running round without resetting it. Player IDs and controller bindings survive
 Use [the desktop integration checklist](desktop-integration-checklist.md) before adding
 or updating a game. It records regression cases found while testing the Windows lobby,
 including Back/Select bounce, controller ownership, and native-resolution rendering.
+
+## Circular player faces
+
+Use the [face API](faces.md) for drawn faces and hats. LÖVE games call
+`Face.drawFace(player, x, y, radius)` from `shared.face`; Rust games use
+`Avatar::head_layout()`. Coordinates describe the head centre, not the image
+bounds. Skin colour is separate. Keep transparent space for hats, and mirror
+around the head centre. Refresh artwork when the player profile changes.
+
+`profile.face` tests artwork rendering and live updates independently of
+`profile.colors`. Carrying an avatar string without drawing it does not pass.
+Faces may appear on characters or in a player portrait for games with vehicles.

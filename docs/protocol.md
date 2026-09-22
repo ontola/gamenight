@@ -583,3 +583,15 @@ Regression checks: `host_controller_identity_survives_reordering_and_disconnects
 in the shared Lua suite, the daemon socket test
 `lobby_controller_frames_keep_device_ids_across_the_real_socket`, and
 `scripts/test-love-integration.py` with sparse, reversed host device IDs.
+
+## Circular player faces
+
+Use the [face API](faces.md) for drawn faces and hats. LÖVE games call
+`Face.drawFace(player, x, y, radius)` from `shared.face`; Rust games use
+`Avatar::head_layout()`. Coordinates describe the head centre, not the image
+bounds. Skin colour is separate. Keep transparent space for hats, and mirror
+around the head centre. Refresh artwork when the player profile changes.
+
+`profile.face` tests artwork rendering and live updates independently of
+`profile.colors`. Carrying an avatar string without drawing it does not pass.
+Faces may appear on characters or in a player portrait for games with vehicles.

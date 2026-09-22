@@ -36,3 +36,19 @@ Never centre the visible pixels: a tall hat would move the eyes down.
 The SDK also supplies the historic origins for old 16/32 pixel drawings.
 Use nearest-neighbour filtering for the pixel artwork. Draw the skin circle
 at the game's output resolution.
+
+## Choosing where to draw it
+
+Blast Party and Bubble Buddies draw the face on the character. Neon Trails,
+Neon Siege and Ricochet Club use player portraits beside their names, preserving
+the shape of the vehicle or trail. Stack Together uses its player cards, and
+Pinpals places one portrait above each player's board.
+
+Pass `{outline = player.color}` for a small clothing-coloured portrait rim.
+The circle itself remains skin-coloured. This is optional and does not change
+the head centre or radius. Live profile changes invalidate the image cache.
+
+The store's 0–5 integration score counts essential playability checks and the
+three independent profile checks: names, colours, and faces. Optional party
+features do not affect that score. Development-only results remain unverified
+until the evidence matches the platform and downloadable artifact.

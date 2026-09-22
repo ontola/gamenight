@@ -1,5 +1,6 @@
 local R = { colors = { { 0.30, 0.92, 0.83 }, { 1, 0.43, 0.40 }, { 1, 0.82, 0.32 }, { 0.61, 0.53, 1 } } }
 local G
+local Face = require("shared.face")
 local BlastRender = require("games.blast_render")
 local SiegeRender = require("games.siege_render")
 local function player_color(p)
@@ -144,13 +145,14 @@ function R.game(mode, s, remaining, finished, managed)
 		local x = positions[i]
 		local c = player_color(p)
 		G.setColor(c)
-		G.circle("fill", x + 3, 30, 3)
+		G.circle("fill", x + 12, 34, 15)
+        Face.drawFace(p, x + 12, 34, 12)
 		G.setFont(R.fonts.small)
 		local name = p.name
-		while R.fonts.small:getWidth(name) > 130 do
+		while R.fonts.small:getWidth(name) > 108 do
 			name = name:sub(1, require("utf8").offset(name, -1) - 1)
 		end
-		G.print(name, x + 15, 22)
+		G.print(name, x + 36, 22)
 		if p.presence == "sleeping" or p.presence == "warning" then
 			G.setColor(p.presence == "warning" and { 1, 0.75, 0.3 } or { 0.6, 0.65, 0.75 })
 			G.print(p.presence == "sleeping" and "zZz Sleeping" or "Move to stay awake", x + 15, 43)

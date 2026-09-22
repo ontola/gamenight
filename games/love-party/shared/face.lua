@@ -19,6 +19,9 @@ function Face.drawFace(player,x,y,radius,options)
   options=options or {}; radius=radius or 12
   local g=love.graphics
   g.push("all"); g.translate(x,y); g.rotate(options.rotation or 0)
+  if options.outline then
+    g.setColor(skin(options.outline)); g.circle("fill",0,0,radius+3)
+  end
   g.setColor(skin(player.skin_color)); g.circle("fill",0,0,radius)
   local entry=cache[player]
   if not entry or entry.payload~=player.avatar then
