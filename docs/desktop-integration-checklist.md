@@ -71,3 +71,24 @@ rasterizing a new size every frame. Test idle sleeping players for several minut
 ## Executable status and release gates
 
 See [Game contract verification](game-contract-verification.md) for the per-game, per-platform evidence matrix. This checklist is guidance; it is not a passing certificate. Missing evidence blocks publication.
+
+## Controller relay across window focus
+
+Managed LÖVE games consume host-tagged controller frames. They must not bind
+players by SDL enumeration order. Both lobby readers (Bevy and Bones) use
+XInput on Windows so sampling continues while the game window owns focus.
+Do not substitute WGI based only on foreground tests.
+
+Before changing an input backend, test with physical controllers:
+
+1. Move and jump in the lobby. Start Volley Trouble while holding the stick.
+2. Confirm the same player moves and jumps in the game, then return with Back.
+3. Repeat with two controllers, including disconnecting and reconnecting one.
+4. Check the relay still sends changing axes and buttons while the lobby is
+   unfocused. Regular neutral frames alone are not evidence of working input.
+
+Synthetic relay tests verify routing and identity. They cannot prove that the
+Windows hardware API continues sampling in the background.
+
+Windows currently accepts four XInput controllers. DirectInput-only devices
+need an XInput compatibility mode or adapter.

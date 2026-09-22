@@ -35,3 +35,20 @@ updates the runtime; they are not maintained by Windows Update.
 The separately downloaded, pinned LOVE distribution includes its own runtime libraries and license
 notices. Pinpals and its selected source revision are listed in the Windows
 preview instructions shipped with the package.
+
+## Bevy gamepad backend
+
+`vendor/bevy_gilrs` is Bevy 0.11.3's `bevy_gilrs` crate, MIT/Apache-2.0.
+Source: https://github.com/bevyengine/bevy/tree/v0.11.3/crates/bevy_gilrs
+Only Cargo.toml differs: Windows selects gilrs/xinput without default WGI.
+Other platforms keep their default backend. Source files are unchanged.
+
+The resident lobby forwards controller state while a game owns focus. WGI can
+return neutral readings in the background; XInput supports background polling.
+The relay remains authoritative, so SDL device ordering cannot swap players.
+Windows supports up to four XInput controllers with this backend. Controllers
+that expose only DirectInput need an XInput compatibility mode or adapter.
+Do not re-enable WGI without verifying physical input after focus changes.
+
+The vendored Bones framework selects the same Windows backend for its own
+controller reader, so lobby movement and the relay use identical XInput slots.

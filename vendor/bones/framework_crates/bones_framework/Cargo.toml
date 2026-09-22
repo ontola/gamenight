@@ -101,7 +101,7 @@ instant       = { version = "0.1", features = ["wasm-bindgen"] }
 noise         = "0.9"
 once_cell     = "1.17"
 thiserror     = "1.0"
-gilrs         = "0.11.0"
+# Use the same stable XInput slots as Bevy's host relay on Windows.
 send_wrapper  = "0.6.0"
 numquant               = "0.2"
 
@@ -161,3 +161,11 @@ directories = "5.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tracing-wasm = { version = "0.2.1", optional = true }
+
+[target.'cfg(windows)'.dependencies.gilrs]
+version = "0.11.0"
+default-features = false
+features = ["xinput"]
+
+[target.'cfg(not(windows))'.dependencies.gilrs]
+version = "0.11.0"
