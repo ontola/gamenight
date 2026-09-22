@@ -640,12 +640,12 @@ let initializing = true;
         tint.putImageData(bodyPixels, 0, 0);
         // Replace the old head silhouette with the common circular head.
         tint.clearRect(34, 18, 30, 27);
-        drawHead(tint, 24, 4);
+        drawHead(tint, 27, 4);
         ctx.drawImage(previewTint, 0, 0);
         // Exactly the same 48×48 crop that receives the face drawing.
         // Reference pixels are display-only and never copied into gridData.
         if (outfitGuideSprite !== previewSprite || outfitGuideColor !== characterColor + skinColor) {
-          const rgba = tint.getImageData(24, 4, GRID_SIZE, GRID_SIZE).data;
+          const rgba = tint.getImageData(27, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
           for (const [x,y] of [[24,26],[30,26],[26,33],[27,33],[28,33],[29,33]]) {
@@ -658,7 +658,7 @@ let initializing = true;
         }
         // Paint stays above the skin without being tinted.
         // Keep the face centre while leaving a larger area for accessories.
-        drawPixelFace(ctx, 24, 4);
+        drawPixelFace(ctx, 27, 4);
       }
 
     }

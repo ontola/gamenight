@@ -2639,7 +2639,7 @@ fn avatar_head_transform(body: &Transform, face: &Transform, facing: f32) -> bev
 /// How far the drawn face leans toward the way the character is facing, in
 /// world units. Small on purpose: the full face-layer offset is 10, which is
 /// most of the way off the head.
-const AVATAR_FACE_LEAD: f32 = 0.0;
+const AVATAR_FACE_LEAD: f32 = 3.0;
 
 /// Vertical fine-tuning for the drawn face, in world units. The face layer's
 /// own y already puts it on the head; this is the knob for taste.

@@ -12,12 +12,12 @@ SKINS = ('fishy', 'pescy', 'sharky', 'orcy')
 def poses():
     stand = Image.open(ART / 'master.png').convert('RGBA')
     assert stand.size == (96, 80)
-    # Canonical circular head: editor canvas (24,4), head centre (24,28).
+    # Canonical circular head: editor canvas (27,4), head centre (24,28).
     # Keep the source drawing immutable; construct this geometry in the builder.
     stand.paste((0, 0, 0, 0), (34, 18, 64, 45))
     for y in range(20, 44):
-        for x in range(36, 60):
-            if (x + .5 - 48) ** 2 + (y + .5 - 32) ** 2 <= 12 ** 2:
+        for x in range(39, 63):
+            if (x + .5 - 51) ** 2 + (y + .5 - 32) ** 2 <= 12 ** 2:
                 stand.putpixel((x, y), (245, 233, 190, 255))
     upper = stand.copy()
     upper.paste((0, 0, 0, 0), (0, 55, 96, 80))
