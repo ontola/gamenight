@@ -31,6 +31,18 @@ return function()
     down="b"; assert(not M.input(1).smash)
     Input.pads[1]=previous
   end)
+  test("face anchor stays centred with hats, mirroring and arbitrary radii",function()
+    local F=require("shared.face")
+    for _,r in ipairs({12,24,55}) do
+      for _,f in ipairs({-1,1}) do
+        local x,y,sx,sy,ox,oy=F.placement(48,48,100,200,r,f)
+        assert(x+(24-ox)*sx==100 and y+(28-oy)*sy==200)
+        assert(math.abs(sx)*12==r and sy*12==r)
+      end
+    end
+    local _,_,_,_,ox,oy=F.placement(32,32,0,0,12,1)
+    assert(ox==10 and oy==13)
+  end)
   if love.audio and love.sound then
     test("native sound plays after pause and lazy initialization",function()
       local A=require("games.volley.audio")

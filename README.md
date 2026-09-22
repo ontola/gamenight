@@ -75,3 +75,7 @@ Add a game, improve an integration or report a bug we can reproduce.
 GameNight's original code is MIT-licensed. See [LICENSE](LICENSE).
 The lobby and vendored dependencies retain their upstream notices.
 [THIRD_PARTY.md](THIRD_PARTY.md) lists source revisions and asset credits.
+
+### Player faces
+
+Use the [face renderer](docs/faces.md) to draw a player by head centre and radius, with their skin colour and artwork.

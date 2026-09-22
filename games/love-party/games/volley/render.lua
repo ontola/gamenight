@@ -1,5 +1,5 @@
 local S = require("games.volley.sim")
-local Avatar = require("games.volley.avatar")
+local Face = require("shared.face")
 local R = {}
 local ink={.055,.085,.13}
 local cream={.96,.95,.85}
@@ -104,22 +104,7 @@ local function player(p,g)
   love.graphics.push(); love.graphics.translate(p.x,p.y); love.graphics.scale(1-stretch,1+stretch)
   circle(ink,0,3,32); circle(c,0,0,29)
   circle(cream,-9,-10,7,.20)
-  if p.portrait==nil or p.renderedAvatar~=p.avatar then p.portrait=Avatar.image(p.avatar) or false; p.renderedAvatar=p.avatar end
-  if p.portrait then
-    local w,h=p.portrait:getDimensions()
-    local scale=2
-    local ox=w==48 and 30 or w/2
-    local oy=h==48 and 31 or h/2
-    color(cream); love.graphics.setColor(1,1,1,1)
-    love.graphics.draw(p.portrait,-ox*scale,-oy*scale,0,scale,scale)
-  else
-    -- Players without a drawing keep a readable default face.
-    box(ink,-26,-14,52,8,3,.8)
-    local look=S.clamp((g.ball.x-p.x)/200,-1,1)*3
-    circle(cream,-9,0,7); circle(cream,10,0,7)
-    circle(ink,-9+look,1,3); circle(ink,10+look,1,3)
-    line(ink,-4,15,5,15,3)
-  end
+  Face.drawFace(p,0,0,24,{facing=p.team==1 and 1 or -1})
   box(ink,-20,24,14,8,4); box(ink,7,24,14,8,4)
   love.graphics.pop()
   if (p.smashCooldown or 0)>0 then

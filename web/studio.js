@@ -25,6 +25,12 @@ let initializing = true;
     let currentArtworkId = localStorage.getItem('gamenight_current_artwork') || null;
 
     const GRID_SIZE = 48;
+    // Shared with gamenight_protocol::Avatar::head_layout and shared/face.lua.
+    const HEAD = { x: 24, y: 28, radius: 12 };
+    function drawHead(ctx, x = 0, y = 0) {
+      ctx.fillStyle = skinColor;
+      ctx.beginPath(); ctx.arc(x + HEAD.x, y + HEAD.y, HEAD.radius, 0, Math.PI * 2); ctx.fill();
+    }
 
     // `null` means transparent. A face should be a *face* — filling the grid
     // with a background colour by default gives everyone an opaque tile with
@@ -97,7 +103,7 @@ let initializing = true;
       const button = document.getElementById('outfit-guide-toggle');
       button.setAttribute('aria-pressed', String(showOutfitGuide));
       button.classList.toggle('active', showOutfitGuide);
-      button.textContent = showOutfitGuide ? 'Hide outfit guide' : 'Show outfit guide';
+      button.textContent = showOutfitGuide ? 'Hide head guide' : 'Show head guide';
       const cells = document.getElementById('pixel-grid').children;
       for (let i = 0; i < cells.length; i++) cells[i].style.background = gridBackground(i);
     }
@@ -632,6 +638,9 @@ let initializing = true;
         const bodyPixels = tint.getImageData(0, 0, 96, 80);
         colourBodyPixels(bodyPixels.data, characterColor, skinColor);
         tint.putImageData(bodyPixels, 0, 0);
+        // Replace the old head silhouette with the common circular head.
+        tint.clearRect(34, 18, 30, 27);
+        drawHead(tint, 24, 4);
         ctx.drawImage(previewTint, 0, 0);
         // Exactly the same 48×48 crop that receives the face drawing.
         // Reference pixels are display-only and never copied into gridData.
@@ -639,6 +648,9 @@ let initializing = true;
           const rgba = tint.getImageData(24, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
+          for (const [x,y] of [[24,26],[30,26],[26,33],[27,33],[28,33],[29,33]]) {
+            outfitGuidePixels[y * GRID_SIZE + x] = 'rgba(30,30,40,.35)';
+          }
           outfitGuideSprite = previewSprite;
           outfitGuideColor = characterColor + skinColor;
           refreshOutfitGuide();
