@@ -138,6 +138,8 @@ pub struct GameMusic {
 }
 
 fn main() {
+    #[cfg(target_os = "macos")]
+    gamenight_macos::set_application_name();
     let startup_started = std::time::Instant::now();
     if !std::path::Path::new("assets").exists() {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));

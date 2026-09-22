@@ -1,4 +1,4 @@
-//! Windows desktop entry point, shared by the installer and portable preview.
+//! Desktop entry point for the Windows package and macOS app bundle.
 #![cfg_attr(windows, windows_subsystem = "windows")]
 #[path = "launcher/data.rs"]
 mod data;
@@ -16,7 +16,11 @@ use std::{
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let executable = std::env::current_exe()?;
-    let root = executable.parent().ok_or("No package directory")?;
+    let executable_dir = executable.parent().ok_or("No package directory")?;
+    #[cfg(target_os = "macos")]
+    let root = executable_dir.join("../Resources").canonicalize()?;
+    #[cfg(not(target_os = "macos"))]
+    let root = executable_dir.to_path_buf();
     let port: u16 = std::env::args()
         .nth(1)
         .map(|v| v.parse())
@@ -27,7 +31,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     // Fail before launching anything if another GameNight owns the port.
     drop(TcpListener::bind(("127.0.0.1", port))?);
+    #[cfg(target_os = "macos")]
+    let daemon = root.join("bin/gamenight-daemon");
+    #[cfg(target_os = "macos")]
+    let lobby = root
+        .join("../Helpers/GameNight.app/Contents/MacOS/GameNight")
+        .canonicalize()?;
+    #[cfg(not(target_os = "macos"))]
     let daemon = root.join("bin/gamenight-daemon.exe");
+    #[cfg(not(target_os = "macos"))]
     let lobby = root.join("bin/lobby.exe");
     let lobby_dir = root.join("lobby");
     for path in [&daemon, &lobby, &root.join("catalog/games/pinpals.json")] {
@@ -55,7 +67,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     fs::write(&shelf_path, serde_json::to_vec_pretty(&shelf)?)?;
     let mut command = Command::new(daemon);
     command
-        .current_dir(root)
+        .current_dir(&root)
         .env("GAMENIGHT_ADDR", format!("127.0.0.1:{port}"))
         .env("GAMENIGHT_LIBRARY", shelf_path)
         .env("GAMENIGHT_CATALOG", root.join("catalog/games"))

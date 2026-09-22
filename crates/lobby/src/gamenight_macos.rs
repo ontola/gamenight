@@ -229,3 +229,22 @@ fn order_visible_windows_front() {
         }
     }
 }
+
+/// Winit uses NSProcessInfo, not the window title, for About/Hide/Quit labels.
+/// Set this before creating the event loop, including for development launches.
+pub fn set_application_name() {
+    unsafe {
+        let Some(info_class) = objc2::runtime::AnyClass::get(c"NSProcessInfo") else {
+            return;
+        };
+        let Some(string_class) = objc2::runtime::AnyClass::get(c"NSString") else {
+            return;
+        };
+        let info: *mut AnyObject = msg_send![info_class, processInfo];
+        let name: *mut AnyObject =
+            msg_send![string_class, stringWithUTF8String: c"GameNight".as_ptr()];
+        if !info.is_null() && !name.is_null() {
+            let _: () = msg_send![info, setProcessName: name];
+        }
+    }
+}

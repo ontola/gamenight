@@ -10,7 +10,13 @@ pub fn user_dir() -> io::Result<PathBuf> {
     }
     #[cfg(windows)]
     let base = std::env::var_os("LOCALAPPDATA");
-    #[cfg(not(windows))]
+    #[cfg(target_os = "macos")]
+    let base = std::env::var_os("HOME").map(|home| {
+        PathBuf::from(home)
+            .join("Library/Application Support")
+            .into_os_string()
+    });
+    #[cfg(not(any(windows, target_os = "macos")))]
     let base = std::env::var_os("XDG_DATA_HOME").or_else(|| {
         std::env::var_os("HOME")
             .map(|home| PathBuf::from(home).join(".local/share").into_os_string())

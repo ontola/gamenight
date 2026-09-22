@@ -1,0 +1,91 @@
+name: macOS installer
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Numeric macOS bundle version'
+        required: true
+        default: '0.1.4'
+permissions:
+  contents: read
+concurrency:
+  group: macos-installer-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [aarch64-apple-darwin, x86_64-apple-darwin]
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            crates/lobby -> target
+          key: macos-installer-${{ matrix.target }}
+      - name: Build current host and lobby
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+          MACOSX_DEPLOYMENT_TARGET: '12.0'
+        run: |
+          cargo build --locked --release --target ${{ matrix.target }} -p gamenight-daemon
+          cargo build --locked --release --target ${{ matrix.target }} --manifest-path crates/lobby/Cargo.toml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/gamenight-launcher
+            target/${{ matrix.target }}/release/gamenight-daemon
+            target/${{ matrix.target }}/release/lobby
+          if-no-files-found: error
+  package:
+    needs: build
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: binaries-*
+          path: binaries
+      - name: Assemble universal app with current assets
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p universal stage release
+          for name in gamenight-launcher gamenight-daemon lobby; do
+            lipo -create binaries/binaries-aarch64-apple-darwin/$name binaries/binaries-x86_64-apple-darwin/$name -output universal/$name
+            lipo -verify_arch arm64 x86_64 universal/$name
+          done
+          python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION"
+          python3 scripts/test-macos-package.py stage/GameNight.app
+      - name: Launch packaged host outside source directory
+        run: |
+          python3 scripts/smoke-macos-package.py stage/GameNight.app --output smoke
+      - name: Create disk image
+        run: |
+          mkdir dmg-root
+          ditto stage/GameNight.app dmg-root/GameNight.app
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname GameNight -srcfolder dmg-root -ov -format UDZO release/GameNight.dmg
+          hdiutil verify release/GameNight.dmg
+          cd release
+          shasum -a 256 GameNight.dmg > GameNight.dmg.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamenight-macos-installer
+          path: release/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gamenight-macos-smoke
+          path: smoke/
+          if-no-files-found: ignore
