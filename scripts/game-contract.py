@@ -54,7 +54,7 @@ def run_check(command, env, log, timeout=90):
 
 
 def evidence(path, output):
-    return {"path": str(path.relative_to(output)), "sha256": digest(path)}
+    return {"path": path.relative_to(output).as_posix(), "sha256": digest(path)}
 
 
 def run_games(report, pack, love, certifier, output):

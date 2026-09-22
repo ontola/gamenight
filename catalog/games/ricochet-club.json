@@ -29,7 +29,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/ricochet-club.love",
-      "sha256": "e25b3b9b62224b60a1accd59845aa407b002f6228fdfeec1556f570b5e5ae5fb",
+      "sha256": "059eb63490c8f2b626c8f9254cc725370eae3c111dcf2781ce20f02d25907692",
       "entrypoint": "ricochet-club.love",
       "runtime": {
         "id": "love-11-5",

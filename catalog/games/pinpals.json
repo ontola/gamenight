@@ -26,7 +26,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/pinpals.love",
-      "sha256": "d3796619e6ef245e94243684bd85dedadb0d164cfbec9bd0e41a74adb4d5a87c",
+      "sha256": "8252f7a5f40b5f417c2672563db6f19205534ba91b55aa5f21799ef296f1f1f9",
       "entrypoint": "pinpals-95ea42fe544cf3906c90aeb556359180964c1e88/main.lua",
       "runtime": {
         "id": "love-11-5",

@@ -16,6 +16,10 @@ RUNTIME = {
 def write_zip(path, files):
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
         for name, content in sorted(files.items()):
+            # Match the repository's LF policy even when an editor left CRLF
+            # in a working tree. Catalog checksums must be portable across OSes.
+            if Path(name).suffix.lower() in {'.lua', '.md', '.txt', '.json'}:
+                content = content.replace(b'\r\n', b'\n')
             info = zipfile.ZipInfo(name, (2026, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16

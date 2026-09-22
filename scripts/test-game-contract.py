@@ -123,6 +123,21 @@ class ContractTests(unittest.TestCase):
         (self.pack/'extra.love').write_bytes(b'unverified')
         self.assertTrue(self.errors())
 
+    def test_nested_evidence_uses_portable_paths(self):
+        nested=self.output/'native'/'observations.json'
+        nested.parent.mkdir()
+        nested.write_text('{}')
+        self.assertEqual(m.evidence(nested,self.output)['path'],'native/observations.json')
+
+    def test_package_text_line_endings_do_not_change_artifact(self):
+        spec=importlib.util.spec_from_file_location('packager',Path(__file__).with_name('package-love-party.py'))
+        packager=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(packager)
+        a,b=self.root/'lf.zip',self.root/'crlf.zip'
+        packager.write_zip(a,{'main.lua':b'return 1\n','image.png':b'\r\n'})
+        packager.write_zip(b,{'main.lua':b'return 1\r\n','image.png':b'\r\n'})
+        self.assertEqual(a.read_bytes(),b.read_bytes())
+
     def test_missing_executable_is_failed_with_evidence(self):
         log=self.output/'missing.log'
         self.assertFalse(m.run_check([str(self.root/'missing')],{},log))

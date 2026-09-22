@@ -31,7 +31,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/stack-together.love",
-      "sha256": "4810489de0331cae1f7b25699a823406d3d428e6eaf527ffc6381eb1967c1671",
+      "sha256": "ff6f9ed9af994d24e83ef77dabf7ac9ca78848c0c665f47481696d4c29530e32",
       "entrypoint": "stack-together.love",
       "runtime": {
         "id": "love-11-5",

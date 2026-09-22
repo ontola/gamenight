@@ -29,7 +29,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/blast-party.love",
-      "sha256": "8f8068e4c652c55dedd4c59b69e9d0e31627cab5091504a91c72434d39ca8743",
+      "sha256": "d527e813fd61c0aba98a8d83e65f4e8ce7bb28f0e818534ebdfc450be560f22a",
       "entrypoint": "blast-party.love",
       "runtime": {
         "id": "love-11-5",

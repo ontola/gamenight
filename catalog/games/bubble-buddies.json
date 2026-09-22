@@ -31,7 +31,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/bubble-buddies.love",
-      "sha256": "4e54c8893f57856fffd16371c592c0f56e54dd7526940ccbf3ea6f1ad8c7f758",
+      "sha256": "623a18261a418bee38967feb07ba1275627944d0f78d67082bc74b5132f34083",
       "entrypoint": "bubble-buddies.love",
       "runtime": {
         "id": "love-11-5",
