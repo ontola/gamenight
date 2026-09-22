@@ -58,7 +58,9 @@ Manual questions are explicitly untested in that report, including CI runs.
 
 The LÖVE workflow runs on every main push and PR, including protocol, SDK, host,
 catalog and test changes. It uploads Windows evidence and puts the matrix in the
-Actions summary. The main workflow tests the gate and publishes the full catalog
+Actions summary. A Linux job then verifies the downloaded Windows evidence and
+package hashes with the release gate, catching path or packaging differences
+before the installer finishes. The main workflow tests the gate and publishes the full catalog
 inventory. The Linux render smoke test is separate; a Windows pass is never reused
 as Linux or macOS proof. Windows CI installs checksum-pinned Mesa beside its test
 runtime because hosted runners expose only OpenGL 1.1. OpenAL uses its null output

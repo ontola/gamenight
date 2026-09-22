@@ -87,3 +87,19 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: xvfb-run -a python3 scripts/test-love-party-render.py --love /usr/bin/love --pack dist/party
+
+  gate:
+    needs: [games, render]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-contract-windows
+          path: evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: gamenight-love-party
+          path: games
+      - name: Verify portable evidence and exact catalog packages
+        run: python scripts/game-contract.py --gate --platform windows --output evidence --pack games
