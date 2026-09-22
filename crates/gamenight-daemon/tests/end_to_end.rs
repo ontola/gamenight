@@ -186,15 +186,16 @@ async fn one_continuous_night() {
 
     // Match over: the vote opens on the overlay.
     towerfall.gn.finished(s1).await.unwrap();
-    // Finishing returns to the lobby and pauses before the later disposal.
-    match towerfall.gn.next_event().await.unwrap() {
-        Some(GameEvent::Pause { session }) => assert_eq!(session, s1),
-        other => panic!("expected pause after finishing, got {other:?}"),
-    }
-
-    overlay
-        .wait_for(|p| p.active_session.as_ref().map(|s| s.phase) == Some(SessionPhase::Finished))
-        .await;
+    // A round notification keeps the game running and the next game prepared.
+    assert!(
+        tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            towerfall.gn.next_event()
+        )
+        .await
+        .is_err(),
+        "round completion must not pause or dispose"
+    );
 
     // Both players stand on "next game" — instant transition.
     overlay
@@ -766,10 +767,15 @@ async fn a_plain_socket_game_plays_a_full_session() {
         .await;
     assert_eq!(party.connected_games, vec![GameId::new("plain")]);
 
-    // Finishing rolls the night on (nobody is seated, so the vote
-    // auto-advances) and our single-entry playlist comes back round to us:
-    // dispose, then a brand-new session in the same process.
+    // Finishing alone leaves this session running, even with no seated players.
+    // Explicit Next disposes it and prepares a fresh session.
     game.send(ClientMessage::Finished { session }).await;
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), game.recv())
+            .await
+            .is_err()
+    );
+    overlay.send(ClientMessage::Next).await;
     match game.recv().await {
         ServerMessage::Dispose { session: s } => assert_eq!(s, session),
         other => panic!("expected dispose, got {other:?}"),
