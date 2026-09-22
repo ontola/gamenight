@@ -73,7 +73,7 @@ jobs:
           mkdir -p universal stage release
           for name in gamenight-launcher gamenight-daemon lobby; do
             lipo -create binaries/binaries-aarch64-apple-darwin/$name binaries/binaries-x86_64-apple-darwin/$name -output universal/$name
-            lipo -verify_arch arm64 x86_64 universal/$name
+            lipo universal/$name -verify_arch arm64 x86_64
           done
           binary_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BINARY_RUN" --jq .head_sha)
           python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION" --binary-revision "$binary_revision"

@@ -17,7 +17,7 @@ def verify(app):
             assert data[key] == "GameNight", (bundle, key)
         assert (bundle / "Resources" / data["CFBundleIconFile"]).stat().st_size > 100
     for binary in [contents / "MacOS/GameNight", helper / "MacOS/GameNight", resources / "bin/gamenight-daemon"]:
-        subprocess.run(["lipo", "-verify_arch", "arm64", "x86_64", str(binary)], check=True)
+        subprocess.run(["lipo", str(binary), "-verify_arch", "arm64", "x86_64"], check=True)
     manifest = json.loads((resources / "build.json").read_text())
     assert manifest["assets"], "Empty asset manifest"
     for name, digest in manifest["assets"].items():
