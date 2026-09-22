@@ -9,13 +9,14 @@ The next game loads in the background while you play. Back/Select returns to
 the lobby; press it again to resume. Your controllers stay assigned to the same
 players across integrated games.
 
-[Download the Windows preview](https://github.com/ontola/gamenight/releases) ·
+[Download for Windows](https://gamenight.ontola.io/download/GameNight-Setup.exe) ·
+[Download for Mac](https://gamenight.ontola.io/download/GameNight.dmg) ·
 [Browse games](https://gamenight.ontola.io/catalog) ·
 [Integrate your game](docs/integrating-your-game.md)
 
 ## Play
 
-Install the Windows preview and connect your controllers. Join the lobby,
+Install GameNight for Windows or macOS and connect your controllers. Join the lobby,
 walk to a game and press Y to play. The lobby shows download and loading
 progress. Downloaded games are cached for later sessions.
 
@@ -25,7 +26,8 @@ which parts of the integration have been checked.
 
 This is an early preview. Game support varies, and controller, audio and window
 behaviour still need testing across machines. See the
-[Windows preview guide](docs/windows-preview.md) for installation details.
+[Windows preview guide](docs/windows-preview.md) or
+[Mac distribution notes](docs/macos-distribution.md) for installation details.
 
 ## Your player comes with you
 
