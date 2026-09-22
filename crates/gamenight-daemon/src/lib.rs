@@ -157,7 +157,9 @@ impl Shared {
         // earlier in the evening. A guard against the daemon acting on its own
         // must never override the party acting on purpose.
         match &command {
-            Command::PlayNext { game } | Command::QueueNext { game } | Command::RequestStart { game } => {
+            Command::PlayNext { game }
+            | Command::QueueNext { game }
+            | Command::RequestStart { game } => {
                 if self.quit_games.remove(game) {
                     info!(%game, "the party asked for it again — it may start");
                 }
@@ -401,7 +403,9 @@ impl Shared {
 
 // Games need party identity and settings, not the lobby's embedded catalog art.
 // Keep Welcome within lightweight clients' frame limits as the catalog grows.
-fn game_welcome_snapshot(mut party: gamenight_protocol::PartySnapshot) -> gamenight_protocol::PartySnapshot {
+fn game_welcome_snapshot(
+    mut party: gamenight_protocol::PartySnapshot,
+) -> gamenight_protocol::PartySnapshot {
     for game in &mut party.library {
         game.cover = None;
         game.icon = None;
@@ -1103,13 +1107,22 @@ async fn serve(
             };
             if let ClientMessage::ControllerFrame { controllers } = &parsed {
                 if !valid_controller_frame(&registration, controllers) {
-                    send(&tx, &ServerMessage::Error { message: "only the lobby publishes controller frames".into() });
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the lobby publishes controller frames".into(),
+                        },
+                    );
                     continue;
                 }
                 let s = shared.lock().await;
-                let frame = ServerMessage::ControllerFrame { controllers: controllers.clone() };
+                let frame = ServerMessage::ControllerFrame {
+                    controllers: controllers.clone(),
+                };
                 for (id, game_tx) in &s.games {
-                    if id.0 != "lobby" { send(game_tx, &frame); }
+                    if id.0 != "lobby" {
+                        send(game_tx, &frame);
+                    }
                 }
                 continue;
             }
@@ -1176,20 +1189,47 @@ enum Registration {
     Overlay(u64),
 }
 
-fn valid_controller_frame(registration: &Registration, controllers: &[gamenight_protocol::ControllerState]) -> bool {
-    if !matches!(registration, Registration::Game(id) if id.0 == "lobby") || controllers.len() > 16 { return false; }
+fn valid_controller_frame(
+    registration: &Registration,
+    controllers: &[gamenight_protocol::ControllerState],
+) -> bool {
+    if !matches!(registration, Registration::Game(id) if id.0 == "lobby") || controllers.len() > 16
+    {
+        return false;
+    }
     let mut ids = std::collections::HashSet::new();
-    controllers.iter().all(|c| c.controller.strip_prefix("ordinal:").and_then(|id| id.parse::<u32>().ok()).is_some()
-        && ids.insert(&c.controller))
+    controllers.iter().all(|c| {
+        c.controller
+            .strip_prefix("ordinal:")
+            .and_then(|id| id.parse::<u32>().ok())
+            .is_some()
+            && ids.insert(&c.controller)
+    })
 }
 
 #[test]
 fn controller_frames_only_accept_unique_host_devices_from_lobby() {
-    let frame = gamenight_protocol::ControllerState { controller: "ordinal:7".into(), axes: [0;6], buttons: 1 };
-    assert!(valid_controller_frame(&Registration::Game(GameId::new("lobby")), &[frame.clone()]));
-    assert!(!valid_controller_frame(&Registration::Game(GameId::new("blast-party")), &[frame.clone()]));
-    assert!(!valid_controller_frame(&Registration::Overlay(0), &[frame.clone()]));
-    assert!(!valid_controller_frame(&Registration::Game(GameId::new("lobby")), &[frame.clone(),frame]));
+    let frame = gamenight_protocol::ControllerState {
+        controller: "ordinal:7".into(),
+        axes: [0; 6],
+        buttons: 1,
+    };
+    assert!(valid_controller_frame(
+        &Registration::Game(GameId::new("lobby")),
+        &[frame.clone()]
+    ));
+    assert!(!valid_controller_frame(
+        &Registration::Game(GameId::new("blast-party")),
+        &[frame.clone()]
+    ));
+    assert!(!valid_controller_frame(
+        &Registration::Overlay(0),
+        &[frame.clone()]
+    ));
+    assert!(!valid_controller_frame(
+        &Registration::Game(GameId::new("lobby")),
+        &[frame.clone(), frame]
+    ));
 }
 
 /// Translate a wire message into a state-machine command, enforcing that each
@@ -1200,7 +1240,9 @@ fn message_to_command(
 ) -> Result<Option<Command>, String> {
     let is_game = matches!(registration, Registration::Game(_));
     let command = match msg {
-        ClientMessage::ControllerFrame { .. } => return Err("controller frames require lobby routing".into()),
+        ClientMessage::ControllerFrame { .. } => {
+            return Err("controller frames require lobby routing".into())
+        }
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
         ClientMessage::Participation {
             session,
@@ -1412,14 +1454,18 @@ mod welcome_artwork_tests {
         let game: GameMeta = serde_json::from_value(serde_json::json!({
             "id": "test", "title": "Test", "cover": art,
             "icon": art, "screenshot": art, "min_players": 2
-        })).unwrap();
+        }))
+        .unwrap();
         night.set_library(vec![game]);
         let original = night.snapshot();
         assert!(serde_json::to_vec(&original).unwrap().len() > 1024 * 1024);
         let compact = game_welcome_snapshot(original.clone());
         assert!(serde_json::to_vec(&compact).unwrap().len() < 1024 * 1024);
         assert_eq!(compact.library[0].title, original.library[0].title);
-        assert_eq!(compact.library[0].min_players, original.library[0].min_players);
+        assert_eq!(
+            compact.library[0].min_players,
+            original.library[0].min_players
+        );
         assert!(compact.library[0].cover.is_none());
         assert!(compact.library[0].icon.is_none());
         assert!(compact.library[0].screenshot.is_none());

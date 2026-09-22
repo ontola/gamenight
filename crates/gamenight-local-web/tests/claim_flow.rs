@@ -1212,19 +1212,41 @@ async fn large_profile_claim_is_acknowledged_before_success() {
     let daemon = start_daemon().await;
     let server = start_server(&daemon).await;
     let mut pad = Watcher::connect(&daemon).await;
-    pad.ws.send(Message::Text(ClientMessage::JoinParty {
-        name: "Guest".into(), seat: None, color: Some("#336699".into()),
-        avatar: Some("old drawing".into()), library: vec![],
-    }.to_json())).await.unwrap();
+    pad.ws
+        .send(Message::Text(
+            ClientMessage::JoinParty {
+                name: "Guest".into(),
+                seat: None,
+                color: Some("#336699".into()),
+                avatar: Some("old drawing".into()),
+                library: vec![],
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
     let party = pad.wait_for(|p| !p.players.is_empty()).await;
     let id = party.players[0].id;
     let avatar = serde_json::json!({"v":1,"w":48,"h":48,"px":vec!["#fa3080";2304]}).to_string();
     assert!(avatar.len() > 16000);
-    assert_eq!(post(&server, "/api/profiles", &profile_json("large", "Joep", "#633d2b", &avatar)).await.0, 200);
+    assert_eq!(
+        post(
+            &server,
+            "/api/profiles",
+            &profile_json("large", "Joep", "#633d2b", &avatar)
+        )
+        .await
+        .0,
+        200
+    );
     // A repeated autosave must acknowledge correctly too, without timing out.
     for _ in 0..2 {
-        let (status, body) = post(&server, "/api/profiles/large/join",
-            &serde_json::json!({"claim":id}).to_string()).await;
+        let (status, body) = post(
+            &server,
+            "/api/profiles/large/join",
+            &serde_json::json!({"claim":id}).to_string(),
+        )
+        .await;
         assert_eq!(status, 200, "{body}");
         // No polling/eventual wait: inspect a new connection immediately.
         let observed = Watcher::connect(&daemon).await.party;

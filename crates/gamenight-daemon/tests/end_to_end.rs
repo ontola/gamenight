@@ -833,19 +833,52 @@ async fn lobby_controller_frames_keep_device_ids_across_the_real_socket() {
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let addr = start_daemon().await;
         let mut lobby = GameNight::connect("lobby", Some(&addr)).await.unwrap();
-        let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}")).await.unwrap();
-        game.send(Message::Text(ClientMessage::Hello {role: Role::Game,game:Some(GameId::new("blast-party")),token:None}.to_json())).await.unwrap();
-        assert!(matches!(Overlay::recv_raw(&mut game).await, ServerMessage::Welcome {..}));
-        let device = gamenight_protocol::ControllerState {controller:"ordinal:7".into(),axes:[-32767,0,0,0,0,0],buttons:1};
-        for frames in [vec![device.clone()],vec![]] {
+        let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .unwrap();
+        game.send(Message::Text(
+            ClientMessage::Hello {
+                role: Role::Game,
+                game: Some(GameId::new("blast-party")),
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        assert!(matches!(
+            Overlay::recv_raw(&mut game).await,
+            ServerMessage::Welcome { .. }
+        ));
+        let device = gamenight_protocol::ControllerState {
+            controller: "ordinal:7".into(),
+            axes: [-32767, 0, 0, 0, 0, 0],
+            buttons: 1,
+        };
+        for frames in [vec![device.clone()], vec![]] {
             lobby.controller_frame(frames.clone()).await.unwrap();
             loop {
-                if let ServerMessage::ControllerFrame {controllers} = Overlay::recv_raw(&mut game).await {
-                    assert_eq!(controllers,frames);break;
+                if let ServerMessage::ControllerFrame { controllers } =
+                    Overlay::recv_raw(&mut game).await
+                {
+                    assert_eq!(controllers, frames);
+                    break;
                 }
             }
         }
-        game.send(Message::Text(ClientMessage::ControllerFrame {controllers:vec![device]}.to_json())).await.unwrap();
-        assert!(matches!(Overlay::recv_raw(&mut game).await, ServerMessage::Error {..}));
-    }).await.unwrap();
+        game.send(Message::Text(
+            ClientMessage::ControllerFrame {
+                controllers: vec![device],
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        assert!(matches!(
+            Overlay::recv_raw(&mut game).await,
+            ServerMessage::Error { .. }
+        ));
+    })
+    .await
+    .unwrap();
 }

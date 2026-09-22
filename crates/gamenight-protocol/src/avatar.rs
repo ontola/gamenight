@@ -59,7 +59,10 @@ struct Encoded {
 
 /// Head anchor in source pixel coordinates, before scaling or mirroring.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HeadLayout { pub center: [f32; 2], pub radius: f32 }
+pub struct HeadLayout {
+    pub center: [f32; 2],
+    pub radius: f32,
+}
 
 impl Avatar {
     /// Centre the *head*, never the non-transparent bounds (a hat changes those).
@@ -67,10 +70,17 @@ impl Avatar {
     /// `center` as its origin. Mirror around that same origin for left-facing.
     pub fn head_layout(&self) -> HeadLayout {
         let offset = |size: u32, small: f32| match size {
-            32 => small, 16 => small + 8.0, _ => (48.0 - size as f32) / 2.0,
+            32 => small,
+            16 => small + 8.0,
+            _ => (48.0 - size as f32) / 2.0,
         };
-        HeadLayout { center: [24.0 - offset(self.width, 14.0),
-            28.0 - offset(self.height, 15.0)], radius: 12.0 }
+        HeadLayout {
+            center: [
+                24.0 - offset(self.width, 14.0),
+                28.0 - offset(self.height, 15.0),
+            ],
+            radius: 12.0,
+        }
     }
 
     /// Decode an avatar payload. Returns `None` for anything malformed —
@@ -216,7 +226,11 @@ mod tests {
 
     #[test]
     fn head_anchor_ignores_painted_bounds() {
-        let mut art = Avatar { width: 48, height: 48, pixels: vec![None; 48*48] };
+        let mut art = Avatar {
+            width: 48,
+            height: 48,
+            pixels: vec![None; 48 * 48],
+        };
         let layout = art.head_layout();
         art.pixels[0] = Some([255, 0, 0]); // a hat at the edge must not move the head
         assert_eq!(layout, art.head_layout());

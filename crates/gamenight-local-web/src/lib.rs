@@ -352,7 +352,10 @@ async fn save_profile(
 ) -> Result<Json<Profile>, StatusCode> {
     let mut state = state.lock().unwrap();
     if state.memory.profiles.contains_key(&profile.id) {
-        state.memory.set(&profile, true).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        state
+            .memory
+            .set(&profile, true)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     }
     state.profiles.insert(profile.id.clone(), profile.clone());
     Ok(Json(profile))
@@ -452,7 +455,9 @@ async fn join_session_inner(
             };
             let mut target = seat_target.or(req.claim);
             if let Some(target) = target {
-                if !existing.contains(&target) { return Err(StatusCode::NOT_FOUND); }
+                if !existing.contains(&target) {
+                    return Err(StatusCode::NOT_FOUND);
+                }
                 let revision = state
                     .lock()
                     .unwrap()
@@ -561,7 +566,8 @@ async fn join_session_inner(
 
             if let Some(pid) = player_id {
                 daemon::wait_for_profile(&mut ws_stream, pid, &profile)
-                    .await.map_err(StatusCode::from)?;
+                    .await
+                    .map_err(StatusCode::from)?;
                 state.lock().unwrap().bindings.insert(id.clone(), pid);
             }
 

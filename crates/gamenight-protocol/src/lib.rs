@@ -681,7 +681,9 @@ pub struct ControllerState {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
     /// Only the authenticated lobby may publish physical input.
-    ControllerFrame { controllers: Vec<ControllerState> },
+    ControllerFrame {
+        controllers: Vec<ControllerState>,
+    },
     /// Opt into presence and live roster notifications for this prepared session.
     Participation {
         session: SessionId,
@@ -871,7 +873,9 @@ pub enum ClientMessage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
     /// Full controller snapshot, including neutral/released state.
-    ControllerFrame { controllers: Vec<ControllerState> },
+    ControllerFrame {
+        controllers: Vec<ControllerState>,
+    },
     /// Full authoritative roster/presence for an opted-in session. Apply without
     /// resetting the match. Unknown fields/messages remain optional for old games.
     PartyUpdated {
