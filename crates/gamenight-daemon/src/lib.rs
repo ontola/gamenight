@@ -1216,15 +1216,15 @@ fn controller_frames_only_accept_unique_host_devices_from_lobby() {
     };
     assert!(valid_controller_frame(
         &Registration::Game(GameId::new("lobby")),
-        &[frame.clone()]
+        std::slice::from_ref(&frame)
     ));
     assert!(!valid_controller_frame(
         &Registration::Game(GameId::new("blast-party")),
-        &[frame.clone()]
+        std::slice::from_ref(&frame)
     ));
     assert!(!valid_controller_frame(
         &Registration::Overlay(0),
-        &[frame.clone()]
+        std::slice::from_ref(&frame)
     ));
     assert!(!valid_controller_frame(
         &Registration::Game(GameId::new("lobby")),

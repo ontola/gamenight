@@ -120,13 +120,24 @@ async fn daemon_launches_the_games_itself() {
     assert!(snap.connected_games.contains(&GameId::new("alpha")));
 
     // Queue "beta": the daemon spawns its process too and it warms behind
-    // alpha. No voters are seated, so when alpha's 1s match ends the night
-    // auto-rolls into beta.
+    // alpha. Round completion does not switch games; the player chooses Next.
     overlay
         .send(ClientMessage::PlayNext {
             game: GameId::new("beta"),
         })
         .await;
+    let prepared = tokio::time::timeout(
+        std::time::Duration::from_secs(15),
+        overlay.wait_for(|p| {
+            p.warm_session
+                .as_ref()
+                .is_some_and(|s| s.game == GameId::new("beta") && s.phase == SessionPhase::Ready)
+        }),
+    )
+    .await
+    .expect("beta never prepared");
+    assert_eq!(prepared.active_session.unwrap().game, GameId::new("alpha"));
+    overlay.send(ClientMessage::Next).await;
     let snap = tokio::time::timeout(
         std::time::Duration::from_secs(15),
         overlay.wait_for(|p| {
@@ -137,7 +148,7 @@ async fn daemon_launches_the_games_itself() {
         }),
     )
     .await
-    .expect("beta never took over after alpha finished");
+    .expect("beta never took over after explicit Next");
     assert!(snap.connected_games.contains(&GameId::new("beta")));
 }
 
