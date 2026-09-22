@@ -33,6 +33,8 @@ class Game:
         self.file = folder / f'{tag}.json'
         self.stop_input = threading.Event()
         self.send_lock = threading.Lock()
+        self.messages = []
+        self.command_id = 0
         self.log = open(folder / f'{tag}.log', 'wb')
         self.server = socket.socket()
         self.server.bind(('127.0.0.1', 0))
@@ -49,7 +51,18 @@ class Game:
             self.stream = self.peer.makefile('rwb', buffering=0)
             hello = json.loads(self.stream.readline())
             assert hello['type'] == 'hello' and hello['token'] == 'probe'
+            self.peer.settimeout(None)
             self.send('welcome', protocol_version=1)
+            # A real host drains the game's output. Leaving participation and
+            # activity unread can keep Windows TCP shutdown from completing.
+            def receive():
+                try:
+                    while line := self.stream.readline():
+                        self.messages.append(json.loads(line))
+                except (OSError, ValueError):
+                    pass
+            self.reader = threading.Thread(target=receive, daemon=True)
+            self.reader.start()
             def stream_input():
                 while not self.stop_input.wait(.04):
                     try:
@@ -67,6 +80,23 @@ class Game:
         with self.send_lock:
             self.stream.write((json.dumps(dict(type=kind, session='probe-session', **values))+'\n').encode())
 
+    def command(self, **values):
+        self.command_id += 1
+        target = self.file.with_suffix('.command')
+        temporary = target.with_suffix('.tmp')
+        temporary.write_text(json.dumps(dict(sequence=self.command_id, **values)), encoding='utf-8')
+        # Windows cannot replace a file during the renderer's brief read.
+        deadline = time.monotonic() + 2
+        while True:
+            try:
+                temporary.replace(target)
+                break
+            except PermissionError:
+                if time.monotonic() >= deadline:
+                    raise
+                time.sleep(.01)
+        return wait_until(self.read, lambda s: s.get('command') == self.command_id)
+
     def read(self):
         return json.loads(self.file.read_text())
 
@@ -79,6 +109,7 @@ class Game:
         if getattr(self, 'peer', None):
             try: self.peer.shutdown(socket.SHUT_RDWR)
             except OSError: pass
+        if getattr(self, 'reader', None): self.reader.join(timeout=2)
         for name in ('stream', 'peer', 'server'):
             obj = getattr(self, name, None)
             if obj:
@@ -87,8 +118,11 @@ class Game:
             self.child.wait(timeout=6)
         except subprocess.TimeoutExpired:
             self.forced_exit = True
-            self.log.write(('TIMEOUT '+self.file.read_text()+'\n').encode())
-            self.child.kill()
+            self.log.write(('TIMEOUT '+(self.file.read_text() if self.file.exists() else 'No observations')+'\n').encode())
+            if os.name == 'nt':
+                subprocess.run(['taskkill', '/PID', str(self.child.pid), '/T', '/F'], capture_output=True)
+            else:
+                self.child.kill()
             self.child.wait()
         self.log.close()
 
@@ -114,11 +148,17 @@ def check(love, artifact, output):
                 games.append(g)
                 g.send('prepare', game=artifact.stem, players=players, seats=seats)
                 ready = g.phase('ready')
+                observations[tag + '_ready'] = ready
+                assert ready['rendered']['colors'], 'No prepared frame was rendered'
+                assert ready['steps'] == 0, 'Simulation advanced during preload'
                 assert not ready['visible'] and ready['audio'] == 0, 'Preloading was visible or audible'
+            verdict('presentation.prewarm', True, 'Both native windows hidden and audio silent after preparing an actual frame')
             first, second = games
+            started = time.monotonic()
             first.send('start')
             sample = wait_until(first.read, lambda s: s['phase']=='running' and s['steps']>90)
             observations['initial'] = sample
+            verdict('gameplay.start', sample['visible'] and time.monotonic()-started < 12, 'Start presents gameplay and advances the simulation within 12 seconds on the test renderer')
             def borderless(snapshot):
                 w = snapshot['window']
                 assert not w['flags']['fullscreen'] and w['flags']['borderless'], 'Game entered fullscreen display mode or has window borders'
@@ -152,6 +192,11 @@ def check(love, artifact, output):
             verdict('input.identity', len(actual)==2 and [p.get('controller') for p in actual]==['ordinal:2','ordinal:7']
                     and len(inputs)==2 and direction(inputs[0])>0 and direction(inputs[1])<0,
                     'Sparse host IDs retain profile ownership and consumed game inputs, independent of SDL enumeration')
+            # Exercise the actual key event path, including held/repeated
+            # presses and the press delivered again when focus returns.
+            time.sleep(1.1)
+            first.command(back=True, held=False)
+            wait_until(lambda: first.messages, lambda ms: sum(m.get('type')=='request_overlay' for m in ms)==1)
             first.send('pause')
             paused = first.phase('paused')
             time.sleep(.15)
@@ -159,12 +204,28 @@ def check(love, artifact, output):
             second.send('start')
             active = wait_until(second.read, lambda s: s['phase']=='running' and s['steps']>90)
             old = first.read()
-            assert not old['visible'] and old['audio']==0 and old['steps']==paused['steps'], 'Old game kept running/visible/audible'
+            observations['paused'] = dict(before=paused, after=old)
+            assert not old['visible'] and old['audio']==0 and old['steps']==paused['steps'] and old['remaining']==paused['remaining'], 'Old game kept running/visible/audible'
+            verdict('gameplay.pause', True, 'Hidden and silent; simulation steps unchanged while the second game runs')
             assert active['visible'], 'New game did not become visible'
             second.send('pause')
             second.phase('paused')
             first.send('resume')
-            wait_until(first.read, lambda s: s['phase']=='running' and s['visible'] and s['steps']>old['steps'])
+            resumed = wait_until(first.read, lambda s: s['phase']=='running' and s['visible'] and s['steps']>old['steps'])
+            assert resumed['players'] == old['players'] and resumed['remaining'] <= old['remaining'], 'Resume reset the roster or round timer'
+            observations['resumed'] = resumed
+            verdict('gameplay.resume', True, 'Same players retained and simulation advances after Resume')
+            first.command(back=True, held=True)
+            time.sleep(1.1)
+            first.command(back=True, held=True)
+            time.sleep(.15)
+            assert sum(m.get('type')=='request_overlay' for m in first.messages)==1, 'Held or focus-return Back bounced into lobby'
+            first.command(held=False)
+            time.sleep(1.1)
+            first.command(back=True, held=False)
+            wait_until(lambda: first.messages, lambda ms: sum(m.get('type')=='request_overlay' for m in ms)==2)
+            observations['back_requests'] = [m for m in first.messages if m.get('type')=='request_overlay']
+            verdict('input.back', True, 'Actual key handler: fresh press accepted; resumed/held presses rejected; released press accepted')
             assert not second.read()['visible'] and second.read()['audio']==0
             # Exercise repeated resumes, including rendering after each hide.
             for _ in range(5):
@@ -174,6 +235,16 @@ def check(love, artifact, output):
                 resumed = wait_until(first.read, lambda s: s['phase']=='running' and s['visible'])
                 borderless(resumed)
             observations['borderless_resumes'] = 5
+            if artifact.stem == 'volley-trouble':
+                # Volley deliberately shows names only on its score screen.
+                # Render each winning side through the normal game renderer.
+                for winner in (1, 2):
+                    first.command(winner=winner)
+                    wait_until(first.read, lambda s: any(players[winner-1]['name'] in t for t in s['rendered']['text']))
+                names = first.read()
+                observations['results_names'] = names
+                verdict('profile.identity', carried('name') and all(any(p['name'] in t for t in names['rendered']['text']) for p in players),
+                        'Updated names retained in state and drawn on both winning-side result screens')
             first.send('dispose')
             disposed = first.phase('idle')
             assert not disposed['players'] and not disposed['visible'] and disposed['audio']==0
@@ -188,7 +259,8 @@ def check(love, artifact, output):
                 verdict('gameplay.switch', False, 'Process failed to exit cleanly after host disconnection: ' + str([(g.child.returncode, getattr(g, 'forced_exit', False)) for g in games]))
             for logfile in [*folder.glob('*.log'), *folder.glob('*.error')]:
                 (output / f'{artifact.stem}.{logfile.name}').write_bytes(logfile.read_bytes())
-    for feature in ('profile.identity','profile.colors','profile.face','input.identity','gameplay.switch'):
+    for feature in ('profile.identity','profile.colors','profile.face','input.identity','gameplay.switch',
+                    'presentation.prewarm','gameplay.start','gameplay.pause','gameplay.resume','input.back'):
         results.setdefault(feature, dict(status='failed',detail='Execution did not reach the observation'))
     (output / f'{artifact.stem}.observations.json').write_text(json.dumps(observations,indent=2)+'\n')
     return results

@@ -10,7 +10,10 @@ permissions:
 jobs:
   games:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      ALSOFT_DRIVERS: "null"
+      GALLIUM_DRIVER: llvmpipe
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -22,6 +25,17 @@ jobs:
           Invoke-WebRequest 'https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip' -OutFile $archive
           if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'BA6E56BE2685E53C817749C4A5007F51137136FE5A3AB64920508BABC2E74369') { throw 'LÖVE checksum mismatch' }
           Expand-Archive $archive (Join-Path $env:RUNNER_TEMP 'love')
+      # Hosted Windows runners only expose OpenGL 1.1. Install Mesa beside
+      # the test runtime, never in the game packages or desktop installer.
+      - name: Install pinned software OpenGL for native window tests
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'mesa.7z'
+          Invoke-WebRequest 'https://github.com/pal1000/mesa-dist-win/releases/download/26.2.0/mesa3d-26.2.0-release-msvc.7z' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne 'DCB2719EF346DAB5B609FCB193A5F13CFC4B0502E3F4DE1AD43D349477402F47') { throw 'Mesa checksum mismatch' }
+          & 7z x $archive "-o$env:RUNNER_TEMP/mesa" -y
+          if ($LASTEXITCODE -ne 0) { throw 'Mesa extraction failed' }
+          Copy-Item "$env:RUNNER_TEMP/mesa/x64/*.dll" "$env:RUNNER_TEMP/love/love-11.5-win64/"
       - name: Simulation and lifecycle tests
         shell: pwsh
         run: |

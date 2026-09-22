@@ -25,8 +25,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/joepio/pinpals/archive/95ea42fe544cf3906c90aeb556359180964c1e88.zip",
-      "sha256": "b574829c2d1fac531fa73c4b13e7aba0758bd067f74c4651de01e75870e6e0f5",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/pinpals.love",
+      "sha256": "d3796619e6ef245e94243684bd85dedadb0d164cfbec9bd0e41a74adb4d5a87c",
       "entrypoint": "pinpals-95ea42fe544cf3906c90aeb556359180964c1e88/main.lua",
       "runtime": {
         "id": "love-11-5",

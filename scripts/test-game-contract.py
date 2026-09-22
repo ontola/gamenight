@@ -102,6 +102,27 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(report['games'][0]['checks']['pause']['status'],'untested')
         self.assertIsNone(report['games'][0]['artifact_sha256'])
 
+    def test_host_and_example_inventory_are_not_game_releases(self):
+        policies={'version':1,'games':{'lobby':{'role':'host'},'demo':{'role':'example'}}}
+        self.entries.extend([{'id':'lobby','title':'Lobby'}, {'id':'demo','title':'Demo'}])
+        extras=m.new_report(self.entries[1:],self.rules,'sha','windows')['games']
+        self.report['games'].extend(extras)
+        self.report['policies']=policies
+        self.assertEqual(m.release_errors(self.report,self.entries,self.rules,'sha','windows',self.output,self.pack,policies),[])
+        self.assertEqual(extras[0]['checks']['pause']['status'],'untested')
+
+    def test_other_platform_inventory_does_not_claim_windows_certification(self):
+        entry={'id':'mac-game','title':'Mac game','downloads':{'mac':{'sha256':'a'*64}}}
+        self.entries.append(entry)
+        self.report['games'].extend(m.new_report([entry],self.rules,'sha','windows')['games'])
+        self.assertEqual(self.errors(),[])
+        entry['downloads']['windows']={'sha256':'b'*64}
+        self.assertTrue(self.errors())
+
+    def test_extra_package_or_missing_platform_game_blocks_release(self):
+        (self.pack/'extra.love').write_bytes(b'unverified')
+        self.assertTrue(self.errors())
+
     def test_missing_executable_is_failed_with_evidence(self):
         log=self.output/'missing.log'
         self.assertFalse(m.run_check([str(self.root/'missing')],{},log))

@@ -4,6 +4,7 @@ local path=os.getenv("GNLOVE_PROBE_FILE")
 if not path then
   function P.install() end
   function P.step() end
+  function P.commands() end
   function P.observe() end
   return P
 end
@@ -19,7 +20,7 @@ function P.install()
       isGamepadDown=function(_,key) return index==1 and (key=="a" or key=="leftshoulder") or index==2 and (key=="b" or key=="rightshoulder") end}
   end
   if os.getenv("GNLOVE_PROBE_HOST_INPUT") ~= "1" then P.devices=pads end
-  love.keyboard.isDown=function() return false end
+  love.keyboard.isDown=function(key) return P.held == true and key == "escape" end
   if not love.graphics then return end
   local avatar=require("games.volley.avatar")
   local make=avatar.image
@@ -54,7 +55,23 @@ function P.step(inputs)
   P.steps=P.steps+1
   P.inputs=inputs
 end
-function P.observe(phase,state)
+  -- Test commands enter the real event/render paths; no protocol messages
+-- or pass verdicts are synthesized. Only enabled with a probe file.
+function P.commands(mode, state)
+  local f=io.open(path:gsub("%.json$", ".command"),"r")
+  if not f then return end
+  local raw=f:read("*a"); f:close()
+  local ok,c=pcall(json.decode,raw)
+  if not ok or c.sequence==P.command then return end
+  P.command=c.sequence
+  if c.held~=nil then P.held=c.held end
+  if c.back then love.event.push("keypressed","escape","escape",false) end
+  if c.winner and mode.id=="volley-trouble" and state then
+    mode.finish(state)
+    state.winner=c.winner
+  end
+end
+function P.observe(phase,state,remaining)
   local now=love.timer.getTime()
   if P.lastPhase==phase and P.lastWrite and now-P.lastWrite<.05 then return end
   P.lastPhase,P.lastWrite=phase,now
@@ -69,7 +86,7 @@ function P.observe(phase,state)
   if love.window then width,height,flags=love.window.getMode() end
   local desktopWidth,desktopHeight
   if love.window then desktopWidth,desktopHeight=love.window.getDesktopDimensions() end
-  local snapshot={presentation=require("shared.window").presentation,window={width=width,height=height,flags=flags,desktopWidth=desktopWidth,desktopHeight=desktopHeight},frames=P.frames,phase=phase,players=players,steps=P.steps,inputs=P.inputs,rendered=P.rendered,
+  local snapshot={remaining=remaining,command=P.command,presentation=require("shared.window").presentation,window={width=width,height=height,flags=flags,desktopWidth=desktopWidth,desktopHeight=desktopHeight},frames=P.frames,phase=phase,players=players,steps=P.steps,inputs=P.inputs,rendered=P.rendered,
     visible=love.window and love.window.isVisible() or false,
     audio=love.audio and love.audio.getActiveSourceCount() or 0}
   local encoded=json.encode(snapshot)

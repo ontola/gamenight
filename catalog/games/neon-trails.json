@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://gamenight.ontola.io/games/379829a583877aef8f33c5d069610d0ef694f3f9d0a5d24a7af054108d2aa4c2/neon-trails.love",
-      "sha256": "379829a583877aef8f33c5d069610d0ef694f3f9d0a5d24a7af054108d2aa4c2",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-trails.love",
+      "sha256": "d2a4f02812cd199c911148a08630d9876893fbfc3c3570da3289bc21ef07a2bb",
       "entrypoint": "neon-trails.love",
       "runtime": {
         "id": "love-11-5",

@@ -30,8 +30,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://gamenight.ontola.io/games/c6f0b01659c3492e75c1b7be9e70daa9fb0699c689a10e725eb6bd1df0c652c0/stack-together.love",
-      "sha256": "c6f0b01659c3492e75c1b7be9e70daa9fb0699c689a10e725eb6bd1df0c652c0",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/stack-together.love",
+      "sha256": "4810489de0331cae1f7b25699a823406d3d428e6eaf527ffc6381eb1967c1671",
       "entrypoint": "stack-together.love",
       "runtime": {
         "id": "love-11-5",

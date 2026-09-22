@@ -27,8 +27,11 @@ Protocol subchecks are included individually. Skipped subchecks remain untested.
 The protocol pause check only observes host state. It does **not** prove simulation
 or audio paused. First-frame rendering does **not** prove prewarming or correct
 player artwork. The instrumented `scripts/test-love-integration.py` runner also observes live
-names, colours and avatar draw calls, synthetic host controller ownership, and
-native process switching/cleanup. Its feature results can fail independently.
+names, colours and avatar draw calls, synthetic host controller ownership,
+hidden/silent preload, gameplay start, frozen simulation while paused, resume,
+Back press/release debounce through the real event handler, and native process
+switching/cleanup. Volley names are checked on its winning-side score screens,
+where the game actually displays them. Its feature results can fail independently.
 Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
 
@@ -57,7 +60,12 @@ The LÖVE workflow runs on every main push and PR, including protocol, SDK, host
 catalog and test changes. It uploads Windows evidence and puts the matrix in the
 Actions summary. The main workflow tests the gate and publishes the full catalog
 inventory. The Linux render smoke test is separate; a Windows pass is never reused
-as Linux or macOS proof.
+as Linux or macOS proof. Windows CI installs checksum-pinned Mesa beside its test
+runtime because hosted runners expose only OpenGL 1.1. OpenAL uses its null output
+device in CI; source playback and muting are observed, not speaker audibility.
+Neither test driver is shipped in the installer. The synthetic host drains game
+replies, as the production daemon does, and kills its own process tree on timeout
+while retaining failure logs.
 
 The Windows publication workflow calls the same LÖVE workflow at the same revision,
 downloads that run's packages and evidence, and runs the strict gate **before**
@@ -66,9 +74,12 @@ features are untested. Publication fails on any missing game, required untested
 feature, failed mandatory/claimed check, stale commit, wrong platform, changed requirements, changed
 package, or missing/modified evidence. There is no override for a catalog label.
 
-**Current intentional consequence:** publication is blocked. We do not yet have
-complete executable evidence for the entire catalog and all mandatory requirements.
-This is exposed work, not a reason to silently mark those rows successful.
+The matrix covers the whole catalog. The Windows game release gate covers every
+playable Windows catalog game, and requires an exact package match. The lobby
+(host) and SDK example have explicit roles in `game-policies.json`; they are not
+game downloads. A macOS-only download is not certified by a Windows run. These
+rows remain untested, with no Windows rating credit. A new Windows game, missing
+package, or extra unverified package still blocks publication.
 
 ## Extending coverage
 

@@ -92,7 +92,8 @@ def run_games(report, pack, love, certifier, output):
         except (OSError, ValueError, KeyError):
             checks = {}
         observation = observed / (artifact.stem + '.observations.json')
-        for feature in ('profile.identity', 'profile.colors', 'profile.face', 'input.identity', 'gameplay.switch'):
+        for feature in ('profile.identity', 'profile.colors', 'profile.face', 'input.identity', 'gameplay.switch',
+                        'presentation.prewarm', 'gameplay.start', 'gameplay.pause', 'gameplay.resume', 'input.back'):
             result = checks.get(feature, {})
             passed = result.get('status') == 'passed' and observation.is_file()
             refs = [evidence(probe_log, output)]
@@ -137,6 +138,19 @@ def write_report(report, output):
     (output/'matrix.md').write_text('\n'.join(lines), encoding='utf-8')
 
 
+def release_game(entry, os_name, policies):
+    # The inventory also contains the host, SDK example and games for other
+    # operating systems. They remain untested in the matrix, not certified by
+    # a Windows game-pack release. Missing downloads are NOT an exemption.
+    role = policies.get('games', {}).get(entry['id'], {}).get('role', 'game')
+    if role not in ('game', 'host', 'example'):
+        raise ValueError(f"Unknown release role for {entry['id']}: {role}")
+    if role != 'game':
+        return False
+    downloads = entry.get('downloads', {})
+    return not downloads or os_name in downloads
+
+
 def release_errors(report, entries, requirements, commit, os_name, output, pack, policies=None):
     errors = []
     policies = policies or {"version":1,"games":{}}
@@ -157,7 +171,16 @@ def release_errors(report, entries, requirements, commit, os_name, output, pack,
     if len(games) != len(rows) or set(games) != {e['id'] for e in entries}:
         errors.append('Catalog coverage is incomplete or duplicated')
     entries_by_id = {e['id']: e for e in entries}
+    expected = {e['id'] for e in entries if release_game(e, os_name, policies)}
+    if not expected:
+        errors.append('Release contains no games for this platform')
+    packaged = {p.stem for p in pack.glob('*.love')}
+    if packaged != expected:
+        errors.append('Release package coverage differs from platform catalog: ' + str(sorted(packaged ^ expected)))
     for game in rows:
+        entry = entries_by_id.get(game['id'], {})
+        if entry and not release_game(entry, os_name, policies):
+            continue
         download = entries_by_id.get(game['id'], {}).get('downloads', {}).get(os_name, {})
         if download.get('sha256') and download['sha256'].lower() != game.get('artifact_sha256'):
             errors.append(f"{game['id']}: tested artifact differs from catalog download")

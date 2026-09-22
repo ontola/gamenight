@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://gamenight.ontola.io/games/8e8cf58f47969a20cff7eb795740d0877e43346f934dcc31a193c9c97ec28c7c/neon-siege.love",
-      "sha256": "8e8cf58f47969a20cff7eb795740d0877e43346f934dcc31a193c9c97ec28c7c",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-siege.love",
+      "sha256": "cdd6240aea5e1e9b4602f660e3c7e0cdacabd4e12c14f24c4afe87ec7cb7f303",
       "entrypoint": "neon-siege.love",
       "runtime": {
         "id": "love-11-5",

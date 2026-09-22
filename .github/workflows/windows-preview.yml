@@ -123,4 +123,5 @@ jobs:
         run: |
           args=(--draft --title "GameNight $RELEASE_VERSION" --target "$GITHUB_SHA" --generate-notes)
           if [ "$RELEASE_CHANNEL" = preview ]; then args+=(--prerelease); fi
-          gh release create "v$RELEASE_VERSION" release/* "${args[@]}"
+          tar -czf release/game-contract-windows.tar.gz -C evidence .
+          gh release create "v$RELEASE_VERSION" release/* games/*.love "${args[@]}"

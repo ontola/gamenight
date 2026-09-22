@@ -11,7 +11,8 @@
     },
     "demo-game": {
       "first_party": true,
-      "claims": []
+      "claims": [],
+      "role": "example"
     },
     "growing-guns": {
       "first_party": true,
@@ -19,7 +20,8 @@
     },
     "lobby": {
       "first_party": true,
-      "claims": []
+      "claims": [],
+      "role": "host"
     },
     "neon-siege": {
       "first_party": true,

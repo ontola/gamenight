@@ -31,8 +31,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://gamenight.ontola.io/games/c61aca586a1c21a8cd59770b170f78a36e59c25cdaddee95bc7cf6889081bf2e/volley-trouble.love",
-      "sha256": "c61aca586a1c21a8cd59770b170f78a36e59c25cdaddee95bc7cf6889081bf2e",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/volley-trouble.love",
+      "sha256": "9e15f504477182080d7e65f1860c53bf887ee11c9b69f6eec83a2ac190830166",
       "entrypoint": "volley-trouble.love",
       "runtime": {
         "id": "love-11-5",
