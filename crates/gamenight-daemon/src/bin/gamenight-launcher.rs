@@ -75,6 +75,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env_remove("GAMENIGHT_NO_PREWARM")
         .env("GAMENIGHT_EXIT_WITH_LOBBY", "1")
         .env("GAMENIGHT_STARTUP_GATE", "1")
+        .env("GAMENIGHT_WEB", "1")
         .stdin(Stdio::piped())
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(local.join("daemon.log"))?)
@@ -84,7 +85,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         "GAMENIGHT_GAME_ID",
         "GAMENIGHT_TOKEN",
         "GAMENIGHT_NO_LOBBY_WATCH",
-        "GAMENIGHT_WEB",
     ] {
         command.env_remove(key);
     }

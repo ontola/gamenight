@@ -3,8 +3,6 @@ import argparse
 import json
 import os
 import subprocess
-import time
-import urllib.request
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
@@ -15,8 +13,12 @@ app = args.app.resolve()
 output = args.output.resolve()
 output.mkdir(parents=True)
 shot = output / "lobby.png"
+memory = output / "test-players.json"
+memory.write_text(json.dumps({"device": "macos-package-test", "profiles": {
+    "mac-test": {"id": "mac-test", "username": "Mac Test", "skin_color": "#dba57a", "avatar": ""}
+}}))
 env = dict(os.environ, GAMENIGHT_DATA_DIR=str(output / "data"),
-           LOBBY_SHOT=str(shot), LOBBY_SHOT_AFTER="18", RUST_BACKTRACE="1")
+           GAMENIGHT_PLAYER_MEMORY=str(memory), LOBBY_SHOT=str(shot), LOBBY_SHOT_AFTER="18", RUST_BACKTRACE="1")
 with (output / "launcher.log").open("w") as log:
     process = subprocess.Popen([str(app / "Contents/MacOS/GameNight"), "17912"],
                                cwd=output, env=env, stdout=log, stderr=log, start_new_session=True)

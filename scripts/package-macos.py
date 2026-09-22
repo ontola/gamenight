@@ -17,7 +17,7 @@ def plist(name, identifier, version, background=False):
                 NSBluetoothAlwaysUsageDescription="Connect controllers to GameNight.")
 
 
-def package(repo, binaries, output, version, binary_revision=None):
+def package(repo, binaries, output, version, binary_revision=None, lobby_revision=None):
     app = output / "GameNight.app"
     contents = app / "Contents"
     resources = contents / "Resources"
@@ -60,7 +60,7 @@ def package(repo, binaries, output, version, binary_revision=None):
                 hashes[relative.as_posix()] = digest
     revision = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
     (resources / "build.json").write_text(json.dumps({"commit": revision, "version": version,
-                                                    "binary_commit": binary_revision or revision, "assets": hashes}, indent=2) + "\n", encoding="utf-8")
+                                                    "binary_commit": binary_revision or revision, "lobby_commit": lobby_revision or binary_revision or revision, "assets": hashes}, indent=2) + "\n", encoding="utf-8")
     return app
 
 
@@ -70,9 +70,10 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--binary-revision")
+    parser.add_argument("--lobby-revision")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
-    app = package(repo, args.binaries, args.output, args.version, args.binary_revision)
+    app = package(repo, args.binaries, args.output, args.version, args.binary_revision, args.lobby_revision)
     iconset = args.output / "GameNight.iconset"
     iconset.mkdir()
     for size in [16, 32, 128, 256, 512]:
