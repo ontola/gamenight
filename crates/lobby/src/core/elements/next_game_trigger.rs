@@ -214,7 +214,7 @@ fn update(
         }
         let enabled = [
             button != crate::gamenight::TvButton::Disabled,
-            bridge.next_game_is_ready(),
+            bridge.can_play_next_game(),
             bridge.can_skip_next_game(),
         ];
         trigger.press=(trigger.press-dt*4.).max(0.);

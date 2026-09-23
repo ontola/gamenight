@@ -525,13 +525,20 @@ fn spawn_install_progress_pump(
             if status.state == gamenight_protocol::InstallState::Installed {
                 if let Some(meta) = resolve_installed_meta(&catalog_dir, &root, &status.game).await
                 {
-                    info!(game = %status.game, "background install joined the shelf");
                     let mut s = shared.lock().await;
-                    if let Some(launch) = &meta.launch {
-                        s.launch_specs.insert(meta.id.clone(), launch.clone());
+                    // An explicit shelf entry belongs to this running host. A
+                    // background catalogue refresh must not replace its launch
+                    // command with a different build while people are playing.
+                    if s.launch_specs.contains_key(&meta.id) {
+                        info!(game = %status.game, "background install kept explicit shelf entry");
+                    } else {
+                        info!(game = %status.game, "background install joined the shelf");
+                        if let Some(launch) = &meta.launch {
+                            s.launch_specs.insert(meta.id.clone(), launch.clone());
+                        }
+                        let fx = s.night.add_to_library(meta);
+                        s.apply_effects(fx, None);
                     }
-                    let fx = s.night.add_to_library(meta);
-                    s.apply_effects(fx, None);
                 }
             }
             let mut s = shared.lock().await;

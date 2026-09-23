@@ -275,13 +275,14 @@ impl GameNightBridge {
         match self.next_game_status() {
             NextGameStatus::Live { .. } => TvButton::Back,
             NextGameStatus::Ready(_) => TvButton::Play,
+            NextGameStatus::Loading(_, _) if self.can_play_next_game() => TvButton::Play,
 
             _ => TvButton::Disabled,
         }
     }
 
     /// Press it. Nothing happens when it's disabled — see `TvButton`.
-    pub fn press_tv_button(&self) {
+    pub fn press_tv_button(&mut self) {
         match self.tv_button() {
             // Back into the game they stepped out of. `CloseOverlay` rather
             // than `Resume` because the overlay is *why* it paused: the lobby
@@ -297,10 +298,8 @@ impl GameNightBridge {
 
     /// Whether the game on the TV can start this instant.
     ///
-    /// The pad in front of the TV is disabled until this is true. Starting a
-    /// game that hasn't finished warming isn't faster — the daemon holds the
-    /// transition until it's ready anyway — it just hands the party a frozen
-    /// lobby and no explanation, which reads as a crash.
+    /// Whether the warm session has actually reported Ready. The play control
+    /// may accept an earlier request; the host starts it once preparation ends.
     pub fn next_game_is_ready(&self) -> bool {
         matches!(self.upcoming_game_status(), NextGameStatus::Ready(_))
     }
@@ -327,12 +326,17 @@ impl GameNightBridge {
     fn flush_skip(&mut self, now: std::time::Instant) {
         let Some((game, tapped)) = self.optimistic_next.as_ref() else { return; };
         if self.skip_pending && now.saturating_duration_since(*tapped) >= Duration::from_millis(400) {
-            if self.join_tx.try_send(ClientMessage::QueueNext { game: game.clone() }).is_ok() {
-                self.skip_pending = false;
-            } else {
-                self.optimistic_next = None;
-                self.skip_pending = false;
-            }
+            self.submit_skip(game.clone());
+        }
+    }
+
+    fn submit_skip(&mut self, game: GameId) -> bool {
+        self.skip_pending = false;
+        if self.join_tx.try_send(ClientMessage::QueueNext { game }).is_ok() {
+            true
+        } else {
+            self.optimistic_next = None;
+            false
         }
     }
 
@@ -410,10 +414,20 @@ impl GameNightBridge {
         self.upcoming_game_status()
     }
 
-    pub fn play_next_game(&self) {
-        if self.next_game_is_ready() {
-            let _ = self.join_tx.try_send(ClientMessage::Next);
+    pub fn can_play_next_game(&self) -> bool {
+        self.optimistic_game().is_some() || self.latest_warm.is_some() || self.latest_warming.is_some()
+    }
+
+    pub fn play_next_game(&mut self) {
+        if !self.can_play_next_game() { return; }
+        // A quick Skip then Play must select the cover the player can see,
+        // even while the skip debounce is still waiting. The host queues both
+        // commands in order and completes Next when that game reports Ready.
+        if self.skip_pending {
+            let Some(game) = self.optimistic_game().cloned() else { return; };
+            if !self.submit_skip(game) { return; }
         }
+        let _ = self.join_tx.try_send(ClientMessage::Next);
     }
 
     pub fn can_skip_next_game(&self) -> bool {
@@ -4302,15 +4316,13 @@ mod next_game_status_tests {
         bridge.press_tv_button();
         assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
         bridge.latest_warm = Some(session("quad", SessionPhase::Preparing));
-        assert_eq!(bridge.tv_button(), TvButton::Disabled);
+        assert_eq!(bridge.tv_button(), TvButton::Play);
         bridge.press_tv_button();
-        assert!(commands.try_recv().is_err());
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
 
         bridge.play_next_game();
-        assert!(
-            commands.try_recv().is_err(),
-            "loading games cannot be started"
-        );
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next),
+            "the host holds Next until the warming game is ready");
         bridge.active_session = Some(session("duo", SessionPhase::Paused));
         bridge.latest_playlist.pop();
         bridge.skip_next_game();
@@ -4318,6 +4330,12 @@ mod next_game_status_tests {
             commands.try_recv().is_err(),
             "skip must not replay the current game"
         );
+        bridge.latest_playlist.push(entry("third", "Third"));
+        bridge.skip_next_game();
+        let selected = bridge.optimistic_game().cloned().expect("selected next game");
+        bridge.play_next_game();
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::QueueNext { game } if game == selected));
+        assert!(matches!(commands.try_recv().unwrap(), ClientMessage::Next));
     }
 
     /// Mirrors `next_game_status` without a live bridge (which owns channels):
