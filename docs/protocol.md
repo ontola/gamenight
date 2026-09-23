@@ -6,8 +6,8 @@ a GameNight game or overlay — Godot, Unity, Bevy, a shell script, a browser.
 
 This document is the formal wire reference. **If you're integrating a game,
 start with [Integrating your game](integrating-your-game.md)** — it walks the
-lifecycle in build order, with the rules of thumb, a test checklist, and a
-complete dependency-free example. The canonical type definitions live in
+lifecycle in build order and links the checks and runnable examples. The
+canonical type definitions live in
 [`crates/gamenight-protocol`](../crates/gamenight-protocol/src/lib.rs).
 
 ## Transport
@@ -47,11 +47,11 @@ A connection announces itself with its first message, a `hello`:
 
 | role | who | sends | receives |
 |---|---|---|---|
-| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` (optional) | session lifecycle commands, `setting_changed` |
+| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` (optional) | session lifecycle commands, `controller_frame`, `setting_changed` |
 | `overlay` | party UI / controller surface / LLM (via `gamenight-mcp`) | party commands | `party_state` snapshots |
 
 ```json
-{ "type": "hello", "role": "game", "game": "towerfall" }
+{ "type": "hello", "role": "game", "game": "my-game", "token": "<GAMENIGHT_TOKEN>" }
 { "type": "hello", "role": "overlay" }
 ```
 
@@ -100,7 +100,7 @@ hang it off — so it carries just the flag:
 {
   "type": "prepare",
   "session": "9be2…",
-  "game": "towerfall",
+  "game": "my-game",
   "seats": [
     { "index": 0, "occupant": { "kind": "local", "player_id": "41af…" } },
     { "index": 1, "occupant": { "kind": "ai" } },
@@ -228,8 +228,8 @@ snapshot), so every screen shows the same thing. The rules:
 
 ```json
 { "type": "set_playlist", "entries": [
-  { "game": "towerfall", "title": "TowerFall" },
-  { "game": "duck-game", "title": "Duck Game" }
+  { "game": "neon-trails", "title": "Neon Trails" },
+  { "game": "neon-siege", "title": "Neon Siege" }
 ] }
 ```
 
@@ -242,21 +242,16 @@ Every state change is broadcast as one snapshot — overlays are dumb renderers:
   "players": [ { "id": "41af…", "name": "Ada" } ],
   "seats": [ ... ],
   "playlist": { "entries": [ ... ], "current": 0 },
-  "active_session": { "id": "9be2…", "game": "towerfall", "phase": "running" },
-  "warm_session":   { "id": "77c1…", "game": "duck-game", "phase": "ready" },
-  "history": [ "towerfall" ],
+  "active_session": { "id": "9be2…", "game": "neon-trails", "phase": "running" },
+  "warm_session":   { "id": "77c1…", "game": "neon-siege", "phase": "ready" },
+  "history": [ "neon-trails" ],
   "vote": { "positions": [ [ "41af…", "next_game" ] ], "decided": null },
   "overlay_open": false,
   "library": [
-    { "id": "towerfall", "title": "TowerFall", "tagline": "Arrows, friends, betrayal.",
-      "color": "#7c5cff", "emoji": "🏹", "players": "2–4" }
+    { "id": "neon-trails", "title": "Neon Trails", "players": "2–4" }
   ],
-  "connected_games": [ "duck-game", "towerfall" ],
-  "settings": [
-    { "game": "towerfall",
-      "specs": [ … ],
-      "values": { "items": false, "stock": 5 } }
-  ],
+  "connected_games": [ "neon-siege", "neon-trails" ],
+  "settings": [],
   "now_playing": { "title": "Hivernale", "artist": "Reynaldo Hahn",
                    "playing": true, "source": "Spotify" }
 } }
@@ -436,18 +431,18 @@ one); reprioritizing only reorders what hasn't started yet.
 ## The night, end to end
 
 ```
-overlay: set_playlist [towerfall, duck-game]
-daemon → towerfall: prepare        (warm the first game)
-towerfall → daemon: ready
-daemon → towerfall: start          (nothing was playing: auto-start)
-daemon → duck-game: prepare        (warm the next one behind it)
-duck-game → daemon: ready          (the party is now skip-proof)
+overlay: set_playlist [neon-trails, neon-siege]
+daemon → neon-trails: prepare      (warm the first game)
+neon-trails → daemon: ready
+daemon → neon-trails: start        (nothing was playing: auto-start)
+daemon → neon-siege: prepare      (warm the next one behind it)
+neon-siege → daemon: ready        (the party is now skip-proof)
 
-towerfall → daemon: finished       (round reported; game shows results and repeats)
+neon-trails → daemon: finished     (round reported; game shows results and repeats)
 players explicitly choose next_game
-daemon → towerfall: dispose
-daemon → duck-game: start          (instant transition)
-daemon → towerfall: prepare        (playlist wraps; warm again)
+daemon → neon-trails: dispose
+daemon → neon-siege: start         (instant transition)
+daemon → neon-trails: prepare      (playlist wraps; warm again)
 ...repeat until someone wins the "quit" vote
 ```
 
@@ -558,6 +553,10 @@ on its authenticated game connection. The daemon forwards it to connected games.
 Only the lobby may publish frames; overlays and other games cannot inject them.
 Each frame contains the full connected-device list, including released buttons.
 
+```json
+{"type":"controller_frame","controllers":[{"controller":"ordinal:0","axes":[16384,0,0,0,0,0],"buttons":1}]}
+```
+
 `controllers` contains `{controller, axes, buttons}` records. `controller` is an
 opaque host token matching `seats[].controller`, not an index into SDL's joystick
 list. The lobby keeps device IDs stable when another controller disconnects.
@@ -569,6 +568,10 @@ The shared LÖVE adapter uses these frames in managed sessions and never matches
 local SDL enumeration against lobby ordinals. Standalone games still read local
 controllers. Frames are sent on change, with a 50 ms heartbeat. After 250 ms
 without input, controls become neutral. TCP_NODELAY is enabled on both hops.
+The Rust SDK exposes each frame as `GameEvent::ControllerFrame`. Use the seat's
+opaque controller token to find its input record; an empty frame or missing
+record means neutral input. `controller_input` reports actual human activity
+for presence and joining. It does not move a game character by itself.
 
 Regression checks: `host_controller_identity_survives_reordering_and_disconnects`
 in the shared Lua suite, the daemon socket test

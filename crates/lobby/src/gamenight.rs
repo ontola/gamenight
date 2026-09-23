@@ -830,6 +830,7 @@ fn gamenight_bridge_system(
             // in the SDK) — the daemon can't send changes for settings that
             // were never declared, so this never actually fires.
             GameEvent::PartyUpdated { .. } => {}
+            GameEvent::ControllerFrame { .. } => {}
             GameEvent::SettingChanged { .. } => {}
             GameEvent::LobbyFocus { active } => {
                 info!(active, "gamenight: lobby focus changed");

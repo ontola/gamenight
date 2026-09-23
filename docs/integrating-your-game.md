@@ -62,6 +62,11 @@ host and game, especially after disconnects.
 
 Use [the shared input adapter](../games/love-party/shared/input.lua) or implement
 [the frame contract](protocol.md#bundled-games-authoritative-controller-input).
+Rust games receive the same stream as `GameEvent::ControllerFrame` from
+`GameNight::next_event()`. Keep the latest frame and look up each non-AI seat by
+its `seat.controller` token. An empty frame, absent token or a frame older than
+250 ms means neutral input. `controller_input` is a separate activity report
+for presence and joining; calling it does not supply movement to the game.
 Process released buttons and disconnected devices; stale input must become
 neutral. Never assign one device to two players or substitute another player's
 controller when a device disappears. Standalone input is a separate path.
@@ -172,5 +177,6 @@ source declarations alone do not earn a pass.
 
 Also follow the [desktop checklist](desktop-integration-checklist.md) with real
 controllers. Test two different profiles, reversed connection order, unplugging
-a pad, live artwork updates, repeated Back/Resume and several game switches.
+a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
+repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.

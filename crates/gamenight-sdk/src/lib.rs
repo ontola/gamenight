@@ -7,8 +7,10 @@
 //! 2. Loop on [`GameNight::next_event`].
 //! 3. On [`GameEvent::Prepare`]: load assets, map the given seats, then call
 //!    [`GameNight::ready`]. Do **not** show anything yet.
-//! 4. On [`GameEvent::Start`]: you are live — start the match instantly.
-//! 5. When the match ends, call [`GameNight::finished`] and keep rendering
+//! 4. On [`GameEvent::ControllerFrame`]: match host controller tokens to seats.
+//!    Never infer ownership from your engine's device order.
+//! 5. On [`GameEvent::Start`]: you are live — start the match instantly.
+//! 6. When the match ends, call [`GameNight::finished`] and keep rendering
 //!    until [`GameEvent::Dispose`], then tear the session down.
 //!
 //! Everything else (party membership, playlists, voting, transitions) is the
@@ -39,9 +41,9 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::debug;
 
 use gamenight_protocol::{
-    ClientMessage, GameId, PartySnapshot, Player, Role, Seat, ServerMessage, SessionId,
-    SettingSpec, SettingValue, DEFAULT_ADDR, ENV_ADDR, ENV_GAMENIGHT, ENV_GAME_ID, ENV_TOKEN,
-    PROTOCOL_VERSION,
+    ClientMessage, ControllerState, GameId, PartySnapshot, Player, Role, Seat, ServerMessage,
+    SessionId, SettingSpec, SettingValue, DEFAULT_ADDR, ENV_ADDR, ENV_GAMENIGHT, ENV_GAME_ID,
+    ENV_TOKEN, PROTOCOL_VERSION,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -60,9 +62,15 @@ impl From<tokio_tungstenite::tungstenite::Error> for SdkError {
     }
 }
 
-/// Session lifecycle events, in the order a game will see them.
+/// Session, party and input events in the order a game receives them.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameEvent {
+    /// The resident lobby's latest physical input, keyed by the opaque
+    /// controller tokens in `Seat::controller`. An empty list releases every
+    /// device. Do not match these IDs to an engine's joystick order.
+    ControllerFrame {
+        controllers: Vec<ControllerState>,
+    },
     /// Apply live presence and (when opted in) roster changes without restarting.
     PartyUpdated {
         session: SessionId,
@@ -182,7 +190,8 @@ impl GameNight {
         &self.party
     }
 
-    /// Wait for the next lifecycle event. `Ok(None)` means the daemon went away.
+    /// Wait for the next game event, including host controller frames.
+    /// `Ok(None)` means the daemon went away.
     pub async fn next_event(&mut self) -> Result<Option<GameEvent>, SdkError> {
         loop {
             match self.ws.next().await {
@@ -230,7 +239,9 @@ impl GameNight {
                             self.party = party;
                             continue;
                         }
-                        ServerMessage::ControllerFrame { .. } => continue,
+                        ServerMessage::ControllerFrame { controllers } => {
+                            GameEvent::ControllerFrame { controllers }
+                        }
                         ServerMessage::Error { message } => {
                             return Err(SdkError::Rejected(message))
                         }
