@@ -163,9 +163,20 @@ def run_spaceracer(report, archive, source, output):
         passed = run_check([sys.executable, str(source/'tests/integration.py'),
                             '--godot', str(extracted/'SpaceRacer.exe'), '--packed', '--headless'],
                            env, log, timeout=180)
-        window_passed = run_check([sys.executable, str(source/'tests/integration.py'),
+        # GitHub's software D3D12 renderer can take longer than the upstream
+        # probe's 15-second ready wait. Change only that wait in a temporary
+        # test copy; keep every assertion and the release artifact unchanged.
+        probe_text = (source/'tests/integration.py').read_text(encoding='utf-8')
+        short_wait = 'def wait(read, predicate, timeout=15):'
+        if probe_text.count(short_wait) != 1:
+            raise ValueError('SpaceRacer probe ready-wait signature changed')
+        window_probe = extracted/'spaceracer-window-integration.py'
+        window_probe.write_text(probe_text.replace(short_wait,
+                                                    'def wait(read, predicate, timeout=90):'),
+                                encoding='utf-8')
+        window_passed = run_check([sys.executable, str(window_probe),
                                    '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
-                                  env, window_log, timeout=180)
+                                  env, window_log, timeout=360)
     ref = evidence(log, output)
     for feature in supported:
         game['checks'][feature] = {

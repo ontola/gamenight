@@ -148,7 +148,7 @@ class ContractTests(unittest.TestCase):
         entry={'id':'spaceracer','downloads':{'windows':{'sha256':m.digest(archive)}}}
         source=self.root/'source'
         (source/'tests').mkdir(parents=True)
-        (source/'tests/integration.py').write_text('')
+        (source/'tests/integration.py').write_text('def wait(read, predicate, timeout=15):\n    pass\n')
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
             m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
             m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
