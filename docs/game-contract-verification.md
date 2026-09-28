@@ -39,7 +39,8 @@ Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
 For SpaceRacer, the packaged native probe covers protocol connection, start,
 pause/resume, synthetic controller ownership, host disconnect, names and avatar
-updates. It does not verify a rendered frame, physical pads, colour rendering,
+updates. A separate windowed run checks that preparation keeps the game hidden
+and silent until start. It does not verify a rendered frame, physical pads, colour rendering,
 cross-game switching or endless rounds. Those checks remain untested in the
 catalog matrix. A passing game-specific CI run is not blanket certification.
 

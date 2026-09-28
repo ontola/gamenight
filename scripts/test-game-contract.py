@@ -142,7 +142,7 @@ class ContractTests(unittest.TestCase):
         features={key:{'required':False} for key in (
             'protocol.handshake','gameplay.start','gameplay.pause','gameplay.resume',
             'input.identity','process.disconnect','profile.identity','profile.face',
-            'profile.colors','presentation.frame','gameplay.continuous')}
+            'profile.colors','presentation.prewarm','presentation.frame','gameplay.continuous')}
         report=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                             {'version':1,'features':features},'sha','windows')
         entry={'id':'spaceracer','downloads':{'windows':{'sha256':m.digest(archive)}}}
@@ -156,6 +156,8 @@ class ContractTests(unittest.TestCase):
         game=report['games'][0]
         self.assertEqual(game['artifact_sha256'],m.digest(archive))
         self.assertEqual(game['checks']['profile.face']['status'],'passed')
+        self.assertEqual(game['checks']['presentation.prewarm']['status'],'passed')
+        self.assertEqual(len(game['checks']['presentation.prewarm']['evidence']),1)
         for feature in ('profile.colors','presentation.frame','gameplay.continuous'):
             self.assertEqual(game['checks'][feature]['status'],'untested')
 

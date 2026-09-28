@@ -127,9 +127,9 @@ def run_games(report, pack, love, certifier, output):
 def run_spaceracer(report, archive, source, output):
     """Run SpaceRacer's pinned packaged-game probe on the catalog ZIP.
 
-    The probe exercises a synthetic host. Only assertions it actually makes
-    receive credit; rendering, physical pads, colours and continuous play do
-    not inherit a pass from its all-or-nothing exit status.
+    The probe exercises a synthetic host. A second run with the actual window
+    checks hidden, muted preparation. Rendering, physical pads, colours and
+    continuous play do not inherit a pass from either exit status.
     """
     game = next(g for g in report['games'] if g['id'] == 'spaceracer')
     entry = next(e for e in catalog() if e['id'] == 'spaceracer')
@@ -151,6 +151,7 @@ def run_spaceracer(report, archive, source, output):
                  'gameplay.resume', 'input.identity', 'process.disconnect',
                  'profile.identity', 'profile.face')
     log = output/'spaceracer.integration.log'
+    window_log = output/'spaceracer.prewarm.log'
     with tempfile.TemporaryDirectory(prefix='spaceracer-contract-') as directory:
         extracted = Path(directory)
         with zipfile.ZipFile(archive) as packed:
@@ -162,6 +163,9 @@ def run_spaceracer(report, archive, source, output):
         passed = run_check([sys.executable, str(source/'tests/integration.py'),
                             '--godot', str(extracted/'SpaceRacer.exe'), '--packed', '--headless'],
                            env, log, timeout=180)
+        window_passed = run_check([sys.executable, str(source/'tests/integration.py'),
+                                   '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
+                                  env, window_log, timeout=180)
     ref = evidence(log, output)
     for feature in supported:
         game['checks'][feature] = {
@@ -169,6 +173,12 @@ def run_spaceracer(report, archive, source, output):
             'detail': 'Pinned v0.4.1 synthetic-host probe on the SHA-256-matched Windows ZIP',
         }
         print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
+    game['checks']['presentation.prewarm'] = {
+        'status': 'passed' if window_passed else 'failed',
+        'evidence': [evidence(window_log, output)],
+        'detail': 'Pinned v0.4.1 windowed probe checks hidden, muted preparation and hidden, muted pause',
+    }
+    print(f"spaceracer: presentation.prewarm: {game['checks']['presentation.prewarm']['status']}", flush=True)
 
 
 def write_report(report, output):
