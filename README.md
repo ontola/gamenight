@@ -81,6 +81,13 @@ The [shared LÖVE package](games/love-party/README.md) contains eight games:
 Neon Trails, Blast Party, Neon Siege, Ricochet Club, Volley Trouble,
 Stack Together, Bubble Buddies and Pinpals.
 
+[SpaceRacer](https://github.com/joepio/spaceracer) is a standalone Godot 3D hover
+racer with three procedural worlds, flight, weapons and 1–4 player split-screen.
+Its source, tests and release workflow live in `joepio/spaceracer`.
+The [catalog entry](catalog/games/spaceracer.json) pins a Windows ZIP and its SHA-256 checksum
+from [GitHub Releases](https://github.com/joepio/spaceracer/releases).
+The GameNight protocol ID is `spaceracer`, including for local debug builds.
+
 ```sh
 python scripts/package-love-party.py --output dist/party
 ```
