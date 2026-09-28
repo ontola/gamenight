@@ -124,12 +124,13 @@ def run_games(report, pack, love, certifier, output):
             print(f"{artifact.stem}: {feature}: {game['checks'][feature]['status']}", flush=True)
 
 
-def run_spaceracer(report, archive, source, output):
+def run_spaceracer(report, archive, source, output, window_probe=False):
     """Run SpaceRacer's pinned packaged-game probe on the catalog ZIP.
 
-    The probe exercises a synthetic host. A second run with the actual window
-    checks hidden, muted preparation. Rendering, physical pads, colours and
-    continuous play do not inherit a pass from either exit status.
+    The probe exercises a synthetic host. An optional run with the actual
+    window checks hidden, muted preparation on a Vulkan-capable machine.
+    Rendering, physical pads, colours and continuous play do not inherit a
+    pass from either exit status.
     """
     game = next(g for g in report['games'] if g['id'] == 'spaceracer')
     entry = next(e for e in catalog() if e['id'] == 'spaceracer')
@@ -163,20 +164,10 @@ def run_spaceracer(report, archive, source, output):
         passed = run_check([sys.executable, str(source/'tests/integration.py'),
                             '--godot', str(extracted/'SpaceRacer.exe'), '--packed', '--headless'],
                            env, log, timeout=180)
-        # GitHub's software D3D12 renderer can take longer than the upstream
-        # probe's 15-second ready wait. Change only that wait in a temporary
-        # test copy; keep every assertion and the release artifact unchanged.
-        probe_text = (source/'tests/integration.py').read_text(encoding='utf-8')
-        short_wait = 'def wait(read, predicate, timeout=15):'
-        if probe_text.count(short_wait) != 1:
-            raise ValueError('SpaceRacer probe ready-wait signature changed')
-        window_probe = extracted/'spaceracer-window-integration.py'
-        window_probe.write_text(probe_text.replace(short_wait,
-                                                    'def wait(read, predicate, timeout=90):'),
-                                encoding='utf-8')
-        window_passed = run_check([sys.executable, str(window_probe),
-                                   '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
-                                  env, window_log, timeout=360)
+        if window_probe:
+            window_passed = run_check([sys.executable, str(source/'tests/integration.py'),
+                                       '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
+                                      env, window_log, timeout=180)
     ref = evidence(log, output)
     for feature in supported:
         game['checks'][feature] = {
@@ -184,12 +175,13 @@ def run_spaceracer(report, archive, source, output):
             'detail': 'Pinned v0.4.1 synthetic-host probe on the SHA-256-matched Windows ZIP',
         }
         print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
-    game['checks']['presentation.prewarm'] = {
-        'status': 'passed' if window_passed else 'failed',
-        'evidence': [evidence(window_log, output)],
-        'detail': 'Pinned v0.4.1 windowed probe checks hidden, muted preparation and hidden, muted pause',
-    }
-    print(f"spaceracer: presentation.prewarm: {game['checks']['presentation.prewarm']['status']}", flush=True)
+    if window_probe:
+        game['checks']['presentation.prewarm'] = {
+            'status': 'passed' if window_passed else 'failed',
+            'evidence': [evidence(window_log, output)],
+            'detail': 'Pinned v0.4.1 windowed probe checks hidden, muted preparation and hidden, muted pause',
+        }
+        print(f"spaceracer: presentation.prewarm: {game['checks']['presentation.prewarm']['status']}", flush=True)
 
 
 def write_report(report, output):
@@ -292,6 +284,8 @@ def main():
     parser.add_argument('--certifier', type=Path)
     parser.add_argument('--spaceracer-archive', type=Path)
     parser.add_argument('--spaceracer-source', type=Path)
+    parser.add_argument('--spaceracer-window-probe', action='store_true',
+                        help='Run the native window/prewarm check on a Vulkan-capable Windows host')
     parser.add_argument('--gate', action='store_true', help='Require complete, current evidence before publication')
     parser.add_argument('--platform', choices=['windows', 'linux', 'mac'],
                         default={'Windows':'windows', 'Linux':'linux', 'Darwin':'mac'}[platform.system()])
@@ -319,7 +313,8 @@ def main():
         if args.spaceracer_archive or args.spaceracer_source:
             if not args.spaceracer_archive or not args.spaceracer_source:
                 parser.error('SpaceRacer probe requires both --spaceracer-archive and --spaceracer-source')
-            run_spaceracer(report, args.spaceracer_archive.resolve(), args.spaceracer_source.resolve(), output)
+            run_spaceracer(report, args.spaceracer_archive.resolve(), args.spaceracer_source.resolve(), output,
+                           window_probe=args.spaceracer_window_probe)
     finally:
         write_report(report, output)
     return any(c['status'] == 'failed' for g in report['games'] for c in g['checks'].values())

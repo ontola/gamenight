@@ -152,7 +152,7 @@ class ContractTests(unittest.TestCase):
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
             m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
             m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
-            m.run_spaceracer(report,archive,source,self.output)
+            m.run_spaceracer(report,archive,source,self.output,window_probe=True)
         game=report['games'][0]
         self.assertEqual(game['artifact_sha256'],m.digest(archive))
         self.assertEqual(game['checks']['profile.face']['status'],'passed')
@@ -160,6 +160,13 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(len(game['checks']['presentation.prewarm']['evidence']),1)
         for feature in ('profile.colors','presentation.frame','gameplay.continuous'):
             self.assertEqual(game['checks'][feature]['status'],'untested')
+        default=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
+                             {'version':1,'features':features},'sha','windows')
+        with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
+            m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
+            m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
+            m.run_spaceracer(default,archive,source,self.output)
+        self.assertEqual(default['games'][0]['checks']['presentation.prewarm']['status'],'untested')
 
     def test_nested_evidence_uses_portable_paths(self):
         nested=self.output/'native'/'observations.json'
