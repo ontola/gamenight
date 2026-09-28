@@ -7,6 +7,8 @@ from pathlib import Path
 import platform
 import subprocess
 import sys
+import tempfile
+import zipfile
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +124,53 @@ def run_games(report, pack, love, certifier, output):
             print(f"{artifact.stem}: {feature}: {game['checks'][feature]['status']}", flush=True)
 
 
+def run_spaceracer(report, archive, source, output):
+    """Run SpaceRacer's pinned packaged-game probe on the catalog ZIP.
+
+    The probe exercises a synthetic host. Only assertions it actually makes
+    receive credit; rendering, physical pads, colours and continuous play do
+    not inherit a pass from its all-or-nothing exit status.
+    """
+    game = next(g for g in report['games'] if g['id'] == 'spaceracer')
+    entry = next(e for e in catalog() if e['id'] == 'spaceracer')
+    expected = entry['downloads']['windows']['sha256'].lower()
+    actual = digest(archive)
+    if actual != expected:
+        raise ValueError(f'SpaceRacer download SHA-256 mismatch: {actual}')
+    source_commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
+    if source_commit != 'c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb':
+        raise ValueError('SpaceRacer probe source differs from v0.4.1 release')
+    source_changes = subprocess.check_output(
+        ['git', '-C', str(source), 'status', '--porcelain', '--untracked-files=no'], text=True).strip()
+    if source_changes:
+        raise ValueError('SpaceRacer probe source has uncommitted changes')
+    game['artifact'] = archive.name
+    game['artifact_sha256'] = actual
+    game['probe_source_commit'] = source_commit
+    supported = ('protocol.handshake', 'gameplay.start', 'gameplay.pause',
+                 'gameplay.resume', 'input.identity', 'process.disconnect',
+                 'profile.identity', 'profile.face')
+    log = output/'spaceracer.integration.log'
+    with tempfile.TemporaryDirectory(prefix='spaceracer-contract-') as directory:
+        extracted = Path(directory)
+        with zipfile.ZipFile(archive) as packed:
+            for name in ('SpaceRacer.exe', 'SpaceRacer.pck'):
+                if name not in packed.namelist():
+                    raise ValueError(f'SpaceRacer release is missing {name}')
+                (extracted/name).write_bytes(packed.read(name))
+        env = {k: v for k, v in os.environ.items() if not k.startswith('GAMENIGHT')}
+        passed = run_check([sys.executable, str(source/'tests/integration.py'),
+                            '--godot', str(extracted/'SpaceRacer.exe'), '--packed', '--headless'],
+                           env, log, timeout=180)
+    ref = evidence(log, output)
+    for feature in supported:
+        game['checks'][feature] = {
+            'status': 'passed' if passed else 'failed', 'evidence': [ref],
+            'detail': 'Pinned v0.4.1 synthetic-host probe on the SHA-256-matched Windows ZIP',
+        }
+        print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
+
+
 def write_report(report, output):
     (output/'matrix.json').write_text(json.dumps(report, indent=2)+'\n', encoding='utf-8')
     lines = [f"# Game contract — {report['platform']}", '', f"Build: `{report['commit']}`", '']
@@ -151,6 +200,16 @@ def release_game(entry, os_name, policies):
     return not downloads or os_name in downloads
 
 
+def bundled_release_game(entry, os_name, policies):
+    if not release_game(entry, os_name, policies):
+        return False
+    download = entry.get('downloads', {}).get(os_name, {})
+    # The installer bundles .love games. Native ZIPs are downloaded on demand
+    # and have their own artifact probes, not this pack's release gate.
+    entrypoint = download.get('entrypoint', '')
+    return not entrypoint or entrypoint.lower().endswith('.love')
+
+
 def release_errors(report, entries, requirements, commit, os_name, output, pack, policies=None):
     errors = []
     policies = policies or {"version":1,"games":{}}
@@ -171,7 +230,7 @@ def release_errors(report, entries, requirements, commit, os_name, output, pack,
     if len(games) != len(rows) or set(games) != {e['id'] for e in entries}:
         errors.append('Catalog coverage is incomplete or duplicated')
     entries_by_id = {e['id']: e for e in entries}
-    expected = {e['id'] for e in entries if release_game(e, os_name, policies)}
+    expected = {e['id'] for e in entries if bundled_release_game(e, os_name, policies)}
     if not expected:
         errors.append('Release contains no games for this platform')
     packaged = {p.stem for p in pack.glob('*.love')}
@@ -179,7 +238,7 @@ def release_errors(report, entries, requirements, commit, os_name, output, pack,
         errors.append('Release package coverage differs from platform catalog: ' + str(sorted(packaged ^ expected)))
     for game in rows:
         entry = entries_by_id.get(game['id'], {})
-        if entry and not release_game(entry, os_name, policies):
+        if entry and not bundled_release_game(entry, os_name, policies):
             continue
         download = entries_by_id.get(game['id'], {}).get('downloads', {}).get(os_name, {})
         if download.get('sha256') and download['sha256'].lower() != game.get('artifact_sha256'):
@@ -210,6 +269,8 @@ def main():
     parser.add_argument('--pack', type=Path)
     parser.add_argument('--love', type=Path)
     parser.add_argument('--certifier', type=Path)
+    parser.add_argument('--spaceracer-archive', type=Path)
+    parser.add_argument('--spaceracer-source', type=Path)
     parser.add_argument('--gate', action='store_true', help='Require complete, current evidence before publication')
     parser.add_argument('--platform', choices=['windows', 'linux', 'mac'],
                         default={'Windows':'windows', 'Linux':'linux', 'Darwin':'mac'}[platform.system()])
@@ -234,6 +295,10 @@ def main():
             if not args.love or not args.certifier:
                 parser.error('--pack requires --love and --certifier')
             run_games(report, args.pack.resolve(), args.love.resolve(), args.certifier.resolve(), output)
+        if args.spaceracer_archive or args.spaceracer_source:
+            if not args.spaceracer_archive or not args.spaceracer_source:
+                parser.error('SpaceRacer probe requires both --spaceracer-archive and --spaceracer-source')
+            run_spaceracer(report, args.spaceracer_archive.resolve(), args.spaceracer_source.resolve(), output)
     finally:
         write_report(report, output)
     return any(c['status'] == 'failed' for g in report['games'] for c in g['checks'].values())

@@ -10,7 +10,7 @@ permissions:
 jobs:
   games:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       ALSOFT_DRIVERS: "null"
       GALLIUM_DRIVER: llvmpipe
@@ -51,13 +51,24 @@ jobs:
           python scripts/package-love-party.py --output dist/repeated
           if ($LASTEXITCODE -ne 0) { throw 'Repeat packaging failed' }
           if ((Get-FileHash dist/party/gamenight-love-party.zip).Hash -ne (Get-FileHash dist/repeated/gamenight-love-party.zip).Hash) { throw 'Non-deterministic package' }
+      - name: Fetch pinned SpaceRacer release and probe source
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/native | Out-Null
+          $entry = Get-Content catalog/games/spaceracer.json -Raw | ConvertFrom-Json
+          $archive = 'dist/native/spaceracer-windows.zip'
+          Invoke-WebRequest $entry.downloads.windows.url -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.downloads.windows.sha256.ToLowerInvariant()) { throw 'SpaceRacer release checksum mismatch' }
+          git clone --depth 1 --branch v0.4.1 https://github.com/joepio/spaceracer.git dist/native-source
+          if ($LASTEXITCODE -ne 0) { throw 'SpaceRacer probe checkout failed' }
+          if ((git -C dist/native-source rev-parse HEAD).Trim() -ne 'c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb') { throw 'SpaceRacer probe source changed' }
       - name: Certify every packaged game against GameNight
         shell: pwsh
         run: |
           cargo build --locked -p gamenight-certify
           if ($LASTEXITCODE -ne 0) { throw 'Certifier build failed' }
           Remove-Item Env:GNLOVE_TEST -ErrorAction SilentlyContinue
-          python scripts/game-contract.py --output dist/contract --pack dist/party --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --certifier target/debug/gamenight-certify.exe
+          python scripts/game-contract.py --output dist/contract --pack dist/party --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --certifier target/debug/gamenight-certify.exe --spaceracer-archive dist/native/spaceracer-windows.zip --spaceracer-source dist/native-source
           if ($LASTEXITCODE -ne 0) { throw 'Contract verification failed' }
       - name: Contract status summary
         if: always()

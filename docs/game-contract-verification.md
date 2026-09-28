@@ -11,6 +11,9 @@ feature gets `passed`, `failed`, `untested`, or (only for optional requirements)
 `not_applicable`. Missing runners stay visible as `untested`; they are never omitted.
 Packaged `.love` games are discovered from the package directory, not a second
 hardcoded certification list. A package with no catalog entry or an empty pack fails.
+SpaceRacer has a separate native runner. CI downloads the exact catalog ZIP,
+checks its SHA-256, checks out the v0.4.1 probe source at its fixed commit,
+and runs the packaged executable against its synthetic-host integration test.
 
 Each run emits `matrix.json`, `matrix.md`, raw certifier JSON, and command logs.
 Evidence is tied to the source commit, operating system and SHA-256 of the tested
@@ -34,6 +37,11 @@ switching/cleanup. Volley names are checked on its winning-side score screens,
 where the game actually displays them. Its feature results can fail independently.
 Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
+For SpaceRacer, the packaged native probe covers protocol connection, start,
+pause/resume, synthetic controller ownership, host disconnect, names and avatar
+updates. It does not verify a rendered frame, physical pads, colour rendering,
+cross-game switching or endless rounds. Those checks remain untested in the
+catalog matrix. A passing game-specific CI run is not blanket certification.
 
 ## Running it
 
@@ -76,20 +84,23 @@ features are untested. Publication fails on any missing game, required untested
 feature, failed mandatory/claimed check, stale commit, wrong platform, changed requirements, changed
 package, or missing/modified evidence. There is no override for a catalog label.
 
-The matrix covers the whole catalog. The Windows game release gate covers every
-playable Windows catalog game, and requires an exact package match. The lobby
+The matrix covers the whole catalog. The Windows installer release gate covers
+every bundled `.love` catalog game and requires an exact package match. Native
+games are downloaded separately; their artifact-specific probe results remain
+in the matrix but do not become installer-bundle requirements. The lobby
 (host) and SDK example have explicit roles in `game-policies.json`; they are not
 game downloads. A macOS-only download is not certified by a Windows run. These
-rows remain untested, with no Windows rating credit. A new Windows game, missing
-package, or extra unverified package still blocks publication.
+rows remain untested, with no Windows rating credit. A new bundled Windows game,
+missing bundle package, or extra unverified bundle package blocks publication.
 
 ## Extending coverage
 
 Add a narrowly scoped runner that executes the actual packaged game. Record a
 feature as passed only after it observes that feature, retaining logs/artifacts.
-The existing `run_games` adapter handles LÖVE; native/Godot games need their own
-artifact runner. Unavailable sources stay untested until their tested package is
-supplied. Volley Trouble is part of the public shared LÖVE package.
+The existing `run_games` adapter handles LÖVE. SpaceRacer's pinned native
+adapter runs its released ZIP; other native/Godot games still need their own
+artifact runner. Unavailable sources stay untested until their tested package
+is supplied. Volley Trouble is part of the public shared LÖVE package.
 Use a distinct feature when a unit test covers only part of a hardware behavior;
 do not relabel an entire shared test suite as proof of every game feature.
 

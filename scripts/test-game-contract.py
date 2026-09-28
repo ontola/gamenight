@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
+import zipfile
 
 spec = importlib.util.spec_from_file_location('contract', Path(__file__).with_name('game-contract.py'))
 m = importlib.util.module_from_spec(spec)
@@ -122,6 +124,40 @@ class ContractTests(unittest.TestCase):
     def test_extra_package_or_missing_platform_game_blocks_release(self):
         (self.pack/'extra.love').write_bytes(b'unverified')
         self.assertTrue(self.errors())
+
+    def test_native_download_is_not_an_installer_bundle_requirement(self):
+        native={'id':'native', 'title':'Native', 'downloads':{'windows':{
+            'entrypoint':'Native.exe', 'sha256':'a'*64}}}
+        self.entries.append(native)
+        self.report['games'].extend(m.new_report([native],self.rules,'sha','windows')['games'])
+        self.assertEqual(self.errors(), [])
+        (self.pack/'extra.love').write_bytes(b'unverified')
+        self.assertTrue(self.errors())
+
+    def test_spaceracer_probe_only_credits_observed_features(self):
+        archive=self.root/'spaceracer-windows.zip'
+        with zipfile.ZipFile(archive,'w') as packed:
+            packed.writestr('SpaceRacer.exe',b'engine')
+            packed.writestr('SpaceRacer.pck',b'game')
+        features={key:{'required':False} for key in (
+            'protocol.handshake','gameplay.start','gameplay.pause','gameplay.resume',
+            'input.identity','process.disconnect','profile.identity','profile.face',
+            'profile.colors','presentation.frame','gameplay.continuous')}
+        report=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
+                            {'version':1,'features':features},'sha','windows')
+        entry={'id':'spaceracer','downloads':{'windows':{'sha256':m.digest(archive)}}}
+        source=self.root/'source'
+        (source/'tests').mkdir(parents=True)
+        (source/'tests/integration.py').write_text('')
+        with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
+            m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
+            m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
+            m.run_spaceracer(report,archive,source,self.output)
+        game=report['games'][0]
+        self.assertEqual(game['artifact_sha256'],m.digest(archive))
+        self.assertEqual(game['checks']['profile.face']['status'],'passed')
+        for feature in ('profile.colors','presentation.frame','gameplay.continuous'):
+            self.assertEqual(game['checks'][feature]['status'],'untested')
 
     def test_nested_evidence_uses_portable_paths(self):
         nested=self.output/'native'/'observations.json'
