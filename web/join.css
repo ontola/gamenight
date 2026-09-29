@@ -1,1 +1,5 @@
+/* Keep the shared header flush with the viewport, like every site page. */
+body.join-screen{margin:0;padding:0;display:block}
 .join-page{width:min(100% - 40px,420px);margin:48px auto}.join-page h1{font-size:2rem}.join-page p{color:var(--dim,#aaa);line-height:1.5}.join-page form{display:grid;gap:14px;margin:28px 0 16px}.join-page input{box-sizing:border-box;width:100%;font:28px monospace;letter-spacing:.25em;text-transform:uppercase;padding:16px;border:1px solid #59536e;border-radius:10px;background:#242132;color:#fff}.join-page button{min-height:44px}.join-note{font-size:.8rem}
+
+.join-page .start-room-link{margin-top:28px;padding-top:22px;border-top:1px solid #ffffff18;font-size:.9rem}.start-room-link a{color:#c5b7ff;text-underline-offset:4px;margin-left:4px}.start-room-link a:hover{color:#fff}
