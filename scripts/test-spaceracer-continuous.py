@@ -49,7 +49,7 @@ def main():
             probe.wait(read, lambda s: s.get('clock', 0) > 2)
             probe.wait(lambda: host.messages,
                        lambda messages: any(m.get('type') == 'finished' for m in messages), timeout=150)
-            finished_clock = read()['clock']
+            finished_clock = probe.wait(read, lambda s: s.get('clock', 0) > 2)['clock']
             assert finished_clock > 2 and child.poll() is None
             restarted = probe.wait(read, lambda s: s.get('phase') == 'running'
                                    and s.get('clock', 1000) < 2, timeout=25)
