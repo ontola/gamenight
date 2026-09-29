@@ -74,7 +74,9 @@ export async function navigate(href:string,replace=false):Promise<void>{
     const moved=active!==id;active=id;route.set(url.pathname+url.hash);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     window.dispatchEvent(new CustomEvent('gamenight-page-change',{detail:{page:id}}));
-    if(moved)window.scrollTo({top:view.scroll,behavior:'instant'});
+    const download=id==='home' && url.hash==='#download'?view.node.querySelector<HTMLElement>('#download'):null;
+    if(download){download.scrollIntoView({block:'center',behavior:'instant'});download.focus({preventScroll:true});}
+    else if(moved)window.scrollTo({top:view.scroll,behavior:'instant'});
   }catch(error){
     window.showToast(error instanceof Error?error.message:'Could not open this page. Try again.');
   }finally{if(turn===sequence)busy.set(false);}

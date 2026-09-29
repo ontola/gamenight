@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { room, route, busy } from './state';
+  import { room, route, busy, signedIn } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
   let leaving = false;
@@ -41,11 +41,12 @@
   <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a>
   <div class="site-links">
     <a href="/catalog" aria-current={$route.startsWith('/catalog')?'page':undefined}>Games</a>
-    <a href="/studio" aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>You</a>
+    <a href={$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$signedIn?'You':'Sign in'}</a>
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
   </div>
   <div class="site-room-actions">
-    <button class="btn-primary" data-room-join hidden={$room!==false} onclick={join}>Join</button>
+    <a class="site-host" href="/#download">Host</a>
+    <button class="btn-primary" data-room-join hidden={$room===true} onclick={join}>Join</button>
     <button class="btn-primary" data-room-leave hidden={$room!==true} onclick={()=>{leaveError='';leaveDialog.showModal();}}>Leave room</button>
   </div>
 </nav>

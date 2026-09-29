@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+export const signedIn = writable(document.body.dataset.local==='true');
 export const room = writable<boolean|null>(null);
 export const player = writable(sessionStorage.getItem('gamenight_nav_name') || localStorage.getItem('gamenight_player_name') || 'Your player');
 export const route = writable(location.pathname + location.hash);

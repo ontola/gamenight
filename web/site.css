@@ -187,3 +187,16 @@ html{scrollbar-gutter:stable}
 }
 #qr-scanner .preference-toggle { margin-top:16px; color:var(--text); }
 #remember-player-card .identity-hint { margin-bottom:0; }
+
+/* Equal navigation hit areas; Host and Join remain the obvious actions. */
+#site-shell .site-nav{grid-template-columns:max-content minmax(0,1fr) 200px}
+#site-shell .site-links{gap:8px}
+#site-shell .site-links a{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:46px;padding:10px 16px;border:1px solid transparent;border-radius:10px;font:600 14px/1.3 system-ui,sans-serif;text-decoration:none}
+#site-shell .site-links a:hover,#site-shell .site-links a:focus-visible{background:#ffffff0d;border-color:#ffffff1c}
+#site-shell .site-room-actions{width:200px;gap:8px}
+#site-shell .site-room-actions :is(.btn-primary,.site-host){display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:46px;padding:10px 16px;border-radius:10px;font:700 14px/1.3 system-ui,sans-serif;text-decoration:none;white-space:nowrap}
+#site-shell .site-host{background:#24213a;border:1px solid #766791;color:#eee8ff}
+#site-shell .site-host:hover{background:#39304f;border-color:#b09acb}
+#site-shell .site-host:focus-visible{outline:2px solid #b6acff;outline-offset:3px}
+@media(max-width:650px){#site-shell .site-nav{grid-template-columns:minmax(0,1fr) max-content;gap:10px}#site-shell .site-room-actions{width:auto}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 12px}#site-shell .site-links{justify-content:space-between}#site-shell .site-links a{flex:1}}
+@media(max-width:380px){#site-shell .site-logo{font-size:18px;gap:6px}#site-shell .site-logo img{width:26px;height:26px}#site-shell .site-room-actions{gap:6px}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 8px;font-size:13px}}
