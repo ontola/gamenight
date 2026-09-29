@@ -51,3 +51,15 @@
 @media(max-width:700px){.host-guide{padding:0 20px}.host-intro{padding:34px 0 28px}.host-intro>p:not(.host-eyebrow){font-size:17px}.host-step{grid-template-columns:1fr;gap:22px;padding:28px 0}.host-copy{padding-left:48px}.host-footer{flex-direction:column;gap:12px}.host-visual{width:100%;box-sizing:border-box}.host-download{padding:16px}.host-needs{gap:8px 16px}}
 @media(max-width:380px){.host-guide{padding:0 16px}.host-download strong{font-size:14px}.host-download{gap:10px}.host-game-row img{width:72px;height:52px}.host-preparing{padding:16px}.host-copy h2{font-size:23px}}
 @media(prefers-reduced-motion:reduce){.host-download{transition:none}}
+
+/* One set of editor-generated faces is reused by every guide illustration. */
+.host-face-defs{position:absolute;width:0;height:0;overflow:hidden;pointer-events:none}
+.host-lobby-scene{position:relative}.host-lobby-crew{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.host-profile-demo{display:flex;align-items:center;justify-content:center;gap:18px;padding:16px 10px;box-sizing:border-box;background:radial-gradient(ellipse at center,#282742,transparent 75%)}
+.host-phone{width:154px;border:2px solid #72748f;border-radius:24px;background:#191d30;padding:12px 12px 16px;text-align:center;box-shadow:0 18px 36px #0003;flex-shrink:0}
+.host-phone-speaker{display:block;width:35px;height:4px;border-radius:4px;background:#737891;margin:0 auto 13px}
+.host-phone-title{font-weight:650;font-size:13px}.host-drawing{margin:12px 0;background-color:#292d42;background-image:linear-gradient(#ffffff08 1px,transparent 1px),linear-gradient(90deg,#ffffff08 1px,transparent 1px);background-size:8px 8px;border-radius:8px}
+.host-drawing svg{display:block;width:100%;height:auto}.host-palette{display:flex;gap:7px;justify-content:center;margin-bottom:12px}.host-palette i{width:15px;height:15px;border-radius:50%;background:#ff6b9d}.host-palette i:nth-child(2){background:#fff}.host-palette i:nth-child(3){background:#1a1a1a;border:1px solid #72748f}.host-palette i:nth-child(4){background:#efc448}.host-palette i:nth-child(5){background:#36a69a}
+.host-phone-saved{font-size:10px;color:#b9c0d8}.host-profile-transfer{text-align:center;flex-shrink:0}.host-profile-transfer svg{display:block;width:30px;height:30px;margin:auto;fill:none;stroke:#b4a6f4;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.host-profile-transfer span{display:block;color:#b4a6f4;font-size:11px;margin-top:10px}
+.host-profile-character{text-align:center;max-width:140px}.host-profile-character svg{display:block;width:125px;height:auto;max-width:100%;margin:auto}.host-profile-character span{font-size:11px;color:#b9c0d8}
+@media(max-width:380px){.host-profile-demo{gap:10px;padding:16px 0}.host-phone{width:122px;padding:10px 8px}.host-profile-character{max-width:96px}.host-profile-transfer span{font-size:10px}.host-profile-transfer svg{width:24px}}
