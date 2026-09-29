@@ -3,10 +3,12 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import struct
 import tempfile
 import unittest
 from unittest import mock
 import zipfile
+import zlib
 
 spec = importlib.util.spec_from_file_location('contract', Path(__file__).with_name('game-contract.py'))
 m = importlib.util.module_from_spec(spec)
@@ -142,23 +144,32 @@ class ContractTests(unittest.TestCase):
         features={key:{'required':False} for key in (
             'protocol.handshake','gameplay.start','gameplay.pause','gameplay.resume',
             'input.identity','process.disconnect','profile.identity','profile.face',
-            'profile.colors','presentation.prewarm','presentation.frame','gameplay.continuous')}
+            'profile.colors','presentation.prewarm','presentation.frame','gameplay.continuous',
+            'party.settings')}
         report=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                             {'version':1,'features':features},'sha','windows')
         entry={'id':'spaceracer','downloads':{'windows':{'sha256':m.digest(archive)}}}
         source=self.root/'source'
         (source/'tests').mkdir(parents=True)
         (source/'tests/integration.py').write_text('def wait(read, predicate, timeout=15):\n    pass\n')
+        def fake_check(cmd,env,log,timeout):
+            log.write_text('PASS')
+            if any('test-spaceracer-frame.py' in part for part in cmd):
+                Path(cmd[cmd.index('--capture')+1]).write_bytes(b'capture')
+            return True
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
             m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
-            m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
+            m,'run_check',side_effect=fake_check):
             m.run_spaceracer(report,archive,source,self.output,window_probe=True)
         game=report['games'][0]
         self.assertEqual(game['artifact_sha256'],m.digest(archive))
         self.assertEqual(game['checks']['profile.face']['status'],'passed')
         self.assertEqual(game['checks']['presentation.prewarm']['status'],'passed')
+        self.assertEqual(game['checks']['presentation.frame']['status'],'passed')
+        self.assertEqual(game['checks']['party.settings']['status'],'passed')
+        self.assertEqual(game['checks']['profile.colors']['status'],'passed')
         self.assertEqual(len(game['checks']['presentation.prewarm']['evidence']),1)
-        for feature in ('profile.colors','presentation.frame','gameplay.continuous'):
+        for feature in ('gameplay.continuous',):
             self.assertEqual(game['checks'][feature]['status'],'untested')
         default=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                              {'version':1,'features':features},'sha','windows')
@@ -167,12 +178,30 @@ class ContractTests(unittest.TestCase):
             m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
             m.run_spaceracer(default,archive,source,self.output)
         self.assertEqual(default['games'][0]['checks']['presentation.prewarm']['status'],'untested')
+        self.assertEqual(default['games'][0]['checks']['presentation.frame']['status'],'untested')
+        self.assertEqual(default['games'][0]['checks']['profile.colors']['status'],'passed')
 
     def test_nested_evidence_uses_portable_paths(self):
         nested=self.output/'native'/'observations.json'
         nested.parent.mkdir()
         nested.write_text('{}')
         self.assertEqual(m.evidence(nested,self.output)['path'],'native/observations.json')
+
+    def test_spaceracer_frame_check_rejects_blank_or_invalid_capture(self):
+        spec=importlib.util.spec_from_file_location('spaceracer_frame',Path(__file__).with_name('test-spaceracer-frame.py'))
+        frame=importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(frame)
+        capture=self.root/'capture.png'
+        capture.write_bytes(b'not a screenshot')
+        with self.assertRaises(ValueError):
+            frame.png_pixels(capture)
+        raw=(b'\0'+b'\0'*(640*3))*360
+        def chunk(kind,data):
+            return struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data))
+        capture.write_bytes(b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',640,360,8,2,0,0,0))+
+                            chunk(b'IDAT',zlib.compress(raw))+chunk(b'IEND',b''))
+        with self.assertRaisesRegex(ValueError,'blank'):
+            frame.png_pixels(capture)
 
     def test_package_text_line_endings_do_not_change_artifact(self):
         spec=importlib.util.spec_from_file_location('packager',Path(__file__).with_name('package-love-party.py'))

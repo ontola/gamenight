@@ -39,13 +39,19 @@ Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
 For SpaceRacer, the packaged native probe covers protocol connection, start,
 pause/resume, synthetic controller ownership, host disconnect, names and avatar
-updates. The optional `--spaceracer-window-probe` runs the same pinned test
-with a real window to check hidden and silent preparation. Use it on a
+updates. A separate headless test changes skin and clothing colours during play
+and checks that only the matching player's face layer is rebuilt. The optional
+`--spaceracer-window-probe` runs the same pinned test
+with a real window to check hidden and silent preparation, then captures and
+inspects a gameplay frame from the packaged executable. The pinned probe also
+verifies that live settings take effect on the next race. Use the window probe on a
 Vulkan-capable Windows host. GitHub's hosted Windows runner lacks that GPU
 support and stalls during renderer warmup, so CI leaves this check untested.
-It does not verify a rendered frame, physical pads, colour rendering,
-cross-game switching or endless rounds. Those checks remain untested in the
-catalog matrix. A passing game-specific CI run is not blanket certification.
+The hosted matrix does not verify a rendered SpaceRacer frame or physical pads;
+the colour test checks the face layer's live data, not sampled display pixels.
+Cross-game switching and endless rounds also remain untested. Back/Select is
+handled globally by the lobby, so the synthetic native host does not certify
+that input path. A passing game-specific CI run is not blanket certification.
 
 ## Running it
 

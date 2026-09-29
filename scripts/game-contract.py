@@ -129,8 +129,8 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
 
     The probe exercises a synthetic host. An optional run with the actual
     window checks hidden, muted preparation on a Vulkan-capable machine.
-    Rendering, physical pads, colours and continuous play do not inherit a
-    pass from either exit status.
+    A separate packaged-game capture tests a rendered frame. Physical pads,
+    colours and continuous play do not inherit a pass from these probes.
     """
     game = next(g for g in report['games'] if g['id'] == 'spaceracer')
     entry = next(e for e in catalog() if e['id'] == 'spaceracer')
@@ -150,9 +150,12 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
     game['probe_source_commit'] = source_commit
     supported = ('protocol.handshake', 'gameplay.start', 'gameplay.pause',
                  'gameplay.resume', 'input.identity', 'process.disconnect',
-                 'profile.identity', 'profile.face')
+                 'profile.identity', 'profile.face', 'party.settings')
     log = output/'spaceracer.integration.log'
     window_log = output/'spaceracer.prewarm.log'
+    frame_log = output/'spaceracer.frame.log'
+    frame = output/'spaceracer.frame.png'
+    colors_log = output/'spaceracer.colors.log'
     with tempfile.TemporaryDirectory(prefix='spaceracer-contract-') as directory:
         extracted = Path(directory)
         with zipfile.ZipFile(archive) as packed:
@@ -164,10 +167,17 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
         passed = run_check([sys.executable, str(source/'tests/integration.py'),
                             '--godot', str(extracted/'SpaceRacer.exe'), '--packed', '--headless'],
                            env, log, timeout=180)
+        colors_passed = run_check([sys.executable, str(ROOT/'scripts/test-spaceracer-colors.py'),
+                                   '--godot', str(extracted/'SpaceRacer.exe'), '--source', str(source)],
+                                  env, colors_log, timeout=90)
         if window_probe:
             window_passed = run_check([sys.executable, str(source/'tests/integration.py'),
                                        '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
                                       env, window_log, timeout=180)
+            frame_passed = run_check([sys.executable, str(ROOT/'scripts/test-spaceracer-frame.py'),
+                                      '--godot', str(extracted/'SpaceRacer.exe'),
+                                      '--capture', str(frame)], env, frame_log, timeout=150)
+            frame_passed = frame_passed and frame.is_file()
     ref = evidence(log, output)
     for feature in supported:
         game['checks'][feature] = {
@@ -175,6 +185,12 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
             'detail': 'Pinned v0.4.1 synthetic-host probe on the SHA-256-matched Windows ZIP',
         }
         print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
+    game['checks']['profile.colors'] = {
+        'status': 'passed' if colors_passed else 'failed',
+        'evidence': [evidence(colors_log, output)],
+        'detail': 'Live skin and clothing updates rebuild only the matching pilot face layer',
+    }
+    print(f"spaceracer: profile.colors: {game['checks']['profile.colors']['status']}", flush=True)
     if window_probe:
         game['checks']['presentation.prewarm'] = {
             'status': 'passed' if window_passed else 'failed',
@@ -182,6 +198,15 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
             'detail': 'Pinned v0.4.1 windowed probe checks hidden, muted preparation and hidden, muted pause',
         }
         print(f"spaceracer: presentation.prewarm: {game['checks']['presentation.prewarm']['status']}", flush=True)
+        frame_refs = [evidence(frame_log, output)]
+        if frame.is_file():
+            frame_refs.append(evidence(frame, output))
+        game['checks']['presentation.frame'] = {
+            'status': 'passed' if frame_passed else 'failed',
+            'evidence': frame_refs,
+            'detail': 'Packaged v0.4.1 Godot build captured a nonblank gameplay frame with renderer draw calls',
+        }
+        print(f"spaceracer: presentation.frame: {game['checks']['presentation.frame']['status']}", flush=True)
 
 
 def write_report(report, output):
@@ -285,7 +310,7 @@ def main():
     parser.add_argument('--spaceracer-archive', type=Path)
     parser.add_argument('--spaceracer-source', type=Path)
     parser.add_argument('--spaceracer-window-probe', action='store_true',
-                        help='Run the native window/prewarm check on a Vulkan-capable Windows host')
+                        help='Run native window/prewarm and gameplay-frame checks on a Vulkan-capable Windows host')
     parser.add_argument('--gate', action='store_true', help='Require complete, current evidence before publication')
     parser.add_argument('--platform', choices=['windows', 'linux', 'mac'],
                         default={'Windows':'windows', 'Linux':'linux', 'Darwin':'mac'}[platform.system()])
