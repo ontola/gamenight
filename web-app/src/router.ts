@@ -4,7 +4,7 @@ const views=new Map<string,View>();
 const loads=new Map<string,Promise<View>>();
 const scripts=new Set<string>();
 let active='',sequence=0,started=false;
-const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/catalog' || url.pathname==='/catalog.html'?'games':url.pathname==='/studio'?'studio':null;
+const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html'?'games':url.pathname==='/studio'?'studio':null;
 function capture(doc:Document,id:string):View {
   const node=document.createElement('div');node.dataset.appView=id;
   for(const child of [...doc.body.children]){

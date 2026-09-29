@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Host a game night | GameNight</title>
+<meta name="description" content="Download GameNight, connect your controllers and play. A simple guide to hosting couch multiplayer on Windows and macOS.">
+<link rel="icon" type="image/svg+xml" href="/web/icon.svg">
+<link rel="stylesheet" href="/web/host.css"><link rel="stylesheet" href="/web/site.css">
+<script src="/web/shell.js" defer></script><script src="/web/host.js" defer></script>
+</head>
+<body class="host-page">
+<div id="site-shell"></div>
+<main class="host-guide">
+  <header class="host-intro">
+    <p class="host-eyebrow">One computer. Everyone together.</p>
+    <h1>Host a game night.</h1>
+    <p>You bring the controllers. GameNight gets the games ready.</p>
+    <div class="host-needs"><span>Windows or Mac</span><span>Controllers</span><span>Internet for setup</span></div>
+  </header>
+  <ol class="host-steps" aria-label="Getting started">
+    <li class="host-step" id="download">
+      <div class="host-copy"><span class="host-number" aria-hidden="true">01</span><h2>Get GameNight.</h2><p>Install it on the computer everyone will play on. Connect it to your TV for the big-screen version.</p></div>
+      <div class="host-visual host-downloads">
+        <a class="host-download" href="/download/GameNight-Setup.exe" download>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4l9-1v8H2zm11-1.2L22 2v9h-9zM2 13h9v8l-9-1zm11 0h9v9l-9-1z"/></svg>
+          <span><strong>Download for Windows</strong><small>Windows x64 · <span data-download-size="windows">≈39 MB</span></small></span><span class="download-arrow" aria-hidden="true">↓</span>
+        </a>
+        <a class="host-download" href="/download/GameNight.dmg" download>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.8 12.4c0-2 1.6-3 1.7-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.2.8-.6 0-1.6-.8-2.7-.8-1.4 0-2.7.8-3.4 2-1.5 2.5-.4 6.2 1 8.2.7 1 1.4 2.1 2.5 2.1s1.5-.7 2.8-.7 1.7.7 2.8.7 1.8-1 2.5-2c.8-1.1 1.1-2.1 1.1-2.2-.1 0-2.1-.8-2.1-3.4zM14.6 6.4c.6-.8 1.1-1.8 1-2.9-1 .1-2 .7-2.7 1.4-.6.7-1.1 1.8-1 2.8 1 .1 2.1-.5 2.7-1.3z"/></svg>
+          <span><strong>Download for macOS</strong><small>Apple Silicon &amp; Intel · <span data-download-size="macos">≈55 MB</span></small></span><span class="download-arrow" aria-hidden="true">↓</span>
+        </a>
+        <p class="host-caption">Free, open source, early preview. Games download separately.</p>
+      </div>
+    </li>
+    <li class="host-step">
+      <div class="host-copy"><span class="host-number" aria-hidden="true">02</span><h2>Open your lobby.</h2><p><strong>Windows:</strong> run the installer, then open GameNight.<br><strong>Mac:</strong> open the DMG, drag GameNight to Applications, then open it.</p><p>That’s your shared home between games.</p></div>
+      <figure class="host-visual host-lobby"><img src="/web/host-lobby.png" width="1024" height="768" alt="The GameNight lobby: a pixel-art room with game screens, platforms and a room-code board." decoding="async"><figcaption>A look inside the lobby</figcaption></figure>
+    </li>
+    <li class="host-step">
+      <div class="host-copy"><span class="host-number" aria-hidden="true">03</span><h2>Controllers in. Friends in.</h2><p>Plug in or pair controllers with the host computer. Press a button on each to join the lobby.</p><p class="host-detail">On Windows, use Xbox / XInput-compatible controllers.</p></div>
+      <div class="host-visual controller-scene" role="img" aria-label="Four controllers, each linked to its own player">
+        <svg viewBox="0 0 480 190" aria-hidden="true">
+          <defs><g id="host-pad"><path d="M-35-20c-10 0-15 8-18 20l-6 24c-3 14 9 20 18 10l14-13h54l14 13c9 10 21 4 18-10L53 0c-3-12-8-20-18-20z" fill="#242a43" stroke="currentColor" stroke-width="2"/><path d="M-34-3v18m-9-9h18" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><circle cx="30" cy="1" r="3" fill="currentColor"/><circle cx="39" cy="9" r="3" fill="currentColor"/><circle cx="22" cy="9" r="3" fill="currentColor"/><circle cx="30" cy="17" r="3" fill="currentColor"/><circle cy="-5" r="3" fill="#979cb8"/></g></defs>
+          <g class="host-player-one"><path d="M72 64v26"/><circle cx="72" cy="44" r="19"/><use href="#host-pad" transform="translate(72 122) scale(.8)"/></g>
+          <g class="host-player-two"><path d="M184 64v26"/><circle cx="184" cy="44" r="19"/><use href="#host-pad" transform="translate(184 122) scale(.8)"/></g>
+          <g class="host-player-three"><path d="M296 64v26"/><circle cx="296" cy="44" r="19"/><use href="#host-pad" transform="translate(296 122) scale(.8)"/></g>
+          <g class="host-player-four"><path d="M408 64v26"/><circle cx="408" cy="44" r="19"/><use href="#host-pad" transform="translate(408 122) scale(.8)"/></g>
+          <g fill="#101321"><circle cx="66" cy="42" r="2"/><circle cx="78" cy="42" r="2"/><circle cx="178" cy="42" r="2"/><circle cx="190" cy="42" r="2"/><circle cx="290" cy="42" r="2"/><circle cx="302" cy="42" r="2"/><circle cx="402" cy="42" r="2"/><circle cx="414" cy="42" r="2"/></g>
+        </svg><p class="host-caption">Your controller stays linked to your player.</p>
+      </div>
+    </li>
+    <li class="host-step">
+      <div class="host-copy"><span class="host-number" aria-hidden="true">04</span><h2>The games get ready.</h2><p>Games install automatically in the background. Hang out in the lobby while the first downloads finish.</p><p class="host-detail">First-time setup depends on your internet speed. Downloaded games are saved for next time.</p></div>
+      <div class="host-visual host-preparing" role="img" aria-label="Illustration of one game ready to play and another downloading in the background">
+        <div class="host-game-row"><img src="/games/previews/ballkickers-v0.1.1/ballkickers.jpg" alt="" width="960" height="540" loading="lazy"><div><strong>Ballkickers</strong><span class="host-ready">✓ Ready to play</span></div></div>
+        <div class="host-game-row"><img src="/games/previews/2026-09-28-v2/spaceracer.jpg" alt="" width="960" height="540" loading="lazy"><div><strong>SpaceRacer</strong><span>Preparing in the background</span><div class="host-progress"><i></i></div></div></div>
+        <p class="host-caption">Example download progress</p>
+      </div>
+    </li>
+    <li class="host-step host-last">
+      <div class="host-copy"><span class="host-number" aria-hidden="true">05</span><h2>Let’s play.</h2><p>Walk up to Play in the lobby and press <kbd>Y</kbd>. Use Back / Select to return to the lobby when you’re ready for something else.</p><a class="host-catalog-link" href="/catalog">Explore the games <span aria-hidden="true">→</span></a></div>
+      <figure class="host-visual host-gameplay"><img src="/games/previews/2026-09-28-v2/spaceracer.jpg" width="960" height="540" loading="lazy" alt="SpaceRacer gameplay"><figcaption>One lobby. A whole evening of games.</figcaption></figure>
+    </li>
+  </ol>
+  <footer class="host-footer"><p>Joining someone else’s game night? <a href="/join">Enter a room code →</a></p><a href="https://github.com/ontola/gamenight">Open source on GitHub ↗</a></footer>
+</main>
+</body>
+</html>

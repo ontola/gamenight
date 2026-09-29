@@ -45,7 +45,7 @@
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
   </div>
   <div class="site-room-actions">
-    <a class="site-host" href="/#download">Host</a>
+    <a class="site-host" href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined}>Host</a>
     <button class="btn-primary" data-room-join hidden={$room===true} onclick={join}>Join</button>
     <button class="btn-primary" data-room-leave hidden={$room!==true} onclick={()=>{leaveError='';leaveDialog.showModal();}}>Leave room</button>
   </div>

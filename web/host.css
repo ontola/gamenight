@@ -1,0 +1,53 @@
+/* Scoped to the hosting guide so cached SPA views retain their own layout. */
+.host-page{margin:0}
+.host-guide{max-width:1052px;padding:0 24px;margin:auto}
+.host-intro{padding:56px 0 40px;max-width:760px}
+.host-eyebrow{color:#afa4f5;font-size:12px;font-weight:750;letter-spacing:.13em;text-transform:uppercase;margin:0 0 14px}
+.host-intro h1{font-size:clamp(36px,6vw,58px);letter-spacing:-.045em;line-height:1.1;margin:0 0 18px}
+.host-intro>p:not(.host-eyebrow){font-size:19px;color:#b4b8cd;margin:0}
+.host-needs{display:flex;gap:10px 22px;flex-wrap:wrap;margin-top:22px;font-size:13px;color:#a8adc4}
+.host-needs span::before{content:'\2713';color:#81d7bd;margin-right:7px}
+.host-steps{list-style:none;padding:0;margin:0}
+.host-step{position:relative;display:grid;grid-template-columns:1fr 1.18fr;align-items:center;gap:60px;border-top:1px solid #343b53;padding:38px 0}
+.host-copy{padding-left:55px;position:relative}
+.host-number{position:absolute;left:0;top:1px;font-size:14px;font-weight:700;color:#a79cf2;border:1px solid #4e466e;border-radius:50%;width:34px;height:34px;display:grid;place-items:center}
+.host-copy h2{font-size:clamp(23px,3vw,28px);line-height:1.2;letter-spacing:-.025em;margin:3px 0 15px}
+.host-copy p{margin:0 0 12px;color:#b4b8cd;font-size:15px;line-height:1.65}
+.host-copy p:last-child{margin-bottom:0}
+.host-copy strong{font-weight:600;color:#eef0fc}
+.host-copy .host-detail{font-size:13px;color:#9ca4bd}
+.host-visual{min-width:0;margin:0}
+.host-downloads{display:grid;gap:10px}
+.host-download{display:flex;align-items:center;gap:14px;padding:18px 20px;border:1px solid #7162c4;border-radius:13px;color:#fff;text-decoration:none;background:#443781;transition:background .15s,border-color .15s}
+.host-download:hover{background:#5746a0;border-color:#b5a7ff}
+.host-download:nth-child(2){background:#22233c;border-color:#4c4c70}
+.host-download:nth-child(2):hover{background:#30314e;border-color:#9990c4}
+.host-download svg{width:26px;height:26px;fill:currentColor;flex-shrink:0}
+.host-download strong{display:block;font-size:16px}
+.host-download small{display:block;color:#d2ccef;font-size:12px;margin-top:3px}
+.download-arrow{font-size:24px;margin-left:auto}
+.host-caption{font-size:12px;color:#969fb8;margin:5px 0 0;line-height:1.5}
+.host-lobby{border-radius:14px;overflow:hidden;background:#141a2c;border:1px solid #343b53}
+.host-lobby img{display:block;width:100%;height:auto}
+.host-lobby figcaption,.host-gameplay figcaption{padding:9px 14px;font-size:12px;color:#a8adc4}
+.controller-scene{padding:18px 10px 12px;background:radial-gradient(ellipse at 50% 30%,#282742,transparent 75%);text-align:center}
+.controller-scene svg{width:100%;height:auto;display:block}
+.controller-scene svg>g>path{stroke:currentColor;stroke-dasharray:3 4}
+.controller-scene svg>g[class]>circle{fill:currentColor}
+.host-player-one{color:#87dec8}.host-player-two{color:#ffa594}.host-player-three{color:#c1a3fa}.host-player-four{color:#f3d083}
+.host-preparing{padding:20px;background:#171c2e;border:1px solid #343b53;border-radius:14px}
+.host-game-row{display:flex;gap:14px;align-items:center;margin:0 0 20px}
+.host-game-row img{width:92px;height:62px;object-fit:cover;border-radius:7px;flex-shrink:0}
+.host-game-row>div{flex:1;min-width:0}.host-game-row strong{font-size:14px}.host-game-row span{display:block;font-size:12px;color:#a8adc4;margin:3px 0}
+.host-game-row .host-ready{color:#87dec8}
+.host-progress{height:4px;border-radius:4px;background:#31354e;margin-top:10px;overflow:hidden}.host-progress i{display:block;width:62%;height:100%;background:#a699f6}
+.host-gameplay{border-radius:14px;overflow:hidden;border:1px solid #343b53;background:#171c2e}.host-gameplay img{display:block;width:100%;height:auto}
+.host-copy kbd{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;border:1px solid #dfcb7a;font:700 12px system-ui;color:#f4de84}
+.host-catalog-link{display:inline-flex;align-items:center;gap:22px;margin-top:8px;color:#c3baff;font-weight:650;text-decoration:none;min-height:44px}
+.host-catalog-link:hover{text-decoration:underline}
+.host-footer{border-top:1px solid #343b53;margin:10px 0 0;padding:26px 0 36px;display:flex;justify-content:space-between;gap:20px;color:#9ca4bd;font-size:13px}
+.host-footer p{margin:0}.host-footer a{color:#c3baff}
+.host-guide a:focus-visible{outline:2px solid #c3baff;outline-offset:5px}
+@media(max-width:700px){.host-guide{padding:0 20px}.host-intro{padding:34px 0 28px}.host-intro>p:not(.host-eyebrow){font-size:17px}.host-step{grid-template-columns:1fr;gap:22px;padding:28px 0}.host-copy{padding-left:48px}.host-footer{flex-direction:column;gap:12px}.host-visual{width:100%;box-sizing:border-box}.host-download{padding:16px}.host-needs{gap:8px 16px}}
+@media(max-width:380px){.host-guide{padding:0 16px}.host-download strong{font-size:14px}.host-download{gap:10px}.host-game-row img{width:72px;height:52px}.host-preparing{padding:16px}.host-copy h2{font-size:23px}}
+@media(prefers-reduced-motion:reduce){.host-download{transition:none}}
