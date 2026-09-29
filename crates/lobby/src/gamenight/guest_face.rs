@@ -1,5 +1,5 @@
 //! Procedural guest artwork in the shared 48px head space.
-//! Keep new features centred on (24, 28); saved profile pixels are untouched.
+//! Keep the head at (24, 28), with features looking right; saved profiles are untouched.
 type Color = [u8; 3];
 const INK: Color = [26, 26, 26];
 const WHITE: Color = [255, 255, 255];
@@ -60,7 +60,7 @@ pub(crate) fn pixels(seed: &[u8; 16]) -> Vec<Option<Color>> {
             rect(12, 20, 24, 1, WHITE);
         }
     }
-    for x in [18, 26] {
+    for x in [22, 30] {
         if seed[3] % 3 == 0 {
             rect(x, 27, 4, 2, INK);
         } else {
@@ -68,9 +68,9 @@ pub(crate) fn pixels(seed: &[u8; 16]) -> Vec<Option<Color>> {
             rect(x + 2, 26, 2, 3, INK);
         }
     }
-    rect(20, 33, 8, 2, INK);
+    rect(24, 33, 8, 2, INK);
     if seed[4] % 2 == 0 {
-        rect(22, 35, 4, 1, INK);
+        rect(26, 35, 4, 1, INK);
     }
     pixels
 }
@@ -101,8 +101,8 @@ mod tests {
                             }
                         }
                     }
-                    assert!(face[26 * 48 + 20].is_some() || face[27 * 48 + 20].is_some());
-                    assert!(face[33 * 48 + 24].is_some());
+                    assert!(face[26 * 48 + 24].is_some() || face[27 * 48 + 24].is_some());
+                    assert!(face[33 * 48 + 28].is_some());
                 }
             }
         }

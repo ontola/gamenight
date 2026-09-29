@@ -414,11 +414,11 @@ let initializing = true;
           return api;
         },
         done() {
-          // New presets use the current head anchor. normalizeFace is only
+          // New presets look right within the fixed head anchor. normalizeFace is only
           // for loading older drawings and must retain its legacy offsets.
           const face = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
           g.forEach((color, i) => {
-            const x = HEAD.x - 8 + i % 16;
+            const x = HEAD.x - 4 + i % 16;
             const y = HEAD.y - 7 + Math.floor(i / 16);
             face[y * GRID_SIZE + x] = color;
           });
@@ -447,6 +447,7 @@ let initializing = true;
     // Seat every style on the same forehead, above the brows. Hair and hats
     // have separate silhouettes, but share the head centre and a 26px band.
     function dressRandomFace(face) {
+      const features = face.slice();
       const pick = values => values[Math.floor(Math.random() * values.length)];
       const hair = pick(['#30231d', '#6b3926', '#c07832', '#efd078', '#dce3ef', '#8b4dcc']);
       const cloth = pick(['#d64c64', '#437bd1', '#7552b8', '#36a69a', '#e39a36']);
@@ -512,6 +513,8 @@ let initializing = true;
         },
       ];
       pick(styles)();
+      // Foreground facial features remain visible in front of side hair.
+      features.forEach((color, i) => { if (color !== EMPTY) face[i] = color; });
       return face;
     }
 
@@ -674,7 +677,7 @@ let initializing = true;
           const rgba = tint.getImageData(27, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
-          for (const [x,y] of [[20,26],[28,26],[21,33],[22,33],[23,33],[24,33],[25,33],[26,33]]) {
+          for (const [x,y] of [[24,26],[32,26],[25,33],[26,33],[27,33],[28,33],[29,33],[30,33]]) {
             outfitGuidePixels[y * GRID_SIZE + x] = 'rgba(30,30,40,.35)';
           }
           outfitGuideSprite = previewSprite;

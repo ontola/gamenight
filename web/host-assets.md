@@ -7,13 +7,16 @@ players over it, clearly captioned as an illustration.
 Lobby artwork retains its existing licenses in `crates/lobby`.
 
 Other gameplay stills use the catalog's existing versioned preview URLs.
-The controller and phone illustrations are original inline SVG/CSS in `host.html`.
+The controller and phone UI are inline SVG/CSS in `host.html`. Character bodies
+use the actual lobby idle sprite at `/assets/characters/living-room`, recoloured
+and drawn at native resolution with nearest-neighbour scaling in `host.js`.
+There are no synthetic vector body silhouettes.
 Four faces are generated from the real character editor's `FACE_RECIPES` and
 `dressRandomFace`, with fixed samples so the same player stays recognizable in
 the controller, lobby, and profile illustrations. Regenerate the SVG symbols
 with `node scripts/generate-host-faces.cjs`. No image or game runtime dependency
 is added. The lobby already supports generated guest avatars and drawn profiles;
-new presets share the centred head layout used by lobby guest artwork. Saved
+new presets face right within the fixed head anchor, as lobby guest artwork does. Saved
 profile artwork keeps its original coordinates.
 
 Download sizes default to approximate values measured from the hosted installers
