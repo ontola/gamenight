@@ -145,7 +145,7 @@ class ContractTests(unittest.TestCase):
             'protocol.handshake','gameplay.start','gameplay.pause','gameplay.resume',
             'input.identity','process.disconnect','profile.identity','profile.face',
             'profile.colors','presentation.prewarm','presentation.frame','gameplay.continuous',
-            'party.settings')}
+            'party.settings','party.round_end')}
         report=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                             {'version':1,'features':features},'sha','windows')
         entry={'id':'spaceracer','downloads':{'windows':{'sha256':m.digest(archive)}}}
@@ -168,9 +168,9 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(game['checks']['presentation.frame']['status'],'passed')
         self.assertEqual(game['checks']['party.settings']['status'],'passed')
         self.assertEqual(game['checks']['profile.colors']['status'],'passed')
+        self.assertEqual(game['checks']['gameplay.continuous']['status'],'passed')
+        self.assertEqual(game['checks']['party.round_end']['status'],'passed')
         self.assertEqual(len(game['checks']['presentation.prewarm']['evidence']),1)
-        for feature in ('gameplay.continuous',):
-            self.assertEqual(game['checks'][feature]['status'],'untested')
         default=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                              {'version':1,'features':features},'sha','windows')
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
@@ -180,6 +180,7 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(default['games'][0]['checks']['presentation.prewarm']['status'],'untested')
         self.assertEqual(default['games'][0]['checks']['presentation.frame']['status'],'untested')
         self.assertEqual(default['games'][0]['checks']['profile.colors']['status'],'passed')
+        self.assertEqual(default['games'][0]['checks']['gameplay.continuous']['status'],'passed')
 
     def test_nested_evidence_uses_portable_paths(self):
         nested=self.output/'native'/'observations.json'

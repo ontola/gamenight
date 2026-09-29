@@ -156,6 +156,7 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
     frame_log = output/'spaceracer.frame.log'
     frame = output/'spaceracer.frame.png'
     colors_log = output/'spaceracer.colors.log'
+    continuous_log = output/'spaceracer.continuous.log'
     with tempfile.TemporaryDirectory(prefix='spaceracer-contract-') as directory:
         extracted = Path(directory)
         with zipfile.ZipFile(archive) as packed:
@@ -170,6 +171,9 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
         colors_passed = run_check([sys.executable, str(ROOT/'scripts/test-spaceracer-colors.py'),
                                    '--godot', str(extracted/'SpaceRacer.exe'), '--source', str(source)],
                                   env, colors_log, timeout=90)
+        continuous_passed = run_check([sys.executable, str(ROOT/'scripts/test-spaceracer-continuous.py'),
+                                       '--godot', str(extracted/'SpaceRacer.exe'), '--source', str(source)],
+                                      env, continuous_log, timeout=210)
         if window_probe:
             window_passed = run_check([sys.executable, str(source/'tests/integration.py'),
                                        '--godot', str(extracted/'SpaceRacer.exe'), '--packed'],
@@ -191,6 +195,13 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
         'detail': 'Live skin and clothing updates rebuild only the matching pilot face layer',
     }
     print(f"spaceracer: profile.colors: {game['checks']['profile.colors']['status']}", flush=True)
+    for feature in ('party.round_end', 'gameplay.continuous'):
+        game['checks'][feature] = {
+            'status': 'passed' if continuous_passed else 'failed',
+            'evidence': [evidence(continuous_log, output)],
+            'detail': 'Packed game reports a finished AI race, then restarts in the same process and session',
+        }
+        print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
     if window_probe:
         game['checks']['presentation.prewarm'] = {
             'status': 'passed' if window_passed else 'failed',
