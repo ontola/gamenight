@@ -10,7 +10,7 @@ const choices=[['Cheeky',[.1,.5,.8]],['Pirate',[.3,.2,.6]],['Surprised',[.8,.7,.
 const faces=choices.map(([name,random])=>{
  let n=0;const math=Object.create(Math);math.random=()=>random[n++%random.length];
  const context={Math:math};vm.createContext(context);
- vm.runInContext(`const EMPTY=null,GRID_SIZE=48;${normalize}${recipes}\nglobalThis.pixels=dressRandomFace(FACE_RECIPES.find(r=>r.name===${JSON.stringify(name)}).build());`,context);
+ vm.runInContext(`const EMPTY=null,GRID_SIZE=48,HEAD={x:24,y:28,radius:12};${normalize}${recipes}\nglobalThis.pixels=dressRandomFace(FACE_RECIPES.find(r=>r.name===${JSON.stringify(name)}).build());`,context);
  const colors=new Map();
  for(let y=0;y<48;y++)for(let x=0;x<48;){const color=context.pixels[y*48+x];let end=x+1;while(end<48&&context.pixels[y*48+end]===color)end++;
   if(color)colors.set(color,(colors.get(color)||'')+`M${x} ${y}h${end-x}v1h-${end-x}z`);x=end;}

@@ -413,7 +413,17 @@ let initializing = true;
           put(row + 1, 4, col); put(row + 1, 11, col);
           return api;
         },
-        done() { return normalizeFace(g); }
+        done() {
+          // New presets use the current head anchor. normalizeFace is only
+          // for loading older drawings and must retain its legacy offsets.
+          const face = Array(GRID_SIZE * GRID_SIZE).fill(EMPTY);
+          g.forEach((color, i) => {
+            const x = HEAD.x - 8 + i % 16;
+            const y = HEAD.y - 7 + Math.floor(i / 16);
+            face[y * GRID_SIZE + x] = color;
+          });
+          return face;
+        }
       };
       return api;
     }
@@ -434,55 +444,71 @@ let initializing = true;
       { name: 'Robot',     build: () => facePad().antenna().eyesSquare(5).mouthGrid(11).done() },
     ];
 
-    // Hair and headwear use the full native-pixel head canvas, independently
-    // of the facial expression. Leave the eyes at their existing right offset.
+    // Seat every style on the same forehead, above the brows. Hair and hats
+    // have separate silhouettes, but share the head centre and a 26px band.
     function dressRandomFace(face) {
       const pick = values => values[Math.floor(Math.random() * values.length)];
       const hair = pick(['#30231d', '#6b3926', '#c07832', '#efd078', '#dce3ef', '#8b4dcc']);
       const cloth = pick(['#d64c64', '#437bd1', '#7552b8', '#36a69a', '#e39a36']);
+      const shade = color => '#' + [1, 3, 5].map(i =>
+        Math.round(parseInt(color.slice(i, i + 2), 16) * .72).toString(16).padStart(2, '0')).join('');
+      const cx = HEAD.x, bandY = HEAD.y - HEAD.radius + 4;
       const box = (x, y, w, h, color) => {
         for (let row = y; row < y + h; row++) for (let col = x; col < x + w; col++) {
           if (row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE) face[row * GRID_SIZE + col] = color;
         }
       };
+      const dome = color => {
+        box(cx - 6, bandY - 8, 12, 2, color);
+        box(cx - 10, bandY - 6, 20, 4, color);
+        box(cx - 12, bandY - 2, 24, 4, color);
+      };
       const styles = [
-        () => { // Side part, with sideburns.
-          box(12, 15, 25, 5, hair); box(16, 12, 17, 3, hair);
-          box(12, 20, 5, 12, hair); box(17, 20, 9, 3, hair);
+        () => { // Side part follows the curve; sideburn stays off the cheek.
+          dome(hair); box(cx - 12, bandY + 1, 4, 10, hair);
+          box(cx - 8, bandY + 1, 6, 2, hair);
+          box(cx - 5, bandY - 6, 1, 5, shade(hair));
         },
-        () => { // Curly hair: staggered little pixel curls.
-          for (let x = 12; x < 36; x += 5) {
-            box(x, 13 + (x % 2) * 2, 6, 6, hair); box(x + 1, 12 + (x % 2) * 2, 4, 8, hair);
+        () => { // Three soft curls and two short temple curls.
+          for (const x of [cx - 9, cx - 3, cx + 3]) {
+            box(x, bandY - 7, 6, 8, hair); box(x + 1, bandY - 9, 4, 2, hair);
           }
-          box(11, 20, 5, 12, hair);
+          box(cx - 12, bandY - 1, 4, 8, hair); box(cx + 8, bandY - 1, 4, 8, hair);
         },
-        () => { // Mohawk.
-          box(22, 7, 5, 14, hair); box(24, 5, 4, 13, hair);
-          box(20, 17, 10, 4, hair);
+        () => { // A compact mohawk rooted at the crown of the head.
+          box(cx - 2, bandY - 13, 4, 13, hair);
+          box(cx - 4, bandY - 3, 8, 5, hair);
+          box(cx + 1, bandY - 11, 1, 8, shade(hair));
         },
-        () => { // Long hair, keeping the face open.
-          box(13, 14, 24, 6, hair); box(11, 20, 7, 20, hair);
-          box(18, 19, 7, 4, hair);
+        () => { // Long hair frames both sides without covering the features.
+          dome(hair); box(cx - 12, bandY, 4, 19, hair);
+          box(cx + 8, bandY, 4, 19, hair);
+          box(cx - 12, bandY + 2, 1, 15, shade(hair));
         },
-        () => { // Beanie and pompom.
-          box(13, 13, 24, 8, cloth); box(17, 10, 16, 3, cloth);
-          box(23, 6, 6, 4, WHITE); box(11, 21, 28, 3, WHITE);
+        () => { // Beanie with a fitted cuff and centred pompom.
+          dome(cloth); box(cx - 2, bandY - 12, 4, 4, WHITE);
+          box(cx - 13, bandY, 26, 3, shade(cloth));
+          box(cx - 12, bandY, 24, 1, WHITE);
         },
-        () => { // Baseball cap with a right-facing brim.
-          box(14, 14, 22, 7, cloth); box(18, 11, 14, 3, cloth);
-          box(12, 21, 31, 3, cloth); box(27, 15, 3, 4, WHITE);
+        () => { // Only the cap's visor extends beyond the head to the right.
+          dome(cloth); box(cx + 2, bandY - 5, 3, 3, WHITE);
+          box(cx - 12, bandY, 27, 2, cloth);
+          box(cx - 12, bandY + 2, 27, 1, shade(cloth));
         },
-        () => { // Wizard hat.
-          for (let y = 5; y < 22; y++) {
-            const width = 3 + Math.floor((y - 5) / 2) * 2;
-            box(25 - Math.floor(width / 2), y, width, 1, cloth);
+        () => { // Wizard cone meets the fitted brim without exposed gaps.
+          for (let y = bandY - 12; y < bandY; y++) {
+            const width = 2 + (y - (bandY - 12)) * 2;
+            box(cx - width / 2, y, width, 1, cloth);
           }
-          box(11, 22, 30, 3, cloth); box(24, 14, 2, 3, '#ffe066');
+          box(cx - 13, bandY, 26, 2, cloth);
+          box(cx - 13, bandY + 2, 26, 1, shade(cloth));
+          box(cx - 1, bandY - 6, 2, 3, '#ffe066');
         },
-        () => { // Crown.
-          box(13, 17, 25, 6, '#efc448');
-          for (const x of [13, 23, 34]) box(x, 11, 4, 6, '#efc448');
-          box(23, 19, 4, 3, cloth);
+        () => { // Crown wraps the forehead instead of hovering over it.
+          box(cx - 12, bandY - 2, 24, 5, '#efc448');
+          for (const x of [cx - 12, cx - 2, cx + 8]) box(x, bandY - 8, 4, 6, '#efc448');
+          box(cx - 12, bandY + 2, 24, 1, '#bd8d27');
+          box(cx - 2, bandY - 1, 4, 2, cloth);
         },
       ];
       pick(styles)();
@@ -648,7 +674,7 @@ let initializing = true;
           const rgba = tint.getImageData(27, 4, GRID_SIZE, GRID_SIZE).data;
           outfitGuidePixels = Array.from({length: GRID_SIZE * GRID_SIZE}, (_, i) =>
             `rgba(${rgba[i*4]},${rgba[i*4+1]},${rgba[i*4+2]},${rgba[i*4+3]/255})`);
-          for (const [x,y] of [[24,26],[30,26],[26,33],[27,33],[28,33],[29,33]]) {
+          for (const [x,y] of [[20,26],[28,26],[21,33],[22,33],[23,33],[24,33],[25,33],[26,33]]) {
             outfitGuidePixels[y * GRID_SIZE + x] = 'rgba(30,30,40,.35)';
           }
           outfitGuideSprite = previewSprite;

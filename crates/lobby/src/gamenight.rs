@@ -22,6 +22,7 @@
 //! have no meaning in the browser build.
 
 mod sleep_visual;
+mod guest_face;
 use std::collections::HashSet;
 use std::time::Duration;
 
@@ -1337,27 +1338,12 @@ struct PruneCountdown {
 /// `GameNightBridge`'s live player list every frame, so there's nothing here
 /// to keep in sync on rename/color-change.
 fn random_guest_avatar() -> String {
-    let seed=PlayerId::new();
-    let bytes=seed.0.as_bytes();
-    let mut art=gamenight_protocol::avatar::Avatar{width:48,height:48,pixels:vec![None;48*48]};
-    let hair=[[48,35,29],[107,57,38],[192,120,50],[239,208,120],[220,227,239]][bytes[0] as usize%5];
-    let hat=[[214,76,100],[67,123,209],[117,82,184],[54,166,154]][bytes[1] as usize%4];
-    let mut rect=|x:usize,y:usize,w:usize,h:usize,c:[u8;3]| {
-        for row in y..(y+h).min(48) {for col in x..(x+w).min(48) {art.pixels[row*48+col]=Some(c);}}
-    };
-    match bytes[2]%4 {
-        0=>{rect(13,14,24,7,hair);rect(12,20,5,13,hair);},
-        1=>{rect(22,6,6,16,hair);rect(18,18,16,4,hair);},
-        2=>{rect(14,13,23,9,hat);rect(12,22,31,3,hat);rect(27,16,3,4,[255,255,255]);},
-        _=>{rect(14,13,23,10,hat);rect(18,10,15,3,hat);rect(24,6,5,4,[255,255,255]);rect(12,22,27,3,[235,225,209]);}
-    }
-    for x in [23,32] {
-        if bytes[3]%3==0 {rect(x,28,4,2,[26,26,26]);}
-        else {rect(x,26,5,5,[255,255,255]);rect(x+2,27,2,3,[26,26,26]);}
-    }
-    rect(27,35,8,2,[26,26,26]);
-    if bytes[4]%2==0 {rect(29,37,4,1,[26,26,26]);}
-    art.encode()
+    let seed = PlayerId::new();
+    gamenight_protocol::avatar::Avatar {
+        width: 48,
+        height: 48,
+        pixels: guest_face::pixels(seed.0.as_bytes()),
+    }.encode()
 }
 
 struct PlayerMenuState {

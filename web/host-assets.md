@@ -13,7 +13,8 @@ Four faces are generated from the real character editor's `FACE_RECIPES` and
 the controller, lobby, and profile illustrations. Regenerate the SVG symbols
 with `node scripts/generate-host-faces.cjs`. No image or game runtime dependency
 is added. The lobby already supports generated guest avatars and drawn profiles;
-this guide does not modify lobby behavior.
+new presets share the centred head layout used by lobby guest artwork. Saved
+profile artwork keeps its original coordinates.
 
 Download sizes default to approximate values measured from the hosted installers
 on 29 September 2026. `host.js` refreshes these using HEAD / Content-Length
