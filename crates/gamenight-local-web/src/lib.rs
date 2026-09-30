@@ -695,7 +695,14 @@ async fn serve_web_asset(Path(asset): Path<String>) -> Response {
 
 async fn serve_docs(Path(page): Path<String>) -> Response {
     match docs_pages::page(&page) {
-        Some(html) => Html(html.replace("<body>", "<body data-local=\"true\">")).into_response(),
+        Some(html) => Html(
+            html.replace("<body>", "<body data-local=\"true\">")
+                .replace(
+                    "href=\"/developers",
+                    "href=\"https://gamenight.ontola.io/developers",
+                ),
+        )
+        .into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
@@ -715,6 +722,7 @@ mod docs_tests {
             let html = String::from_utf8(body.to_vec()).unwrap();
             assert!(html.contains("data-local=\"true\""));
             assert!(html.contains("aria-label=\"Documentation\""));
+            assert!(!html.contains("href=\"/developers"));
         }
         assert_eq!(
             serve_docs(Path("../private".into())).await.status(),
