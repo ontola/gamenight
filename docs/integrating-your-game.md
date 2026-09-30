@@ -10,13 +10,17 @@ A successful handshake alone is not a complete integration.
 
 ## Submit a game
 
-The [developer workspace](https://gamenight.ontola.io/developers/submissions)
-accepts existing playable games, including games that do not yet speak the protocol.
-Choose assisted integration or integrate with your own developers or AI using this
-guide. For assisted work, agree repository access, code handling and any AI use
+Start with a [short message to GameNight](https://gamenight.ontola.io/developers).
+Your email and a few words about the game are enough. Include a link if you have
+one. No account or protocol integration is required to start the conversation.
+Keep the private conversation link to read replies and follow up.
+
+We can help with integration, or you can use this guide with your own developers
+or AI tools. For assisted work, agree repository access, code handling and any AI use
 first. Private repositories can stay private. GameNight prepares a pull request;
 you review and merge it, then supply the resulting build for testing.
 
+When ready for review, use the [release workspace](https://gamenight.ontola.io/developers/releases).
 Submit one platform build with a version, player limits and controls. Its SHA-256
 is required before approval. The workspace holds private feedback and revisions;
 each revised build needs a new review. Code access does not grant distribution
