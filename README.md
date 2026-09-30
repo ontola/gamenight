@@ -12,7 +12,7 @@ players across integrated games.
 [Download for Windows](https://gamenight.ontola.io/download/GameNight-Setup.exe) ·
 [Download for Mac](https://gamenight.ontola.io/download/GameNight.dmg) ·
 [Browse games](https://gamenight.ontola.io/catalog) ·
-[Integrate your game](docs/integrating-your-game.md)
+[Developer docs](https://gamenight.ontola.io/docs)
 
 ## Play
 

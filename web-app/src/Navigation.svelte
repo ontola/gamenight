@@ -41,6 +41,7 @@
   <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a>
   <div class="site-links">
     <a href="/catalog" aria-current={$route.startsWith('/catalog')?'page':undefined}>Games</a>
+    <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
     <a href={$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$signedIn?'You':'Sign in'}</a>
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
   </div>

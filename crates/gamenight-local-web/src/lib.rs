@@ -11,6 +11,9 @@ mod dev_web;
 mod local_room;
 mod memory;
 mod playlist;
+mod docs_pages {
+    include!("../../../web/docs-routes.rs");
+}
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -118,6 +121,11 @@ pub fn create_router(state: SharedState) -> Router {
             }),
         )
         .route("/studio", get(serve_studio))
+        .route(
+            "/docs",
+            get(|| async { serve_docs(Path(String::new())).await }),
+        )
+        .route("/docs/:page", get(serve_docs))
         .route("/web/:asset", get(serve_web_asset))
         .route(
             "/web/fonts/ark-pixel-16px-latin.ttf",
@@ -671,6 +679,8 @@ pub static STUDIO_HTML: &str = include_str!("../../../web/studio.html");
 
 async fn serve_web_asset(Path(asset): Path<String>) -> Response {
     let (mime, data) = match asset.as_str() {
+        "docs.css" => ("text/css", include_str!("../../../web/docs.css")),
+        "docs.js" => ("text/javascript", include_str!("../../../web/docs.js")),
         "storage.js" => ("text/javascript", include_str!("../../../web/storage.js")),
         "site.css" => ("text/css", include_str!("../../../web/site.css")),
         "studio.css" => ("text/css", include_str!("../../../web/studio.css")),
@@ -681,6 +691,36 @@ async fn serve_web_asset(Path(asset): Path<String>) -> Response {
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     ([("content-type", mime)], data).into_response()
+}
+
+async fn serve_docs(Path(page): Path<String>) -> Response {
+    match docs_pages::page(&page) {
+        Some(html) => Html(html.replace("<body>", "<body data-local=\"true\">")).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+#[cfg(test)]
+mod docs_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn documentation_is_public_and_unknown_pages_are_not_served() {
+        for slug in ["", "love", "rust", "godot", "c", "faces", "protocol"] {
+            let response = serve_docs(Path(slug.into())).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let html = String::from_utf8(body.to_vec()).unwrap();
+            assert!(html.contains("data-local=\"true\""));
+            assert!(html.contains("aria-label=\"Documentation\""));
+        }
+        assert_eq!(
+            serve_docs(Path("../private".into())).await.status(),
+            StatusCode::NOT_FOUND
+        );
+    }
 }
 
 #[cfg(test)]

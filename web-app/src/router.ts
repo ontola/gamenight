@@ -4,7 +4,7 @@ const views=new Map<string,View>();
 const loads=new Map<string,Promise<View>>();
 const scripts=new Set<string>();
 let active='',sequence=0,started=false;
-const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html'?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':null;
+const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html'?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
 function capture(doc:Document,id:string):View {
   const node=document.createElement('div');node.dataset.appView=id;
   for(const child of [...doc.body.children]){
@@ -76,6 +76,9 @@ export async function navigate(href:string,replace=false):Promise<void>{
     window.dispatchEvent(new CustomEvent('gamenight-page-change',{detail:{page:id}}));
     const download=id==='home' && url.hash==='#download'?view.node.querySelector<HTMLElement>('#download'):null;
     if(download){download.scrollIntoView({block:'center',behavior:'instant'});download.focus({preventScroll:true});}
+    else if(id.startsWith('/docs') && url.hash){
+      try{view.node.querySelector<HTMLElement>('#'+CSS.escape(decodeURIComponent(url.hash.slice(1))))?.scrollIntoView({block:'start',behavior:'instant'});}catch{ /* Ignore malformed fragments. */ }
+    }
     else if(moved)window.scrollTo({top:view.scroll,behavior:'instant'});
   }catch(error){
     window.showToast(error instanceof Error?error.message:'Could not open this page. Try again.');

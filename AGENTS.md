@@ -6,3 +6,15 @@ link. Include a phone-sized view when the flow supports mobile use. Use test dat
 and keep credentials and private user information out of screenshots.
 
 This is the user's stated review preference from 30 September 2026.
+
+# Integration documentation
+
+The website docs are generated from `docs/site/pages.json`, its Markdown sources
+and source excerpts. When changing a protocol, SDK, controller/face helper or
+release contract, review the corresponding pages, then run
+`python scripts/build-docs.py` and `python scripts/build-docs.py --check`.
+Install `docs/site/requirements.txt` first. Do not edit generated `web/docs*.html`
+or `web/docs-routes.rs`. A successful build does not verify prose or real hardware;
+state adapter gaps and test limits explicitly. Keep the SDK READMEs pointing at
+the canonical engine guides. Import the committed public web bundle into the
+internal repo before building the cloud service.
