@@ -8,6 +8,29 @@ The [wire reference](protocol.md) defines messages; the
 [release requirements](../contract/requirements.json) define what must work.
 A successful handshake alone is not a complete integration.
 
+## Submit a game
+
+The [developer workspace](https://gamenight.ontola.io/developers/submissions)
+accepts existing playable games, including games that do not yet speak the protocol.
+Choose assisted integration or integrate with your own developers or AI using this
+guide. For assisted work, agree repository access, code handling and any AI use
+first. Private repositories can stay private. GameNight prepares a pull request;
+you review and merge it, then supply the resulting build for testing.
+
+Submit one platform build with a version, player limits and controls. Its SHA-256
+is required before approval. The workspace holds private feedback and revisions;
+each revised build needs a new review. Code access does not grant distribution
+permission. Staff review the package, rights and test evidence before approving
+catalog publication. Listing is free. The first flow supports free releases;
+commercial interest is accepted, but purchases, payouts and timed trials are not
+enabled by submitting a game.
+
+Run the [contract checks](game-contract-verification.md) before review and share
+their results. Also test physical controllers, joining/leaving, pause/resume and
+returning to the lobby on each supported platform. Automated test coverage varies
+by engine and runner; untested requirements are not passes. Do not treat the
+certifier as a complete controller or commercial trial test environment.
+
 ## Connect
 
 The host launches your process with `GAMENIGHT=1`, `GAMENIGHT_ADDR`,
