@@ -1,4 +1,4 @@
-//! Opt-in player memory for one desktop installation. Never stores phone/account tokens.
+//! Main player and guest memory for one installation. Never stores account tokens.
 use crate::Profile;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
@@ -6,6 +6,11 @@ use std::{collections::HashMap, path::PathBuf};
 pub struct Memory {
     pub device: String,
     pub profiles: HashMap<String, Profile>,
+    #[serde(default)]
+    pub main_profile: Option<String>,
+    /// Once cleared, another guest must not silently become the main player.
+    #[serde(default)]
+    pub main_initialized: bool,
     #[serde(skip)]
     path: Option<PathBuf>,
 }
@@ -49,9 +54,36 @@ impl Memory {
             next.profiles.insert(profile.id.clone(), profile.clone());
         } else {
             next.profiles.remove(&profile.id);
+            if next.main_profile.as_ref() == Some(&profile.id) {
+                next.main_profile = None;
+            }
         }
         next.save()?;
         *self = next;
+        Ok(())
+    }
+    pub fn main_player(&mut self, profile: &Profile, enabled: bool) -> std::io::Result<()> {
+        let mut next = self.clone();
+        next.main_initialized = true;
+        if enabled {
+            next.main_profile = Some(profile.id.clone());
+            next.profiles.insert(profile.id.clone(), profile.clone());
+        } else if next.main_profile.as_ref() == Some(&profile.id) {
+            next.main_profile = None;
+            next.profiles.remove(&profile.id);
+        }
+        next.save()?;
+        *self = next;
+        Ok(())
+    }
+    /// Called only after a room code or controller claim has been validated.
+    pub fn linked(&mut self, profile: &Profile, remember: Option<bool>) -> std::io::Result<()> {
+        if !self.main_initialized {
+            return self.main_player(profile, remember != Some(false));
+        }
+        if let Some(remember) = remember {
+            self.set(profile, remember)?;
+        }
         Ok(())
     }
 }
@@ -71,6 +103,53 @@ pub fn path() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn first_link_survives_restart_and_guests_never_replace_or_reclaim_it() {
+        let dir = std::env::temp_dir().join(format!("gamenight-main-{}", uuid::Uuid::new_v4()));
+        let path = dir.join("players.json");
+        let profile = |id: &str| Profile {
+            id: id.into(),
+            username: id.into(),
+            skin_color: "#abcdef".into(),
+            avatar: "face-and-hat".into(),
+        };
+        let mut memory = Memory::load(path.clone()).unwrap();
+        memory.linked(&profile("main"), None).unwrap();
+        memory.linked(&profile("guest"), None).unwrap();
+        let mut restored = Memory::load(path.clone()).unwrap();
+        assert_eq!(restored.main_profile.as_deref(), Some("main"));
+        assert_eq!(restored.profiles.len(), 1);
+        assert_eq!(restored.profiles["main"].avatar, "face-and-hat");
+        restored.main_player(&profile("main"), false).unwrap();
+        let mut restored = Memory::load(path.clone()).unwrap();
+        restored.linked(&profile("guest"), None).unwrap();
+        assert!(restored.main_profile.is_none());
+        assert!(restored.profiles.is_empty());
+        restored.main_player(&profile("guest"), true).unwrap();
+        restored.set(&profile("guest"), false).unwrap();
+        assert!(Memory::load(path).unwrap().main_profile.is_none());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn declining_first_memory_and_failed_writes_do_not_assign_main() {
+        let p = Profile {
+            id: "phone".into(),
+            username: "Player".into(),
+            skin_color: "#abcdef".into(),
+            avatar: String::new(),
+        };
+        let mut memory = Memory::default();
+        memory.linked(&p, Some(false)).unwrap();
+        memory.linked(&p, None).unwrap();
+        assert!(memory.main_profile.is_none());
+        let blocker =
+            std::env::temp_dir().join(format!("gamenight-main-file-{}", uuid::Uuid::new_v4()));
+        std::fs::write(&blocker, b"not a directory").unwrap();
+        memory.path = Some(blocker.join("players.json"));
+        assert!(memory.main_player(&p, true).is_err());
+        assert!(memory.profiles.is_empty());
+        std::fs::remove_file(blocker).unwrap();
+    }
     #[test]
     fn restart_restores_full_profile_and_forgetting_is_durable() {
         let dir = std::env::temp_dir().join(format!("gamenight-memory-{}", uuid::Uuid::new_v4()));

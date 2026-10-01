@@ -20,7 +20,7 @@
         <div id="room-code-slots" aria-hidden="true"><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span></div>
       </div>
       <label class="preference-toggle"><input id="remember-join" type="checkbox"> Remember me on this GameNight</label>
-      <p class="identity-hint">Have your player waiting at the door next time.</p>
+      <p class="identity-hint">The first player to join becomes this GameNight’s main player and returns next time. You can change this in You.</p>
     </form>
     <button id="room-leave" class="nav-btn" type="button" hidden>Leave room</button>
   </header>
@@ -28,8 +28,12 @@
 
 <main>
     <section class="card" id="remember-player-card" hidden>
+      <label class="preference-toggle"><input id="main-player" type="checkbox"> Main player on this GameNight</label>
+      <p class="identity-hint" id="main-player-hint">Appear at the door on startup, ready for your controller.</p>
+      <div id="remember-guest-options">
       <label class="preference-toggle"><input id="remember-player" type="checkbox"> Remember me on this GameNight</label>
-      <p class="identity-hint">Your player will be waiting at the door next time.</p>
+      <p class="identity-hint">Return as a guest without becoming the main player.</p>
+      </div>
     </section>
     <div id="tab-playlist" class="tab-content">
       <section class="playlist-editor">

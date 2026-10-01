@@ -150,7 +150,7 @@ pub fn create_router(state: SharedState) -> Router {
             get(|| async {
                 (
                     [(axum::http::header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../assets/qr-scanner.js"),
+                    include_str!("../../../web/qr-scanner.js"),
                 )
             }),
         )
@@ -164,6 +164,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/player-links", get(player_links))
         .route("/api/local-room/join", post(local_room::join))
         .route("/api/profiles/:id/remember", post(local_room::remember))
+        .route("/api/profiles/:id/main-player", post(local_room::main_player))
         .route("/api/local-room/cancel/:id", post(local_room::cancel))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
@@ -189,6 +190,7 @@ pub async fn run_server(
             local.profiles.insert(profile.id.clone(), profile.clone());
             local.local_room.restore(&profile.id);
         }
+        local.local_room.main_profile=memory.main_profile.clone();
         local.memory = memory;
     }
     if let Some(bridge) = cloud::Bridge::configured() {
@@ -229,7 +231,7 @@ async fn profile_session(
         let current = party.active_session.as_ref().map(|session| serde_json::json!({"title": title(&session.game), "phase": session.phase}));
         let next = party.warm_session.as_ref().map(|session| title(&session.game)).or_else(|| party.warming.as_ref().map(|entry| entry.title.clone()));
         let local = state.lock().unwrap();
-        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "remembered":local.memory.profiles.contains_key(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
+        Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "remembered":local.memory.profiles.contains_key(&id), "main_player":local.memory.main_profile.as_ref()==Some(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))
     }).await.map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
 }
 
@@ -576,7 +578,12 @@ async fn join_session_inner(
                 daemon::wait_for_profile(&mut ws_stream, pid, &profile)
                     .await
                     .map_err(StatusCode::from)?;
-                state.lock().unwrap().bindings.insert(id.clone(), pid);
+                let mut local=state.lock().unwrap();
+                local.bindings.insert(id.clone(), pid);
+                if local.cloud.is_none() {
+                    local.memory.linked(&profile,None).map_err(|_|StatusCode::INTERNAL_SERVER_ERROR)?;
+                    local.local_room.main_profile=local.memory.main_profile.clone();
+                }
             }
 
             // All fields are now acknowledged by the host, not merely flushed.

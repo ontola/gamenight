@@ -86,8 +86,8 @@
         panel.append(close,title,text,rememberLabel,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
         try{
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
-          rememberPair.checked=!!info.remembered;
-          text.textContent='Your saved character will connect to player '+(info.seat+1)+' in the room you scanned.';
+          rememberPair.checked=!!info.remembered || !!info.main_available;
+          text.textContent='Your saved character will connect to player '+(info.seat+1)+' in the room you scanned.'+(info.main_available?' You will become the main player here and return on startup. Uncheck Remember me to join just this time.':'');
           button.disabled=false;
           button.onclick=async()=>{
             if(accepting)return;accepting=true;button.disabled=true;close.disabled=true;text.textContent='Joining room…';
@@ -104,24 +104,42 @@
     const rememberJoin=document.getElementById('remember-join');
     const rememberPlayer=document.getElementById('remember-player');
     const rememberCard=document.getElementById('remember-player-card');
+    const mainPlayer=document.getElementById('main-player');
     let memoryRoom=null, memoryBusy=false;
     function showMemory(state) {
       memoryRoom=state;
       const available=state.status==='connected'||state.status==='waiting';
       rememberCard.hidden=!available;
-      if(!memoryBusy && available)rememberJoin.checked=rememberPlayer.checked=!!state.remembered;
+      if(!memoryBusy && available){
+        rememberJoin.checked=rememberPlayer.checked=!!state.remembered;
+        mainPlayer.checked=!!state.main_player;
+        rememberPlayer.disabled=!!state.main_player;
+        document.getElementById('remember-guest-options').hidden=!!state.main_player;
+      }
     }
     window.addEventListener('gamenight-local-session',event=>showMemory({...event.detail,status:event.detail.linked?'connected':event.detail.waiting?'waiting':'none'}));
     rememberPlayer.onchange=async()=>{
       if(memoryBusy||!memoryRoom)return;
       const remember=rememberPlayer.checked, previous=!!memoryRoom.remembered;
-      memoryBusy=true;rememberPlayer.disabled=true;
+      memoryBusy=true;rememberPlayer.disabled=mainPlayer.disabled=true;
       try {
         await request(cloud?'/v1/rooms/remember':'/api/profiles/'+encodeURIComponent(local.getItem('gamenight_profile_id'))+'/remember','POST',{remember,...(cloud?{code:memoryRoom.room_code}:{})});
         memoryRoom.remembered=remember;rememberJoin.checked=remember;
         window.showToast(remember?'Your player will be waiting here next time.':'Your player will no longer be remembered here.');
       } catch(error) {rememberPlayer.checked=previous;window.showToast(error.message);}
-      finally {memoryBusy=false;rememberPlayer.disabled=false;}
+      finally {memoryBusy=false;mainPlayer.disabled=false;showMemory(memoryRoom);}
+    };
+    mainPlayer.onchange=async()=>{
+      if(memoryBusy||!memoryRoom)return;
+      const enabled=mainPlayer.checked, previous=!!memoryRoom.main_player;
+      memoryBusy=true;mainPlayer.disabled=rememberPlayer.disabled=true;
+      try {
+        await request(cloud?'/v1/rooms/main-player':'/api/profiles/'+encodeURIComponent(local.getItem('gamenight_profile_id'))+'/main-player','POST',{enabled,...(cloud?{code:memoryRoom.room_code}:{})});
+        memoryRoom.main_player=enabled;
+        if(enabled || previous)memoryRoom.remembered=enabled;
+        window.showToast(enabled?'You are the main player on this GameNight.':'Your player will no longer appear automatically.');
+      } catch(error){mainPlayer.checked=previous;window.showToast(error.message);}
+      finally {memoryBusy=false;mainPlayer.disabled=false;showMemory(memoryRoom);}
     };
     // Offline rooms are reached by their LAN QR; hosted room codes must not
     // unexpectedly navigate a local editing session to the hosted site.

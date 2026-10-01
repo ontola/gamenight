@@ -20,6 +20,7 @@ pub struct Room {
     code: String,
     pending: HashMap<String, (String, u64)>,
     attempts: (Instant, u32),
+    pub main_profile: Option<String>,
 }
 impl Room {
     pub fn new() -> Self {
@@ -32,6 +33,7 @@ impl Room {
                 .collect(),
             pending: HashMap::new(),
             attempts: (Instant::now(), 0),
+            main_profile: None,
         }
     }
     pub fn restore(&mut self, profile: &str) {
@@ -46,7 +48,10 @@ impl Room {
             .is_some_and(|(_, expires)| *expires > now())
     }
     pub fn snapshot(&self, profiles: &HashMap<String, Profile>) -> serde_json::Value {
-        let pending:Vec<_>=self.pending.iter().filter_map(|(profile,(id,expires))| {
+        let mut entries: Vec<_> = self.pending.iter().collect();
+        entries
+            .sort_by_key(|(profile, _)| (self.main_profile.as_ref() != Some(*profile), *profile));
+        let pending:Vec<_>=entries.into_iter().filter_map(|(profile,(id,expires))| {
             let p=profiles.get(profile)?;
             (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"profile":{"display_name":p.username,"skin_color":p.skin_color,"avatar":p.avatar}}))
         }).collect();
@@ -87,12 +92,11 @@ pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> St
     if s.local_room.pending.len() >= 4 && !s.local_room.pending.contains_key(&req.profile) {
         return StatusCode::TOO_MANY_REQUESTS;
     }
-    if let Some(remember) = req.remember {
-        let profile = s.profiles[&req.profile].clone();
-        if s.memory.set(&profile, remember).is_err() {
-            return StatusCode::INTERNAL_SERVER_ERROR;
-        }
+    let profile = s.profiles[&req.profile].clone();
+    if s.memory.linked(&profile, req.remember).is_err() {
+        return StatusCode::INTERNAL_SERVER_ERROR;
     }
+    s.local_room.main_profile = s.memory.main_profile.clone();
     s.local_room
         .pending
         .entry(req.profile)
@@ -248,7 +252,38 @@ pub async fn remember(
         return StatusCode::NOT_FOUND;
     };
     match s.memory.set(&profile, req.remember) {
-        Ok(()) => StatusCode::NO_CONTENT,
+        Ok(()) => {
+            s.local_room.main_profile = s.memory.main_profile.clone();
+            StatusCode::NO_CONTENT
+        }
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+#[derive(Deserialize)]
+pub struct MainPlayer {
+    enabled: bool,
+}
+pub async fn main_player(
+    Path(id): Path<String>,
+    State(state): State<SharedState>,
+    Json(req): Json<MainPlayer>,
+) -> StatusCode {
+    let mut s = state.lock().unwrap();
+    if s.cloud.is_some() {
+        return StatusCode::NOT_FOUND;
+    }
+    if !s.bindings.contains_key(&id) && !s.local_room.waiting(&id) {
+        return StatusCode::FORBIDDEN;
+    }
+    let Some(profile) = s.profiles.get(&id).cloned() else {
+        return StatusCode::NOT_FOUND;
+    };
+    match s.memory.main_player(&profile, req.enabled) {
+        Ok(()) => {
+            s.local_room.main_profile = s.memory.main_profile.clone();
+            StatusCode::NO_CONTENT
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -279,7 +314,29 @@ mod memory_access_tests {
             .await,
             StatusCode::FORBIDDEN
         );
+        assert_eq!(
+            main_player(
+                Path("phone".into()),
+                State(state.clone()),
+                Json(MainPlayer { enabled: true })
+            )
+            .await,
+            StatusCode::FORBIDDEN
+        );
         state.lock().unwrap().local_room.restore("phone");
+        assert_eq!(
+            main_player(
+                Path("phone".into()),
+                State(state.clone()),
+                Json(MainPlayer { enabled: true })
+            )
+            .await,
+            StatusCode::NO_CONTENT
+        );
+        assert_eq!(
+            state.lock().unwrap().memory.main_profile.as_deref(),
+            Some("phone")
+        );
         assert_eq!(
             remember(
                 Path("phone".into()),
@@ -308,6 +365,7 @@ mod memory_access_tests {
         );
         let s = state.lock().unwrap();
         assert!(!s.memory.profiles.contains_key("phone"));
+        assert!(s.memory.main_profile.is_none());
         assert_eq!(s.bindings["phone"], player);
     }
 }

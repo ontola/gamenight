@@ -18,7 +18,9 @@ updates for paired accounts; POST `/v1/lobbies/ticket` takes `{index}` and retur
 an expiring ticket. Browser pairing uses authenticated CSRF-protected account APIs.
 The relay also carries catalog selections, playlist changes and device-memory
 preferences. It does not stream gameplay controls or process purchases. See
-[player memory](player-memory.md).
+[player memory](player-memory.md). The first successful account link establishes
+an installation's main player, restored at the pickup door on later launches.
+This is a per-device startup preference, not an administrator account.
 
 Current alpha limits: connections expire after two minutes without a heartbeat
 and after 24 hours total. A cloud restart requires scanning a new QR, but not
