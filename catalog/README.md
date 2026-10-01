@@ -244,4 +244,6 @@ and `GNLOVE_GAME=<id>`. Screenshots depict actual gameplay, not generated mockup
 
 ## Gameplay preview
 
-Follow the [gameplay preview guide](../docs/gameplay-previews.md): five seconds of varied, quick gameplay cuts, with visual review on desktop and phone.
+Every playable listing needs a five-second montage. Follow the
+[gameplay preview guide](../docs/gameplay-previews.md) for shot variety, quick cuts,
+real gameplay capture, encoding, visual review and publication checks.
