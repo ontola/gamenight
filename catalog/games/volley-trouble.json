@@ -32,7 +32,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/volley-trouble.love",
-      "sha256": "e8ca5f47175322475056c6d4f8449796eee963a17d950b042b9dd1faa3c480be",
+      "sha256": "bf040260b120b134675f7a0a0308c634c1bfeff980eb18129cb95ee9fb2e9348",
       "entrypoint": "volley-trouble.love",
       "runtime": {
         "id": "love-11-5",
@@ -44,7 +44,7 @@
     },
     "mac": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/volley-trouble.love",
-      "sha256": "e8ca5f47175322475056c6d4f8449796eee963a17d950b042b9dd1faa3c480be",
+      "sha256": "bf040260b120b134675f7a0a0308c634c1bfeff980eb18129cb95ee9fb2e9348",
       "entrypoint": "volley-trouble.love",
       "runtime": {
         "id": "love-11-5-macos",

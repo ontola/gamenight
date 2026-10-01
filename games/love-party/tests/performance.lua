@@ -1,4 +1,5 @@
 -- Run from games/love-party: luajit tests/performance.lua
+local previousLove=love
 love={graphics={getRendererInfo=function()return 'OpenGL','4','vendor','Test GPU' end,
     getPixelDimensions=function()return 1920,1080 end},system={getOS=function()return 'Test OS' end}}
 local Performance=require('shared.performance')
@@ -23,4 +24,9 @@ bridge.session='two';p:update(1,bridge)
 for _=1,10 do p:update(1,bridge) end
 assert(#reports==3 and reports[3].session=='two' and reports[3].sample.frames==10)
 assert(reports[3].sample.width==1920 and reports[3].sample.slow_frames==10)
+love.graphics=nil
+local headless=Performance.new()
+for _=1,30 do headless:update(1,bridge) end
+assert(#reports==3, 'Headless update ticks must not be reported as rendered frames')
+love=previousLove
 print('PASS performance cadence, pause, suspension, session reset and hardware coverage')

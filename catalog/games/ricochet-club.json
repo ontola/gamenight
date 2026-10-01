@@ -29,7 +29,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/ricochet-club.love",
-      "sha256": "8c57addf84b5807bdbf5fd40018f5c3f9ad71cd75fce29d943809a2167d140fc",
+      "sha256": "0775851e92c2297a9fbabda8f71fe22ffb07b1c256dc3203fd3917f5e115b67f",
       "entrypoint": "ricochet-club.love",
       "runtime": {
         "id": "love-11-5",
@@ -41,7 +41,7 @@
     },
     "mac": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/ricochet-club.love",
-      "sha256": "8c57addf84b5807bdbf5fd40018f5c3f9ad71cd75fce29d943809a2167d140fc",
+      "sha256": "0775851e92c2297a9fbabda8f71fe22ffb07b1c256dc3203fd3917f5e115b67f",
       "entrypoint": "ricochet-club.love",
       "runtime": {
         "id": "love-11-5-macos",

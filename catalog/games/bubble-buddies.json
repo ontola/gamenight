@@ -31,7 +31,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/bubble-buddies.love",
-      "sha256": "f075e106bc5e25a091bd56a9a249cfb58ea091e7ae0d9f32c6aea6c7e0993de6",
+      "sha256": "317fe8f7ef764ec46a9c94456a44644705acce8bdb476b1d494fafaecfb2ca8c",
       "entrypoint": "bubble-buddies.love",
       "runtime": {
         "id": "love-11-5",
@@ -43,7 +43,7 @@
     },
     "mac": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/bubble-buddies.love",
-      "sha256": "f075e106bc5e25a091bd56a9a249cfb58ea091e7ae0d9f32c6aea6c7e0993de6",
+      "sha256": "317fe8f7ef764ec46a9c94456a44644705acce8bdb476b1d494fafaecfb2ca8c",
       "entrypoint": "bubble-buddies.love",
       "runtime": {
         "id": "love-11-5-macos",

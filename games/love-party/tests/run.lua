@@ -339,3 +339,4 @@ print("PASS " .. n .. " party pack tests")
 require("tests.volley.run")()
 
 require("tests.coop.run")()
+require("tests.performance")

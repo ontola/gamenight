@@ -29,7 +29,7 @@
   "downloads": {
     "windows": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
-      "sha256": "5d392985ea5e4720ee3fdb454ced32603ed387dcf83428f3b394b533b2a4d9b7",
+      "sha256": "09a038d077b028aaf873ef8effd68adc4e9caddd44efcf8d7140d035c88facaa",
       "entrypoint": "blast-party.love",
       "runtime": {
         "id": "love-11-5",
@@ -41,7 +41,7 @@
     },
     "mac": {
       "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
-      "sha256": "5d392985ea5e4720ee3fdb454ced32603ed387dcf83428f3b394b533b2a4d9b7",
+      "sha256": "09a038d077b028aaf873ef8effd68adc4e9caddd44efcf8d7140d035c88facaa",
       "entrypoint": "blast-party.love",
       "runtime": {
         "id": "love-11-5-macos",
