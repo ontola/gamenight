@@ -29,6 +29,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --workspace --locked
+      - if: runner.os == 'Linux'
+        name: Test first-launch catalog handoff and recovery
+        run: python3 scripts/test-onboarding.py
       - if: runner.os != 'Windows'
         run: cargo run -p gamenight-certify -- demo-game -- target/debug/demo-game 1
       - if: runner.os == 'Windows'
