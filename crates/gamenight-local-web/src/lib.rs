@@ -10,6 +10,7 @@ mod dev_catalog;
 mod dev_web;
 mod local_room;
 mod memory;
+mod onboarding;
 mod playlist;
 mod docs_pages {
     include!("../../../web/docs-routes.rs");
@@ -62,6 +63,7 @@ pub struct JoinSessionRequest {
 }
 
 pub struct ServerState {
+    onboarding: Option<onboarding::Handoff>,
     local_room: local_room::Room,
     memory: memory::Memory,
     cloud: Option<cloud::Bridge>,
@@ -85,6 +87,7 @@ pub struct ServerState {
 impl ServerState {
     pub fn new(daemon_addr: String) -> Self {
         Self {
+            onboarding: None,
             local_room: local_room::Room::new(),
             memory: memory::Memory::default(),
             cloud: None,
@@ -100,6 +103,8 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
+        .route("/onboarding", get(onboarding::page))
+        .route("/api/onboarding", post(onboarding::claim))
         .route("/api/dev-catalog/room", get(dev_catalog::status))
         .route("/api/dev-catalog/next", post(dev_catalog::next))
         .route(
@@ -200,8 +205,9 @@ pub async fn run_server(
         state.lock().unwrap().cloud = Some(bridge.clone());
         tokio::spawn(bridge.run(state.clone()));
     }
-    let app = create_router(state);
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    onboarding::start(&state, listener.local_addr()?.port());
+    let app = create_router(state);
     // Log the address a phone can actually use, not just the bind address —
     // `0.0.0.0` is not something anyone can type into a browser.
     tracing::info!(

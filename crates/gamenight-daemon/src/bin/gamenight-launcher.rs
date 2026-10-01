@@ -56,6 +56,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .open(local.join("launcher.lock"))?;
     lock.try_lock()
         .map_err(|_| "GameNight is already running")?;
+    // Only a fresh installation asks the browser for a catalog choice. Keep
+    // pending setup across interrupted launches; never reset an existing party.
+    let onboarding = local.join("onboarding.json");
+    if !local.join("shelf.json").exists() && !onboarding.exists() {
+        fs::write(&onboarding, b"{\"complete\":false}")?;
+    }
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
     let mut shelf = serde_json::json!([
@@ -77,6 +83,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_EXIT_WITH_LOBBY", "1")
         .env("GAMENIGHT_STARTUP_GATE", "1")
         .env("GAMENIGHT_WEB", "1")
+        .env("GAMENIGHT_ONBOARDING_FILE", onboarding)
         .stdin(Stdio::piped())
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(local.join("daemon.log"))?)

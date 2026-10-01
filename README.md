@@ -29,6 +29,9 @@ behaviour still need testing across machines. See the
 [Windows preview guide](docs/windows-preview.md) or
 [Mac distribution notes](docs/macos-distribution.md) for installation details.
 
+The catalog's Play button remembers your chosen game for first launch.
+See [catalog onboarding](docs/catalog-onboarding.md) for the browser handoff and its limits.
+
 ## Your player comes with you
 
 Draw a face on your phone, choose your colours and pick up your player with a
