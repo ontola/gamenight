@@ -164,7 +164,10 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/player-links", get(player_links))
         .route("/api/local-room/join", post(local_room::join))
         .route("/api/profiles/:id/remember", post(local_room::remember))
-        .route("/api/profiles/:id/main-player", post(local_room::main_player))
+        .route(
+            "/api/profiles/:id/main-player",
+            post(local_room::main_player),
+        )
         .route("/api/local-room/cancel/:id", post(local_room::cancel))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
@@ -190,7 +193,7 @@ pub async fn run_server(
             local.profiles.insert(profile.id.clone(), profile.clone());
             local.local_room.restore(&profile.id);
         }
-        local.local_room.main_profile=memory.main_profile.clone();
+        local.local_room.main_profile = memory.main_profile.clone();
         local.memory = memory;
     }
     if let Some(bridge) = cloud::Bridge::configured() {
@@ -578,11 +581,14 @@ async fn join_session_inner(
                 daemon::wait_for_profile(&mut ws_stream, pid, &profile)
                     .await
                     .map_err(StatusCode::from)?;
-                let mut local=state.lock().unwrap();
+                let mut local = state.lock().unwrap();
                 local.bindings.insert(id.clone(), pid);
                 if local.cloud.is_none() {
-                    local.memory.linked(&profile,None).map_err(|_|StatusCode::INTERNAL_SERVER_ERROR)?;
-                    local.local_room.main_profile=local.memory.main_profile.clone();
+                    local
+                        .memory
+                        .linked(&profile, None)
+                        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+                    local.local_room.main_profile = local.memory.main_profile.clone();
                 }
             }
 

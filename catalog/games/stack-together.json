@@ -17,7 +17,7 @@
     "falling-blocks",
     "love2d"
   ],
-  "emoji": "🧩",
+  "emoji": "\ud83e\udde9",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -25,13 +25,13 @@
   "requirements": {
     "disk_mb": 5,
     "ram_mb": 128,
-    "cpu": "LÖVE 11.5",
+    "cpu": "L\u00d6VE 11.5",
     "gpu": "OpenGL 2.1"
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/stack-together.love",
-      "sha256": "ff6f9ed9af994d24e83ef77dabf7ac9ca78848c0c665f47481696d4c29530e32",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/stack-together.love",
+      "sha256": "0144dbeee36a630dfec67d342d0c6aa75e7732ee29c73bafb67234cd2551346b",
       "entrypoint": "stack-together.love",
       "runtime": {
         "id": "love-11-5",
@@ -42,8 +42,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/stack-together.love",
-      "sha256": "ff6f9ed9af994d24e83ef77dabf7ac9ca78848c0c665f47481696d4c29530e32",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/stack-together.love",
+      "sha256": "0144dbeee36a630dfec67d342d0c6aa75e7732ee29c73bafb67234cd2551346b",
       "entrypoint": "stack-together.love",
       "runtime": {
         "id": "love-11-5-macos",

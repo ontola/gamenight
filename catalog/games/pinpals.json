@@ -25,8 +25,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/pinpals.love",
-      "sha256": "8252f7a5f40b5f417c2672563db6f19205534ba91b55aa5f21799ef296f1f1f9",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/pinpals.love",
+      "sha256": "b37738e10488a8a5b1d54b31c462cb19836ab6a2b170e2db5a32b89cf798e74f",
       "entrypoint": "pinpals.love",
       "runtime": {
         "id": "love-11-5",
@@ -37,8 +37,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/pinpals.love",
-      "sha256": "8252f7a5f40b5f417c2672563db6f19205534ba91b55aa5f21799ef296f1f1f9",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/pinpals.love",
+      "sha256": "b37738e10488a8a5b1d54b31c462cb19836ab6a2b170e2db5a32b89cf798e74f",
       "entrypoint": "pinpals.love",
       "runtime": {
         "id": "love-11-5-macos",

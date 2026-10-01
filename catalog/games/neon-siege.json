@@ -18,7 +18,7 @@
     "open-source",
     "love2d"
   ],
-  "emoji": "🛡️",
+  "emoji": "\ud83d\udee1\ufe0f",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-siege.love",
-      "sha256": "4abf87827b45240eac0f43a6e808a7123a5defd6b6a090040d5bc4b2784c6c31",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-siege.love",
+      "sha256": "123337b7062972d04ec4920e9a23463df8d866f4656d5d3fce596a3274acb466",
       "entrypoint": "neon-siege.love",
       "runtime": {
         "id": "love-11-5",
@@ -40,8 +40,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-siege.love",
-      "sha256": "4abf87827b45240eac0f43a6e808a7123a5defd6b6a090040d5bc4b2784c6c31",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-siege.love",
+      "sha256": "123337b7062972d04ec4920e9a23463df8d866f4656d5d3fce596a3274acb466",
       "entrypoint": "neon-siege.love",
       "runtime": {
         "id": "love-11-5-macos",

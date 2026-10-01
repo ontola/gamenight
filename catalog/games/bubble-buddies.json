@@ -17,7 +17,7 @@
     "bubble-popper",
     "love2d"
   ],
-  "emoji": "🫧",
+  "emoji": "\ud83e\udee7",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -25,13 +25,13 @@
   "requirements": {
     "disk_mb": 5,
     "ram_mb": 128,
-    "cpu": "LÖVE 11.5",
+    "cpu": "L\u00d6VE 11.5",
     "gpu": "OpenGL 2.1"
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/bubble-buddies.love",
-      "sha256": "623a18261a418bee38967feb07ba1275627944d0f78d67082bc74b5132f34083",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/bubble-buddies.love",
+      "sha256": "f075e106bc5e25a091bd56a9a249cfb58ea091e7ae0d9f32c6aea6c7e0993de6",
       "entrypoint": "bubble-buddies.love",
       "runtime": {
         "id": "love-11-5",
@@ -42,8 +42,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/bubble-buddies.love",
-      "sha256": "623a18261a418bee38967feb07ba1275627944d0f78d67082bc74b5132f34083",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/bubble-buddies.love",
+      "sha256": "f075e106bc5e25a091bd56a9a249cfb58ea091e7ae0d9f32c6aea6c7e0993de6",
       "entrypoint": "bubble-buddies.love",
       "runtime": {
         "id": "love-11-5-macos",

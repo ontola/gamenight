@@ -85,6 +85,20 @@ jobs:
             $params.SigningMetadata = $metadata
           }
           ./scripts/build-windows-installer.ps1 @params
+      - name: Check packaged catalog and install every native download
+        shell: pwsh
+        run: |
+          cargo build --locked -p gamenight-installer
+          if ($LASTEXITCODE -ne 0) { throw 'Installer probe build failed' }
+          python scripts/check-release-catalog.py --platform windows --packaged-catalog "$env:RUNNER_TEMP/installer/package/gamenight-windows-preview/catalog/games" --installer target/debug/gamenight-installer.exe --output "$env:RUNNER_TEMP/native-downloads"
+          if ($LASTEXITCODE -ne 0) { throw 'Native download or packaged catalog check failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-download-evidence
+          path: |
+            ${{ runner.temp }}/native-downloads/results.json
+            ${{ runner.temp }}/native-downloads/installer.log
       - uses: actions/upload-artifact@v4
         with:
           name: gamenight-windows-installer

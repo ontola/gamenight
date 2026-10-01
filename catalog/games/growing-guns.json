@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "id": "growing-guns",
   "title": "Growing Guns",
-  "tagline": "Fast arena FPS — the loser of each round picks the upgrade.",
+  "tagline": "Fast arena FPS \u2014 the loser of each round picks the upgrade.",
   "developer": "Joep Meindertsma",
   "players": {
     "min": 2,
@@ -18,7 +18,7 @@
     "splitscreen",
     "godot"
   ],
-  "emoji": "🔫",
+  "emoji": "\ud83d\udd2b",
   "color": "#ffb454",
   "integration": {
     "level": "integrated",
@@ -38,6 +38,12 @@
       "url": "https://gamenight.ontola.io/games/growing-guns/mac/2b6e727ec916.zip",
       "sha256": "2b6e727ec9168e50973e7472ff5b65ae5bc9e2ad675dd2f1c361f9681b704d53",
       "entrypoint": "Growing Guns.app/Contents/MacOS/Growing Guns"
+    },
+    "windows": {
+      "url": "https://gamenight.ontola.io/games/growing-guns/windows/6f2d9bafd0de.zip",
+      "sha256": "6f2d9bafd0de8276f93594c84dd0818c17c08826080dc4fa6568d5fbb87e3bf9",
+      "entrypoint": "GrowingGuns.exe",
+      "size_mb": 83
     }
   }
 }

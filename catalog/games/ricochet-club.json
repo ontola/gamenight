@@ -18,7 +18,7 @@
     "open-source",
     "love2d"
   ],
-  "emoji": "🎯",
+  "emoji": "\ud83c\udfaf",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/ricochet-club.love",
-      "sha256": "059eb63490c8f2b626c8f9254cc725370eae3c111dcf2781ce20f02d25907692",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/ricochet-club.love",
+      "sha256": "8c57addf84b5807bdbf5fd40018f5c3f9ad71cd75fce29d943809a2167d140fc",
       "entrypoint": "ricochet-club.love",
       "runtime": {
         "id": "love-11-5",
@@ -40,8 +40,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/ricochet-club.love",
-      "sha256": "059eb63490c8f2b626c8f9254cc725370eae3c111dcf2781ce20f02d25907692",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/ricochet-club.love",
+      "sha256": "8c57addf84b5807bdbf5fd40018f5c3f9ad71cd75fce29d943809a2167d140fc",
       "entrypoint": "ricochet-club.love",
       "runtime": {
         "id": "love-11-5-macos",

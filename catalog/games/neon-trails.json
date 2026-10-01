@@ -18,7 +18,7 @@
     "open-source",
     "love2d"
   ],
-  "emoji": "⚡",
+  "emoji": "\u26a1",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-trails.love",
-      "sha256": "c29ccc457d80171ef859edb1ff5db52efd4a6999fc0e645dc6742dea983cc0fd",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-trails.love",
+      "sha256": "d8cd064751e6e6388d8c2380e364f56ddfcf13c49f2ea608dc66fc17c48b0153",
       "entrypoint": "neon-trails.love",
       "runtime": {
         "id": "love-11-5",
@@ -40,8 +40,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/neon-trails.love",
-      "sha256": "c29ccc457d80171ef859edb1ff5db52efd4a6999fc0e645dc6742dea983cc0fd",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-trails.love",
+      "sha256": "d8cd064751e6e6388d8c2380e364f56ddfcf13c49f2ea608dc66fc17c48b0153",
       "entrypoint": "neon-trails.love",
       "runtime": {
         "id": "love-11-5-macos",

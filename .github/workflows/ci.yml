@@ -130,6 +130,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python scripts/test-game-contract.py
+      - run: python scripts/test-release-catalog.py
       - run: python scripts/game-contract.py --output contract-audit
       - run: cat contract-audit/matrix.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4

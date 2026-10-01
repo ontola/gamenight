@@ -18,7 +18,7 @@
     "open-source",
     "love2d"
   ],
-  "emoji": "💣",
+  "emoji": "\ud83d\udca3",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -28,8 +28,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/blast-party.love",
-      "sha256": "d527e813fd61c0aba98a8d83e65f4e8ce7bb28f0e818534ebdfc450be560f22a",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
+      "sha256": "5d392985ea5e4720ee3fdb454ced32603ed387dcf83428f3b394b533b2a4d9b7",
       "entrypoint": "blast-party.love",
       "runtime": {
         "id": "love-11-5",
@@ -40,8 +40,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/blast-party.love",
-      "sha256": "d527e813fd61c0aba98a8d83e65f4e8ce7bb28f0e818534ebdfc450be560f22a",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
+      "sha256": "5d392985ea5e4720ee3fdb454ced32603ed387dcf83428f3b394b533b2a4d9b7",
       "entrypoint": "blast-party.love",
       "runtime": {
         "id": "love-11-5-macos",

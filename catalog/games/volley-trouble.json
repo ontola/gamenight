@@ -18,7 +18,7 @@
     "local-multiplayer",
     "love2d"
   ],
-  "emoji": "🏐",
+  "emoji": "\ud83c\udfd0",
   "integration": {
     "level": "integrated",
     "protocol": 1
@@ -26,13 +26,13 @@
   "requirements": {
     "disk_mb": 5,
     "ram_mb": 128,
-    "cpu": "LÖVE 11.5",
+    "cpu": "L\u00d6VE 11.5",
     "gpu": "OpenGL 2.1"
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/volley-trouble.love",
-      "sha256": "115dceba3dcd7548c9281c53558169bc7847e95970ffb4d9dc7397e0426bff02",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/volley-trouble.love",
+      "sha256": "e8ca5f47175322475056c6d4f8449796eee963a17d950b042b9dd1faa3c480be",
       "entrypoint": "volley-trouble.love",
       "runtime": {
         "id": "love-11-5",
@@ -43,8 +43,8 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.3/volley-trouble.love",
-      "sha256": "115dceba3dcd7548c9281c53558169bc7847e95970ffb4d9dc7397e0426bff02",
+      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/volley-trouble.love",
+      "sha256": "e8ca5f47175322475056c6d4f8449796eee963a17d950b042b9dd1faa3c480be",
       "entrypoint": "volley-trouble.love",
       "runtime": {
         "id": "love-11-5-macos",

@@ -51,6 +51,30 @@ a GitHub prerelease. Upload the feed and all `.nupkg` files together with Setup;
 Setup alone cannot serve automatic updates. Existing releases are never
 silently overwritten.
 
+The installer workflow also compares its packaged catalog with every Windows
+entry in the committed source and installs each native download into an empty
+cache through `gamenight-installer`. See the `native-download-evidence` artifact.
+Missing entries, changed metadata, failed HTTP downloads, checksum mismatches
+and missing entrypoints block publication. These checks do not certify native
+controller input or GPU behavior.
+
+For a local delivery check, build `gamenight-installer`, then run:
+
+```powershell
+python scripts/check-release-catalog.py --platform windows --packaged-catalog C:/builds/app/catalog/games --installer target/debug/gamenight-installer.exe --output C:/builds/download-check
+```
+
+Use a new output directory. For an isolated running host, the installed-game
+probe accepts that same catalog as its fourth argument, so native games are
+included in prepare/start/pause/resume checks:
+
+```powershell
+node scripts/test-installed-downloads.mjs ws://127.0.0.1:17912 C:/builds/results.json C:/builds/app/catalog/games
+```
+
+The probe uses AI seats. Physical controller ownership, actual paused simulation,
+audio and window presentation require the engine probes and hardware checks too.
+
 ## Signing
 
 Preview artifacts can be built unsigned. Stable packaging refuses to proceed

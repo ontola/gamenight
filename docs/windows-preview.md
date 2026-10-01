@@ -9,13 +9,13 @@ The portable ZIP also works: extract it and run **GameNight.exe**. Close the lob
 to close GameNight and all its games; there is no separate console to manage.
 The older `v0.1.0-preview.1` ZIP uses a console and Enter to exit instead.
 
-On first launch, Pinpals and its shared LÖVE runtime download automatically in
-the background. The lobby shows progress and remains usable while downloading.
+On first launch, games in the packaged Windows catalog download automatically
+in the background. This includes native games as well as the shared LÖVE pack.
+The lobby shows progress and remains usable while downloading.
 An internet connection is needed once; cached games work offline on later starts.
 Failed downloads appear in the lobby and are retried the next time GameNight starts.
 
-Connect two controllers and press a button on each to join the lobby. Pinpals
-is the starter game in the preview package. In current builds, approach Play and
+Connect two controllers and press a button on each to join the lobby. Approach Play and
 press Y. Back/Select pauses and returns to the lobby; another released press can
 resume the paused game after the transition guard. The TV also offers Resume.
 Games remain hidden and silent while preparing. Older downloaded previews may

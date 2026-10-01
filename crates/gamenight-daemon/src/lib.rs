@@ -1277,8 +1277,12 @@ fn message_to_command(
         // Game messages.
         ClientMessage::Ready { session } if is_game => Command::SessionReady { session },
         ClientMessage::Finished { session } if is_game => Command::SessionFinished { session },
-        ClientMessage::Performance {session,sample} => match registration {
-            Registration::Game(game) => Command::Performance {game:game.clone(),session,sample},
+        ClientMessage::Performance { session, sample } => match registration {
+            Registration::Game(game) => Command::Performance {
+                game: game.clone(),
+                session,
+                sample,
+            },
             _ => return Err("only games report performance".into()),
         },
         ClientMessage::Progress {
