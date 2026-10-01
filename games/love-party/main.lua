@@ -156,6 +156,8 @@ function love.update(dt)
 	end
 	if bridge then
 		bridge:update()
+		bridge.performance=bridge.performance or require('shared.performance').new()
+		bridge.performance:update(dt,bridge)
 		local backHeld = love.keyboard and (love.keyboard.isDown("escape") or love.keyboard.isDown("backspace")) or false
 		for _, pad in ipairs(pads()) do
 			if pad:isGamepadDown("back") then backHeld = true end

@@ -4206,6 +4206,7 @@ mod next_game_status_tests {
             phase,
             progress: None,
             progress_label: None,
+            diagnostics: Default::default(),
         }
     }
 

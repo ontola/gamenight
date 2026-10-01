@@ -60,8 +60,10 @@ Face.drawFace(player, x, y, 24, { facing = -1 })
 python scripts/package-love-party.py --output dist/my-party-build
 </code></pre></div>
 <p>The output directory must be new. Packaging builds the registered titles; it does not automatically publish them. Run the <a href="/docs/testing">integration suite</a> against the resulting packages, then check real controllers and window switching on each target OS.</p>
+<h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
+<p>The bundled launcher samples application frame intervals while running and reports them every ten active seconds. It includes GPU, OS and pixel dimensions; CPU and RAM are unavailable. Standalone games send nothing. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="b0d44fd5ed87d09476fb0a10f5bcfebad969e46314af92247af15f976b4a9be3">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="7e36dd29efc9ead356d5885bfc913e95d513e36f67e49454577d9ac659cd793d">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/lifecycle"><small>Previous</small>Game lifecycle</a><a href="/docs/rust"><small>Next</small>Rust / Bevy</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-reference-game">Run the reference game</a><a href="#add-your-game-module">Add your game module</a><a href="#draw-a-player-face">Draw a player face</a><a href="#keep-the-shared-window-path">Keep the shared window path</a><a href="#package-and-test">Package and test</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-reference-game">Run the reference game</a><a href="#add-your-game-module">Add your game module</a><a href="#draw-a-player-face">Draw a player face</a><a href="#keep-the-shared-window-path">Keep the shared window path</a><a href="#package-and-test">Package and test</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

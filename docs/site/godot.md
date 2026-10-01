@@ -37,3 +37,7 @@ The default connection retries automatically. Managed games need to handle disco
 ## Before release
 
 Check the [lifecycle contract](/docs/lifecycle) and [controller stream](/docs/controllers), then run [packaged integration checks](/docs/testing). These documentation excerpts are checked against source. There is no Godot runtime test attached to this docs build, and enabling the plugin alone does not prove compatibility.
+
+## Optional performance diagnostics
+
+The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.

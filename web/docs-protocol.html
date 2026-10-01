@@ -252,6 +252,9 @@ handling and borderless windows.</p>
 <p>Ready completes preparation. Release acceptance additionally requires the
 behaviors in <a href="https://github.com/ontola/gamenight/blob/main/contract/requirements.json">the contract</a>, including pause,
 resume, input ownership, clean switching and continuous play.</p>
+<p>Session snapshots include <a href="#session-diagnostics">diagnostics</a>. Consumers must
+treat absent diagnostics from older hosts as unavailable, not zero measured
+play time.</p>
 <p><code>finished</code> is an optional round notification. It never advances the playlist,
 opens the lobby, pauses the game or hides its window. The game owns its score
 screen and starts the next round itself. Players can keep playing indefinitely.
@@ -677,8 +680,38 @@ around the head centre. Refresh artwork when the player profile changes.</p>
 <p><code>profile.face</code> tests artwork rendering and live updates independently of
 <code>profile.colors</code>. Carrying an avatar string without drawing it does not pass.
 Faces may appear on characters or in a player portrait for games with vehicles.</p>
+<h2 id="session-diagnostics">Session diagnostics</h2>
+<p><code>SessionInfo.diagnostics</code> contains cumulative <code>active_ms</code>, <code>paused_ms</code> and
+<code>rounds_reported</code>. The host counts time only for the active session, excluding
+preloading. A long host suspension contributes at most two seconds per tick.
+Round counts reflect optional <code>finished</code> notifications, not verified completion.</p>
+<p>A game may also send cumulative application-frame measurements:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;:&quot;performance&quot;,&quot;session&quot;:&quot;SESSION_UUID&quot;,&quot;sample&quot;:{&quot;frames&quot;:600,&quot;elapsed_us&quot;:10000000,&quot;slow_frames&quot;:2,&quot;max_frame_us&quot;:41000,&quot;gpu&quot;:&quot;GPU model&quot;,&quot;os&quot;:&quot;Windows&quot;,&quot;width&quot;:1920,&quot;height&quot;:1080}}
+</code></pre></div>
+<p>Reset counters on <code>prepare</code>. Count only running frames. Skip the first frame
+after start/resume and suspension gaps over two seconds. <code>slow_frames</code> counts
+intervals over 33,333 microseconds. Report roughly every ten active seconds.
+The host accepts reports only from the game registered for the running session,
+rejects invalid or decreasing counters, and exposes the latest sample as
+<code>SessionInfo.diagnostics.performance</code>. An absent sample means unknown, never zero FPS.
+Average application FPS is <code>frames * 1_000_000 / elapsed_us</code>; this is not a count
+of display presents or a frame-time percentile.</p>
+<p>Optional hardware fields are <code>cpu</code>, <code>gpu</code>, <code>os</code>, <code>memory_mib</code>, <code>width</code> and
+<code>height</code>. Strings must be at most 256 UTF-8 bytes without control characters.
+Use an empty string or zero for unavailable hardware. Never include serial
+numbers, machine names, paths, network addresses or raw input.</p>
+<p>The bundled LÖVE launcher reports frames, GPU, OS and pixel dimensions. The
+Godot autoload also reports CPU and physical RAM. These are shipped source
+adapters: already published game binaries need rebuilding to use them. Rust
+games can call <code>GameNight::performance(session, sample)</code> with their own frame
+measurements. C and other engines must send the JSON message themselves; there
+is no automatic sampler for them yet.</p>
+<p>These are factual diagnostics available to any host. The public runtime keeps
+only the current session counters. It contains no behavioral database, account
+profiling, recommendation model or training pipeline. An optional configured
+cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="dc23a8558bfa1ea25bbcb23c9d816dee2c536d3fe28000cd0463d974181b6bbc">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="b3f62716bf4ba31b8e5937e8d63eea174081a3ad4eed235bc2a5f9256a120ba6">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

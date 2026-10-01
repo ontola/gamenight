@@ -306,6 +306,16 @@ impl GameNight {
         self.send(&ClientMessage::Finished { session }).await
     }
 
+    /// Report cumulative active frame counters, at most once per ten seconds.
+    pub async fn performance(
+        &mut self,
+        session: SessionId,
+        sample: gamenight_protocol::PerformanceSample,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::Performance { session, sample })
+            .await
+    }
+
     /// Optional: say how far along warming is (0-100), so the lobby can show
     /// the party something truthful while they wait instead of an unchanging
     /// "loading". Send as often as is useful; the daemon keeps the latest.

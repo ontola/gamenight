@@ -43,3 +43,7 @@ python scripts/package-love-party.py --output dist/my-party-build
 ```
 
 The output directory must be new. Packaging builds the registered titles; it does not automatically publish them. Run the [integration suite](/docs/testing) against the resulting packages, then check real controllers and window switching on each target OS.
+
+## Optional performance diagnostics
+
+The bundled launcher samples application frame intervals while running and reports them every ten active seconds. It includes GPU, OS and pixel dimensions; CPU and RAM are unavailable. Standalone games send nothing. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.

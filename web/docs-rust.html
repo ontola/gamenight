@@ -86,8 +86,10 @@ async fn main() -&gt; Result&lt;(), SdkError&gt; {
 cargo test -p gamenight-sdk
 </code></pre></div>
 <p>These check the SDK and example. They do not certify your window, audio, controller mapping or renderer. Run the packaged-game <a href="/docs/testing">integration checks</a> too.</p>
+<h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
+<p>Call <code>GameNight::performance(session, sample)</code> with a <code>gamenight_protocol::PerformanceSample</code> built from your own active frame measurements. The Rust SDK does not assume an engine update loop or sample automatically. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/rust.md">Edit this page</a><span data-source-fingerprint="d8d7539f087b9971efdf0edd7d2a013f488546742e17c8947d15b7048d1ae589">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/rust.md">Edit this page</a><span data-source-fingerprint="22a61f9df1bb0839733a04ac5568a84ebada054a68c65f1574a12f7b68844ff0">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/love"><small>Previous</small>LÖVE / Lua</a><a href="/docs/godot"><small>Next</small>Godot 4</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-sdk">Add the SDK</a><a href="#receive-lifecycle-events">Receive lifecycle events</a><a href="#connect-to-your-game-loop">Connect to your game loop</a><a href="#controllers-and-faces">Controllers and faces</a><a href="#validate-the-result">Validate the result</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-sdk">Add the SDK</a><a href="#receive-lifecycle-events">Receive lifecycle events</a><a href="#connect-to-your-game-loop">Connect to your game loop</a><a href="#controllers-and-faces">Controllers and faces</a><a href="#validate-the-result">Validate the result</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

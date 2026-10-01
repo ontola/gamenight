@@ -133,6 +133,11 @@ pub enum Command {
     SessionFinished {
         session: SessionId,
     },
+    Performance {
+        game: GameId,
+        session: SessionId,
+        sample: gamenight_protocol::PerformanceSample,
+    },
     /// The game reported how far along its loading is.
     SessionProgress {
         session: SessionId,
@@ -426,7 +431,24 @@ impl GameNight {
                 session,
                 controller,
             } => self.on_controller_input(game, session, controller, &mut fx),
-            Command::PresenceTick { elapsed } => self.tick_presence(elapsed, &mut fx),
+            Command::PresenceTick { elapsed } => {
+                if let Some(active) = &mut self.active {
+                    // Bound long suspension gaps; a sleeping host is not active play.
+                    let ms = elapsed.as_millis().min(2000) as u64;
+                    match active.phase {
+                        SessionPhase::Running => {
+                            active.diagnostics.active_ms =
+                                active.diagnostics.active_ms.saturating_add(ms)
+                        }
+                        SessionPhase::Paused => {
+                            active.diagnostics.paused_ms =
+                                active.diagnostics.paused_ms.saturating_add(ms)
+                        }
+                        _ => {}
+                    }
+                }
+                self.tick_presence(elapsed, &mut fx)
+            }
             Command::GameConnected { game } => {
                 let is_lobby = self.lobby_game.as_ref() == Some(&game);
                 self.connected_games.insert(game);
@@ -620,6 +642,34 @@ impl GameNight {
                 label,
             } => self.on_session_progress(session, percent, label, &mut fx),
             Command::SessionFinished { session } => self.on_session_finished(session, &mut fx),
+            Command::Performance {
+                game,
+                session,
+                sample,
+            } => {
+                if let Some(active) = self.active.as_mut().filter(|s| {
+                    s.id == session && s.game == game && s.phase == SessionPhase::Running
+                }) {
+                    if sample.valid()
+                        && active.diagnostics.performance.as_ref().is_none_or(|p| {
+                            sample.frames > p.frames
+                                && sample.elapsed_us > p.elapsed_us
+                                && sample.slow_frames >= p.slow_frames
+                                && sample.max_frame_us >= p.max_frame_us
+                        })
+                    {
+                        active.diagnostics.performance = Some(sample);
+                    } else {
+                        fx.push(Effect::Reject {
+                            reason: "invalid or stale performance sample".into(),
+                        });
+                    }
+                } else {
+                    fx.push(Effect::Reject {
+                        reason: "performance for another or inactive session".into(),
+                    });
+                }
+            }
             Command::InstallProgress { status } => self.on_install_progress(status, &mut fx),
             Command::NowPlaying { track } => self.on_now_playing(track, &mut fx),
             Command::MediaControl { action } => self.on_media_control(action, &mut fx),
@@ -1410,6 +1460,7 @@ impl GameNight {
                     && matches!(a.phase, SessionPhase::Running | SessionPhase::Paused) =>
             {
                 // Round completion is informational. The game owns its results
+                a.diagnostics.rounds_reported = a.diagnostics.rounds_reported.saturating_add(1);
                 // screen and next round; keep focus, pause state and warm game.
                 // Explicit party votes may still request a transition.
                 self.vote.open();

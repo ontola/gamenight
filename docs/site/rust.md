@@ -42,3 +42,7 @@ cargo test -p gamenight-sdk
 ```
 
 These check the SDK and example. They do not certify your window, audio, controller mapping or renderer. Run the packaged-game [integration checks](/docs/testing) too.
+
+## Optional performance diagnostics
+
+Call `GameNight::performance(session, sample)` with a `gamenight_protocol::PerformanceSample` built from your own active frame measurements. The Rust SDK does not assume an engine update loop or sample automatically. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.

@@ -185,6 +185,10 @@ Ready completes preparation. Release acceptance additionally requires the
 behaviors in [the contract](../contract/requirements.json), including pause,
 resume, input ownership, clean switching and continuous play.
 
+Session snapshots include [diagnostics](#session-diagnostics). Consumers must
+treat absent diagnostics from older hosts as unavailable, not zero measured
+play time.
+
 `finished` is an optional round notification. It never advances the playlist,
 opens the lobby, pauses the game or hides its window. The game owns its score
 screen and starts the next round itself. Players can keep playing indefinitely.
@@ -589,3 +593,42 @@ around the head centre. Refresh artwork when the player profile changes.
 `profile.face` tests artwork rendering and live updates independently of
 `profile.colors`. Carrying an avatar string without drawing it does not pass.
 Faces may appear on characters or in a player portrait for games with vehicles.
+
+## Session diagnostics
+
+`SessionInfo.diagnostics` contains cumulative `active_ms`, `paused_ms` and
+`rounds_reported`. The host counts time only for the active session, excluding
+preloading. A long host suspension contributes at most two seconds per tick.
+Round counts reflect optional `finished` notifications, not verified completion.
+
+A game may also send cumulative application-frame measurements:
+
+```json
+{"type":"performance","session":"SESSION_UUID","sample":{"frames":600,"elapsed_us":10000000,"slow_frames":2,"max_frame_us":41000,"gpu":"GPU model","os":"Windows","width":1920,"height":1080}}
+```
+
+Reset counters on `prepare`. Count only running frames. Skip the first frame
+after start/resume and suspension gaps over two seconds. `slow_frames` counts
+intervals over 33,333 microseconds. Report roughly every ten active seconds.
+The host accepts reports only from the game registered for the running session,
+rejects invalid or decreasing counters, and exposes the latest sample as
+`SessionInfo.diagnostics.performance`. An absent sample means unknown, never zero FPS.
+Average application FPS is `frames * 1_000_000 / elapsed_us`; this is not a count
+of display presents or a frame-time percentile.
+
+Optional hardware fields are `cpu`, `gpu`, `os`, `memory_mib`, `width` and
+`height`. Strings must be at most 256 UTF-8 bytes without control characters.
+Use an empty string or zero for unavailable hardware. Never include serial
+numbers, machine names, paths, network addresses or raw input.
+
+The bundled LÖVE launcher reports frames, GPU, OS and pixel dimensions. The
+Godot autoload also reports CPU and physical RAM. These are shipped source
+adapters: already published game binaries need rebuilding to use them. Rust
+games can call `GameNight::performance(session, sample)` with their own frame
+measurements. C and other engines must send the JSON message themselves; there
+is no automatic sampler for them yet.
+
+These are factual diagnostics available to any host. The public runtime keeps
+only the current session counters. It contains no behavioral database, account
+profiling, recommendation model or training pipeline. An optional configured
+cloud room relay includes session diagnostics in its discovery snapshot.

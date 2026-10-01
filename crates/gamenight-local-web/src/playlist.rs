@@ -130,6 +130,7 @@ mod tests {
             phase: SessionPhase::Ready,
             progress: None,
             progress_label: None,
+            diagnostics: Default::default(),
         });
         assert!(party.warming.is_none());
         assert_eq!(View::from(party).next, Some(GameId::new("tank")));

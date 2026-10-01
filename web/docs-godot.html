@@ -34,7 +34,7 @@ signal disposed(session_id: String)
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L144">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L181">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
 <h2 id="current-gaps">Current gaps</h2>
 <p>The addon does not dispatch <code>controller_frame</code> or game <code>party_updated</code> messages. Its <code>party_updated</code> signal currently comes from the overlay-style <code>party_state</code> snapshot. Add the game message handlers and match controller tokens to seats; <code>devices_for_local_seats()</code> uses local enumeration and is not safe for managed ownership.</p>
@@ -42,8 +42,10 @@ signal disposed(session_id: String)
 <p>The default connection retries automatically. Managed games need to handle disconnection by stopping and exiting. There is no built-in circular-face renderer in this addon; implement the <a href="/docs/faces">face transform</a> in your scene.</p>
 <h2 id="before-release">Before release</h2>
 <p>Check the <a href="/docs/lifecycle">lifecycle contract</a> and <a href="/docs/controllers">controller stream</a>, then run <a href="/docs/testing">packaged integration checks</a>. These documentation excerpts are checked against source. There is no Godot runtime test attached to this docs build, and enabling the plugin alone does not prove compatibility.</p>
+<h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
+<p>The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="fb2d2b1e51e62107ef0d8d2a2d7fc8e76a5bc96c15d409a47de425e9f88b9a71">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="db87909281148db4d29058ea5edf3e01e12bff9be27b50085468a2ac38814c85">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#current-gaps">Current gaps</a><a href="#before-release">Before release</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#current-gaps">Current gaps</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

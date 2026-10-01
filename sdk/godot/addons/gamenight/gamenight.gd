@@ -55,6 +55,41 @@ var _launch_token: String = ""
 var _socket: WebSocketPeer
 var _said_hello := false
 var _reconnect_at := 0.0
+var _performance_session := ""
+var _performance_running := false
+var _performance_last_us := 0
+var _performance_sent_us := 0
+var _performance: Dictionary = {}
+
+func _reset_performance(session_id: String) -> void:
+	_performance_session = session_id
+	_performance_running = false
+	_performance_last_us = 0
+	_performance_sent_us = 0
+	_performance = {"frames":0,"elapsed_us":0,"slow_frames":0,"max_frame_us":0,
+		"cpu":OS.get_processor_name().left(128),"gpu":RenderingServer.get_video_adapter_name().left(128),
+		"os":OS.get_name(),"memory_mib":int(OS.get_memory_info().get("physical",0)/1048576)}
+
+func _sample_performance() -> void:
+	var now_us := Time.get_ticks_usec()
+	if not _performance_running or _performance_session.is_empty():
+		_performance_last_us = 0
+		return
+	var elapsed_us := now_us - _performance_last_us if _performance_last_us > 0 else 0
+	_performance_last_us = now_us
+	# Skip OS suspension; report actual frame intervals rather than scaled game time.
+	if elapsed_us <= 0 or elapsed_us > 2000000:
+		return
+	_performance.frames += 1
+	_performance.elapsed_us += elapsed_us
+	_performance.slow_frames += int(elapsed_us > 33333)
+	_performance.max_frame_us = maxi(_performance.max_frame_us,elapsed_us)
+	if _performance.elapsed_us - _performance_sent_us >= 10000000:
+		var size := DisplayServer.window_get_size()
+		_performance.width = size.x
+		_performance.height = size.y
+		_send({"type":"performance","session":_performance_session,"sample":_performance})
+		_performance_sent_us = _performance.elapsed_us
 
 func _ready() -> void:
 	# The daemon passes the handshake via environment — same binary boots
@@ -88,6 +123,7 @@ func _process(_delta: float) -> void:
 	_socket.poll()
 	match _socket.get_ready_state():
 		WebSocketPeer.STATE_OPEN:
+			_sample_performance()
 			if not _said_hello:
 				_said_hello = true
 				var hello := {"type": "hello", "role": "game", "game": game_id}
@@ -98,6 +134,7 @@ func _process(_delta: float) -> void:
 				var text := _socket.get_packet().get_string_from_utf8()
 				_handle(JSON.parse_string(text))
 		WebSocketPeer.STATE_CLOSED:
+			_performance_running = false
 			if _said_hello:
 				daemon_disconnected.emit()
 			_socket = null
@@ -290,14 +327,20 @@ func _handle(msg: Variant) -> void:
 			party = msg.get("party", {})
 			party_updated.emit(party)
 		"prepare":
+			_reset_performance(msg.get("session", ""))
 			prepared.emit(msg.get("session", ""), msg.get("seats", []), msg.get("players", []))
 		"start":
+			_performance_running = msg.get("session", "") == _performance_session
 			started.emit(msg.get("session", ""))
 		"pause":
+			_performance_running = false
+			_performance_last_us = 0
 			paused.emit(msg.get("session", ""))
 		"resume":
+			_performance_running = msg.get("session", "") == _performance_session
 			resumed.emit(msg.get("session", ""))
 		"dispose":
+			_performance_running = false
 			disposed.emit(msg.get("session", ""))
 		"setting_changed":
 			var value: Variant = msg.get("value")

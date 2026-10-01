@@ -22,6 +22,7 @@ pub struct Session {
     pub progress: Option<u8>,
     /// What the game said it's doing right now ("generating arena").
     pub progress_label: Option<String>,
+    pub diagnostics: gamenight_protocol::SessionDiagnostics,
 }
 
 impl Session {
@@ -33,6 +34,7 @@ impl Session {
             playlist_index,
             progress: None,
             progress_label: None,
+            diagnostics: Default::default(),
         }
     }
 
@@ -43,6 +45,7 @@ impl Session {
             phase: self.phase,
             progress: self.progress,
             progress_label: self.progress_label.clone(),
+            diagnostics: self.diagnostics.clone(),
         }
     }
 

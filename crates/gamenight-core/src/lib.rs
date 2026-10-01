@@ -454,9 +454,18 @@ mod night_tests {
     fn round_completion_keeps_current_game_and_preloaded_next() {
         let (mut night, session) = night_in_progress();
         let before = night.snapshot();
-        for _ in 0..3 {
+        for rounds in 1..=3 {
             let fx = night.handle(Command::SessionFinished { session });
             let after = night.snapshot();
+            assert_eq!(
+                after
+                    .active_session
+                    .as_ref()
+                    .unwrap()
+                    .diagnostics
+                    .rounds_reported,
+                rounds
+            );
             assert_eq!(after.active_session.as_ref().unwrap().id, session);
             assert_eq!(
                 after.active_session.as_ref().unwrap().phase,
@@ -469,6 +478,102 @@ mod night_tests {
             assert_eq!(after.overlay_open, before.overlay_open);
             assert!(fx.iter().all(|e| matches!(e, Effect::StateChanged)));
         }
+    }
+
+    #[test]
+    fn lifecycle_diagnostics_exclude_preload_pause_and_host_sleep() {
+        let (mut night, _) = night_in_progress();
+        night.handle(Command::GameConnected {
+            game: GameId::new("g2"),
+        });
+        night.handle(Command::QueueNext {
+            game: GameId::new("g2"),
+        });
+        night.handle(Command::PresenceTick {
+            elapsed: std::time::Duration::from_secs(1),
+        });
+        let snapshot = night.snapshot();
+        assert_eq!(snapshot.active_session.unwrap().diagnostics.active_ms, 1000);
+        assert_eq!(snapshot.warm_session.unwrap().diagnostics.active_ms, 0);
+        night.handle(Command::Pause);
+        night.handle(Command::PresenceTick {
+            elapsed: std::time::Duration::from_secs(1),
+        });
+        let d = night.snapshot().active_session.unwrap().diagnostics;
+        assert_eq!((d.active_ms, d.paused_ms), (1000, 1000));
+        night.handle(Command::Resume);
+        night.handle(Command::PresenceTick {
+            elapsed: std::time::Duration::from_secs(600),
+        });
+        assert_eq!(
+            night
+                .snapshot()
+                .active_session
+                .unwrap()
+                .diagnostics
+                .active_ms,
+            3000
+        );
+    }
+
+    #[test]
+    fn performance_requires_current_game_session_and_increasing_valid_counters() {
+        let (mut night, session) = night_in_progress();
+        let sample = gamenight_protocol::PerformanceSample {
+            frames: 600,
+            elapsed_us: 10000000,
+            slow_frames: 1,
+            max_frame_us: 40000,
+            ..Default::default()
+        };
+        let rejected = |fx: Vec<Effect>| fx.iter().any(|e| matches!(e, Effect::Reject { .. }));
+        assert!(rejected(night.handle(Command::Performance {
+            game: GameId::new("other"),
+            session,
+            sample: sample.clone()
+        })));
+        assert!(rejected(night.handle(Command::Performance {
+            game: GameId::new("g1"),
+            session: SessionId::new(),
+            sample: sample.clone()
+        })));
+        assert!(!rejected(night.handle(Command::Performance {
+            game: GameId::new("g1"),
+            session,
+            sample: sample.clone()
+        })));
+        assert!(rejected(night.handle(Command::Performance {
+            game: GameId::new("g1"),
+            session,
+            sample: sample.clone()
+        })));
+        let mut bad = sample.clone();
+        bad.gpu = "line\nbreak".into();
+        bad.frames += 1;
+        bad.elapsed_us += 16667;
+        assert!(rejected(night.handle(Command::Performance {
+            game: GameId::new("g1"),
+            session,
+            sample: bad
+        })));
+        night.handle(Command::Pause);
+        let mut newer = sample.clone();
+        newer.frames += 60;
+        newer.elapsed_us += 1000000;
+        assert!(rejected(night.handle(Command::Performance {
+            game: GameId::new("g1"),
+            session,
+            sample: newer
+        })));
+        assert_eq!(
+            night
+                .snapshot()
+                .active_session
+                .unwrap()
+                .diagnostics
+                .performance,
+            Some(sample)
+        );
     }
 
     #[test]

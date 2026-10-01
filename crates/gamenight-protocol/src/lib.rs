@@ -243,6 +243,9 @@ pub struct SessionInfo {
     pub id: SessionId,
     pub game: GameId,
     pub phase: SessionPhase,
+    /// Host lifecycle counters for status displays and diagnostics. Not a rating.
+    #[serde(default)]
+    pub diagnostics: SessionDiagnostics,
     /// How far along loading is, 0 to 100, if the game bothers to say.
     /// Optional on purpose: a game that loads instantly has nothing to
     /// report, and screens must stay honest without it (see `Progress`).
@@ -254,6 +257,54 @@ pub struct SessionInfo {
     /// What it's doing right now ("generating arena"), if the game says.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub progress_label: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionDiagnostics {
+    pub active_ms: u64,
+    pub paused_ms: u64,
+    /// Number of `finished` reports received, not proof every round was reported.
+    pub rounds_reported: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub performance: Option<PerformanceSample>,
+}
+
+/// Optional cumulative application-frame diagnostics for this session.
+/// Measure active frames only. Never send serial numbers, paths or machine names.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PerformanceSample {
+    pub frames: u64,
+    pub elapsed_us: u64,
+    pub slow_frames: u64,
+    pub max_frame_us: u64,
+    #[serde(default)]
+    pub cpu: String,
+    #[serde(default)]
+    pub gpu: String,
+    #[serde(default)]
+    pub os: String,
+    #[serde(default)]
+    pub memory_mib: u64,
+    #[serde(default)]
+    pub width: u32,
+    #[serde(default)]
+    pub height: u32,
+}
+impl PerformanceSample {
+    pub fn valid(&self) -> bool {
+        self.frames > 0
+            && self.frames <= 1_000_000_000
+            && self.elapsed_us > 0
+            && self.elapsed_us <= 604_800_000_000
+            && self.slow_frames <= self.frames
+            && self.max_frame_us <= 60_000_000
+            && [&self.cpu, &self.gpu, &self.os]
+                .iter()
+                .all(|v| v.len() <= 256 && !v.chars().any(char::is_control))
+            && self.memory_mib <= 16_777_216
+            && self.width <= 32768
+            && self.height <= 32768
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -821,6 +872,11 @@ pub enum ClientMessage {
     /// A round ended. Informational: keep playing; no focus or playlist change.
     Finished {
         session: SessionId,
+    },
+    /// Optional factual diagnostics, without accounts or recommendation data.
+    Performance {
+        session: SessionId,
+        sample: PerformanceSample,
     },
     /// Optional: how far along warming is, so screens can show something
     /// truthful while the party waits. Send as often as is useful; the
