@@ -10,12 +10,7 @@ fn main() {
             .set("CompanyName", "Ontola")
             .compile()
             .expect("compile GameNight Windows branding");
-        // The standalone launcher does not link the daemon library, so Cargo's
-        // native-library metadata alone does not carry its resource into the EXE.
-        #[cfg(target_env = "msvc")]
-        println!(
-            "cargo:rustc-link-arg-bin=gamenight-launcher={}/resource.lib",
-            std::env::var("OUT_DIR").unwrap()
-        );
+        // The launcher links the daemon library for local shelf loading. Cargo
+        // carries its native branding resource; linking it twice duplicates VERSION.
     }
 }

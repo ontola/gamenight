@@ -18,3 +18,11 @@ or `web/docs-routes.rs`. A successful build does not verify prose or real hardwa
 state adapter gaps and test limits explicitly. Keep the SDK READMEs pointing at
 the canonical engine guides. Import the committed public web bundle into the
 internal repo before building the cloud service.
+
+
+# Store gameplay videos
+
+Before creating, changing or publishing a five-second store video, read
+[docs/gameplay-previews.md](docs/gameplay-previews.md). Require a varied montage
+of quick, readable gameplay cuts; encoding and playback checks alone do not
+meet the preview quality bar. Apply this when adding a playable catalog entry too.

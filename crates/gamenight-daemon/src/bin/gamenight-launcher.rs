@@ -58,11 +58,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "GameNight is already running")?;
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
-    let shelf = serde_json::json!([
+    let mut shelf = serde_json::json!([
         {"id":"lobby", "title":"GameNight", "players":"1-4", "min_players":1, "max_players":4,
          "emoji":"", "color":"#7c5cff", "launch":{"command":lobby, "cwd":lobby_dir,
          "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
     ]);
+    data::merge_local_games(&mut shelf, &local)?;
     let shelf_path = local.join("shelf.json");
     fs::write(&shelf_path, serde_json::to_vec_pretty(&shelf)?)?;
     let mut command = Command::new(daemon);

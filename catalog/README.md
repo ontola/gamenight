@@ -9,9 +9,15 @@ The catalogue answers the questions a party asks before picking a game:
 *how many of us can play? will it run on this machine? how big is the
 download? does it actually speak the protocol, or is it on the wishlist?*
 
-## The integration ladder
+## Integration status
 
-Every entry declares honestly where it stands:
+`integration.level` is a broad metadata label. It is not proof that a game works
+with the current GameNight build. The store's integration rating comes from the
+versioned checks in [`contract/requirements.json`](../contract/requirements.json)
+and matching evidence for a platform and downloadable package. Development runs
+can show passing checks, but do not count as verified release evidence.
+
+The metadata labels describe the entry's implementation stage:
 
 | level | meaning |
 |---|---|
@@ -20,8 +26,10 @@ Every entry declares honestly where it stands:
 | `adapter` | launchable by the daemon but silent — no protocol; transitions are kill-and-relaunch |
 | `planned` | wishlist: metadata so the shelf can show it, no integration yet |
 
-Climbing the ladder is the point: `planned` entries are invitations, and the
-PR that moves a game to `certified` must include the harness output.
+`lobby` and `demo-game` are host implementation entries. They remain in the
+machine-readable catalog for internal host and contract use, but the discovery
+store filters them out and does not offer them as next-game choices. Do not add
+either to a user-facing game list.
 
 ## Entry format
 
@@ -38,27 +46,24 @@ players.min`, certified needing `protocol`, …) still live in `validate()`.
 ```json
 {
   "$schema": "../schema.json",
-  "id": "duck-game",
-  "title": "Duck Game",
-  "tagline": "Ducks. Guns. No mercy.",
-  "developer": "Landon Podbielski",
-  "players": { "min": 1, "max": 4, "best": 4 },
-  "match_minutes": 3,
-  "price": "paid",
-  "tags": ["versus", "shooter", "chaos"],
-  "emoji": "🦆",
-  "color": "#ffb454",
-  "cover": "https://…/cover.png",
+  "id": "your-game",
+  "title": "Your Game",
+  "tagline": "A short description of the game.",
+  "developer": "Your name or studio",
+  "players": { "min": 2, "max": 4, "best": 4 },
+  "match_minutes": 5,
+  "price": "free",
+  "tags": ["versus", "party"],
   "integration": { "level": "planned" },
   "requirements": {
     "disk_mb": 200, "ram_mb": 1024,
     "cpu": "any dual-core", "gpu": "integrated is fine"
   },
-  "links": { "steam": "https://store.steampowered.com/app/312530" },
+  "links": { "homepage": "https://example.com/your-game" },
   "downloads": {
-    "linux": { "url": "https://…/duck-game-linux.tar.gz",
-               "sha256": "…64 hex chars…", "size_mb": 180,
-               "entrypoint": "duck-game-linux/duck-game" }
+    "windows": { "url": "https://downloads.example.com/your-game.zip",
+                 "sha256": "…64 hex chars…", "size_mb": 180,
+                 "entrypoint": "your-game/your-game.exe" }
   }
 }
 ```
@@ -70,8 +75,9 @@ Field rules (enforced by `cargo test -p gamenight-catalog`):
 - `players` — `min`/`max` are required; `best` is the count the game shines
   at. Don't lie: `max` is *couch* seats, not online lobby size.
 - `price` — `free`, `pay_what_you_want`, or `paid`.
-- `integration.level` — the ladder above. `certified` entries must state the
-  `protocol` version and `certified_with` (harness version).
+- `integration.level` — the metadata stage above. A `certified` label does not
+  replace platform and package-matched evidence in the integration rating.
+  Certified entries must state the `protocol` and `certified_with` versions.
 - `requirements` — approximate, honest figures. `disk_mb` installed size,
   `ram_mb` beyond the OS, `cpu`/`gpu` in plain words ("any dual-core",
   "integrated is fine"). A living-room PC is the target; when in doubt,
@@ -88,7 +94,7 @@ Field rules (enforced by `cargo test -p gamenight-catalog`):
   a `downloads` URL present (paid + `downloads` is itself rejected by
   `validate()`).
 - `downloads.<platform>.entrypoint` — path to the runnable executable,
-  relative to the extracted archive's root (e.g. `duck-game-linux/duck-game`).
+  relative to the extracted archive's root (e.g. `your-game/your-game.exe`).
   Required whenever the URL is an archive (`.tar.gz`/`.tgz`/`.zip` —
   [`Download::is_archive`](../crates/gamenight-catalog/src/lib.rs)); omit it
   for a bare-binary download, where the file itself is the executable. This
@@ -235,3 +241,7 @@ embedded catalog metadata. `--captures <LOVE save directory>` rebuilds the
 initial screenshot-based covers and game-specific icons. Capture party games
 with `GNLOVE_RENDER_SMOKE=1 GNLOVE_CAPTURE_ART=1 GNLOVE_DEMO=1 GNLOVE_SEED=42`
 and `GNLOVE_GAME=<id>`. Screenshots depict actual gameplay, not generated mockups.
+
+## Gameplay preview
+
+Follow the [gameplay preview guide](../docs/gameplay-previews.md): five seconds of varied, quick gameplay cuts, with visual review on desktop and phone.
