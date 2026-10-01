@@ -235,3 +235,9 @@ embedded catalog metadata. `--captures <LOVE save directory>` rebuilds the
 initial screenshot-based covers and game-specific icons. Capture party games
 with `GNLOVE_RENDER_SMOKE=1 GNLOVE_CAPTURE_ART=1 GNLOVE_DEMO=1 GNLOVE_SEED=42`
 and `GNLOVE_GAME=<id>`. Screenshots depict actual gameplay, not generated mockups.
+
+## Gameplay preview
+
+Every playable listing needs a five-second montage. Follow the
+[gameplay preview guide](../docs/gameplay-previews.md) for shot variety, quick cuts,
+real gameplay capture, encoding, visual review and publication checks.
