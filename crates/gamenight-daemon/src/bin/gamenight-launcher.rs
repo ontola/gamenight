@@ -1,5 +1,7 @@
 //! Desktop entry point for the Windows package and macOS app bundle.
 #![cfg_attr(windows, windows_subsystem = "windows")]
+#[path = "launcher/browser.rs"]
+mod browser;
 #[path = "launcher/data.rs"]
 mod data;
 #[cfg(windows)]
@@ -62,6 +64,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if !local.join("shelf.json").exists() && !onboarding.exists() {
         fs::write(&onboarding, b"{\"complete\":false}")?;
     }
+    let browser_request = local.join("onboarding-browser.txt");
+    match fs::remove_file(&browser_request) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
     let mut shelf = serde_json::json!([
@@ -84,6 +92,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_STARTUP_GATE", "1")
         .env("GAMENIGHT_WEB", "1")
         .env("GAMENIGHT_ONBOARDING_FILE", onboarding)
+        .env("GAMENIGHT_BROWSER_REQUEST", &browser_request)
         .stdin(Stdio::piped())
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(local.join("daemon.log"))?)
@@ -115,7 +124,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .take()
         .ok_or("Missing startup pipe")?
         .write_all(&[1])?;
+    let browser = browser::Worker::start(browser_request);
     let status = child.wait();
+    drop(browser);
     #[cfg(windows)]
     job.close()?; // No hidden game or descendant may survive into an update.
     if !status?.success() {
