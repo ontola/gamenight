@@ -35,7 +35,7 @@ Additional source audits found existing declarations in the separate projects:
 | Ballkickers | Match length, team size | Local `goal-rush` checkout, `src/party.gd` and `src/main.gd` |
 | Frog Fighter | Mode, arena | Local `frog-fighter` checkout, `src/main.gd` |
 | Ion Rush | Laps, graphics quality | Local game import, `src/main.gd`; not a catalog release |
-| Growing Guns | Not verified | Source checkout not available during this audit |
+| Growing Guns | 1–30 rounds to win (next match), modifier chance 0–100% (next round), card choice time 3–30 seconds (next pick) | [ontola/growing-guns](https://github.com/ontola/growing-guns), `scripts/gamenight_settings.gd`; added and engine-tested |
 
 These audits do not certify the options in downloaded release binaries. The
 lobby and retired demo games are not playable catalog entries and are excluded.

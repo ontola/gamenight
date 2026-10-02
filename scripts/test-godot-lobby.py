@@ -97,7 +97,7 @@ def avatar(style):
     return json.dumps({"v": 1, "w": 48, "h": 48, "px": pixels})
 
 
-def run(godot, capture=None, narrow=False, settings=False):
+def run(godot, capture=None, narrow=False, settings=False, game_ids=None):
     if capture:
         capture.unlink(missing_ok=True)
     with socket.socket() as probe:
@@ -112,7 +112,7 @@ def run(godot, capture=None, narrow=False, settings=False):
         else:
             godot_args += ["--headless", "--script", "res://lobby/tests/flow.gd"]
         if settings: godot_args += ["--capture-settings"]
-        game_ids = ["neon-trails", "bubble-buddies", "blast-party"]
+        game_ids = game_ids or ["neon-trails", "bubble-buddies", "blast-party"]
         shelf = []
         for game_id in game_ids:
             catalog = json.loads((ROOT / "catalog/games" / (game_id + ".json")).read_text())
