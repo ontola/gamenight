@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-love">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-love" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love" aria-current="page">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-love" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love" aria-current="page">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="love-lua">LÖVE / Lua</h1>
 <p>Use the shared runner in <code>games/love-party</code>. It handles the GameNight connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.</p>
 <h2 id="run-the-reference-game">Run the reference game</h2>
@@ -45,7 +45,7 @@ function M.update(s, dt, inputs)
 		end
 	end
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/games/love-party/games/trails.lua#L24">Source: games/love-party/games/trails.lua</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/games/love-party/games/trails.lua#L30">Source: games/love-party/games/trails.lua</a></p>
 <p>The input entries belong to the supplied player slots. Do not replace them with <code>love.joystick.getJoysticks()</code> in managed mode. The shared input adapter neutralises disconnected devices and frames older than 250 ms.</p>
 <p>Register a new module in <code>modes</code> in <a href="https://github.com/ontola/gamenight/blob/main/games/love-party/main.lua">main.lua</a>, add its renderer and add its ID to <code>GAMES</code> in <a href="https://github.com/ontola/gamenight/blob/main/scripts/package-love-party.py">the packaging script</a>. These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.</p>
 <h2 id="draw-a-player-face">Draw a player face</h2>
@@ -56,14 +56,16 @@ Face.drawFace(player, x, y, 24, { facing = -1 })
 <h2 id="keep-the-shared-window-path">Keep the shared window path</h2>
 <p>Use <code>shared.window</code> and <code>shared.back_gate</code>. Prepare before showing the window. Back needs a fresh press after release, and a focus event must never resume a paused game. Keep borderless fullscreen and the helper’s Windows presentation workaround.</p>
 <h2 id="package-and-test">Package and test</h2>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">GNLOVE_HEADLESS=1 GNLOVE_TEST=1 love games/love-party
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python scripts/test-love-simulation.py
 python scripts/package-love-party.py --output dist/my-party-build
 </code></pre></div>
 <p>The output directory must be new. Packaging builds the registered titles; it does not automatically publish them. Run the <a href="/docs/testing">integration suite</a> against the resulting packages, then check real controllers and window switching on each target OS.</p>
 <h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
 <p>The bundled launcher samples application frame intervals while running and reports them every ten active seconds. It includes GPU, OS and pixel dimensions; CPU and RAM are unavailable. Standalone games send nothing. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
+<h2 id="game-settings">Game settings</h2>
+<p>Use the <a href="/docs/settings">settings helper and game reference</a> to expose choices, toggles and bounded numbers to the lobby and phone. Validate each change and snapshot round rules when creating a round.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="7e36dd29efc9ead356d5885bfc913e95d513e36f67e49454577d9ac659cd793d">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="3f941867716f11cf41cf31c63b7821b2ad9852a40abd5c42c3d31a8b5d6dfc40">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/lifecycle"><small>Previous</small>Game lifecycle</a><a href="/docs/rust"><small>Next</small>Rust / Bevy</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-reference-game">Run the reference game</a><a href="#add-your-game-module">Add your game module</a><a href="#draw-a-player-face">Draw a player face</a><a href="#keep-the-shared-window-path">Keep the shared window path</a><a href="#package-and-test">Package and test</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-reference-game">Run the reference game</a><a href="#add-your-game-module">Add your game module</a><a href="#draw-a-player-face">Draw a player face</a><a href="#keep-the-shared-window-path">Keep the shared window path</a><a href="#package-and-test">Package and test</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#game-settings">Game settings</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -1,8 +1,9 @@
 -- Authored formations repeat in a readable order; difficulty follows clears,
 -- never elapsed time. A struggling team cannot accumulate another wave.
 local W = { names = { "SWEEP", "PINCER", "CORNERS", "CROSSWIND" }, rest = 2, warning = 1.4 }
-function W.plan(number, players, width, height)
-	local count = math.min(60, 14 + (number - 1) * 4 + math.max(0, players - 2) * 4)
+function W.plan(number, players, width, height, difficulty)
+	local pressure = ({relaxed=0.7,standard=1,intense=1.35})[difficulty or "standard"] or 1
+	local count = math.min(60, math.floor((14 + (number - 1) * 4 + math.max(0, players - 2) * 4) * pressure))
 	local pattern = (number - 1) % 4 + 1
 	local rotation = math.floor((number - 1) / 4) % 4
 	local groups = pattern == 1 and 2 or 3
@@ -56,7 +57,7 @@ function W.update(s, dt, spawn)
 			s.wave = s.wave + 1
 			s.waveClock = 0
 			s.wavePhase = "attack"
-			s.waveQueue, s.waveName = W.plan(s.wave, #s.players, s.width, s.height)
+			s.waveQueue, s.waveName = W.plan(s.wave, #s.players, s.width, s.height, s.settings and s.settings.difficulty)
 		end
 		return
 	end

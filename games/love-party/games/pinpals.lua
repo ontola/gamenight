@@ -1,6 +1,10 @@
 local Input=require("shared.input")
 local Face=require("shared.face")
 local M={id="pinpals",title="Pinpals",tagline="Two boards. One shared ball.",controls="LB/RB flippers / A gate / B paddle",duration=math.huge,coop=true}
+require("shared.settings").bind(M, {
+    {key="speed", label="Simulation speed % (next game)", kind="number", default=100, min=60, max=125},
+})
+
 local Match,Render,Audio,FX,Intents,defs
 function M.load()
  if not love.filesystem.getInfo("core/constants.lua") then
@@ -14,7 +18,7 @@ end
 function M.new(players)
  if not Match then M.load() end
  FX.reset()
- return {players=players,match=Match.new(defs,os.time()),previous={}}
+ return {settings=M.preferences(),players=players,match=Match.new(defs,os.time()),previous={}}
 end
 function M.input(slot)
  local v=Input.sample(slot);local pad=Input.pads[slot]
@@ -34,7 +38,7 @@ function M.update(s,dt,inputs)
    s.previous[i]=now
   end
  end
- s.match:advance(dt);local events=s.match:drain_events()
+ s.match:advance(dt*s.settings.speed/100);local events=s.match:drain_events()
  Audio.update(s.match,events);FX.update(s.match,events,dt)
  if love.graphics then Render.update_camera(s.match.state,defs,dt) end
 end

@@ -48,12 +48,15 @@ class Peer:
         self.socket.close()
 
 
+GAME_SETTINGS = {}
+
+
 def game_loop(port, game_id, stop):
     peer = Peer(port, "game", game_id)
-    peer.send({"type":"declare_settings","settings":[
+    peer.send({"type":"declare_settings","settings":GAME_SETTINGS.get(game_id, [
         {"key":"items","label":"Pickups","kind":"toggle","default":True},
         {"key":"rounds","label":"Rounds","kind":"number","default":3,"min":1,"max":5},
-        {"key":"arena","label":"Arena","kind":"choice","default":"Garden","options":["Garden","Warehouse"]}]})
+        {"key":"arena","label":"Arena","kind":"choice","default":"Garden","options":["Garden","Warehouse"]}])})
     try:
         while not stop.is_set():
             message = peer.read()
@@ -182,11 +185,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--godot", default="godot")
     parser.add_argument("--capture-dir", type=Path)
+    parser.add_argument("--settings-json", type=Path, help="Use exported game settings in captures")
     args = parser.parse_args()
     godot = shutil.which(args.godot)
     if not godot:
         parser.error("Godot 4 executable not found")
     run(str(Path(godot).resolve()))
+    if args.settings_json:
+        GAME_SETTINGS.update(json.loads(args.settings_json.read_text()))
     if args.capture_dir:
         target = args.capture_dir.resolve()
         target.mkdir(parents=True, exist_ok=True)

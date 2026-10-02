@@ -10,6 +10,12 @@ local M = {
 	controls = "MOVE left stick / keys   AIM + FIRE right stick / keyboard auto   DASH A / action   PULSE B / secondary",
 	limits = { enemies = 96, shots = 600, hostile = 240, particles = 650, pickups = 36 },
 }
+require("shared.settings").bind(M, {
+    {key="difficulty", label="Enemy pressure (next round)", kind="choice", default="standard", options={"relaxed","standard","intense"}},
+    {key="gravity", label="Gravity strength % (next round)", kind="number", default=100, min=0, max=175},
+    {key="wormholes", label="Wormholes (next round)", kind="toggle", default=true},
+})
+
 local specs = {
 	boss = { hp = 180, r = 38, speed = 60, value = 1000 },
 	chaser = { hp = 1, r = 11, speed = 115, value = 10 },
@@ -80,6 +86,7 @@ function M.spawn(s, kind, x, y, delay)
 end
 function M.new(players, rng)
 	local s = {
+		settings = M.preferences(),
 		players = players,
 		rng = rng,
 		enemies = {},

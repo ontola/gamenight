@@ -41,7 +41,7 @@ jobs:
         run: |
           $env:GNLOVE_HEADLESS = '1'
           $env:GNLOVE_TEST = '1'
-          & "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" games/love-party
+          python scripts/test-love-simulation.py --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Game tests failed' }
       - name: Package and verify deterministic output
         shell: pwsh
@@ -51,6 +51,8 @@ jobs:
           python scripts/package-love-party.py --output dist/repeated
           if ($LASTEXITCODE -ne 0) { throw 'Repeat packaging failed' }
           if ((Get-FileHash dist/party/gamenight-love-party.zip).Hash -ne (Get-FileHash dist/repeated/gamenight-love-party.zip).Hash) { throw 'Non-deterministic package' }
+          python scripts/test-love-party.py --love "$env:RUNNER_TEMP/love/love-11.5-win64/lovec.exe" --pack dist/party
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged settings/lifecycle tests failed' }
       - name: Fetch pinned SpaceRacer release and probe source
         shell: pwsh
         run: |

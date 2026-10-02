@@ -100,8 +100,8 @@ pub enum GameEvent {
         session: SessionId,
     },
     /// The party changed one of the settings you declared with
-    /// [`GameNight::declare_settings`]. Apply it live if a match is running,
-    /// otherwise from the next match.
+    /// [`GameNight::declare_settings`]. Apply it live when safe, or at the next
+    /// round boundary. State that timing in the setting label.
     SettingChanged {
         key: String,
         value: SettingValue,

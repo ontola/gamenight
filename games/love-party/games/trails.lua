@@ -4,11 +4,17 @@ local M = {
 	controls = "TURN  stick / direction keys     Survive to score",
 	id = "neon-trails",
 }
+require("shared.settings").bind(M, {
+    {key="speed", label="Speed % (next round)", kind="number", default=100, min=50, max=175},
+    {key="round_pause", label="Round pause (next round)", kind="choice", default="1.4 s", options={"0.5 s","1.0 s","1.4 s","2.0 s","3.0 s","5.0 s"}},
+})
+
 local W, H = 48, 26
 local function key(x, y)
 	return y * W + x
 end
 local function reset(s)
+	s.settings = M.preferences()
 	s.grid = {}
 	s.clock = 0
 	s.intermission = nil
@@ -49,10 +55,10 @@ function M.update(s, dt, inputs)
 		end
 	end
 	s.clock = s.clock + dt
-	if s.clock < 0.105 then
+	if s.clock < 0.105 * 100 / s.settings.speed then
 		return
 	end
-	s.clock = s.clock - 0.105
+	s.clock = s.clock - 0.105 * 100 / s.settings.speed
 	local targets = {}
 	for _, p in ipairs(s.players) do
 		if p.alive then
@@ -87,7 +93,7 @@ function M.update(s, dt, inputs)
 				p.score = p.score + 3
 			end
 		end
-		s.intermission = 1.4
+		s.intermission = tonumber(s.settings.round_pause:match("^[%d.]+"))
 	end
 end
 function M.bot(s, p)

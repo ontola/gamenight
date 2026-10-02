@@ -76,7 +76,7 @@ GameNight lifecycle. Copy a game module to add another game, then register it
 in `main.lua` and the packaging script. Keep simulation free of LÖVE APIs.
 
 ```sh
-GNLOVE_HEADLESS=1 GNLOVE_TEST=1 love games/love-party
+python scripts/test-love-simulation.py
 GNLOVE_DEMO=1 GNLOVE_GAME=neon-trails love games/love-party
 ```
 
@@ -196,3 +196,7 @@ Missing renderer support is a failed check, never inferred from accepting protoc
 Pinpals keeps its own board authoring tools and physics tests. Run `make check` in
 `games/pinpals` as well as the shared runner tests. Its upstream provenance is recorded
 in `games/pinpals/UPSTREAM.json`.
+
+## Party settings
+
+All eight active modes declare game-specific settings. See [the settings reference](../../docs/game-settings.md) for keys, ranges and when changes apply. The shared test runner stages the same Pinpals modules as the release pack, then checks declarations, validation and gameplay effects.

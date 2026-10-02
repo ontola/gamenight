@@ -1,16 +1,21 @@
 local B={id="bubble-buddies",title="BUBBLE BUDDIES",floor=646,left=64,right=1216,ceiling=188}
+B.settings={
+ {key="hearts",label="Team hearts (next round)",kind="number",default=6,min=2,max=12},
+ {key="waves",label="Waves to clear (next round)",kind="number",default=5,min=1,max=10},
+ {key="wave_seconds",label="Seconds per wave (next round)",kind="number",default=80,min=30,max=150}}
 local radii={18,32,52}; local bounce={-355,-485,-605}; local speed={215,165,120}
 local function clamp(x,a,b) return math.max(a,math.min(b,x)) end
 local function bubble(size,x,y,dir) return {size=size,x=x,y=y,r=radii[size],vx=dir*speed[size],vy=bounce[size]} end
 function B.wave(g,n)
-  g.wave=n; g.bubbles={}; g.ropes={}; g.clock=80; g.phase="ready"; g.timer=1.5
+  g.wave=n; g.bubbles={}; g.ropes={}; g.clock=g.settings.wave_seconds; g.phase="ready"; g.timer=1.5
   for i=1,math.min(4,n+1) do
     g.bubbles[i]=bubble(n<3 and 2 or 3,130+i*190,245+(i%2)*55,i%2==0 and 1 or -1)
   end
   for i,p in ipairs(g.players) do p.x=210+(i-1)*270; p.out=0; p.invuln=2; p.cooldown=0 end
 end
-function B.new(seats)
-  local g={players={},hearts=6,phase="play",events={},time=0,popped=0,flash=0}
+function B.new(seats,_seed,settings)
+  settings=settings or {hearts=6,waves=5,wave_seconds=80}
+  local g={players={},settings=settings,hearts=settings.hearts,phase="play",events={},time=0,popped=0,flash=0}
   for _,s in ipairs(seats) do g.players[#g.players+1]={slot=s.slot,name=s.name,avatar=s.avatar,bot=s.bot} end
   B.wave(g,1); return g
 end
@@ -44,7 +49,7 @@ function B.step(g,inputs,dt)
     g.timer=g.timer-dt
     if g.timer<=0 then
       if g.phase=="clear" then
-        if g.wave>=5 then g.phase="won" else g.hearts=math.min(6,g.hearts+1); B.wave(g,g.wave+1) end
+        if g.wave>=g.settings.waves then g.phase="won" else g.hearts=math.min(g.settings.hearts,g.hearts+1); B.wave(g,g.wave+1) end
       else g.phase="play" end
     end
     return

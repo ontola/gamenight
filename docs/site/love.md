@@ -38,7 +38,7 @@ Use `shared.window` and `shared.back_gate`. Prepare before showing the window. B
 ## Package and test
 
 ```sh
-GNLOVE_HEADLESS=1 GNLOVE_TEST=1 love games/love-party
+python scripts/test-love-simulation.py
 python scripts/package-love-party.py --output dist/my-party-build
 ```
 
@@ -47,3 +47,7 @@ The output directory must be new. Packaging builds the registered titles; it doe
 ## Optional performance diagnostics
 
 The bundled launcher samples application frame intervals while running and reports them every ten active seconds. It includes GPU, OS and pixel dimensions; CPU and RAM are unavailable. Standalone games send nothing. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
+
+## Game settings
+
+Use the [settings helper and game reference](/docs/settings) to expose choices, toggles and bounded numbers to the lobby and phone. Validate each change and snapshot round rules when creating a round.

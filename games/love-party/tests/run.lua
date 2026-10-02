@@ -340,3 +340,4 @@ require("tests.volley.run")()
 
 require("tests.coop.run")()
 require("tests.performance")
+require("tests.settings")

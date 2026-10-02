@@ -11,6 +11,7 @@ from server import Server
 class ModRecovery(unittest.TestCase):
     def adapter(self, root):
         a=Adapter.__new__(Adapter)
+        a.settings=Mock(future=None)
         a.root=root;a.directory=root/'managed';a.directory.mkdir()
         a.mod_request={'id':'e8d5088a-42f7-4278-b322-1eab544b6387','instance':'session','expected_revision':1,'expires':9999999999,'seat':{'index':0,'player':'player','revision':1},'values':{'bounce':1.5}}
         a.session='session';a.seats=[];a.mod_restart=None;a.mod_future=Future()

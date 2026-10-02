@@ -13,6 +13,7 @@ pub fn page(slug: &str) -> Option<&'static str> {
         "faces" => Some(include_str!("docs-faces.html")),
         "testing" => Some(include_str!("docs-testing.html")),
         "publishing" => Some(include_str!("docs-publishing.html")),
+        "settings" => Some(include_str!("docs-settings.html")),
         "protocol" => Some(include_str!("docs-protocol.html")),
         _ => None,
     }

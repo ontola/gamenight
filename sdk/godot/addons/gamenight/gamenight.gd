@@ -33,8 +33,8 @@ signal party_updated(party: Dictionary)
 signal controllers_changed(controllers: Array)
 signal roster_changed(seats: Array, players: Array, presence: Array)
 ## The party changed one of the settings you declared with
-## declare_settings(). Apply it live if a match is running, otherwise from
-## the next match. `value` is a bool, int or String per the setting's kind.
+## declare_settings(). Apply it live when safe, or at the next round boundary.
+## State that timing in the label. `value` is a bool, int or String.
 signal setting_changed(key: String, value: Variant)
 
 const PROTOCOL_VERSION := 1

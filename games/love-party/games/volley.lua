@@ -4,23 +4,18 @@ local A=require("games.volley.audio")
 local Input=require("shared.input")
 local M={id="volley-trouble",title="Volley Trouble",tagline="Good friends. Terrible teamwork.",
  controls="A / LB jump / X or RB smash / right stick aim",duration=math.huge,coop=true}
-local settings={arena="beach",bomb=false,target=10,variety=true}
-M.settings={
- {key="arena",label="Court",kind="choice",default="beach",options={"beach","scaffolding","elevator","lava"}},
- {key="bomb",label="Exploding ball",kind="toggle",default=false},
- {key="variety",label="Rotating round rules",kind="toggle",default=true},
- {key="target",label="Points to win",kind="number",default=10,min=1,max=21}}
-function M.setting(key,value)
- if key=="arena" then for _,a in ipairs(S.arenas) do if a.id==value then settings.arena=value end end
- elseif (key=="bomb" or key=="variety") and type(value)=="boolean" then settings[key]=value
- elseif key=="target" and type(value)=="number" then settings.target=S.clamp(math.floor(value),1,21) end
-end
+require("shared.settings").bind(M,{
+ {key="arena",label="Court (next match)",kind="choice",default="beach",options={"beach","scaffolding","elevator","lava"}},
+ {key="bomb",label="Exploding ball (next match)",kind="toggle",default=false},
+ {key="variety",label="Rotating rules (next match)",kind="toggle",default=true},
+ {key="target",label="Points to win (next match)",kind="number",default=10,min=1,max=21}})
 function M.roster(players)
  table.sort(players,function(a,b) return a.slot<b.slot end)
  for i,p in ipairs(players) do p.team=(i-1)%2+1 end
  return players
 end
 function M.new(players)
+ local settings=M.preferences()
  local s=S.new({seats=M.roster(players),arena=settings.arena,bomb=settings.bomb,target=settings.target,variety=settings.variety})
  for i,p in ipairs(s.players) do
   local identity=players[i]

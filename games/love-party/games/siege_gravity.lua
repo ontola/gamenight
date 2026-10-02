@@ -1,14 +1,16 @@
 -- Softened inverse-square fields: bounded at the core and frame-rate independent.
 local M = {}
 function M.fields(s)
+ if s.settings and s.settings.gravity==0 then return {} end
  local t=s.time
  local fields={}
  if s.wave>=1 then fields[1]={x=s.width*(0.30+0.045*math.sin(t*0.22)),y=s.height*(0.30+0.06*math.cos(t*0.18)),mass=1600000*math.min(1,s.wave/4),r=19} end
  if s.wave>=5 then fields[#fields+1]={x=s.width*0.73,y=s.height*0.67,mass=6500000,r=24,lethal=true} end
+ for _,field in ipairs(fields) do field.mass=field.mass*((s.settings and s.settings.gravity or 100)/100) end
  return fields
 end
 function M.portals(s)
- if s.wave<3 then return {} end
+ if s.wave<3 or (s.settings and not s.settings.wormholes) then return {} end
  return {{x=s.width*0.12,y=s.height*0.70,r=25},{x=s.width*0.88,y=s.height*0.28,r=25}}
 end
 function M.strength(s) return math.min(1,math.max(0,(s.time-3)/3)) end

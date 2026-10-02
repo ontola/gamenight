@@ -121,6 +121,17 @@
     ]
   },
   {
+    "slug": "settings",
+    "title": "Game settings",
+    "group": "Reference",
+    "source": "docs/game-settings.md",
+    "watch": [
+      "games/love-party/shared/settings.lua",
+      "games/love-party/tests/settings.lua",
+      "examples/mineclonia/settings.py"
+    ]
+  },
+  {
     "slug": "protocol",
     "title": "Protocol reference",
     "group": "Reference",

@@ -15,6 +15,7 @@ import shutil
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import modding
+from settings import Settings
 from host import Host
 from couch import singleton
 from server import Server, preserve_world
@@ -53,6 +54,7 @@ class Adapter:
         self.root, self.send = root, send
         self.server = Server(root)
         self.server.start()
+        self.settings = Settings(root)
         self.directory = root / "managed"
         self.directory.mkdir(exist_ok=True)
         self.server_frame = self.directory / "server.frame"
@@ -74,6 +76,7 @@ class Adapter:
     def dispose(self):
         self.active = False
         self.flush()
+        self.settings.settle()
         if self.children and self.server.process and self.server.process.poll() is None:
             # Abruptly terminating a UDP client leaves its name reserved on the
             # server. Explicitly disconnect first, before any replacement view.
@@ -87,7 +90,11 @@ class Adapter:
 
     def receive(self, msg):
         kind = msg.get("type")
-        if kind == "controller_frame":
+        if kind == "welcome":
+            self.send({"type": "declare_settings", "settings": self.settings.specs()})
+        elif kind == "setting_changed":
+            self.settings.change(msg.get("key"), msg.get("value"))
+        elif kind == "controller_frame":
             self.controllers = msg["controllers"]; self.received = time.monotonic()
         elif kind == "prepare":
             if self.mod_request and self.mod_request.get("instance") != msg["session"]:
@@ -152,6 +159,7 @@ class Adapter:
         self.mod_request = self.mod_future = self.mod_restart = None
 
     def mods(self):
+        if self.settings.future is not None: return
         path = self.directory / "mod-request.json"
         if path.exists() and self.mod_request is None:
             req = json.loads(path.read_text()); path.unlink()
@@ -220,6 +228,7 @@ class Adapter:
 
     def tick(self):
         self.server.check()
+        self.settings.tick(blocked=self.mod_request is not None)
         self.mods()
         if any(c.poll() is not None for c in self.children):
             raise RuntimeError("A Mineclonia view closed; ending this pair")
@@ -262,7 +271,10 @@ def main():
                         if line: adapter.receive(json.loads(line))
                 adapter.tick()
         finally:
-            try: adapter.dispose()
+            try:
+                adapter.settings.close()
+                adapter.mod_worker.shutdown(wait=True, cancel_futures=True)
+                adapter.dispose()
             finally: adapter.server.stop()
 
 if __name__ == "__main__": main()

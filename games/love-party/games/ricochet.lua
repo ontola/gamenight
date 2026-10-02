@@ -7,6 +7,12 @@ local M = {
 	tagline = "Every wall is another angle.",
 	controls = "MOVE stick / keys   AIM right stick / movement   FIRE RB / RT   SHIELD B",
 }
+require("shared.settings").bind(M, {
+    {key="bounces", label="Wall bounces (next round)", kind="number", default=4, min=0, max=10},
+    {key="shot_speed", label="Shot speed % (next round)", kind="number", default=100, min=50, max=160},
+    {key="cover", label="Destructible cover (next round)", kind="toggle", default=true},
+})
+
 local function overlaps(x, y, radius, block)
 	return math.abs(x - block.x) < block.size / 2 + radius and math.abs(y - block.y) < block.size / 2 + radius
 end
@@ -56,6 +62,7 @@ local function hitCover(s, index)
 	end
 end
 function M.new(players, rng)
+	local settings = M.preferences()
 	A.roster(players)
 	for _, p in ipairs(players) do
 		p.ax = 1
@@ -74,7 +81,8 @@ function M.new(players, rng)
 			end
 		end
 	end
-	return { players = players, rng = rng, shots = {}, cover = cover, debris = {}, time = 0, sfx = {} }
+	if not settings.cover then cover = {} end
+	return { settings = settings, players = players, rng = rng, shots = {}, cover = cover, debris = {}, time = 0, sfx = {} }
 end
 function M.update(s, dt, inputs)
 	s.time = s.time + dt
@@ -113,8 +121,8 @@ function M.update(s, dt, inputs)
 			s.shots[#s.shots + 1] = {
 				x = p.x + p.ax * 22,
 				y = p.y + p.ay * 22,
-				vx = p.ax * 430,
-				vy = p.ay * 430,
+				vx = p.ax * 430 * s.settings.shot_speed / 100,
+				vy = p.ay * 430 * s.settings.shot_speed / 100,
 				owner = p,
 				ttl = 4,
 				bounces = 0,
@@ -125,7 +133,7 @@ function M.update(s, dt, inputs)
 	for i = #s.shots, 1, -1 do
 		local b = s.shots[i]
 		b.ttl = b.ttl - dt
-		local steps = math.max(1, math.ceil(dt * 430 / 6))
+		local steps = math.max(1, math.ceil(dt * 430 * s.settings.shot_speed / 100 / 6))
 		for _ = 1, steps do
 			if b.ttl <= 0 then
 				break
@@ -170,7 +178,7 @@ function M.update(s, dt, inputs)
 					break
 				end
 			end
-			if b.bounces > 4 then
+			if b.bounces > s.settings.bounces then
 				b.ttl = 0
 			end
 		end

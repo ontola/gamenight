@@ -41,6 +41,14 @@ def main():
                         hello = json.loads(stream.readline())
                         assert hello["type"] == "hello" and hello["game"] == game and hello["token"] == "fixture-token"
                         stream.write((json.dumps({"type": "welcome", "protocol_version": 1})+"\n").encode())
+                        declaration = json.loads(stream.readline())
+                        assert declaration.get("type") == "declare_settings" and declaration.get("settings"), declaration
+                        specs = declaration["settings"]
+                        assert len({s["key"] for s in specs}) == len(specs), "duplicate setting keys"
+                        for spec in specs:
+                            value = (not spec["default"] if spec["kind"] == "toggle" else
+                                     spec["options"][-1] if spec["kind"] == "choice" else spec["min"])
+                            stream.write((json.dumps({"type":"setting_changed", "key":spec["key"], "value":value})+"\n").encode())
                         stream.write((json.dumps({"type": "prepare", "game": game, "session": "session-one",
                                                    "seats": [{"index": 0, "occupant": {"kind": "ai"}},
                                                              {"index": 2, "occupant": {"kind": "ai"}}], "players": []})+"\n").encode())

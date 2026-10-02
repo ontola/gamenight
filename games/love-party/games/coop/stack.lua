@@ -1,5 +1,8 @@
 -- A shared twelve-column well. Each player owns six columns; rows clear together.
 local T={id="stack-together",title="STACK TOGETHER",width=12,height=18}
+T.settings={
+ {key="target",label="Rows to clear (next round)",kind="number",default=12,min=4,max=40},
+ {key="speed",label="Falling speed % (next round)",kind="number",default=100,min=50,max=175}}
 local shapes={{{0,0},{1,0},{2,0},{3,0}},{{0,0},{1,0},{0,1},{1,1}},
   {{1,0},{0,1},{1,1},{2,1}},{{1,0},{2,0},{0,1},{1,1}},
   {{0,0},{1,0},{1,1},{2,1}},{{0,0},{0,1},{1,1},{2,1}},{{2,0},{0,1},{1,1},{2,1}}}
@@ -35,8 +38,9 @@ function T.spawn(g,p)
   p.ai=nil; p.age=0
   if not T.fits(g,p,p.x,p.y,0) then g.phase="lost"; g.reason="THE STACK REACHED THE TOP" end
 end
-function T.new(seats,seed)
-  local g={board={},players={},rows=0,target=12,phase="play",time=0,seed=seed or 7381,events={},flash=0}
+function T.new(seats,seed,settings)
+  settings=settings or {target=12,speed=100}
+  local g={board={},players={},rows=0,target=settings.target,settings=settings,phase="play",time=0,seed=seed or 7381,events={},flash=0}
   for y=1,T.height do g.board[y]={} end
   for i,s in ipairs(seats) do if i<=2 then
     g.players[i]={slot=s.slot,name=s.name,avatar=s.avatar,bot=s.bot,lane=(i-1)*6+1,bag={},previous={}}
@@ -142,7 +146,7 @@ function T.step(g,inputs,dt)
     if a.drop and not p.previous.drop then p.y=T.dropY(g,p,p.x,p.rot) or p.y; lock(g,p)
     else
       p.fall=p.fall+dt
-      local interval=a.down and .045 or math.max(.26,.85-g.rows*.025)
+      local interval=a.down and .045 or math.max(.26,.85-g.rows*.025)*100/g.settings.speed
       if p.fall>=interval then
         p.fall=0
         if T.fits(g,p,p.x,p.y+1,p.rot) then p.y=p.y+1 else lock(g,p) end

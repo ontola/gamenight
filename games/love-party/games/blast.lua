@@ -8,6 +8,12 @@ local M = {
 	height = 11,
 	powers = { "remote", "kick", "diagonal", "beam", "star", "range", "capacity", "speed", "cross" },
 }
+require("shared.settings").bind(M, {
+    {key="pickups", label="Pickup chance % (next round)", kind="number", default=25, min=0, max=60},
+    {key="crates", label="Crate density % (next round)", kind="number", default=62, min=20, max=85},
+    {key="fuse", label="Bomb fuse (next round)", kind="choice", default="2.3 s", options={"1.0 s","1.5 s","2.0 s","2.3 s","3.0 s","4.0 s"}},
+})
+
 local directions = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 local diagonals = { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } }
 local spawns = { { 1, 1 }, { 17, 9 }, { 1, 9 }, { 17, 1 } }
@@ -32,7 +38,8 @@ local function occupied(s, x, y)
 	end
 	return false
 end
-function M.generate(rng)
+function M.generate(rng, settings)
+	settings = settings or M.preferences()
 	local tiles, drops = {}, {}
 	for y = 0, 10 do
 		for x = 0, 18 do
@@ -50,11 +57,11 @@ function M.generate(rng)
 					kind = "wall"
 				elseif mx % 2 == 0 and my % 2 == 0 and rng() < 0.85 then
 					kind = "wall"
-				elseif not safe and rng() < 0.62 then
+				elseif not safe and rng() < settings.crates / 100 then
 					kind = "crate"
 				end
 				tiles[k] = kind
-				if kind == "crate" and rng() < 0.25 then
+				if kind == "crate" and rng() < settings.pickups / 100 then
 					drops[k] = M.powers[rng(1, #M.powers)]
 				end
 			end
@@ -65,7 +72,8 @@ function M.generate(rng)
 	return tiles, drops
 end
 local function reset(s)
-	s.tiles, s.drops = M.generate(s.rng)
+	s.settings = M.preferences()
+	s.tiles, s.drops = M.generate(s.rng, s.settings)
 	s.bombs, s.flames, s.items = {}, {}, {}
 	s.round = (s.round or 0) + 1
 	s.theme = s.rng(1, 3)
@@ -159,7 +167,7 @@ function M.placeBomb(s, p)
 		dx = p.dx,
 		dy = p.dy,
 		remote = p.remote,
-		fuse = p.remote and math.huge or 2.3,
+		fuse = p.remote and math.huge or tonumber(s.settings.fuse:match("^[%d.]+")),
 		slideClock = 0,
 	}
 	s.bombs[#s.bombs + 1] = b
@@ -318,7 +326,7 @@ function M.update(s, dt, inputs)
 			end
 		end
 		if not b.owner.alive then
-			b.fuse = math.min(b.fuse, 2.3)
+			b.fuse = math.min(b.fuse, tonumber(s.settings.fuse:match("^[%d.]+")))
 		end
 		b.fuse = b.fuse - dt
 		if s.flames[M.key(b.x, b.y)] then

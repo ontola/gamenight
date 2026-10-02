@@ -3,8 +3,9 @@ local Audio=require("shared.audio")
 local V=require("games.coop.view")
 return function(module)
  local M={id=module.id,title=module.title,tagline="One very cooperative couch",controls="Move / A action / B drop",duration=math.huge,coop=true}
+ require("shared.settings").bind(M,module.settings)
  function M.new(players)
-  local s=module.new(players)
+  local s=module.new(players,nil,M.preferences())
   for i,p in ipairs(s.players) do
    local identity=players[i]
    p.id,p.controller,p.color,p.skin_color=identity.id,identity.controller,identity.color,identity.skin_color
