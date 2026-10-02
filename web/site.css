@@ -166,7 +166,9 @@ html{scrollbar-gutter:stable}
 #site-shell .site-links a:active{background:#ffffff12}
 #site-shell .site-links a[aria-current],#site-shell .site-links a:hover{color:#eef0fc}
 @media(max-width:650px){#site-shell{min-height:126px}#site-shell .site-nav{grid-template-columns:minmax(0,1fr) 140px;padding:16px;gap:14px;min-height:126px}#site-shell .site-links{grid-column:1/-1;justify-content:space-between;gap:12px;width:100%}#site-shell .site-room-actions{grid-column:2;grid-row:1}}
-@view-transition{navigation:auto}
+/* The shared SPA preserves navigation. Full-page auth/pickup redirects may
+   interrupt cross-document transitions, so keep those navigations immediate. */
+@view-transition{navigation:none}
 ::view-transition-group(site-navigation){animation-duration:0s}
 ::view-transition-old(site-navigation){display:none}
 ::view-transition-new(site-navigation){animation:none}
