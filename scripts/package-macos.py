@@ -84,8 +84,21 @@ def main():
     icon = app / "Contents/Resources/GameNight.icns"
     subprocess.run(["iconutil", "-c", "icns", str(iconset), "-o", str(icon)], check=True)
     shutil.copy2(icon, app / "Contents/Helpers/GameNight.app/Contents/Resources/GameNight.icns")
+    links = app / "Contents/Helpers/GameNight Link.app/Contents"
+    (links / "MacOS").mkdir(parents=True)
+    (links / "Resources").mkdir()
+    link_plist = plist("GameNight Link", "io.ontola.gamenight.link", args.version, True)
+    link_plist["CFBundleURLTypes"] = [{"CFBundleURLName": "GameNight games", "CFBundleURLSchemes": ["gamenight"]}]
+    (links / "Info.plist").write_bytes(plistlib.dumps(link_plist))
+    shutil.copy2(icon, links / "Resources/GameNight.icns")
+    architectures = []
+    for arch in ["arm64", "x86_64"]:
+        binary = args.output / ("GameNightLink-" + arch)
+        subprocess.run(["swiftc", "-target", arch + "-apple-macosx12.0", str(repo / "scripts/macos-link.swift"), "-o", str(binary)], check=True)
+        architectures.append(str(binary))
+    subprocess.run(["lipo", "-create", *architectures, "-output", str(links / "MacOS/GameNight Link")], check=True)
     # Ad-hoc signing supports Apple Silicon execution. It is not notarization.
-    for path in [app / "Contents/Resources/bin/gamenight-daemon", app / "Contents/Helpers/GameNight.app", app]:
+    for path in [app / "Contents/Resources/bin/gamenight-daemon", app / "Contents/Helpers/GameNight.app", links.parent, app]:
         subprocess.run(["codesign", "--force", "--sign", "-", str(path)], check=True)
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     print(app)

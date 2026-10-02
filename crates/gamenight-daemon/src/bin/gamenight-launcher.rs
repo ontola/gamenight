@@ -4,6 +4,8 @@
 mod browser;
 #[path = "launcher/data.rs"]
 mod data;
+#[path = "launcher/links.rs"]
+mod links;
 #[cfg(windows)]
 #[path = "launcher/windows.rs"]
 mod windows;
@@ -23,16 +25,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let root = executable_dir.join("../Resources").canonicalize()?;
     #[cfg(not(target_os = "macos"))]
     let root = executable_dir.to_path_buf();
-    let port: u16 = std::env::args()
-        .nth(1)
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let requested = if args.first().is_some_and(|arg| arg == "--open-url") {
+        Some(
+            links::game(args.get(1).ok_or("Missing GameNight link")?)
+                .filter(|_| args.len() == 2)
+                .ok_or("Invalid GameNight link")?,
+        )
+    } else {
+        None
+    };
+    let port: u16 = args
+        .first()
+        .filter(|_| requested.is_none())
         .map(|v| v.parse())
         .transpose()?
         .unwrap_or(7912);
     if port == 0 {
         return Err("Port must not be zero".into());
     }
-    // Fail before launching anything if another GameNight owns the port.
-    drop(TcpListener::bind(("127.0.0.1", port))?);
     #[cfg(target_os = "macos")]
     let daemon = root.join("bin/gamenight-daemon");
     #[cfg(target_os = "macos")]
@@ -56,11 +67,26 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .truncate(false)
         .write(true)
         .open(local.join("launcher.lock"))?;
-    lock.try_lock()
-        .map_err(|_| "GameNight is already running")?;
+    if lock.try_lock().is_err() {
+        if let Some(game) = requested {
+            links::request(&local, game)?;
+            return Ok(());
+        }
+        return Err("GameNight is already running".into());
+    }
+    drop(TcpListener::bind(("127.0.0.1", port))?);
+    if let Err(error) = links::register() {
+        eprintln!("GameNight links: {error}");
+    }
     // Only a fresh installation asks the browser for a catalog choice. Keep
     // pending setup across interrupted launches; never reset an existing party.
     let onboarding = local.join("onboarding.json");
+    if let Some(game) = requested {
+        fs::write(
+            &onboarding,
+            serde_json::json!({"complete":false,"game":game}).to_string(),
+        )?;
+    }
     if !local.join("shelf.json").exists() && !onboarding.exists() {
         fs::write(&onboarding, b"{\"complete\":false}")?;
     }
@@ -155,6 +181,15 @@ fn main() {
     #[cfg(windows)]
     velopack::VelopackApp::build()
         .set_auto_apply_on_startup(false)
+        .on_after_install_fast_callback(|_| {
+            let _ = links::register();
+        })
+        .on_after_update_fast_callback(|_| {
+            let _ = links::register();
+        })
+        .on_before_uninstall_fast_callback(|_| {
+            let _ = links::unregister();
+        })
         .run();
     if let Err(error) = run() {
         #[cfg(windows)]

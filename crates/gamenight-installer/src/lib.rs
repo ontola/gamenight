@@ -17,7 +17,7 @@
 //! party wants to warm something that isn't installed yet, jumping it ahead
 //! of whatever else `prewarm_all` was going to fetch next.
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
@@ -366,9 +366,8 @@ pub struct PrewarmHandle {
 
 impl PrewarmHandle {
     /// Ask the background prewarm to fetch `game` next, ahead of whatever
-    /// else is still queued. A no-op once the queue has already passed it —
-    /// installed, failed, or never eligible — reordering only affects work
-    /// that hasn't started yet. An in-flight download always finishes
+    /// else is still queued. A failed download is retried only on this explicit
+    /// request. Installed and ineligible games are ignored. An in-flight download finishes
     /// rather than being thrown away half-fetched (no HTTP range support to
     /// resume it later).
     pub fn prioritize(&self, game: impl Into<String>) {
@@ -435,7 +434,7 @@ pub async fn prewarm_all(
 pub async fn prewarm_all_reporting(
     catalog_dir: &Path,
     root: &Path,
-    mut signals: Option<mpsc::UnboundedReceiver<PrewarmSignal>>,
+    signals: Option<mpsc::UnboundedReceiver<PrewarmSignal>>,
     reporter: Option<InstallReporter>,
 ) -> Vec<PrewarmResult> {
     let entries = match gamenight_catalog::load_dir(catalog_dir) {
@@ -445,10 +444,19 @@ pub async fn prewarm_all_reporting(
             return Vec::new();
         }
     };
-    let mut queue: VecDeque<CatalogEntry> = entries
+    let queue: VecDeque<CatalogEntry> = entries
         .into_iter()
         .filter(|e| e.auto_download_here().is_some())
         .collect();
+    prewarm_queue(queue, root, signals, reporter).await
+}
+
+async fn prewarm_queue(
+    mut queue: VecDeque<CatalogEntry>,
+    root: &Path,
+    mut signals: Option<mpsc::UnboundedReceiver<PrewarmSignal>>,
+    reporter: Option<InstallReporter>,
+) -> Vec<PrewarmResult> {
     if queue.is_empty() {
         return Vec::new();
     }
@@ -470,14 +478,39 @@ pub async fn prewarm_all_reporting(
     }
 
     let mut results = Vec::with_capacity(queue.len());
-    while !queue.is_empty() {
-        if let Some(rx) = &mut signals {
-            apply_signals(&mut queue, rx);
+    let mut failed = HashMap::new();
+    loop {
+        if queue.is_empty() {
+            if failed.is_empty() {
+                break;
+            }
+            let Some(rx) = &mut signals else { break };
+            let Some(signal) = rx.recv().await else { break };
+            if let PrewarmSignal::Prioritize(game) = signal {
+                if let Some(entry) = failed.remove(&game) {
+                    queue.push_back(entry);
+                }
+            }
         }
-        let entry = queue.pop_front().expect("checked not empty");
+        if let Some(rx) = &mut signals {
+            apply_signals(&mut queue, rx, &mut failed);
+        }
+        let Some(entry) = queue.pop_front() else {
+            continue;
+        };
+        if let Some(tx) = &reporter {
+            let _ = tx.send(InstallStatus {
+                game: GameId::new(&entry.id),
+                title: entry.title.clone(),
+                state: InstallState::Queued,
+                percent: None,
+                label: None,
+            });
+        }
         let outcome = ensure_installed_reporting(&entry, root, reporter.as_ref()).await;
         if let Err(e) = &outcome {
             warn!(game = %entry.id, error = %e, "prewarm failed");
+            failed.insert(entry.id.clone(), entry.clone());
         }
         results.push(PrewarmResult {
             game: entry.id.clone(),
@@ -496,6 +529,7 @@ pub async fn prewarm_all_reporting(
 fn apply_signals(
     queue: &mut VecDeque<CatalogEntry>,
     rx: &mut mpsc::UnboundedReceiver<PrewarmSignal>,
+    failed: &mut HashMap<String, CatalogEntry>,
 ) {
     let mut bumps = Vec::new();
     let mut players = None;
@@ -517,6 +551,9 @@ fn apply_signals(
 
     // Last request wins the front slot, so apply them in order.
     for game in bumps {
+        if let Some(entry) = failed.remove(&game) {
+            queue.push_front(entry);
+        }
         if let Some(pos) = queue.iter().position(|e| e.id == game) {
             let bumped = queue.remove(pos).expect("position just found");
             queue.push_front(bumped);
@@ -785,6 +822,25 @@ mod tests {
     }
 
     #[test]
+    fn explicit_retry_requeues_a_failure_once_without_reinstalling_other_games() {
+        let mut queue = VecDeque::from([seating("other", 1, 4, None)]);
+        let mut failed = HashMap::from([("broken".into(), seating("broken", 1, 4, None))]);
+        let (handle, mut rx) = prewarm_channel();
+        handle.set_players(2);
+        apply_signals(&mut queue, &mut rx, &mut failed);
+        assert_eq!(queue.len(), 1); // No automatic retry loop.
+        handle.prioritize("broken");
+        handle.prioritize("broken");
+        handle.prioritize("installed-or-unknown");
+        apply_signals(&mut queue, &mut rx, &mut failed);
+        assert_eq!(
+            queue.iter().map(|g| g.id.as_str()).collect::<Vec<_>>(),
+            ["broken", "other"]
+        );
+        assert!(failed.is_empty());
+    }
+
+    #[test]
     fn player_count_reorders_the_queue_toward_games_that_seat_the_party() {
         let mut queue: VecDeque<CatalogEntry> = VecDeque::from(vec![
             seating("solo-only", 1, 1, Some(1)),
@@ -795,7 +851,7 @@ mod tests {
         tx.send(PrewarmSignal::Players(2)).unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         // All three tiers, in order: the game built for two, then the one that
         // seats two without being about it, then the one that can't.
@@ -817,7 +873,7 @@ mod tests {
         tx.send(PrewarmSignal::Players(4)).unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["party", "solo-only", "duel"]);
@@ -837,7 +893,7 @@ mod tests {
             .unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["solo-only", "party"]);
@@ -855,7 +911,7 @@ mod tests {
         tx.send(PrewarmSignal::Players(0)).unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["solo-only", "party"]);
@@ -871,7 +927,7 @@ mod tests {
         tx.send(PrewarmSignal::Prioritize("c".into())).unwrap();
         drop(tx); // dropping the sender doesn't discard what's already buffered
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["c", "a", "b"]);
@@ -890,7 +946,7 @@ mod tests {
             .unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["a", "b"]);
@@ -907,7 +963,7 @@ mod tests {
         tx.send(PrewarmSignal::Prioritize("c".into())).unwrap();
         drop(tx);
 
-        apply_signals(&mut queue, &mut rx);
+        apply_signals(&mut queue, &mut rx, &mut HashMap::new());
 
         let order: Vec<_> = queue.iter().map(|e| e.id.clone()).collect();
         assert_eq!(order, vec!["c", "b", "a"]);

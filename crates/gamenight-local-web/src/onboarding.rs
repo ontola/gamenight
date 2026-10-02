@@ -3,7 +3,7 @@
 use crate::{daemon, SharedState};
 use axum::{
     extract::{ConnectInfo, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::Html,
     Json,
 };
@@ -30,6 +30,7 @@ pub(crate) fn start(state: &SharedState, port: u16) {
     let Some(file) = std::env::var_os("GAMENIGHT_ONBOARDING_FILE").map(PathBuf::from) else {
         return;
     };
+    listen_for_catalog_requests(state.clone(), file.clone());
     let Ok(bytes) = std::fs::read(&file) else {
         return;
     };
@@ -64,6 +65,106 @@ pub(crate) fn start(state: &SharedState, port: u16) {
             tracing::warn!(%error, "Could not open catalog setup; local play is still available");
         }
     });
+}
+
+fn listen_for_catalog_requests(state: SharedState, file: PathBuf) {
+    tokio::spawn(async move {
+        let Some(directory) = file.parent() else {
+            return;
+        };
+        let request = directory.join("catalog-request.json");
+        loop {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let processing = directory.join(format!(
+                "catalog-request-{}.processing",
+                uuid::Uuid::new_v4()
+            ));
+            // Claim atomically, so a second launcher can submit the next choice
+            // while this one waits for the daemon acknowledgement.
+            if std::fs::rename(&request, &processing).is_err() {
+                continue;
+            }
+            let value = std::fs::read(&processing)
+                .ok()
+                .and_then(|v| serde_json::from_slice::<Value>(&v).ok());
+            let _ = std::fs::remove_file(processing);
+            let Some(game) = value
+                .as_ref()
+                .and_then(|v| v["game"].as_str())
+                .filter(|g| allowed(g))
+            else {
+                continue;
+            };
+            let addr = state.lock().unwrap().daemon_addr.clone();
+            if std::fs::write(&file, json!({"complete":false,"game":game}).to_string()).is_err() {
+                continue;
+            }
+            match queue(&addr, game).await {
+                Ok(installed) => {
+                    let _ = std::fs::write(
+                        &file,
+                        json!({"complete":installed,"game":game}).to_string(),
+                    );
+                }
+                Err(error) => {
+                    tracing::warn!(%game, %error, "Catalog selection could not reach the lobby; saved for next launch")
+                }
+            }
+        }
+    });
+}
+
+/// Refresh an expired setup in the local page, without restarting the app.
+pub(crate) async fn reconnect(
+    State(state): State<SharedState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+    Json(_): Json<Value>,
+) -> Result<Json<Value>, StatusCode> {
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let local_host = host
+        .split(':')
+        .next()
+        .is_some_and(|h| h == "127.0.0.1" || h == "localhost");
+    if !peer.ip().is_loopback()
+        || !local_host
+        || headers.get("origin").and_then(|v| v.to_str().ok())
+            != Some(format!("http://{host}").as_str())
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
+    let file = std::env::var_os("GAMENIGHT_ONBOARDING_FILE")
+        .map(PathBuf::from)
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let saved = std::fs::read(&file)
+        .ok()
+        .and_then(|v| serde_json::from_slice::<Value>(&v).ok());
+    let mut local = state.lock().unwrap();
+    if local.onboarding.as_ref().is_some_and(|h| h.busy) {
+        return Err(StatusCode::CONFLICT);
+    }
+    let ticket = uuid::Uuid::new_v4().simple().to_string();
+    local.onboarding = Some(Handoff {
+        ticket: ticket.clone(),
+        expires: Instant::now() + Duration::from_secs(1200),
+        file,
+        busy: false,
+        accepted: None,
+    });
+    let games = gamenight_catalog::load_dir(&gamenight_catalog::catalog_dir())
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|g| {
+            g.auto_download_here().is_some() && !["lobby", "demo-game"].contains(&g.id.as_str())
+        })
+        .map(|g| json!({"id":g.id,"title":g.title}))
+        .collect::<Vec<_>>();
+    Ok(Json(
+        json!({"ticket":ticket,"game":saved.and_then(|v| v["game"].as_str().map(str::to_owned)),"games":games}),
+    ))
 }
 
 fn open_browser(url: &str) -> std::io::Result<()> {
@@ -310,6 +411,39 @@ mod tests {
         .await;
         assert_eq!(result.unwrap_err(), StatusCode::FORBIDDEN);
         assert!(!file.exists());
+    }
+
+    #[tokio::test]
+    async fn reconnect_rejects_cross_site_and_rebound_hosts() {
+        for (peer, host, origin) in [
+            (
+                "192.168.1.2:4000",
+                "127.0.0.1:7913",
+                "http://127.0.0.1:7913",
+            ),
+            ("127.0.0.1:4000", "127.0.0.1:7913", "https://evil.example"),
+            (
+                "127.0.0.1:4000",
+                "evil.example:7913",
+                "http://evil.example:7913",
+            ),
+        ] {
+            let (state, _) = fixture();
+            let mut headers = HeaderMap::new();
+            headers.insert("host", host.parse().unwrap());
+            headers.insert("origin", origin.parse().unwrap());
+            assert_eq!(
+                reconnect(
+                    State(state),
+                    ConnectInfo(peer.parse().unwrap()),
+                    headers,
+                    Json(json!({}))
+                )
+                .await
+                .unwrap_err(),
+                StatusCode::FORBIDDEN
+            );
+        }
     }
 
     #[tokio::test]

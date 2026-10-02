@@ -151,6 +151,15 @@
       window.updateRoomNavigation?.(connected);
       qrOpen.hidden=connected; roomForm.hidden=connected; roomLeave.hidden=!connected;
       if(connected)document.getElementById('qr-scanner')?.close();
+      if(connected){
+        try{
+          const intent=JSON.parse(sessionStorage.getItem('gamenight_play_after_join_v1'));
+          sessionStorage.removeItem('gamenight_play_after_join_v1');
+          if(intent?.expires>Date.now()&&/^[a-z0-9][a-z0-9-]{0,79}$/.test(intent.game)&&!['lobby','demo-game'].includes(intent.game)){
+            location.assign('/play?game='+encodeURIComponent(intent.game));
+          }
+        }catch{}
+      }
       roomLeave.textContent=state.room_code ? "Leave room "+state.room_code : "Leave room";
     }
     async function checkRoom(){

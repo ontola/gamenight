@@ -105,6 +105,7 @@ pub fn create_router(state: SharedState) -> Router {
     Router::new()
         .route("/onboarding", get(onboarding::page))
         .route("/api/onboarding", post(onboarding::claim))
+        .route("/api/onboarding/reconnect", post(onboarding::reconnect))
         .route("/api/dev-catalog/room", get(dev_catalog::status))
         .route("/api/dev-catalog/next", post(dev_catalog::next))
         .route(

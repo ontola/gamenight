@@ -114,6 +114,32 @@ def main():
                 assert claim(ticket, "another-game")[0] == 409
                 view = playlist()
                 assert view["next"] == "test-game" and view["playing"] is None, view
+                # Local recovery refreshes a capability without restarting; a
+                # foreign website cannot obtain one through the same endpoint.
+                def reconnect(origin):
+                    request = urllib.request.Request(
+                        f"http://127.0.0.1:{web_port}/api/onboarding/reconnect",
+                        data=b"{}", headers={"Content-Type":"application/json","Origin":origin})
+                    try:
+                        with urllib.request.urlopen(request, timeout=10) as response:
+                            return response.status, json.load(response)
+                    except urllib.error.HTTPError as error:
+                        return error.code, None
+                assert reconnect("https://evil.example")[0] == 403
+                code, fresh = reconnect(f"http://127.0.0.1:{web_port}")
+                assert code == 200 and fresh["ticket"] != ticket
+                assert claim(ticket, "test-game")[0] == 403
+                assert claim(fresh["ticket"], "test-game")[0] == 200
+                # This is the same inbox a second launcher writes for an
+                # already running app. A valid choice is acknowledged and saved.
+                (root / "onboarding.json").write_text('{"complete":true}')
+                (root / "catalog-request.json").write_text('{"game":"test-game"}')
+                for _ in range(100):
+                    saved = json.loads((root / "onboarding.json").read_text())
+                    if saved.get("game") == "test-game": break
+                    time.sleep(.1)
+                assert saved.get("game") == "test-game"
+                assert playlist()["playing"] is None
                 stop()
                 (root / "opened-url").unlink()
                 start()
@@ -127,7 +153,7 @@ def main():
                     time.sleep(.1)
                 assert view["next"] == "test-game" and view["playing"] is None, view
                 assert not (root / "opened-url").exists(), "Saved choice should not reopen the picker"
-                print("PASS: first-run capability, catalog validation, host acknowledgement, no automatic start, retry and restart recovery")
+                print("PASS: first-run capability, safe reconnect, running-app inbox, catalog validation, host acknowledgement, no automatic start and restart recovery")
         except Exception:
             print((root / "log").read_text(), file=sys.stderr)
             raise

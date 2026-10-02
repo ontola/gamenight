@@ -31,13 +31,37 @@ interrupted first download is selected again on the next launch; once it is
 installed, setup is marked complete. Existing installs with a shelf and no
 onboarding file do not open a new setup tab after updating.
 
+## Returning players and recovery
+
+`gamenight://play/blast-party` opens the desktop app and queues a catalog game.
+Only lowercase game IDs are accepted. Paths, query strings, arbitrary URLs and
+launch arguments are rejected. The host still checks its platform catalog before
+downloading. An existing game keeps playing.
+
+Windows registers the scheme during install, update and app launch. Uninstall
+removes it only when that installation still owns the handler. The Mac package
+contains a universal AppKit URL receiver, registered on the first normal launch.
+An already running launcher accepts the choice through its local request inbox;
+another game host is not started. A stopped app persists the choice before boot.
+
+The local `/onboarding` page can reconnect to an expired setup or choose a game
+after setup was skipped. Refreshing a capability requires a same-origin JSON
+POST from loopback; it is not exposed to arbitrary websites or LAN clients.
+The picker uses the local catalog and works without the hosted website.
+
+Failed background downloads stay available for an explicit Retry request.
+They do not retry in a loop. Retry uses the same checksum verification and safe
+extraction as an initial download. The optional cloud discovery view carries a
+short failure hint, never raw host paths, download URLs or credentials.
+
 ## Boundaries
 
 - The browser must have the choice saved. A different default browser, private
   browsing or cleared storage leads to the picker instead. A phone can share the
   game's setup URL with the computer; it cannot silently configure that computer.
-- An existing app uses the room join flow and Play next. This flow does not yet
-  register a `gamenight:` URL handler or launch an already installed app.
+- Older releases need an update before they can open `gamenight:` links.
+  Browsers may ask permission to open the app. Websites cannot reliably detect
+  whether the scheme is installed, so keep a download fallback visible.
 - The browser handoff needs the website once. Local gameplay does not depend on
   it. Offline setup can still use the lobby normally.
 - `GAMENIGHT_ONBOARDING_FILE` is set by the packaged launcher. Development daemons
@@ -46,3 +70,6 @@ onboarding file do not open a new setup tab after updating.
   for QueueNext acknowledgement. Browser tests cover installer selection, mobile
   sharing, missing storage and the loopback redirect. These do not certify OS
   browser prompts, SmartScreen, Gatekeeper or physical controller play.
+- The installer test simulates a failed download followed by a successful retry
+  without restarting the host. `scripts/test-onboarding.py` exercises the real
+  daemon, local HTTP receiver, saved choices and restart recovery.

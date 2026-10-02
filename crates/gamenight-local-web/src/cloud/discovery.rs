@@ -34,7 +34,7 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         let selectable = game.max_players.is_none_or(|max| count <= max)
             && (game.launch.is_some()
                 || party.connected_games.contains(&game.id)
-                || install.is_some_and(|i| i.state != InstallState::Failed));
+                || install.is_some());
         let mut state = if selectable {
             "available"
         } else {
@@ -72,15 +72,28 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         {
             state = "playing";
         }
-        games.push(json!({"id":game.id,"selectable":selectable,"state":state,"percent":percent}));
+        games.push(json!({"id":game.id,"selectable":selectable,"state":state,"percent":percent,"failure":install.filter(|i|i.state==InstallState::Failed).map(|i|failure_hint(i.label.as_deref()))}));
     }
     for install in &party.installs {
         if games.iter().any(|g| g["id"] == install.game.0) {
             continue;
         }
-        games.push(json!({"id":install.game,"selectable":install.state != InstallState::Failed,"state":install.state,"percent":install.percent}));
+        games.push(json!({"id":install.game,"selectable":true,"state":install.state,"percent":install.percent,"failure":(install.state==InstallState::Failed).then(||failure_hint(install.label.as_deref()))}));
     }
     json!({"session":party.active_session,"playlist":party.playlist,"games":games,"current":party.active_session.as_ref().map(|s| &s.game),"next":party.warming.as_ref().map(|s| &s.game).or_else(|| party.warm_session.as_ref().map(|s| &s.game)),"acknowledged":acknowledged})
+}
+
+fn failure_hint(label: Option<&str>) -> &'static str {
+    let label = label.unwrap_or_default().to_lowercase();
+    if label.contains("space") || label.contains("os error 112") || label.contains("os error 28") {
+        "Free some disk space on the host, then retry."
+    } else if label.contains("checksum") || label.contains("sha256") {
+        "The download could not be verified. Retry to fetch a fresh copy."
+    } else if label.contains("http") || label.contains("network") || label.contains("timed out") {
+        "The download could not be reached. Check the host's connection, then retry."
+    } else {
+        "The game could not be installed. Retry the download."
+    }
 }
 
 pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
@@ -149,19 +162,24 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
             return None;
         }
         // Retried deliveries after a lost HTTP response do not reorder the queue.
-        if party
-            .warming
-            .as_ref()
-            .is_some_and(|s| s.game.0 == selection.game)
-            || party
-                .warm_session
+        let failed = party
+            .installs
+            .iter()
+            .any(|i| i.game.0 == selection.game && i.state == InstallState::Failed);
+        if !failed
+            && (party
+                .warming
                 .as_ref()
                 .is_some_and(|s| s.game.0 == selection.game)
+                || party
+                    .warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.game.0 == selection.game))
         {
             return Some(());
         }
         ws.send(Message::Text(
-            ClientMessage::PlayNext {
+            ClientMessage::QueueNext {
                 game: GameId(selection.game.clone()),
             }
             .to_json(),
@@ -197,6 +215,19 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn failed_installs_are_retryable_and_do_not_expose_host_paths() {
+        let mut party = gamenight_core::GameNight::default().snapshot();
+        party.installs.push(serde_json::from_value(json!({"game":"broken","title":"Broken","state":"failed","label":"HTTP error downloading https://secret.example/private?token=x"})).unwrap());
+        let view = snapshot(&party, &None);
+        assert_eq!(view["games"][0]["selectable"], true);
+        assert_eq!(view["games"][0]["state"], "failed");
+        assert!(!view.to_string().contains("secret"));
+        assert!(view["games"][0]["failure"]
+            .as_str()
+            .unwrap()
+            .contains("connection"));
+    }
     #[test]
     fn discovery_never_exports_launch_instructions() {
         let mut party = gamenight_core::GameNight::default().snapshot();

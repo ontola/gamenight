@@ -22,6 +22,9 @@ struct Server {
 }
 impl Server {
     fn new(game: Vec<u8>, runtime: Vec<u8>) -> Self {
+        Self::with_failures(game, runtime, 0)
+    }
+    fn with_failures(game: Vec<u8>, runtime: Vec<u8>, failures: usize) -> Self {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         listener.set_nonblocking(true).unwrap();
         let address = format!("http://{}", listener.local_addr().unwrap());
@@ -45,7 +48,10 @@ impl Server {
                             } else {
                                 &game
                             };
-                        count.fetch_add(1, Ordering::SeqCst);
+                        if count.fetch_add(1, Ordering::SeqCst) < failures {
+                            stream.write_all(b"HTTP/1.1 503 Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+                            continue;
+                        }
                         write!(
                             stream,
                             "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -68,6 +74,49 @@ impl Server {
             thread: Some(thread),
         }
     }
+}
+
+#[tokio::test]
+async fn failed_download_waits_for_explicit_retry_then_installs_without_restart() {
+    let game = archive("game/main.lua", b"game");
+    let runtime = archive("runtime/engine.exe", b"runtime");
+    let server = Server::with_failures(game.clone(), runtime.clone(), 1);
+    let entry = entry(&server, &game, &runtime);
+    let root = std::env::temp_dir().join(format!("gamenight-retry-{}", uuid::Uuid::new_v4()));
+    let (handle, signals) = prewarm_channel();
+    let (reporter, mut progress) = progress_channel();
+    let directory = root.clone();
+    let task = tokio::spawn(async move {
+        prewarm_queue(
+            VecDeque::from([entry]),
+            &directory,
+            Some(signals),
+            Some(reporter),
+        )
+        .await
+    });
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while progress.recv().await.unwrap().state != InstallState::Failed {}
+    })
+    .await
+    .unwrap();
+    assert!(!task.is_finished());
+    assert_eq!(server.requests.load(Ordering::SeqCst), 1);
+    handle.prioritize("first-game");
+    let results = tokio::time::timeout(std::time::Duration::from_secs(5), task)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(results[0].outcome.is_err());
+    assert!(results[1].outcome.is_ok());
+    assert_eq!(results.len(), 2);
+    let mut states = Vec::new();
+    while let Ok(status) = progress.try_recv() {
+        states.push(status.state);
+    }
+    assert!(states.contains(&InstallState::Queued));
+    assert_eq!(states.last(), Some(&InstallState::Installed));
+    tokio::fs::remove_dir_all(root).await.unwrap();
 }
 impl Drop for Server {
     fn drop(&mut self) {
