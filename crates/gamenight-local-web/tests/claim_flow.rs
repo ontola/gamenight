@@ -179,8 +179,8 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
     let server = start_server(&daemon).await;
     let mut watcher = Watcher::connect(&daemon).await;
 
-    // A controller-joined character already in the lobby: name and color, no
-    // avatar (a pad can't draw one) — exactly what the lobby treats as unclaimed.
+    // A controller-joined guest has a host-generated face. Profile ownership
+    // comes from the link record, not the presence of an avatar.
     let mut pad = Watcher::connect(&daemon).await;
     pad.ws
         .send(Message::Text(
@@ -201,8 +201,8 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
     let target: PlayerId = party.players[0].id;
     assert_eq!(party.players[0].name, "Panda");
     assert!(
-        party.players[0].avatar.is_none(),
-        "a pad-joined player must start unclaimed, or the lobby hides its QR"
+        party.players[0].avatar.is_some(),
+        "a guest starts with a generated face and must still be claimable"
     );
 
     post(

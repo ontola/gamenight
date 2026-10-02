@@ -144,6 +144,10 @@ impl Bridge {
             waiting: Arc::new(Mutex::new(serde_json::json!({}))),
         })
     }
+    pub fn origin(&self) -> &str {
+        &self.origin
+    }
+
     pub fn waiting(&self) -> serde_json::Value {
         self.waiting.lock().unwrap().clone()
     }

@@ -25,7 +25,7 @@ impl Worker {
                     if valid_url(&url) {
                         let _ = std::fs::remove_file(&path);
                         let _ = open(&url);
-                        return;
+                        continue;
                     }
                 }
                 thread::sleep(Duration::from_millis(250));
@@ -45,7 +45,22 @@ impl Drop for Worker {
         }
     }
 }
+pub fn open_lobby_settings() -> std::io::Result<()> {
+    open(&format!(
+        "http://127.0.0.1:{}/host/lobby",
+        gamenight_protocol::DEFAULT_WEB_PORT
+    ))
+}
 fn valid_url(url: &str) -> bool {
+    if url
+        == format!(
+            "http://127.0.0.1:{}/host/lobby?recovery=1",
+            gamenight_protocol::DEFAULT_WEB_PORT
+        )
+    {
+        return true;
+    }
+
     let Some(args) = url.strip_prefix("https://gamenight.ontola.io/play#desktop=") else {
         return false;
     };
@@ -95,6 +110,11 @@ mod tests {
     fn browser_request_cannot_open_arbitrary_urls_or_partial_writes() {
         let good="https://gamenight.ontola.io/play#desktop=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&port=7913&platform=windows";
         assert!(valid_url(good));
+        assert!(valid_url("http://127.0.0.1:7913/host/lobby?recovery=1"));
+        assert!(!valid_url("http://192.0.2.1:7913/host/lobby?recovery=1"));
+        assert!(!valid_url(
+            "http://127.0.0.1:7913/host/lobby?recovery=1&url=evil"
+        ));
         for bad in [
             "file:///tmp/anything",
             "https://evil.test/play",

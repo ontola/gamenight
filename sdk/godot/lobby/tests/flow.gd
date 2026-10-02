@@ -1,0 +1,144 @@
+extends SceneTree
+## Exercises the actual lobby scene against a real daemon and protocol game.
+var view: Control
+var failed := false
+
+func _initialize() -> void:
+	call_deferred("run")
+
+func check(condition: bool, label: String) -> void:
+	if not condition:
+		failed = true
+		push_error("LOBBY_TEST: " + label)
+
+func wait_until(predicate: Callable, label: String) -> void:
+	var deadline := Time.get_ticks_msec() + 8000
+	while not predicate.call() and Time.get_ticks_msec() < deadline:
+		await process_frame
+	check(predicate.call(), label)
+
+func key(code: int) -> void:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.pressed = true
+	Input.parse_input_event(event)
+
+func run() -> void:
+	view = load("res://lobby/main.tscn").instantiate()
+	root.add_child(view)
+	await wait_until(func(): return view.client.connected and view.party.get("players", []).size() == 4, "connected with four test players")
+	check(view.party.players[0].name == "Nora", "names arrive from party snapshots")
+	check(not view.faces.decode(view.party.players[0].avatar).is_empty(), "custom avatar decodes")
+	check(view.faces.decode(view.party.players[0].avatar).center == Vector2(24, 28), "48px face head anchor")
+	check(view.faces.decode('{"v":1,"w":256,"h":256,"px":[]}').is_empty(), "malformed avatar falls back")
+	check(view.faces.decode('{"v":1,"w":[],"h":48,"px":[]}').is_empty(), "invalid dimensions fall back")
+	var old := {"v": 1, "w": 16, "h": 16, "px": []}
+	old.px.resize(256)
+	check(view.faces.decode(JSON.stringify(old)).center == Vector2(2, 5), "historic face anchor")
+	await wait_until(func(): return view.client.active, "lobby ready owns screen")
+	# Exercise the actual scene's per-player cursors with deterministic frames.
+	var original_seats: Array = view.party.seats.duplicate(true)
+	view.party.seats[0]["controller"] = "test:0"
+	view.party.seats[1]["controller"] = "test:1"
+	await process_frame
+	var frames: Array = [{"controller":"test:0", "buttons":0}, {"controller":"test:1", "buttons":0}]
+	view._controllers_changed(frames)
+	check(view._cursors.size() == 2, "each joined controller gets a selection")
+	var second_action: String = view._cursors["test:1"].action
+	frames[0]["axes"] = [0,0,0,0,0,32767]
+	view._controllers_changed(frames)
+	check(view._cursors["test:0"].game == 1, "RT cycles to the next game")
+	check(view._cursors["test:1"].action == second_action, "RT preserves the other player selection")
+	view._controllers_changed(frames)
+	check(view._cursors["test:0"].game == 1, "holding RT does not skip repeatedly")
+	frames[0].axes = [0,0,0,0,0,0]
+	view._controllers_changed(frames)
+	frames[0].axes = [0,0,0,0,32767,0]
+	view._controllers_changed(frames)
+	check(view._cursors["test:0"].game == 0, "LT cycles to the previous game")
+	frames[0].axes = [0,0,0,0,0,0]
+	view._controllers_changed(frames)
+	frames[0].axes = [0,0,0,0,32767,0]
+	view._controllers_changed(frames)
+	check(view._cursors["test:0"].game == view.games.size()-1, "LT wraps around the catalog")
+	view._cycle_game("test:0",1)
+	await process_frame
+	frames[0].axes = [0,0,0,0,0,0]
+	frames[0].buttons = 1 << 10
+	view._controllers_changed(frames)
+	check(view._section(view._cursors["test:0"].action) != "games", "D-pad up leaves the carousel")
+	var layout: Array = view._carousel_layout(32,400,900,true)
+	check(layout.size()==3 and layout[-1].index==view.selected, "selected card is the central foreground card")
+	check(layout[-1].rect.size.x > layout[0].rect.size.x and layout[-1].rect.size.y > layout[0].rect.size.y, "center card is larger")
+	check(layout[0].rect.get_center().x < layout[-1].rect.get_center().x and layout[1].rect.get_center().x > layout[-1].rect.get_center().x, "neighbors flank the selected game")
+	check(view._cursor_hits("test:0").all(func(hit): return hit.action != "leave:" + str(view.party.players[1].id)), "controller cannot select another player's leave button")
+	view.party.seats = original_seats
+	view._controllers_changed([])
+	view.selected = 0
+	var first_id: String = view.games[view.selected].id
+	key(KEY_RIGHT)
+	await process_frame
+	check(view.games[view.selected].id != first_id, "keyboard changes selected game")
+	var before: Array = view.party.playlist.entries.duplicate(true)
+	key(KEY_A)
+	await wait_until(func(): return view.party.playlist.entries.size() == before.size()+1, "A appends one game")
+	check(view.party.playlist.entries[-1].game == view.games[view.selected].id, "A appends at the end")
+	check(view.party.playlist.entries[0] == before[0], "A preserves the first game")
+	check(view.party.get("active_session", {}).is_empty(), "A never starts gameplay")
+	view._activate("settings")
+	await wait_until(func(): return not view._settings().is_empty(),"game declares editable settings")
+	view._change_setting(0,1)
+	await wait_until(func(): return view._settings().values.items == false,"toggle setting reaches runtime")
+	view._change_setting(1,99)
+	await wait_until(func(): return view._settings().values.rounds == 5,"number setting respects bounds")
+	view._change_setting(2,1)
+	await wait_until(func(): return view._settings().values.arena == "Warehouse","choice setting reaches runtime")
+	view._activate("settings-close")
+	key(KEY_X)
+	await wait_until(func(): return view.party.playlist.entries.size() == before.size()+2, "X inserts one game")
+	check(view.party.playlist.entries[0].game == view.games[view.selected].id, "X puts the selected game first")
+	check(view._next_game().id == view.party.playlist.entries[0].game, "Up next follows the head of the queue")
+	await wait_until(func(): return view.party.get("warm_session", {}).get("game") == view.games[view.selected].id, "first game is prepared")
+	check(view.party.get("active_session", {}).is_empty(), "X never starts gameplay")
+	key(KEY_ENTER)
+	await wait_until(func(): return view.party.get("active_session", {}).get("phase") == "running", "play starts selected game")
+	await wait_until(func(): return not view.client.active, "lobby yields to game")
+	view.client.open_lobby()
+	await wait_until(func(): return view.client.active and view.party.get("active_session", {}).get("phase") == "paused", "return pauses game")
+	key(KEY_ESCAPE)
+	await wait_until(func(): return view.party.get("active_session", {}).get("phase") == "running", "resume keeps same session")
+	view.client.open_lobby()
+	await wait_until(func(): return view.client.active, "return again")
+	var player_id: String = view.party.players[0].id
+	view.client._send({"type": "rename_player", "player_id": player_id, "name": "Nora updated"})
+	view.client._send({"type": "set_player_avatar", "player_id": player_id, "avatar": JSON.stringify(old)})
+	await wait_until(func(): return view.party.players[0].name == "Nora updated" and view.party.players[0].avatar == JSON.stringify(old), "live name and artwork updates")
+	var seats: Array = view.party.seats.duplicate(true)
+	view.client._socket.close()
+	await wait_until(func(): return not view.client.connected, "disconnect detected")
+	await wait_until(func(): return view.client.connected, "authenticated reconnect")
+	check(view.party.seats == seats and view.party.players.size() == 4, "reconnect preserves players and controller bindings")
+	view.client.leave(player_id)
+	await wait_until(func(): return view.party.players.size() == 3, "leave frees seat")
+	key(KEY_J)
+	await process_frame
+	check(view.party.players.size() == 3, "keyboard cannot create a controller-less guest")
+	check(view.hits.all(func(hit): return hit.action != "join"), "no manual guest join buttons")
+	var art = view.artwork
+	check(not art.remote_url("file:///etc/passwd"),"artwork rejects file URLs")
+	check(art.remote_url("https://example.test/cover.png"),"artwork accepts HTTPS")
+	var picture := Image.create(2,2,false,Image.FORMAT_RGBA8)
+	picture.fill(Color.RED)
+	check(art.decode(picture.save_png_to_buffer()) != null,"artwork decodes PNG")
+	check(art.decode(picture.save_jpg_to_buffer()) != null,"artwork decodes JPEG")
+	check(art.decode(PackedByteArray([1,2,3])) == null,"bad artwork has title fallback")
+	print("LOBBY_FLOW_", "FAIL" if failed else "PASS")
+	key(KEY_Q)
+	await process_frame
+	check(view._quit_confirm, "quit asks before ending party")
+	key(KEY_ENTER)
+	# A successful request ends the daemon and this child. Staying alive would
+	# mean the user-visible quit path failed or restarted the lobby.
+	await create_timer(3).timeout
+	print("LOBBY_FLOW_FAIL: quit did not end the runtime")
+	quit(1)

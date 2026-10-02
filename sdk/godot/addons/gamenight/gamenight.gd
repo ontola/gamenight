@@ -30,6 +30,8 @@ signal daemon_connected
 signal daemon_disconnected
 ## Fresh party snapshot (players, seats, playlist, vote...).
 signal party_updated(party: Dictionary)
+signal controllers_changed(controllers: Array)
+signal roster_changed(seats: Array, players: Array, presence: Array)
 ## The party changed one of the settings you declared with
 ## declare_settings(). Apply it live if a match is running, otherwise from
 ## the next match. `value` is a bool, int or String per the setting's kind.
@@ -46,6 +48,10 @@ const RECONNECT_DELAY := 2.0
 @export var auto_reconnect: bool = true
 
 var party: Dictionary = {}
+var session := ""
+var phase := "idle"
+var _frames: Dictionary = {}
+var _frame_at := -10000
 ## True when this process was launched by a GameNight daemon (GAMENIGHT=1).
 ## Games use this to skip their menu and boot straight into party mode.
 var launched_by_daemon: bool = false
@@ -92,6 +98,7 @@ func _sample_performance() -> void:
 		_performance_sent_us = _performance.elapsed_us
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	# The daemon passes the handshake via environment — same binary boots
 	# into game-night mode when launched, runs standalone otherwise.
 	launched_by_daemon = OS.get_environment("GAMENIGHT") == "1"
@@ -109,6 +116,8 @@ func _ready() -> void:
 
 func _open() -> void:
 	_socket = WebSocketPeer.new()
+	_socket.inbound_buffer_size = 16 * 1024 * 1024
+	_socket.max_queued_packets = 256
 	_said_hello = false
 	var err := _socket.connect_to_url(daemon_url)
 	if err != OK:
@@ -134,6 +143,7 @@ func _process(_delta: float) -> void:
 				var text := _socket.get_packet().get_string_from_utf8()
 				_handle(JSON.parse_string(text))
 		WebSocketPeer.STATE_CLOSED:
+			_frames.clear()
 			_performance_running = false
 			if _said_hello:
 				daemon_disconnected.emit()
@@ -141,6 +151,12 @@ func _process(_delta: float) -> void:
 			_schedule_reconnect()
 
 func _schedule_reconnect() -> void:
+	if launched_by_daemon:
+		_frames.clear()
+		phase = "idle"
+		auto_reconnect = false
+		get_tree().quit()
+		return
 	_reconnect_at = Time.get_ticks_msec() / 1000.0 + RECONNECT_DELAY
 
 ## Emitted the moment `ready` goes out, so anything that has been waiting for
@@ -150,10 +166,12 @@ signal ready_sent(session_id: String)
 
 ## Assets loaded, controllers mapped: the session can start instantly.
 func notify_ready(session_id: String) -> void:
+	if session_id != session or phase != "preparing": return
+	phase = "ready"
 	_send({"type": "ready", "session": session_id})
 	ready_sent.emit(session_id)
 
-## The match is over. The daemon takes it from here (vote / transition).
+## Report a completed round. Keep your results screen and next-round flow in game.
 func notify_finished(session_id: String) -> void:
 	_send({"type": "finished", "session": session_id})
 
@@ -228,38 +246,29 @@ func ai_seat_count(seats: Array) -> int:
 	return n
 
 
-## Which physical device drives each local seat, in seat order: `[0]` drives
-## seat 0. `-1` means keyboard/mouse.
-##
-## GameNight hands out seats, not controller ids — routing input is the
-## daemon's job and it doesn't do it yet — so the mapping is yours to make.
-## The rule, and the reasoning, in one place instead of once per game:
-##
-##  * Connected pads in order. The party seats people in join order and
-##    desktop gamepad enumeration follows connection order, so index-to-index
-##    is right in practice and self-correcting when it isn't (people swap pads,
-##    or the party swaps the seats).
-##  * Keyboard/mouse last, and only once. There is one mouse on this machine;
-##    handing it to two seats is one mouse turning two heads.
-##  * A seat with nothing left to drive it is left out rather than doubled up,
-##    and returned short — spawn a bot for the difference if your game needs
-##    the numbers.
-##
-## **Call this on `start`, not on `prepare`.** Warming happens minimised and
-## unfocused, where a pad that connects — or gets picked up — need not be
-## enumerated for a background process yet.
+## Standalone-only convenience. Managed games must use frame_for_seat instead.
 func devices_for_local_seats(count: int) -> Array:
-	var pads := Input.get_connected_joypads()
-	var devices: Array = []
-	for i in range(count):
-		if i < pads.size():
-			devices.append(int(pads[i]))
-		elif not devices.has(-1):
-			devices.append(-1)
-		else:
-			push_warning("[gamenight] seat %d has no input device left to drive it" % i)
-			break
+	if launched_by_daemon:
+		push_warning("Use frame_for_seat: local device indices do not identify GameNight players.")
+		return []
+	var devices: Array = Array(Input.get_connected_joypads()).slice(0,count)
+	if devices.size() < count: devices.append(-1)
 	return devices
+
+## Canonical host input for a seat index. Missing/disconnected/stale input is neutral.
+func frame_for_seat(index: int) -> Dictionary:
+	if phase != "running" or Time.get_ticks_msec()-_frame_at >= 250: return {}
+	for seat in party.get("seats",[]):
+		if int(seat.get("index",-1)) == index:
+			return _frames.get(str(seat.get("controller","")),{}).duplicate(true)
+	return {}
+
+static func axis(frame: Dictionary, index: int) -> float:
+	var axes: Array = frame.get("axes",[])
+	return clampf(float(axes[index])/32767.0,-1,1) if index>=0 and index<axes.size() else 0.0
+
+static func button(frame: Dictionary, index: int) -> bool:
+	return index>=0 and index<14 and (int(frame.get("buttons",0)) & (1<<index)) != 0
 
 
 func _send(msg: Dictionary) -> void:
@@ -301,7 +310,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# inconsistent copy of the party UI inside every engine. Only fall back to
 	# opening the overlay URL when there is no daemon to ask.
 	if launched_by_daemon:
-		request_overlay()
+		if f1: request_overlay() # The host already handles physical Back/Select.
 	else:
 		_raise_overlay()
 
@@ -314,7 +323,9 @@ func _raise_overlay() -> void:
 func _handle(msg: Variant) -> void:
 	if typeof(msg) != TYPE_DICTIONARY:
 		return
-	match msg.get("type", ""):
+	var kind: String = msg.get("type", "")
+	if kind in ["start","pause","resume","dispose","party_updated"] and (session.is_empty() or msg.get("session","") != session): return
+	match kind:
 		"welcome":
 			party = msg.get("party", {})
 			daemon_connected.emit()
@@ -326,22 +337,49 @@ func _handle(msg: Variant) -> void:
 		"party_state":
 			party = msg.get("party", {})
 			party_updated.emit(party)
+		"controller_frame":
+			_frames.clear()
+			_frame_at = Time.get_ticks_msec()
+			for frame in msg.get("controllers",[]):
+				var token := str(frame.get("controller",""))
+				if not token.is_empty() and not _frames.has(token): _frames[token] = frame
+			controllers_changed.emit(msg.get("controllers",[]))
+		"party_updated":
+			for key in ["seats","players","presence"]: party[key] = msg.get(key,[])
+			roster_changed.emit(party.seats,party.players,party.presence)
+			party_updated.emit(party)
 		"prepare":
+			if msg.get("game", game_id) != game_id or msg.get("session", "").is_empty() or msg.get("session", "") == session: return
+			if not session.is_empty(): disposed.emit(session)
+			session = msg.session
+			phase = "preparing"
+			_frames.clear()
+			party["seats"] = msg.get("seats",[])
+			party["players"] = msg.get("players",[])
 			_reset_performance(msg.get("session", ""))
 			prepared.emit(msg.get("session", ""), msg.get("seats", []), msg.get("players", []))
 		"start":
+			if phase != "ready": return
+			phase = "running"
 			_performance_running = msg.get("session", "") == _performance_session
 			started.emit(msg.get("session", ""))
 		"pause":
+			if phase != "running": return
+			phase = "paused"
 			_performance_running = false
 			_performance_last_us = 0
 			paused.emit(msg.get("session", ""))
 		"resume":
+			if phase != "paused": return
+			phase = "running"
 			_performance_running = msg.get("session", "") == _performance_session
 			resumed.emit(msg.get("session", ""))
 		"dispose":
 			_performance_running = false
-			disposed.emit(msg.get("session", ""))
+			disposed.emit(session)
+			session = ""
+			phase = "idle"
+			_frames.clear()
 		"setting_changed":
 			var value: Variant = msg.get("value")
 			if value is float:

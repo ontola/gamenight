@@ -26,6 +26,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "macos"))]
     let root = executable_dir.to_path_buf();
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let choose_lobby = args.first().is_some_and(|arg| arg == "--choose-lobby");
     let requested = if args.first().is_some_and(|arg| arg == "--open-url") {
         Some(
             links::game(args.get(1).ok_or("Missing GameNight link")?)
@@ -37,7 +38,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
     let port: u16 = args
         .first()
-        .filter(|_| requested.is_none())
+        .filter(|_| requested.is_none() && !choose_lobby)
         .map(|v| v.parse())
         .transpose()?
         .unwrap_or(7912);
@@ -68,6 +69,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .write(true)
         .open(local.join("launcher.lock"))?;
     if lock.try_lock().is_err() {
+        if choose_lobby {
+            browser::open_lobby_settings()?;
+            return Ok(());
+        }
         if let Some(game) = requested {
             links::request(&local, game)?;
             return Ok(());
@@ -104,6 +109,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
          "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
     ]);
     data::merge_local_games(&mut shelf, &local)?;
+    let lobby_config = local.join("selected-lobby.json");
+    let registrations = local.join("local-games.json");
+    let custom = gamenight_local_web::host_lobby::selected(&lobby_config, &registrations);
+    let lobby_id = custom
+        .as_ref()
+        .map(|m| m.id.0.clone())
+        .unwrap_or_else(|| "lobby".into());
+    if lobby_id != "lobby" {
+        shelf.as_array_mut().unwrap().retain(|v| v["id"] != "lobby");
+    }
+    shelf
+        .as_array_mut()
+        .unwrap()
+        .retain(|v| v["id"] == lobby_id || v["launch"]["env"]["GAMENIGHT_LOBBY_API"] != "1");
+
     let shelf_path = local.join("shelf.json");
     fs::write(&shelf_path, serde_json::to_vec_pretty(&shelf)?)?;
     let mut command = Command::new(daemon);
@@ -117,6 +137,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_EXIT_WITH_LOBBY", "1")
         .env("GAMENIGHT_STARTUP_GATE", "1")
         .env("GAMENIGHT_WEB", "1")
+        .env("GAMENIGHT_LOBBY_GAME", &lobby_id)
+        .env("GAMENIGHT_LOBBY_CONFIG", &lobby_config)
+        .env("GAMENIGHT_LOCAL_GAMES", &registrations)
         .env("GAMENIGHT_ONBOARDING_FILE", onboarding)
         .env("GAMENIGHT_BROWSER_REQUEST", &browser_request)
         .stdin(Stdio::piped())
@@ -151,6 +174,19 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("Missing startup pipe")?
         .write_all(&[1])?;
     let browser = browser::Worker::start(browser_request);
+    if choose_lobby {
+        std::thread::spawn(|| {
+            for _ in 0..100 {
+                if std::net::TcpStream::connect(("127.0.0.1", gamenight_protocol::DEFAULT_WEB_PORT))
+                    .is_ok()
+                {
+                    let _ = browser::open_lobby_settings();
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+        });
+    }
     let status = child.wait();
     drop(browser);
     #[cfg(windows)]

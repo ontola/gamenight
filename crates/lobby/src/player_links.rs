@@ -89,7 +89,7 @@ impl PlayerLinks {
 fn request(method: &str, path: &str) -> Option<String> {
     use std::io::{Read, Write};
     let base =
-        std::env::var("GAMENIGHT_JOIN_URL").unwrap_or_else(|_| gamenight_protocol::web_base_url());
+        std::env::var("GAMENIGHT_LINKS_URL").or_else(|_| std::env::var("GAMENIGHT_JOIN_URL")).unwrap_or_else(|_| gamenight_protocol::web_base_url());
     let original = base.strip_prefix("http://")?.split('/').next()?;
     let local_pickup = path.starts_with("/api/room-pickup/");
     let loopback = format!(

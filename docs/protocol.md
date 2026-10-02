@@ -49,6 +49,14 @@ A connection announces itself with its first message, a `hello`:
 |---|---|---|---|
 | `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` (optional) | session lifecycle commands, `controller_frame`, `setting_changed` |
 | `overlay` | party UI / controller surface / LLM (via `gamenight-mcp`) | party commands | `party_state` snapshots |
+| `lobby` | selected replacement lobby executable | party commands, `lobby_ready`, `quit_party` | full snapshots, `lobby_focus`, runtime controller frames |
+
+The replacement lobby role requires the configured lobby ID and launch token,
+including on reconnect. Declare `GAMENIGHT_LOBBY_API=1` in its launch environment
+so the runtime owns input and retains the party if that process fails before
+hello. Send `lobby_ready` after initial rendering; `quit_party` explicitly ends
+the runtime. A disconnect alone preserves players and bindings. See
+[Build a lobby](site/lobbies.md) for the lifecycle, example and current limits.
 
 ```json
 { "type": "hello", "role": "game", "game": "my-game", "token": "<GAMENIGHT_TOKEN>" }
@@ -64,6 +72,13 @@ The daemon answers with a `welcome`:
 One connection per game id: a second `hello` for the same game is answered
 with an `error` and the connection is closed. Identity is per *title*, not per
 session — one process hosts many disposable sessions over the night.
+
+After three automatic replacement-lobby restarts fail, the host pauses the
+game and opens its local recovery page. A trusted overlay may then send
+`retry_lobby` to reset the restart budget, or `quit_party` to end the session.
+Games cannot issue these commands. A retry preserves players and the playlist;
+`party_state` acknowledges the request, not successful rendering of the new
+lobby. A later `lobby_ready` confirms readiness.
 
 ## Session lifecycle
 
@@ -198,6 +213,10 @@ session stays ready across rounds. Pausing also freezes the game's results timer
 
 ## Party commands (overlay → daemon)
 
+The authenticated replacement `lobby` role may also send these commands.
+Game lifecycle reports and physical input publication are excluded from that
+role; the runtime supplies its controller stream.
+
 | message | effect |
 |---|---|
 | `join_party {name, seat?}` | new player; the requested seat if free, else the first empty one |
@@ -210,6 +229,8 @@ session stays ready across rounds. Pausing also freezes the game's results timer
 | `swap_seats {a, b}` | two people trade controllers: swap the occupants of two seats |
 | `set_playlist {entries}` | set the night's queue; the next game starts warming |
 | `play_next {game}` | make this game the next one up: it starts warming now (inserted into the playlist after the current entry if needed) |
+| `queue_game {game, first}` | append a new occurrence, or insert first among upcoming games when `first` is true; preserves the current game and never starts playback |
+| `queue_next {game}` | select an existing or new upcoming game without starting playback |
 | `next` | skip to the warm session immediately, no vote |
 | `pause` / `resume` | pause/resume the active session |
 | `open_overlay` / `close_overlay` | the party overlay came up / went away (see below) |
@@ -552,9 +573,11 @@ the skin preference. Avatar paint is composited above skin and is not recoloured
 
 ### Bundled games: authoritative controller input
 
-The resident lobby samples physical controllers and publishes `controller_frame`
-on its authenticated game connection. The daemon forwards it to connected games.
-Only the lobby may publish frames; overlays and other games cannot inject them.
+With a replacement `lobby` role, the runtime samples physical controllers and
+publishes `controller_frame` to the lobby and games. It consumes Back/Select
+and the A press used to claim a seat. No client may inject physical frames in
+this mode. The legacy platformer still samples input on its authenticated game
+connection; the daemon forwards those frames to connected games.
 Each frame contains the full connected-device list, including released buttons.
 
 ```json
@@ -570,7 +593,8 @@ left stick, right stick, D-pad up, down, left, right.
 
 The shared LÖVE adapter uses these frames in managed sessions and never matches
 local SDL enumeration against lobby ordinals. Standalone games still read local
-controllers. Frames are sent on change, with a 50 ms heartbeat. After 250 ms
+controllers. Legacy frames are sent on change, with a 50 ms heartbeat; the
+runtime-owned stream samples approximately every 16 ms. After 250 ms
 without input, controls become neutral. TCP_NODELAY is enabled on both hops.
 The Rust SDK exposes each frame as `GameEvent::ControllerFrame`. Use the seat's
 opaque controller token to find its input record; an empty frame or missing

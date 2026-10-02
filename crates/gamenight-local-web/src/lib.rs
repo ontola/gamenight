@@ -8,6 +8,7 @@ use axum::{
 mod cloud;
 mod dev_catalog;
 mod dev_web;
+pub mod host_lobby;
 mod local_room;
 mod memory;
 mod onboarding;
@@ -65,6 +66,7 @@ pub struct JoinSessionRequest {
 pub struct ServerState {
     onboarding: Option<onboarding::Handoff>,
     local_room: local_room::Room,
+    join_base: String,
     memory: memory::Memory,
     cloud: Option<cloud::Bridge>,
     pub profiles: HashMap<String, Profile>,
@@ -89,6 +91,7 @@ impl ServerState {
         Self {
             onboarding: None,
             local_room: local_room::Room::new(),
+            join_base: gamenight_protocol::web_base_url(),
             memory: memory::Memory::default(),
             cloud: None,
             profiles: HashMap::new(),
@@ -103,6 +106,12 @@ pub type SharedState = Arc<Mutex<ServerState>>;
 
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
+        .route("/host/lobby", get(host_lobby::page))
+        .route(
+            "/api/host/lobby",
+            get(host_lobby::get).post(host_lobby::select),
+        )
+        .route("/api/host/recovery", post(host_lobby::recover))
         .route("/onboarding", get(onboarding::page))
         .route("/api/onboarding", post(onboarding::claim))
         .route("/api/onboarding/reconnect", post(onboarding::reconnect))
@@ -207,7 +216,11 @@ pub async fn run_server(
         tokio::spawn(bridge.run(state.clone()));
     }
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    onboarding::start(&state, listener.local_addr()?.port());
+    let port = listener.local_addr()?.port();
+    let host =
+        gamenight_protocol::lan_ip().unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
+    state.lock().unwrap().join_base = format!("http://{}", std::net::SocketAddr::new(host, port));
+    onboarding::start(&state, port);
     let app = create_router(state);
     // Log the address a phone can actually use, not just the bind address —
     // `0.0.0.0` is not something anyone can type into a browser.
@@ -247,9 +260,70 @@ async fn profile_session(
 
 async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Value> {
     let state = state.lock().unwrap();
+    let mut room = state
+        .cloud
+        .as_ref()
+        .map(|b| b.waiting())
+        .unwrap_or_else(|| state.local_room.snapshot(&state.profiles));
+    let base = state
+        .cloud
+        .as_ref()
+        .map(|b| b.origin())
+        .unwrap_or(&state.join_base);
+    add_room_artwork(&mut room, base);
     Json(
-        serde_json::json!({"linked": state.bindings.values().collect::<Vec<_>>(), "revisions": state.link_revisions,"room":state.cloud.as_ref().map(|b|b.waiting()).unwrap_or_else(||state.local_room.snapshot(&state.profiles)), "cloud":state.cloud.is_some(), "pairing_urls":state.cloud.as_ref().map(|b|b.pairing_urls()).unwrap_or_default()}),
+        serde_json::json!({"linked":state.bindings.values().collect::<Vec<_>>(),
+        "revisions":state.link_revisions,"room":room,"cloud":state.cloud.is_some(),
+        "pairing_urls":state.cloud.as_ref().map(|b|b.pairing_urls()).unwrap_or_default()}),
     )
+}
+
+fn add_room_artwork(room: &mut serde_json::Value, base: &str) {
+    let Some(code) = room.get("room_code").and_then(|v| v.as_str()) else {
+        return;
+    };
+    if code.is_empty() || !code.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        return;
+    }
+    let url = format!("{}/?r={code}", base.trim_end_matches('/'));
+    let Ok(qr) = QrCode::new(url.as_bytes()) else {
+        return;
+    };
+    let svg = qr
+        .render::<svg::Color>()
+        .quiet_zone(true)
+        .min_dimensions(256, 256)
+        .build();
+    room["join_url"] = url.into();
+    room["qr_svg"] = svg.into();
+}
+
+#[cfg(test)]
+mod lobby_room_tests {
+    use super::*;
+    #[tokio::test]
+    async fn native_room_api_supplies_current_code_link_and_qr() {
+        let state = Arc::new(Mutex::new(ServerState::new("unused".into())));
+        state.lock().unwrap().join_base = "http://192.0.2.10:17935".into();
+        let Json(value) = player_links(State(state)).await;
+        let room = &value["room"];
+        assert_eq!(
+            room["join_url"],
+            format!(
+                "http://192.0.2.10:17935/?r={}",
+                room["room_code"].as_str().unwrap()
+            )
+        );
+        assert!(room["qr_svg"].as_str().unwrap().contains("<svg"));
+    }
+    #[test]
+    fn no_qr_until_room_registration_has_a_valid_code() {
+        for code in ["", "a&claim=x"] {
+            let mut room = serde_json::json!({"room_code":code});
+            add_room_artwork(&mut room, "https://gamenight.invalid/");
+            assert!(room.get("qr_svg").is_none());
+        }
+    }
 }
 
 async fn room_pickup(

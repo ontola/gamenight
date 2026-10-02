@@ -26,7 +26,7 @@ AI seats receive bots. Empty seats receive no controllable pawn. Keep standalone
 
 After Prepare, send `participation` before Ready. Set `instant_join` only if the match can accept new players immediately. Handle `party_updated` without resetting the running match. Update names, clothing, skin and face artwork independently.
 
-`controller_input` reports activity for presence and joining. It does not send movement to the game. Only the authenticated lobby publishes physical frames; games consume them.
+`controller_input` reports activity for presence and joining. It does not send movement to the game. Replacement lobbies use runtime-owned sampling; the legacy platformer publishes its own authenticated frames. Games consume the same frame format in both modes. See [Build a lobby](/docs/lobbies#input-and-screen-ownership).
 
 ## Back must toggle once
 

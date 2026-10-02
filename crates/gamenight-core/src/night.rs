@@ -108,6 +108,11 @@ pub enum Command {
     QueueNext {
         game: GameId,
     },
+    /// Add a new occurrence at the end, or first among upcoming games. Never starts play.
+    QueueGame {
+        game: GameId,
+        first: bool,
+    },
     Pause,
     Resume,
     /// The party overlay came up: pause the active game.
@@ -274,6 +279,7 @@ pub struct GameNight {
     /// resident the whole night, so its disconnecting means it actually
     /// crashed, quit, or got restarted, not that a match started elsewhere.
     lobby_game: Option<GameId>,
+    preserve_lobby_party: bool,
     /// The lobby's last-notified focus state (see `sync_lobby_focus`) — lets
     /// `LobbyFocus` fire only on actual change instead of every command.
     lobby_focused: bool,
@@ -324,6 +330,7 @@ impl GameNight {
             overlay_open: false,
             overlay_paused: false,
             lobby_game: None,
+            preserve_lobby_party: false,
             lobby_focused: true,
             installs: Vec::new(),
             now_playing: None,
@@ -337,6 +344,12 @@ impl GameNight {
     /// inherit seats occupied by players it never saw join.
     pub fn set_lobby_game(&mut self, game: Option<GameId>) {
         self.lobby_game = game;
+    }
+
+    /// Replacement lobbies reconstruct their UI from snapshots. Their loss
+    /// must not invalidate players, controller bindings or phone profiles.
+    pub fn preserve_party_on_lobby_disconnect(&mut self) {
+        self.preserve_lobby_party = true;
     }
 
     /// Install the game shelf (usually once, at daemon startup).
@@ -629,6 +642,7 @@ impl GameNight {
             }
             Command::PlayNext { game } => self.on_play_next(game, &mut fx),
             Command::QueueNext { game } => self.select_next(game, false, &mut fx),
+            Command::QueueGame { game, first } => self.enqueue(game, first, &mut fx),
             Command::Pause => self.on_pause(&mut fx),
             Command::Resume => self.on_resume(&mut fx),
             Command::OverlayOpened => self.on_overlay_opened(&mut fx),
@@ -959,12 +973,28 @@ impl GameNight {
         library: Vec<GameId>,
         fx: &mut Vec<Effect>,
     ) {
+        let id = PlayerId::new();
+        let guest = avatar.is_none();
+        let color = color.or_else(|| {
+            gamenight_protocol::guest_face::COLORS
+                .iter()
+                .find(|color| {
+                    !self
+                        .players
+                        .iter()
+                        .any(|p| p.color.as_deref() == Some(**color))
+                })
+                .map(|color| (*color).to_owned())
+        });
         let player = Player {
-            id: PlayerId::new(),
+            id,
             name,
             color,
-            skin_color: None,
-            avatar,
+            skin_color: guest.then(|| {
+                gamenight_protocol::guest_face::SKINS[id.0.as_bytes()[5] as usize % 6].to_owned()
+            }),
+            avatar: avatar
+                .or_else(|| Some(gamenight_protocol::guest_face::avatar(id.0.as_bytes()).encode())),
             library,
         };
         // Walk in, grab a controller, press A: your preferred seat if it's
@@ -1264,6 +1294,41 @@ impl GameNight {
         if start_if_idle && self.active.is_none() {
             self.pending_transition = true;
             self.try_transition(fx);
+        }
+        fx.push(Effect::StateChanged);
+    }
+
+    fn enqueue(&mut self, game: GameId, first: bool, fx: &mut Vec<Effect>) {
+        let Some(meta) = self.library.iter().find(|m| m.id == game) else {
+            fx.push(Effect::Reject {
+                reason: "unknown game".into(),
+            });
+            return;
+        };
+        if self.lobby_game.as_ref() == Some(&game) || !self.game_has_capacity(&game) {
+            fx.push(Effect::Reject {
+                reason: "this game cannot fit everyone in the party".into(),
+            });
+            return;
+        }
+        let entry = PlaylistEntry {
+            game,
+            title: meta.title.clone(),
+        };
+        let index = if first {
+            self.playlist.current().map_or(0, |c| c + 1)
+        } else {
+            self.playlist.entries().len()
+        };
+        if first {
+            self.dispose_warm(fx);
+        }
+        self.playlist.insert(index, entry);
+        self.pending_transition = false;
+        if first {
+            self.set_next_up(index, fx);
+        } else {
+            self.maybe_warm(fx);
         }
         fx.push(Effect::StateChanged);
     }
@@ -1588,7 +1653,7 @@ impl GameNight {
         // dev restart) — clear the party rather than let it inherit seats
         // occupied by players the new process never saw join, which
         // otherwise silently fills up and locks new joins out forever.
-        if self.lobby_game.as_ref() == Some(&game) {
+        if self.lobby_game.as_ref() == Some(&game) && !self.preserve_lobby_party {
             self.players.clear();
             for seat in &mut self.seats {
                 seat.occupant = SeatOccupant::Empty;

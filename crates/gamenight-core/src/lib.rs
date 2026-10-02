@@ -32,6 +32,56 @@ mod night_tests {
         }
     }
 
+    #[test]
+    fn guests_receive_stable_shared_artwork_and_distinct_colors() {
+        let mut night = GameNight::new(4);
+        for name in ["A", "B", "C", "D"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        let before = night.snapshot();
+        let colors: std::collections::HashSet<_> =
+            before.players.iter().map(|p| p.color.clone()).collect();
+        assert_eq!(colors.len(), 4);
+        for player in &before.players {
+            let art = gamenight_protocol::Avatar::parse(player.avatar.as_deref().unwrap()).unwrap();
+            assert_eq!((art.width, art.height), (48, 48));
+            assert!(!art.is_blank());
+            assert!(player.skin_color.is_some());
+        }
+        night.handle(Command::LeaveParty {
+            player_id: before.players[3].id,
+        });
+        for (before, after) in before.players.iter().zip(night.snapshot().players.iter()) {
+            assert_eq!(before.avatar, after.avatar);
+            assert_eq!(before.skin_color, after.skin_color);
+            assert_eq!(before.color, after.color);
+        }
+    }
+
+    #[test]
+    fn joining_with_saved_artwork_does_not_replace_it_with_guest_art() {
+        let mut night = GameNight::new(2);
+        for artwork in ["", "saved profile artwork"] {
+            night.handle(Command::JoinParty {
+                name: "Saved player".into(),
+                seat: None,
+                color: Some("#123456".into()),
+                avatar: Some(artwork.into()),
+                library: vec![],
+            });
+        }
+        let snapshot = night.snapshot();
+        assert_eq!(snapshot.players[0].avatar.as_deref(), Some(""));
+        assert_eq!(
+            snapshot.players[1].avatar.as_deref(),
+            Some("saved profile artwork")
+        );
+        assert!(snapshot
+            .players
+            .iter()
+            .all(|p| p.color.as_deref() == Some("#123456") && p.skin_color.is_none()));
+    }
+
     fn entry(id: &str) -> PlaylistEntry {
         PlaylistEntry {
             game: GameId::new(id),
@@ -104,6 +154,73 @@ mod night_tests {
         Command::PresenceTick {
             elapsed: std::time::Duration::from_secs(seconds),
         }
+    }
+
+    #[test]
+    fn queue_append_and_front_preserve_playing_game_and_order() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        night.set_library(vec![meta("a"), meta("b"), meta("c")]);
+        for id in ["a", "b", "c"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(id),
+            });
+        }
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("a"), entry("b")],
+        });
+        night.handle(Command::QueueGame {
+            game: GameId::new("c"),
+            first: false,
+        });
+        assert_eq!(
+            night
+                .snapshot()
+                .playlist
+                .entries
+                .iter()
+                .map(|e| e.game.0.as_str())
+                .collect::<Vec<_>>(),
+            ["a", "b", "c"]
+        );
+        night.handle(Command::QueueGame {
+            game: GameId::new("b"),
+            first: true,
+        });
+        assert_eq!(
+            night
+                .snapshot()
+                .playlist
+                .entries
+                .iter()
+                .map(|e| e.game.0.as_str())
+                .collect::<Vec<_>>(),
+            ["b", "a", "b", "c"]
+        );
+        let warm = night.snapshot().warm_session.unwrap();
+        night.handle(Command::SessionReady { session: warm.id });
+        assert!(
+            night.snapshot().active_session.is_none(),
+            "queue edits never launch an idle game"
+        );
+        night.handle(Command::Next);
+        let active = night.snapshot().active_session.unwrap();
+        night.handle(Command::QueueGame {
+            game: GameId::new("c"),
+            first: true,
+        });
+        let after = night.snapshot();
+        assert_eq!(after.active_session.unwrap().id, active.id);
+        assert_eq!(
+            after
+                .playlist
+                .entries
+                .iter()
+                .map(|e| e.game.0.as_str())
+                .collect::<Vec<_>>(),
+            ["b", "c", "a", "b", "c"]
+        );
+        assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
     }
 
     #[test]

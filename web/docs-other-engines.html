@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-other-engines">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-other-engines" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines" aria-current="page">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-other-engines" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines" aria-current="page">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="unity-unreal-and-other-engines">Unity, Unreal and other engines</h1>
 <p>There is no maintained Unity or Unreal plugin in this repository. Use the open protocol to write an adapter, or <a href="/developers">ask for integration help</a>. Do not assume a game is supported because its engine can open a socket.</p>
 <h2 id="open-the-connection">Open the connection</h2>
@@ -28,12 +28,12 @@
     pub buttons: u32,
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs#L723">Source: crates/gamenight-protocol/src/lib.rs</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs#L727">Source: crates/gamenight-protocol/src/lib.rs</a></p>
 <p>Treat player IDs and controller tokens as opaque values. See <a href="/docs/controllers">Controllers &amp; players</a> for the matching rules and <a href="/docs/faces">Faces &amp; colours</a> for rendering player artwork.</p>
 <h2 id="prove-the-integration">Prove the integration</h2>
 <p>Use the <a href="/docs/protocol">protocol reference</a> for message fields and the <a href="/docs/testing">test guide</a> for build-specific evidence. A custom adapter needs the same pause, input, window and cleanup checks as a bundled game.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/other-engines.md">Edit this page</a><span data-source-fingerprint="ebb69243c543dfaa2f0e30b941e08d9c36d98f2e06c14017a49d9663964b6f28">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/other-engines.md">Edit this page</a><span data-source-fingerprint="664a38ddb321ae83e2f06b0a62ddd0447f58159649971103e18b223207055fa6">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/c"><small>Previous</small>C / C++</a><a href="/docs/controllers"><small>Next</small>Controllers &amp; players</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#open-the-connection">Open the connection</a><a href="#keep-the-adapter-alive">Keep the adapter alive</a><a href="#decode-host-input">Decode host input</a><a href="#prove-the-integration">Prove the integration</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-protocol">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-protocol" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol" aria-current="page">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-protocol" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol" aria-current="page">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="the-gamenight-protocol-v1">The GameNight Protocol (v1)</h1>
 <p>The protocol is the product. Engine plugins are convenience wrappers around
 what is written here. Anything that can open a WebSocket and speak JSON can be
@@ -93,8 +93,20 @@ untouched.</li>
 <td>party commands</td>
 <td><code>party_state</code> snapshots</td>
 </tr>
+<tr>
+<td><code>lobby</code></td>
+<td>selected replacement lobby executable</td>
+<td>party commands, <code>lobby_ready</code>, <code>quit_party</code></td>
+<td>full snapshots, <code>lobby_focus</code>, runtime controller frames</td>
+</tr>
 </tbody>
 </table>
+<p>The replacement lobby role requires the configured lobby ID and launch token,
+including on reconnect. Declare <code>GAMENIGHT_LOBBY_API=1</code> in its launch environment
+so the runtime owns input and retains the party if that process fails before
+hello. Send <code>lobby_ready</code> after initial rendering; <code>quit_party</code> explicitly ends
+the runtime. A disconnect alone preserves players and bindings. See
+<a href="/docs/lobbies">Build a lobby</a> for the lifecycle, example and current limits.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;hello&quot;, &quot;role&quot;: &quot;game&quot;, &quot;game&quot;: &quot;my-game&quot;, &quot;token&quot;: &quot;&lt;GAMENIGHT_TOKEN&gt;&quot; }
 { &quot;type&quot;: &quot;hello&quot;, &quot;role&quot;: &quot;overlay&quot; }
 </code></pre></div>
@@ -104,6 +116,12 @@ untouched.</li>
 <p>One connection per game id: a second <code>hello</code> for the same game is answered
 with an <code>error</code> and the connection is closed. Identity is per <em>title</em>, not per
 session — one process hosts many disposable sessions over the night.</p>
+<p>After three automatic replacement-lobby restarts fail, the host pauses the
+game and opens its local recovery page. A trusted overlay may then send
+<code>retry_lobby</code> to reset the restart budget, or <code>quit_party</code> to end the session.
+Games cannot issue these commands. A retry preserves players and the playlist;
+<code>party_state</code> acknowledges the request, not successful rendering of the new
+lobby. A later <code>lobby_ready</code> confirms readiness.</p>
 <h2 id="session-lifecycle">Session lifecycle</h2>
 <p>Sessions are disposable. They move strictly forward:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>created → preparing → ready → running ⇄ paused
@@ -262,6 +280,9 @@ Back/Select pauses and opens the lobby; Resume continues. Play next explicitly
 switches games, while Skip changes only the queued next game. A prepared next
 session stays ready across rounds. Pausing also freezes the game's results timer.</p>
 <h2 id="party-commands-overlay-daemon">Party commands (overlay → daemon)</h2>
+<p>The authenticated replacement <code>lobby</code> role may also send these commands.
+Game lifecycle reports and physical input publication are excluded from that
+role; the runtime supplies its controller stream.</p>
 <table>
 <thead>
 <tr>
@@ -309,6 +330,14 @@ session stays ready across rounds. Pausing also freezes the game's results timer
 <tr>
 <td><code>play_next {game}</code></td>
 <td>make this game the next one up: it starts warming now (inserted into the playlist after the current entry if needed)</td>
+</tr>
+<tr>
+<td><code>queue_game {game, first}</code></td>
+<td>append a new occurrence, or insert first among upcoming games when <code>first</code> is true; preserves the current game and never starts playback</td>
+</tr>
+<tr>
+<td><code>queue_next {game}</code></td>
+<td>select an existing or new upcoming game without starting playback</td>
 </tr>
 <tr>
 <td><code>next</code></td>
@@ -647,9 +676,11 @@ fixed round rosters. Custom clients can send the JSON directly.</p>
 <code>Player.color</code> on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.</p>
 <h3 id="bundled-games-authoritative-controller-input">Bundled games: authoritative controller input</h3>
-<p>The resident lobby samples physical controllers and publishes <code>controller_frame</code>
-on its authenticated game connection. The daemon forwards it to connected games.
-Only the lobby may publish frames; overlays and other games cannot inject them.
+<p>With a replacement <code>lobby</code> role, the runtime samples physical controllers and
+publishes <code>controller_frame</code> to the lobby and games. It consumes Back/Select
+and the A press used to claim a seat. No client may inject physical frames in
+this mode. The legacy platformer still samples input on its authenticated game
+connection; the daemon forwards those frames to connected games.
 Each frame contains the full connected-device list, including released buttons.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;:&quot;controller_frame&quot;,&quot;controllers&quot;:[{&quot;controller&quot;:&quot;ordinal:0&quot;,&quot;axes&quot;:[16384,0,0,0,0,0],&quot;buttons&quot;:1}]}
 </code></pre></div>
@@ -661,7 +692,8 @@ Y is down-positive. Button bits 0 through 13 are A, B, X, Y, LB, RB, Back, Start
 left stick, right stick, D-pad up, down, left, right.</p>
 <p>The shared LÖVE adapter uses these frames in managed sessions and never matches
 local SDL enumeration against lobby ordinals. Standalone games still read local
-controllers. Frames are sent on change, with a 50 ms heartbeat. After 250 ms
+controllers. Legacy frames are sent on change, with a 50 ms heartbeat; the
+runtime-owned stream samples approximately every 16 ms. After 250 ms
 without input, controls become neutral. TCP_NODELAY is enabled on both hops.
 The Rust SDK exposes each frame as <code>GameEvent::ControllerFrame</code>. Use the seat's
 opaque controller token to find its input record; an empty frame or missing
@@ -711,7 +743,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="b3f62716bf4ba31b8e5937e8d63eea174081a3ad4eed235bc2a5f9256a120ba6">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="718538fbaa636266baf63209855de742e0611b05681ba3bd789e53cd86071937">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

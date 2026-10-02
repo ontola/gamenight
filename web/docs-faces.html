@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-faces">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-faces" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces" aria-current="page">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-faces" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces" aria-current="page">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="drawing-a-gamenight-face">Drawing a GameNight face</h1>
 <p>Put the head where you want it. Pass its centre and radius, not a texture corner.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-lua">local Face = require(&quot;shared.face&quot;)
@@ -18,6 +18,19 @@ Face.drawFace(player, x, y, 24, { facing = -1, rotation = angle })
 <p>The helper draws the circular skin, transparent artwork and a default face when
 there is no drawing. It caches textures, follows profile changes and restores
 the graphics state. <code>skin_color</code> stays separate from the artwork.</p>
+<h2 id="guest-faces-from-the-host">Guest faces from the host</h2>
+<p>When joining a new guest, omit <code>avatar</code> in <code>join_party</code>. GameNight generates a
+face with hair or a hat from its shared guest collection, chooses a skin tone,
+and assigns an unused clothing color while the eight-color palette has room.
+The resulting <code>avatar</code>, <code>skin_color</code>, and <code>color</code> arrive together in the player
+snapshot. Render those fields with the normal face helper in any engine.</p>
+<p>The appearance stays on that player through lobby and game transitions. Do not
+regenerate it when the screen redraws or the player list changes. A saved avatar,
+including an explicitly empty drawing, is preserved when supplied at join.</p>
+<p>Rust integrations can also use
+<code>gamenight_protocol::guest_face::avatar(&amp;seed)</code> with a 16-byte seed to create the
+same artwork. It returns an <code>Avatar</code>; call <code>.encode()</code> for the wire payload.
+Skin remains a separate field so the entire head circle receives its color.</p>
 <h2 id="coordinates">Coordinates</h2>
 <p>The studio uses a 48 x 48 canvas. The head centre is <strong>(24, 28)</strong> and its radius
 is <strong>12</strong> source pixels. Positive Y points down. The default expression looks
@@ -39,6 +52,10 @@ The SDK also supplies the historic origins for old 16/32 pixel drawings.
 Use nearest-neighbour filtering for the pixel artwork. Draw the skin circle
 at the game's output resolution.</p>
 <h2 id="choosing-where-to-draw-it">Choosing where to draw it</h2>
+<p>Godot's reusable <code>sdk/godot/addons/gamenight/face.gd</code> draws the same head layout.
+See the <a href="/docs/lobbies#faces-and-names">Godot lobby example</a> for usage. The
+Living Room shows each current player's name beside their face and repaints
+when a profile changes.</p>
 <p>Blast Party and Bubble Buddies draw the face on the character. Neon Trails,
 Neon Siege and Ricochet Club use player portraits beside their names, preserving
 the shape of the vehicle or trail. Stack Together uses its player cards, and
@@ -51,7 +68,7 @@ three independent profile checks: names, colours, and faces. Optional party
 features do not affect that score. Development-only results remain unverified
 until the evidence matches the platform and downloadable artifact.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/faces.md">Edit this page</a><span data-source-fingerprint="5c849984bb18929fd7f56090e939108e9d77371adc8e50294911466d1cbba450">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/faces.md">Edit this page</a><span data-source-fingerprint="b023f8e6b916238926815ac4cd21f0138b81c6fb372c230b0289c73d8d2b6179">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/controllers"><small>Previous</small>Controllers &amp; players</a><a href="/docs/testing"><small>Next</small>Test your integration</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#coordinates">Coordinates</a><a href="#choosing-where-to-draw-it">Choosing where to draw it</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#guest-faces-from-the-host">Guest faces from the host</a><a href="#coordinates">Coordinates</a><a href="#choosing-where-to-draw-it">Choosing where to draw it</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

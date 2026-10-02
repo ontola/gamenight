@@ -167,7 +167,7 @@ pub(crate) async fn reconnect(
     ))
 }
 
-fn open_browser(url: &str) -> std::io::Result<()> {
+pub(crate) fn open_browser(url: &str) -> std::io::Result<()> {
     // Packaged hosts run in a Windows kill-on-close job. Let the launcher,
     // outside that job, open the browser so it never becomes a game descendant.
     if let Some(path) = std::env::var_os("GAMENIGHT_BROWSER_REQUEST") {

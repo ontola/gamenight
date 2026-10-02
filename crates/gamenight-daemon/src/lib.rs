@@ -5,6 +5,7 @@
 //! logic lives in `gamenight-core`; this crate only does IO — decode incoming
 //! messages into [`Command`]s, execute the returned [`Effect`]s.
 
+mod lobby_input;
 #[cfg(target_os = "macos")]
 mod macos;
 mod nowplaying;
@@ -89,6 +90,13 @@ struct Shared {
     prewarm_players: Option<u8>,
     /// Packaged app lifetime: quitting the lobby also quits its host.
     exit_with_lobby: bool,
+    lobby_game: Option<GameId>,
+    lobby_token: Option<String>,
+    lobby_connections: std::collections::HashSet<GameId>,
+    runtime_input: bool,
+    shutdown_requested: bool,
+    lobby_restarts: u8,
+    lobby_recovery_opened: bool,
 }
 
 impl Shared {
@@ -119,6 +127,13 @@ impl Shared {
             // front keeps the first real join the first signal ever sent.
             prewarm_players: Some(0),
             exit_with_lobby: false,
+            lobby_game: None,
+            lobby_token: None,
+            lobby_connections: Default::default(),
+            runtime_input: false,
+            shutdown_requested: false,
+            lobby_restarts: 0,
+            lobby_recovery_opened: false,
         }
     }
 
@@ -159,6 +174,7 @@ impl Shared {
         match &command {
             Command::PlayNext { game }
             | Command::QueueNext { game }
+            | Command::QueueGame { game, .. }
             | Command::RequestStart { game } => {
                 if self.quit_games.remove(game) {
                     info!(%game, "the party asked for it again — it may start");
@@ -170,7 +186,10 @@ impl Shared {
             }
             _ => {}
         }
-        if let Command::PlayNext { game } | Command::QueueNext { game } = &command {
+        if let Command::PlayNext { game }
+        | Command::QueueNext { game }
+        | Command::QueueGame { game, .. } = &command
+        {
             if !self.launch_specs.contains_key(game) {
                 if let Some(prewarm) = &self.prewarm {
                     info!(%game, "playing an uninstalled catalogue game — bumping the prewarm queue");
@@ -245,6 +264,14 @@ impl Shared {
             };
             for tx in self.overlays.values() {
                 send(tx, &msg);
+            }
+            let lobby_msg = ServerMessage::PartyState {
+                party: lobby_snapshot(self.night.snapshot()),
+            };
+            for id in &self.lobby_connections {
+                if let Some(tx) = self.games.get(id) {
+                    send(tx, &lobby_msg);
+                }
             }
         }
     }
@@ -410,6 +437,17 @@ fn game_welcome_snapshot(
         game.cover = None;
         game.icon = None;
         game.screenshot = None;
+    }
+    party
+}
+
+// The lobby renders catalogue metadata. Commands, local paths and arbitrary
+// launch environment values stay inside the runtime.
+fn lobby_snapshot(
+    mut party: gamenight_protocol::PartySnapshot,
+) -> gamenight_protocol::PartySnapshot {
+    for game in &mut party.library {
+        game.launch = None;
     }
     party
 }
@@ -825,7 +863,7 @@ async fn run_inner(
     info!(%addr, "gamenight daemon listening");
     let shared = Arc::new(Mutex::new(Shared::new(library, addr.to_string(), prewarm)));
     shared.lock().await.exit_with_lobby = exit_with_lobby;
-    let watched_lobby = lobby_game.clone().filter(|_| exit_with_lobby);
+    let watched_lobby = lobby_game.clone();
     if let Some(rx) = install_progress {
         spawn_install_progress_pump(shared.clone(), rx);
     }
@@ -835,6 +873,18 @@ async fn run_inner(
     if let Some(lobby_game) = lobby_game {
         let mut s = shared.lock().await;
         s.night.set_lobby_game(Some(lobby_game.clone()));
+        s.lobby_game = Some(lobby_game.clone());
+        // Declare the new contract in the launch spec so even a crash before
+        // hello is treated as a plugin failure, not "quit the whole party".
+        if s.launch_specs
+            .get(&lobby_game)
+            .and_then(|spec| spec.env.get("GAMENIGHT_LOBBY_API"))
+            .is_some_and(|version| version == "1")
+        {
+            s.runtime_input = true;
+            s.night.preserve_party_on_lobby_disconnect();
+            lobby_input::spawn(shared.clone());
+        }
         // Put the couch on screen. The lobby is the one thing the party must
         // never have to start for themselves — "the daemon is the launcher"
         // is the whole premise — and waiting for a Back press meant a night
@@ -874,9 +924,14 @@ async fn run_inner(
                 s.apply_effects(fx, None);
                 continue;
             },
-            _ = lifetime_tick.tick(), if watched_lobby.is_some() => {
+            _ = lifetime_tick.tick() => {
                 let mut s = shared.lock().await;
-                let lobby = watched_lobby.as_ref().expect("guarded");
+                if s.shutdown_requested {
+                    s.kill_all_children();
+                    return Ok(());
+                }
+                let Some(lobby) = watched_lobby.as_ref() else { continue };
+                if !s.exit_with_lobby && !s.runtime_input { continue; }
                 let child = if let Some(pending) = s.pending_launches.get_mut(lobby) {
                     Some(&mut pending.child)
                 } else {
@@ -887,6 +942,27 @@ async fn run_inner(
                     None => false,
                 };
                 if !alive {
+                    if s.runtime_input {
+                        // A plugin crash must not kill the game or erase seats.
+                        // Bound restarts so a broken package cannot spin forever.
+                        if s.lobby_restarts < 3 {
+                            s.lobby_restarts += 1;
+                            warn!(attempt = s.lobby_restarts, "restarting replacement lobby; party retained");
+                            s.running_children.remove(lobby);
+                            s.pending_launches.remove(lobby);
+                            s.quit_games.remove(lobby);
+                            s.launch(lobby);
+                        } else if !s.lobby_recovery_opened {
+                            s.running_children.remove(lobby);
+                            s.pending_launches.remove(lobby);
+                            s.lobby_recovery_opened = true;
+                            s.dispatch(Command::OverlayOpened,None);
+                            if std::env::var_os("GAMENIGHT_WEB").is_some() {
+                                if let Err(error)=gamenight_local_web::host_lobby::open_recovery() { warn!(%error,"could not open lobby recovery"); }
+                            }
+                        }
+                        continue;
+                    }
                     s.kill_all_children();
                     return Ok(());
                 }
@@ -1025,7 +1101,7 @@ async fn serve(
     };
 
     let registration = match role {
-        Role::Game => {
+        Role::Game | Role::Lobby => {
             let Some(game_id) = game else {
                 send(
                     &tx,
@@ -1036,6 +1112,35 @@ async fn serve(
                 return Err("game hello without game id".into());
             };
             let mut s = shared.lock().await;
+            if s.runtime_input && s.lobby_game.as_ref() == Some(&game_id) && role != Role::Lobby {
+                send(
+                    &tx,
+                    &ServerMessage::Error {
+                        message: "the selected replacement lobby must use the lobby role".into(),
+                    },
+                );
+                return Err("incorrect lobby role".into());
+            }
+            if role == Role::Lobby {
+                let expected = s
+                    .pending_launches
+                    .get(&game_id)
+                    .map(|p| p.token.as_str())
+                    .or(s.lobby_token.as_deref());
+                if s.lobby_game.as_ref() != Some(&game_id)
+                    || expected.is_none()
+                    || token.as_deref() != expected
+                {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "lobby requires the selected id and its launch token".into(),
+                        },
+                    );
+                    return Err("unauthorized lobby".into());
+                }
+                s.lobby_token = token.clone();
+            }
             if s.games.contains_key(&game_id) {
                 send(
                     &tx,
@@ -1069,16 +1174,30 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
-                    party: game_welcome_snapshot(s.night.snapshot()),
+                    party: if role == Role::Lobby {
+                        lobby_snapshot(s.night.snapshot())
+                    } else {
+                        game_welcome_snapshot(s.night.snapshot())
+                    },
                 },
             );
-            s.dispatch(
-                Command::GameConnected {
-                    game: game_id.clone(),
-                },
-                Some(&tx),
-            );
-            Registration::Game(game_id)
+            if role == Role::Lobby {
+                s.lobby_connections.insert(game_id.clone());
+                s.night.preserve_party_on_lobby_disconnect();
+                if !s.runtime_input {
+                    s.runtime_input = true;
+                    lobby_input::spawn(shared.clone());
+                }
+                Registration::Lobby(game_id)
+            } else {
+                s.dispatch(
+                    Command::GameConnected {
+                        game: game_id.clone(),
+                    },
+                    Some(&tx),
+                );
+                Registration::Game(game_id)
+            }
         }
         Role::Overlay => {
             let mut s = shared.lock().await;
@@ -1112,8 +1231,88 @@ async fn serve(
                     continue;
                 }
             };
+            if matches!(parsed, ClientMessage::RetryLobby) {
+                let mut s = shared.lock().await;
+                if matches!(
+                    registration,
+                    Registration::Overlay(_) | Registration::Lobby(_)
+                ) && s.runtime_input
+                    && s.lobby_recovery_opened
+                {
+                    if let Some(lobby) = s.lobby_game.clone() {
+                        if !s.games.contains_key(&lobby) && !s.pending_launches.contains_key(&lobby)
+                        {
+                            s.lobby_restarts = 0;
+                            s.lobby_recovery_opened = false;
+                            s.running_children.remove(&lobby);
+                            s.quit_games.remove(&lobby);
+                            s.launch(&lobby);
+                        }
+                    }
+                    send(
+                        &tx,
+                        &ServerMessage::PartyState {
+                            party: s.night.snapshot(),
+                        },
+                    );
+                } else {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only a local party UI can retry a replacement lobby".into(),
+                        },
+                    );
+                }
+                continue;
+            }
+            if matches!(parsed, ClientMessage::QuitParty)
+                && matches!(registration, Registration::Overlay(_))
+            {
+                let mut s = shared.lock().await;
+                if s.lobby_recovery_opened {
+                    send(
+                        &tx,
+                        &ServerMessage::PartyState {
+                            party: s.night.snapshot(),
+                        },
+                    );
+                    s.shutdown_requested = true;
+                } else {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message:
+                                "quit is only available through the lobby or its recovery screen"
+                                    .into(),
+                        },
+                    );
+                }
+                continue;
+            }
+            if matches!(
+                parsed,
+                ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby
+            ) {
+                if let Registration::Lobby(game) = &registration {
+                    let mut s = shared.lock().await;
+                    if matches!(parsed, ClientMessage::QuitParty) {
+                        s.shutdown_requested = true;
+                    } else {
+                        s.dispatch(Command::GameConnected { game: game.clone() }, Some(&tx));
+                    }
+                } else {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the selected lobby can send this command".into(),
+                        },
+                    );
+                }
+                continue;
+            }
             if let ClientMessage::ControllerFrame { controllers } = &parsed {
-                if !valid_controller_frame(&registration, controllers) {
+                let s = shared.lock().await;
+                if s.runtime_input || !valid_controller_frame(&registration, controllers) {
                     send(
                         &tx,
                         &ServerMessage::Error {
@@ -1122,7 +1321,6 @@ async fn serve(
                     );
                     continue;
                 }
-                let s = shared.lock().await;
                 let frame = ServerMessage::ControllerFrame {
                     controllers: controllers.clone(),
                 };
@@ -1184,6 +1382,18 @@ async fn serve(
                 info!(overlay = id, "overlay disconnected");
                 s.overlays.remove(id);
             }
+            Registration::Lobby(game_id) => {
+                s.games.remove(game_id);
+                s.lobby_connections.remove(game_id);
+                s.dispatch(
+                    Command::GameDisconnected {
+                        game: game_id.clone(),
+                    },
+                    None,
+                );
+                // Keep the child and token: a temporary socket failure is
+                // recoverable without replacing its process or party.
+            }
         }
     }
     drop(tx);
@@ -1193,6 +1403,7 @@ async fn serve(
 
 enum Registration {
     Game(GameId),
+    Lobby(GameId),
     Overlay(u64),
 }
 
@@ -1251,6 +1462,9 @@ fn message_to_command(
             return Err("controller frames require lobby routing".into())
         }
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
+        ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby => {
+            return Err("lobby lifecycle requires dedicated routing".into())
+        }
         ClientMessage::Participation {
             session,
             instant_join,
@@ -1304,7 +1518,7 @@ fn message_to_command(
         // its window.
         ClientMessage::RequestStart => match registration {
             Registration::Game(game) => Command::RequestStart { game: game.clone() },
-            Registration::Overlay(_) => {
+            Registration::Overlay(_) | Registration::Lobby(_) => {
                 return Err(
                     "only games report being switched to; overlays use next/play_next".into(),
                 )
@@ -1315,7 +1529,9 @@ fn message_to_command(
                 game: game.clone(),
                 settings,
             },
-            Registration::Overlay(_) => return Err("only games declare settings".into()),
+            Registration::Overlay(_) | Registration::Lobby(_) => {
+                return Err("only games declare settings".into())
+            }
         },
         ClientMessage::Ready { .. }
         | ClientMessage::Finished { .. }
@@ -1375,6 +1591,7 @@ fn message_to_command(
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
         ClientMessage::QueueNext { game } => Command::QueueNext { game },
+        ClientMessage::QueueGame { game, first } => Command::QueueGame { game, first },
         ClientMessage::Pause => Command::Pause,
         ClientMessage::Resume => Command::Resume,
         ClientMessage::OpenOverlay => Command::OverlayOpened,
@@ -1384,6 +1601,117 @@ fn message_to_command(
         ClientMessage::MediaControl { action } => Command::MediaControl { action },
     };
     Ok(Some(command))
+}
+
+#[cfg(test)]
+mod replacement_lobby_tests {
+    use super::*;
+    type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
+
+    #[test]
+    fn lobby_snapshot_keeps_art_but_omits_launch_internals() {
+        let game = serde_json::from_value(serde_json::json!({
+            "id": "game", "title": "Game", "cover": "data:image/png;base64,test",
+            "launch": {"command": "private/path", "env": {"PRIVATE_VALUE": "test"}}
+        }))
+        .unwrap();
+        let state = Shared::new(vec![game], "127.0.0.1:0".into(), None);
+        let party = lobby_snapshot(state.night.snapshot());
+        assert!(party.library[0].cover.is_some());
+        assert!(party.library[0].launch.is_none());
+    }
+
+    async fn receive(ws: &mut Ws) -> ServerMessage {
+        let frame = tokio::time::timeout(std::time::Duration::from_secs(2), ws.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        serde_json::from_str(frame.to_text().unwrap()).unwrap()
+    }
+
+    async fn connect(addr: &str, role: Role, id: &str, token: &str) -> Ws {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .unwrap();
+        ws.send(Message::Text(
+            ClientMessage::Hello {
+                role,
+                game: Some(GameId::new(id)),
+                token: Some(token.into()),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        ws
+    }
+
+    #[tokio::test]
+    async fn replacement_lobby_is_selected_authenticated_and_cannot_publish_input_or_game_lifecycle(
+    ) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let mut state = Shared::new(Vec::new(), addr.clone(), None);
+        state.lobby_game = Some(GameId::new("test-room"));
+        state.night.set_lobby_game(state.lobby_game.clone());
+        state.lobby_token = Some("test-launch-token".into());
+        state.runtime_input = true; // deterministic test: no hardware sampling
+        let shared = Arc::new(Mutex::new(state));
+        let task = tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                let shared = shared.clone();
+                tokio::spawn(async move {
+                    let _ = handle_connection(stream, shared).await;
+                });
+            }
+        });
+        for (role, id, token) in [
+            (Role::Lobby, "other-room", "test-launch-token"),
+            (Role::Lobby, "test-room", "wrong-token"),
+            (Role::Game, "test-room", "test-launch-token"),
+        ] {
+            let mut ws = connect(&addr, role, id, token).await;
+            assert!(matches!(
+                receive(&mut ws).await,
+                ServerMessage::Error { .. }
+            ));
+        }
+        let mut ws = connect(&addr, Role::Lobby, "test-room", "test-launch-token").await;
+        assert!(matches!(
+            receive(&mut ws).await,
+            ServerMessage::Welcome { .. }
+        ));
+        for message in [
+            ClientMessage::ControllerFrame {
+                controllers: Vec::new(),
+            },
+            ClientMessage::Ready {
+                session: SessionId::default(),
+            },
+        ] {
+            ws.send(Message::Text(message.to_json())).await.unwrap();
+            assert!(matches!(
+                receive(&mut ws).await,
+                ServerMessage::Error { .. }
+            ));
+        }
+        ws.send(Message::Text(ClientMessage::LobbyReady.to_json()))
+            .await
+            .unwrap();
+        let mut focus = false;
+        let mut snapshot = false;
+        for _ in 0..2 {
+            match receive(&mut ws).await {
+                ServerMessage::LobbyFocus { active } => focus = active,
+                ServerMessage::PartyState { .. } => snapshot = true,
+                other => panic!("unexpected {other:?}"),
+            }
+        }
+        assert!(focus && snapshot);
+        ws.close(None).await.unwrap();
+        task.abort();
+    }
 }
 
 #[cfg(test)]
@@ -1425,6 +1753,33 @@ mod desktop_lifetime_tests {
         assert!(tokio::time::timeout(
             std::time::Duration::from_millis(300),
             run_inner(listener, Vec::new(), None, None, None, false, false)
+        )
+        .await
+        .is_err());
+    }
+
+    #[tokio::test]
+    async fn replacement_lobby_crashing_before_hello_does_not_end_the_runtime() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        #[cfg(windows)]
+        let command = serde_json::json!({"command":"cmd.exe", "args":["/C", "exit", "0"], "env":{"GAMENIGHT_LOBBY_API":"1"}});
+        #[cfg(not(windows))]
+        let command = serde_json::json!({"command":"/bin/sh", "args":["-c", "exit 0"], "env":{"GAMENIGHT_LOBBY_API":"1"}});
+        let lobby = serde_json::from_value(
+            serde_json::json!({"id":"replacement", "title":"Replacement", "launch":command}),
+        )
+        .unwrap();
+        assert!(tokio::time::timeout(
+            std::time::Duration::from_millis(1500),
+            run_inner(
+                listener,
+                vec![lobby],
+                Some(GameId::new("replacement")),
+                None,
+                None,
+                false,
+                true
+            )
         )
         .await
         .is_err());

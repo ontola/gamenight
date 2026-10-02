@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub mod avatar;
+pub mod guest_face;
 pub use avatar::Avatar;
 
 /// Bumped only on breaking changes. Additive changes (new message types, new
@@ -713,6 +714,9 @@ pub struct VoteSnapshot {
 pub enum Role {
     /// A game process (via an SDK). Receives session lifecycle commands.
     Game,
+    /// The configured replacement lobby. Uses one authenticated connection
+    /// for party commands, snapshots, focus and runtime-owned input.
+    Lobby,
     /// An overlay / controller UI. Receives party snapshots, sends commands.
     Overlay,
 }
@@ -731,6 +735,12 @@ pub struct ControllerState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
+    /// Replacement lobby has rendered its first usable frame.
+    LobbyReady,
+    /// Explicitly end the desktop party; a lobby disconnect is not a quit.
+    QuitParty,
+    /// Retry the configured replacement lobby after a crash. Trusted local UI only.
+    RetryLobby,
     /// Only the authenticated lobby may publish physical input.
     ControllerFrame {
         controllers: Vec<ControllerState>,
@@ -836,6 +846,11 @@ pub enum ClientMessage {
     /// Change the upcoming game without starting or resuming gameplay.
     QueueNext {
         game: GameId,
+    },
+    /// Add a new occurrence at the end, or first among upcoming games. Never starts play.
+    QueueGame {
+        game: GameId,
+        first: bool,
     },
     Pause,
     Resume,

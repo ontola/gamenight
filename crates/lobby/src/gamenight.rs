@@ -1357,6 +1357,7 @@ struct PlayerMenuState {
 /// (there's no reasonable way to type a name with a d-pad).
 #[derive(Clone)]
 enum MenuAction {
+    Assistant,
     /// Detach the phone profile while keeping the controller seated.
     Unlink,
     Leave,
@@ -1370,6 +1371,7 @@ enum MenuAction {
 
 fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
     let mut actions = vec![MenuAction::Leave];
+    if assistant::url().is_some() { actions.insert(0, MenuAction::Assistant); }
     if has_inactive { actions.push(MenuAction::PruneInactive); }
     actions.push(MenuAction::Quit);
     if linked { actions.insert(0, MenuAction::Unlink); }
@@ -1379,6 +1381,7 @@ fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
 impl MenuAction {
     fn label(&self) -> String {
         match self {
+            MenuAction::Assistant => "Session assistant".to_string(),
             MenuAction::Unlink => "Unlink".to_string(),
             MenuAction::Leave => "Leave".to_string(),
             MenuAction::PruneInactive => "Remove inactive players".to_string(),
@@ -1579,6 +1582,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
     // a menu-open player's controls would always be a frame late.
     use bevy::prelude::IntoSystemConfigs as _;
     app.init_resource::<sleep_visual::PoseBackup>();
+    app.add_systems(bevy::prelude::PostUpdate, assistant::sync.before(interaction_visual::sync));
     app.add_systems(bevy::prelude::PreUpdate, sleep_visual::restore.before(gate_gamepad_input_system));
     app.add_systems(bevy::prelude::PreUpdate, gate_gamepad_input_system);
     app.add_systems(bevy::prelude::PreUpdate, stream_controller_input.after(bevy::input::InputSystem));
@@ -2128,6 +2132,7 @@ fn global_input_system(
                         let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)), input.open_menus.get(&player_id).is_some_and(|m| m.has_inactive));
                         if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
+                                MenuAction::Assistant => { assistant::open(); input.open_menus.remove(&player_id); }
                                 MenuAction::Unlink => {
                                     links.unlink(player_id);
                                     if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.highlight = 0; }
@@ -3674,6 +3679,7 @@ mod game_cases;
 mod room_pickup;
 mod punch_visual;
 mod interaction_visual;
+mod assistant;
 mod station_art;
 mod themes;
 

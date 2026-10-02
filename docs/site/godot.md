@@ -1,6 +1,8 @@
 # Godot 4
 
-The Godot addon exposes lifecycle signals over WebSocket. It is a starting point, not a complete current integration. Read the gaps below before shipping with it.
+The Godot addon handles lifecycle messages, runtime controller frames and live
+player profiles over WebSocket. Your game connects these to its simulation and
+rendering.
 
 ## Install
 
@@ -16,7 +18,9 @@ These declarations come directly from the addon:
 
 Connect each signal to your game. Prepare loads a level while hidden; Start begins play. Pause must freeze gameplay, timers and audio. Resume continues the same state. Dispose clears session resources but permits a later Prepare.
 
-Keep `GameNight` processing while your scene is paused. Its transport must still receive Resume. Opt out of reconnecting and exit cleanly on host loss in managed mode.
+The autoload processes while the scene tree is paused, so it can receive Resume.
+In managed mode, losing the host clears input and exits the game. Standalone
+development connections may reconnect automatically.
 
 ## Report preparation progress
 
@@ -26,17 +30,55 @@ The addon provides this implementation:
 
 Call `GameNight.notify_ready(session_id)` only after your level and first frame are prepared. `notify_finished` reports a round; your game still owns the results screen and next round.
 
-## Current gaps
+## Controllers and live profiles
 
-The addon does not dispatch `controller_frame` or game `party_updated` messages. Its `party_updated` signal currently comes from the overlay-style `party_state` snapshot. Add the game message handlers and match controller tokens to seats; `devices_for_local_seats()` uses local enumeration and is not safe for managed ownership.
+Use the runtime stream in managed play. A seat's controller token is opaque;
+it is not a Godot joystick index. `frame_for_seat` resolves the token from the
+latest roster, returns a copy, and returns an empty frame while paused or when
+input is more than 250 ms old.
 
-`GameNightScreen` currently calls `request_start()` on focus. That conflicts with the current contract: focus must not start or resume a game. Remove that focus-triggered path before shipping. Setting `automatic = false` after its `_ready()` has run does not disconnect existing signals.
+```gdscript
+func _physics_process(delta: float) -> void:
+    if GameNight.phase != "running":
+        return
+    var frame = GameNight.frame_for_seat(0)
+    var movement = Vector2(GameNight.axis(frame, 0), GameNight.axis(frame, 1))
+    # Apply movement to the character assigned to seat 0.
+    if GameNight.button(frame, 0): # A, held; add your own press-edge detection.
+        pass
+```
 
-The default connection retries automatically. Managed games need to handle disconnection by stopping and exiting. There is no built-in circular-face renderer in this addon; implement the [face transform](/docs/faces) in your scene.
+Use `GameNight.roster_changed` to refresh seat ownership, names, skin colour
+and avatar artwork. The current snapshot is available in `GameNight.party`.
+`devices_for_local_seats()` is only for standalone play and returns no native
+devices in managed mode. Back/Select belongs to the host; do not bind native
+Back to a second pause/resume handler.
+
+For circular faces, use `face.gd` with a head centre and radius. See the
+[face helper example](/docs/lobbies#faces-and-names). The helper draws the skin
+circle under the artwork and supports historic avatar anchors.
+
+## Screen ownership
+
+`GameNightScreen` follows Start, Pause, Resume and Dispose. OS focus does not
+request Start or Resume. A game preparing in the background stays quiet until
+the runtime explicitly starts it. The helper handles the window and master
+audio bus; your lifecycle callbacks must still pause the simulation and timers.
+
+## Godot lobby example
+
+The SDK includes a runnable Living Room project using a separate authenticated
+lobby client. It shows live player names and faces and can join, queue, play
+and resume. See [Build a lobby](/docs/lobbies) for launch instructions and the
+runtime-owned controller contract. Its client is independent of the game autoloads.
 
 ## Before release
 
-Check the [lifecycle contract](/docs/lifecycle) and [controller stream](/docs/controllers), then run [packaged integration checks](/docs/testing). These documentation excerpts are checked against source. There is no Godot runtime test attached to this docs build, and enabling the plugin alone does not prove compatibility.
+Check the [lifecycle contract](/docs/lifecycle) and [controller stream](/docs/controllers), then run [packaged integration checks](/docs/testing). Run `python scripts/test-godot-sdk.py --godot /path/to/godot` for the headless
+adapter regression checks. The lobby has a separate real-daemon flow test.
+These tests and source-checked documentation do not verify your game callbacks,
+physical controllers or platform window behaviour. Enabling the plugin alone
+does not certify a game.
 
 ## Optional performance diagnostics
 

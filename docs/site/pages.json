@@ -1,14 +1,132 @@
 [
-  {"slug":"", "title":"Get started", "group":"Start here", "source":"docs/site/overview.md", "watch":["contract/requirements.json"]},
-  {"slug":"lifecycle", "title":"Game lifecycle", "group":"Start here", "source":"docs/integrating-your-game.md", "watch":["crates/gamenight-sdk/src/lib.rs","games/love-party/shared/lifecycle.lua"]},
-  {"slug":"love", "title":"LÖVE / Lua", "group":"Your engine", "source":"docs/site/love.md", "watch":["games/love-party/main.lua","games/love-party/shared/window.lua","games/love-party/shared/back_gate.lua"]},
-  {"slug":"rust", "title":"Rust / Bevy", "group":"Your engine", "source":"docs/site/rust.md", "watch":["crates/gamenight-sdk/src/lib.rs"]},
-  {"slug":"godot", "title":"Godot 4", "group":"Your engine", "source":"docs/site/godot.md", "watch":["sdk/godot/addons/gamenight/gamenight.gd","sdk/godot/addons/gamenight/screen.gd"]},
-  {"slug":"c", "title":"C / C++", "group":"Your engine", "source":"docs/site/c.md", "watch":["sdk/c/gamenight.h"]},
-  {"slug":"other-engines", "title":"Unity, Unreal & others", "group":"Your engine", "source":"docs/site/other-engines.md", "watch":["crates/gamenight-protocol/src/lib.rs"]},
-  {"slug":"controllers", "title":"Controllers & players", "group":"Integration", "source":"docs/site/controllers.md", "watch":["games/love-party/shared/input.lua","crates/gamenight-protocol/src/lib.rs"]},
-  {"slug":"faces", "title":"Faces & colours", "group":"Integration", "source":"docs/faces.md", "watch":["games/love-party/shared/face.lua","crates/gamenight-protocol/src/avatar.rs"]},
-  {"slug":"testing", "title":"Test your integration", "group":"Ship your game", "source":"docs/game-contract-verification.md", "watch":["contract/requirements.json","scripts/game-contract.py"]},
-  {"slug":"publishing", "title":"Publish a game", "group":"Ship your game", "source":"docs/site/publishing.md", "watch":["scripts/package-love-party.py"]},
-  {"slug":"protocol", "title":"Protocol reference", "group":"Reference", "source":"docs/protocol.md", "watch":["crates/gamenight-protocol/src/lib.rs"]}
+  {
+    "slug": "",
+    "title": "Get started",
+    "group": "Start here",
+    "source": "docs/site/overview.md",
+    "watch": [
+      "contract/requirements.json"
+    ]
+  },
+  {
+    "slug": "lifecycle",
+    "title": "Game lifecycle",
+    "group": "Start here",
+    "source": "docs/integrating-your-game.md",
+    "watch": [
+      "crates/gamenight-sdk/src/lib.rs",
+      "games/love-party/shared/lifecycle.lua"
+    ]
+  },
+  {
+    "slug": "love",
+    "title": "L\u00d6VE / Lua",
+    "group": "Your engine",
+    "source": "docs/site/love.md",
+    "watch": [
+      "games/love-party/main.lua",
+      "games/love-party/shared/window.lua",
+      "games/love-party/shared/back_gate.lua"
+    ]
+  },
+  {
+    "slug": "rust",
+    "title": "Rust / Bevy",
+    "group": "Your engine",
+    "source": "docs/site/rust.md",
+    "watch": [
+      "crates/gamenight-sdk/src/lib.rs"
+    ]
+  },
+  {
+    "slug": "godot",
+    "title": "Godot 4",
+    "group": "Your engine",
+    "source": "docs/site/godot.md",
+    "watch": [
+      "sdk/godot/addons/gamenight/gamenight.gd",
+      "sdk/godot/addons/gamenight/screen.gd"
+    ]
+  },
+  {
+    "slug": "lobbies",
+    "title": "Build a lobby",
+    "group": "Your engine",
+    "source": "docs/site/lobbies.md",
+    "watch": [
+      "sdk/godot/addons/gamenight/lobby.gd",
+      "sdk/godot/addons/gamenight/face.gd",
+      "sdk/godot/lobby/main.gd",
+      "crates/gamenight-daemon/src/lobby_input.rs",
+      "sdk/godot/addons/gamenight/artwork.gd",
+      "crates/gamenight-local-web/src/host_lobby.rs",
+      "crates/gamenight-daemon/src/bin/gamenight-launcher.rs"
+    ]
+  },
+  {
+    "slug": "c",
+    "title": "C / C++",
+    "group": "Your engine",
+    "source": "docs/site/c.md",
+    "watch": [
+      "sdk/c/gamenight.h"
+    ]
+  },
+  {
+    "slug": "other-engines",
+    "title": "Unity, Unreal & others",
+    "group": "Your engine",
+    "source": "docs/site/other-engines.md",
+    "watch": [
+      "crates/gamenight-protocol/src/lib.rs"
+    ]
+  },
+  {
+    "slug": "controllers",
+    "title": "Controllers & players",
+    "group": "Integration",
+    "source": "docs/site/controllers.md",
+    "watch": [
+      "games/love-party/shared/input.lua",
+      "crates/gamenight-protocol/src/lib.rs"
+    ]
+  },
+  {
+    "slug": "faces",
+    "title": "Faces & colours",
+    "group": "Integration",
+    "source": "docs/faces.md",
+    "watch": [
+      "games/love-party/shared/face.lua",
+      "crates/gamenight-protocol/src/avatar.rs"
+    ]
+  },
+  {
+    "slug": "testing",
+    "title": "Test your integration",
+    "group": "Ship your game",
+    "source": "docs/game-contract-verification.md",
+    "watch": [
+      "contract/requirements.json",
+      "scripts/game-contract.py"
+    ]
+  },
+  {
+    "slug": "publishing",
+    "title": "Publish a game",
+    "group": "Ship your game",
+    "source": "docs/site/publishing.md",
+    "watch": [
+      "scripts/package-love-party.py"
+    ]
+  },
+  {
+    "slug": "protocol",
+    "title": "Protocol reference",
+    "group": "Reference",
+    "source": "docs/protocol.md",
+    "watch": [
+      "crates/gamenight-protocol/src/lib.rs"
+    ]
+  }
 ]

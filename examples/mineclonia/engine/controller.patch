@@ -1,0 +1,602 @@
+diff --git a/irr/include/gamenight_controller.h b/irr/include/gamenight_controller.h
+new file mode 100644
+index 0000000..f3b5db5
+--- /dev/null
++++ b/irr/include/gamenight_controller.h
+@@ -0,0 +1,70 @@
++// SPDX-License-Identifier: LGPL-2.1-or-later
++// GameNight's opt-in, per-process controller binding. No OS input injection.
++#pragma once
++#include <cstdlib>
++#include <string>
++#include <array>
++#include <chrono>
++#include <fstream>
++#include <cstdint>
++inline const char *gamenightFramePath() {
++    const char *p=std::getenv("GAMENIGHT_CONTROLLER_FRAME");
++    return p && *p ? p : nullptr;
++}
++struct GameNightHostFrame {
++    uint64_t sequence=0;
++    bool active=false, connected=false;
++    uint32_t buttons=0;
++    std::array<int,6> axes{};
++};
++inline GameNightHostFrame gamenightHostFrame() {
++    using Clock=std::chrono::steady_clock;
++    static GameNightHostFrame frame;
++    static auto checked=Clock::time_point{}, changed=Clock::time_point{};
++    const auto now=Clock::now();
++    const char *path=gamenightFramePath();
++    if(!path) return frame;
++    if(now-checked>=std::chrono::milliseconds(5)) {
++        checked=now;
++        std::ifstream file(path);
++        GameNightHostFrame next;
++        int active=0, connected=0;
++        if(file >> next.sequence >> active >> connected >> next.buttons
++            >> next.axes[0] >> next.axes[1] >> next.axes[2]
++            >> next.axes[3] >> next.axes[4] >> next.axes[5]) {
++            bool valid=active>=0 && active<=1 && connected>=0 && connected<=1 && next.buttons<16384;
++            for(int axis:next.axes) valid &= axis>=-32768 && axis<=32767;
++            if(valid && next.sequence>frame.sequence) {
++                next.active=active;next.connected=connected;frame=next;changed=now;
++            }
++        }
++    }
++    auto result=frame;
++    if(now-changed>std::chrono::milliseconds(250)) {
++        result.connected=false;result.buttons=0;result.axes.fill(0);
++    }
++    if(now-changed>std::chrono::seconds(2)) result.active=false;
++    return result;
++}
++inline bool gamenightControllerMode() {
++    const char *p=std::getenv("GAMENIGHT_CONTROLLER_PATH");
++    return (p && *p) || gamenightFramePath();
++}
++struct GameNightControllerBinding {
++    std::string path;
++    int id=-1;
++    bool armed=false;
++    bool attach(int instance, const std::string &candidate, bool neutral) {
++        if (candidate.empty() || candidate != path || id >= 0) return false;
++        id=instance; armed=neutral; return true;
++    }
++    bool accept(int instance, bool neutral) {
++        if (instance != id || id < 0) return false;
++        if (!armed) { armed=neutral; return false; }
++        return true;
++    }
++    bool detach(int instance) {
++        if(instance != id) return false;
++        id=-1;armed=false;return true;
++    }
++};
+diff --git a/irr/src/CIrrDeviceSDL.cpp b/irr/src/CIrrDeviceSDL.cpp
+index fef8b1b..4cce059 100644
+--- a/irr/src/CIrrDeviceSDL.cpp
++++ b/irr/src/CIrrDeviceSDL.cpp
+@@ -29,6 +29,13 @@
+ #include <cstdio>
+ #include <cstdlib>
+ #include <cassert>
++#ifdef _WIN32
++#ifndef NOMINMAX
++#define NOMINMAX
++#endif
++#include <windows.h>
++#include <fstream>
++#endif
+ 
+ #ifdef _IRR_EMSCRIPTEN_PLATFORM_
+ #include <emscripten.h>
+@@ -464,6 +471,12 @@ CIrrDeviceSDL::CIrrDeviceSDL(const SIrrlichtCreationParameters &param) :
+ 		flags |= SDL_INIT_GAMEPAD;
+ #endif
+ 
++#ifndef _IRR_USE_SDL3_
++        if (gamenightControllerMode() && !gamenightFramePath()) {
++            couchController.path=std::getenv("GAMENIGHT_CONTROLLER_PATH");
++            SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
++        }
++#endif
+ #ifdef _IRR_USE_SDL3_
+ 		if (!SDL_Init(flags))
+ #else
+@@ -742,6 +755,7 @@ bool CIrrDeviceSDL::createWindowWithContext()
+ #ifdef _IRR_USE_SDL3_
+ 	Window = SDL_CreateWindow("", Width, Height, SDL_Flags);
+ #else
++	if(gamenightFramePath()) SDL_Flags=(SDL_Flags & ~SDL_WINDOW_SHOWN) | SDL_WINDOW_HIDDEN;
+ 	Window = SDL_CreateWindow("", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Width, Height, SDL_Flags);
+ #endif
+ 	if (!Window) {
+@@ -749,6 +763,18 @@ bool CIrrDeviceSDL::createWindowWithContext()
+ 		return false;
+ 	}
+ 
++#ifndef _IRR_USE_SDL3_
++    if(gamenightControllerMode()) {
++        const char *seat=std::getenv("GAMENIGHT_COUCH_SEAT");
++        SDL_Rect bounds;
++        if(seat && (*seat=='0' || *seat=='1') && SDL_GetDisplayBounds(0,&bounds)==0) {
++            SDL_SetWindowFullscreen(Window,0);
++            SDL_SetWindowBordered(Window,SDL_FALSE);
++            SDL_SetWindowSize(Window,bounds.w/2,bounds.h);
++            SDL_SetWindowPosition(Window,bounds.x+(*seat-'0')*(bounds.w/2),bounds.y);
++        }
++    }
++#endif
+ 	Context = SDL_GL_CreateContext(Window);
+ 	if (!Context) {
+ 		os::Printer::log("Could not create context", SDL_GetError(), ELL_WARNING);
+@@ -763,7 +789,7 @@ bool CIrrDeviceSDL::createWindowWithContext()
+ #endif
+ 
+ 	updateSizeAndScale();
+-	if (ScaleX != 1.0f || ScaleY != 1.0f) {
++	if (!gamenightControllerMode() && (ScaleX != 1.0f || ScaleY != 1.0f)) {
+ 		// The given window size is in pixels, not in screen coordinates.
+ 		// We can only do the conversion now since we didn't know the scale before.
+ 		SDL_SetWindowSize(Window,
+@@ -825,6 +851,7 @@ static int wrap_PollEvent(SDL_Event *ev)
+ bool CIrrDeviceSDL::run()
+ {
+ 	os::Timer::tick();
++	if(gamenightFramePath()) couchHostStep();
+ 
+ 	SEvent irrevent;
+ 	SDL_Event SDL_event;
+@@ -1149,9 +1176,23 @@ bool CIrrDeviceSDL::run()
+ #else
+ 			auto id = SDL_event.cdevice.which;
+ #endif
++			if(gamenightFramePath()) break; // Managed input comes only from host seat tokens.
+ 			if (auto gamepad = SDL_OpenGamepad(id); gamepad != nullptr) {
+-				gamepads.emplace(id, gamepad);
+-				recentGamepadID = id;
++#ifndef _IRR_USE_SDL3_
++                // ADDED uses a device index; all subsequent events use an instance ID.
++                id=SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(gamepad));
++                if (gamenightControllerMode()) {
++                    const char *path=SDL_GameControllerPath(gamepad);
++                    if (!couchController.attach(id,path ? path : "",false)) {
++                        SDL_CloseGamepad(gamepad);
++                        break;
++                    }
++                    os::Printer::log("GameNight controller bound",path,ELL_INFORMATION);
++                }
++#endif
++                gamepads.emplace(id, gamepad);
++                recentGamepadID = id;
++                if(gamenightControllerMode()) couchAccept(id);
+ 				os::Printer::log("Gamepad connected", SDL_GetGamepadName(gamepad), ELL_INFORMATION);
+ 				os::Printer::log("Gamepad type", SDL_GetGamepadStringForType(SDL_GetGamepadType(gamepad)), ELL_INFORMATION);
+ 				if (auto mapping = SDL_GetGamepadMapping(gamepad); mapping != nullptr) {
+@@ -1172,8 +1213,9 @@ bool CIrrDeviceSDL::run()
+ #endif
+ 			if (auto p = gamepads.find(id); p != gamepads.end()) {
+ 				os::Printer::log("Gamepad disconnected", SDL_GetGamepadName(p->second), ELL_INFORMATION);
+-				SDL_CloseGamepad(p->second);
+-				gamepads.erase(id);
++                if (gamenightControllerMode() && couchController.detach(id)) couchRelease(id);
++                SDL_CloseGamepad(p->second);
++                gamepads.erase(id);
+ 			}
+ 			break;
+ 		}
+@@ -1188,6 +1230,7 @@ bool CIrrDeviceSDL::run()
+ 			auto id = SDL_event.cbutton.which;
+ 			irrevent.GamepadButtonEvent.Button = static_cast<GamepadButton>(SDL_event.cbutton.button);
+ #endif
++			if (gamenightControllerMode() && !couchAccept(id)) break;
+ 			irrevent.GamepadButtonEvent.ID = id;
+ 			irrevent.GamepadButtonEvent.PressedDown = (SDL_event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN);
+ 			recentGamepadID = id;
+@@ -1206,6 +1249,7 @@ bool CIrrDeviceSDL::run()
+ 			irrevent.GamepadAxisEvent.Axis = static_cast<GamepadAxis>(SDL_event.caxis.axis);
+ 			irrevent.GamepadAxisEvent.Value = SDL_event.caxis.value;
+ #endif
++			if (gamenightControllerMode() && !couchAccept(id)) break;
+ 			irrevent.GamepadAxisEvent.ID = id;
+ 			recentGamepadID = id;
+ 			postEventFromUser(irrevent);
+@@ -1222,6 +1266,42 @@ bool CIrrDeviceSDL::run()
+ 	return !Close;
+ }
+ 
++
++bool CIrrDeviceSDL::couchAccept(SDL_JoystickID id)
++{
++    if(gamenightFramePath()) return false;
++#ifndef _IRR_USE_SDL3_
++    auto p=gamepads.find(id);
++    if(p==gamepads.end()) return false;
++    bool neutral=true;
++    for(int b=0;b<SDL_CONTROLLER_BUTTON_MAX;b++)
++        neutral &= !SDL_GameControllerGetButton(p->second,static_cast<SDL_GameControllerButton>(b));
++    for(int a=0;a<SDL_CONTROLLER_AXIS_MAX;a++)
++        neutral &= std::abs(SDL_GameControllerGetAxis(p->second,static_cast<SDL_GameControllerAxis>(a)))<8000;
++    return couchController.accept(id,neutral);
++#else
++    return false; // This pinned couch adapter targets SDL2 only.
++#endif
++}
++void CIrrDeviceSDL::couchRelease(SDL_JoystickID id)
++{
++    // Neutralize every held action/cursor axis on disconnect.
++    SEvent e{};
++    e.EventType=EET_GAMEPAD_BUTTON_EVENT;
++    e.GamepadButtonEvent.ID=id;
++    e.GamepadButtonEvent.PressedDown=false;
++    for(int b=0;b<static_cast<int>(GamepadButton::COUNT);b++) {
++        e.GamepadButtonEvent.Button=static_cast<GamepadButton>(b);
++        postEventFromUser(e);
++    }
++    e.EventType=EET_GAMEPAD_AXIS_EVENT;
++    e.GamepadAxisEvent.ID=id;e.GamepadAxisEvent.Value=0;
++    for(int a=0;a<static_cast<int>(GamepadAxis::COUNT);a++) {
++        e.GamepadAxisEvent.Axis=static_cast<GamepadAxis>(a);
++        postEventFromUser(e);
++    }
++}
++
+ void CIrrDeviceSDL::updateSizeAndScale()
+ {
+ 	int window_w, window_h;
+@@ -1638,3 +1718,54 @@ void CIrrDeviceSDL::CCursorControl::initCursors()
+ }
+ 
+ #endif // _IRR_COMPILE_WITH_SDL_DEVICE_
++
++void CIrrDeviceSDL::couchHostStep() {
++#ifndef _IRR_USE_SDL3_
++    auto frame=gamenightHostFrame();
++    if(frame.active!=couchVisible) {
++        couchVisible=frame.active;couchArmed=false;
++        if(couchVisible) {SDL_ShowWindow(Window);SDL_RaiseWindow(Window);}
++        else SDL_HideWindow(Window);
++    }
++#ifdef _WIN32
++    // Two tiled borderless views cover the complete monitor together. Keep
++    // both above the taskbar only while a member of this owned pair has focus.
++    // Alt-Tab and Back release them; never pin the game above other apps.
++    static Uint32 focusCheck=0;
++    static bool above=false;
++    if(SDL_GetTicks()>=focusCheck) {
++        focusCheck=SDL_GetTicks()+100;
++        DWORD foreground=0;
++        GetWindowThreadProcessId(GetForegroundWindow(), &foreground);
++        bool owned=false;
++        if(const char *group=std::getenv("GAMENIGHT_COUCH_GROUP")) {
++            std::ifstream file(group); unsigned long pid;
++            while(file>>pid) if(pid==foreground) owned=true;
++        }
++        bool desired=frame.active && owned;
++        if(desired!=above) {above=desired;SDL_SetWindowAlwaysOnTop(Window,above?SDL_TRUE:SDL_FALSE);}
++    }
++#endif
++    // Back belongs to the resident lobby. Never echo its request or open Luanti's menu.
++    frame.buttons &= ~(1u<<6);
++    bool neutral=frame.buttons==0;
++    for(int axis:frame.axes) neutral &= std::abs(axis)<8000;
++    if(!frame.connected || !frame.active) couchArmed=false;
++    else if(neutral) couchArmed=true;
++    if(!couchArmed) {frame.buttons=0;frame.axes.fill(0);}
++    const int buttons[]={0,1,2,3,9,10,4,6,7,8,11,12,13,14};
++    SEvent e{};
++    e.EventType=EET_GAMEPAD_BUTTON_EVENT;e.GamepadButtonEvent.ID=0;
++    for(int i=0;i<14;i++) if((frame.buttons^couchPrevious.buttons)&(1u<<i)) {
++        e.GamepadButtonEvent.Button=static_cast<GamepadButton>(buttons[i]);
++        e.GamepadButtonEvent.PressedDown=(frame.buttons&(1u<<i))!=0;
++        postEventFromUser(e);
++    }
++    e.EventType=EET_GAMEPAD_AXIS_EVENT;e.GamepadAxisEvent.ID=0;
++    for(int i=0;i<6;i++) if(frame.axes[i]!=couchPrevious.axes[i]) {
++        e.GamepadAxisEvent.Axis=static_cast<GamepadAxis>(i);e.GamepadAxisEvent.Value=frame.axes[i];
++        postEventFromUser(e);
++    }
++    couchPrevious=frame;
++#endif
++}
+diff --git a/irr/src/CIrrDeviceSDL.h b/irr/src/CIrrDeviceSDL.h
+index 69bc5be..4ce73a9 100644
+--- a/irr/src/CIrrDeviceSDL.h
++++ b/irr/src/CIrrDeviceSDL.h
+@@ -27,6 +27,7 @@
+ #include <map>
+ #include <memory>
+ #include <unordered_map>
++#include "gamenight_controller.h"
+ 
+ #ifndef _IRR_USE_SDL3_
+ 	// Backward compatibility for SDL2
+@@ -324,6 +325,12 @@ class CIrrDeviceSDL : public CIrrDeviceStub
+ 	SDL_Window *Window;
+ #if defined(_IRR_COMPILE_WITH_JOYSTICK_EVENTS_)
+ 	std::map<SDL_JoystickID, SDL_Gamepad*> gamepads;
++	GameNightControllerBinding couchController;
++	bool couchAccept(SDL_JoystickID id);
++	void couchHostStep();
++	GameNightHostFrame couchPrevious;
++	bool couchVisible=false, couchArmed=false;
++	void couchRelease(SDL_JoystickID id);
+ #ifdef _IRR_USE_SDL3
+ 	SDL_JoystickID recentGamepadID = -1;
+ #else
+diff --git a/src/client/game.cpp b/src/client/game.cpp
+index 8c5cc35..068ff1f 100644
+--- a/src/client/game.cpp
++++ b/src/client/game.cpp
+@@ -1,3 +1,4 @@
++#include "gamenight_controller.h"
+ // Luanti
+ // SPDX-License-Identifier: LGPL-2.1-or-later
+ // Copyright (C) 2010-2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+@@ -579,6 +580,7 @@ void Game::run()
+ 		updatePlayerControl(cam_view);
+ 
+ 		updatePauseState();
++		if(gamenightFramePath() && !gamenightHostFrame().active) m_is_paused=true;
+ 		if (m_is_paused)
+ 			dtime = 0.0f;
+ 
+@@ -592,6 +594,11 @@ void Game::run()
+ 		processPlayerInteraction(dtime, m_game_ui->m_flags.show_hud);
+ 		updateFrame(&graph, &stats, dtime, cam_view);
+ 		updateProfilerGraphs(&graph);
++        // Acknowledge a rendered world frame, not merely a process/window launch.
++        if(const char *frame=gamenightFramePath()) {
++            static bool reported=false;
++            if(!reported) {std::ofstream(std::string(frame)+".ready") << "rendered\n";reported=true;}
++        }
+ 
+ 		if (m_does_lost_focus_pause_game && !device->isWindowFocused() && !isMenuActive()) {
+ 			m_game_formspec.showPauseMenu();
+@@ -1380,7 +1387,7 @@ void Game::processUserInput(f32 dtime)
+ 	}
+ 
+ 	// Reset input if window not active or some menu is active
+-	if (!device->isWindowActive() || isMenuActive() || guienv->hasFocus(gui_chat_console.get())) {
++	if ((!device->isWindowActive() && !gamenightControllerMode()) || isMenuActive() || guienv->hasFocus(gui_chat_console.get())) {
+ 		if (m_game_focused) {
+ 			m_game_focused = false;
+ 			infostream << "Game lost focus" << std::endl;
+@@ -1946,7 +1953,13 @@ void Game::updateCameraDirection(CameraOrientation *cam, float dtime)
+ 	this results in duplicated input. To avoid that, we don't enable relative
+ 	mouse mode if we're in touchscreen mode. */
+ 	if (cur_control)
+-		cur_control->setRelativeMode(!g_touchcontrols && !isMenuActive());
++		cur_control->setRelativeMode(!gamenightControllerMode() && !g_touchcontrols && !isMenuActive());
++
++    if (gamenightControllerMode()) {
++        if (cur_control) cur_control->setVisible(false);
++        if (!isMenuActive()) updateCameraOrientation(cam,dtime);
++        return;
++    }
+ 
+ 	if ((device->isWindowActive() && device->isWindowFocused()
+ 			&& !isMenuActive()) || input->isRandom()) {
+@@ -2003,7 +2016,7 @@ void Game::updateCameraOrientation(CameraOrientation *cam, float dtime)
+ 		// User setting is already applied by TouchControls.
+ 		cam->camera_yaw   += g_touchcontrols->getYawChange()   * sens_scale;
+ 		cam->camera_pitch += g_touchcontrols->getPitchChange() * sens_scale;
+-	} else {
++	} else if (!gamenightControllerMode()) {
+ 		v2s32 center(driver->getScreenSize().Width / 2, driver->getScreenSize().Height / 2);
+ 		v2s32 dist = input->getMousePos() - center;
+ 
+@@ -2656,7 +2669,8 @@ void Game::updateSound(f32 dtime)
+ 			camera->getDirection(),
+ 			camera->getCameraNode()->getUpVector());
+ 
+-	sound_volume_control(sound_manager.get(), device->isWindowActive());
++	sound_volume_control(sound_manager.get(), device->isWindowActive() || gamenightControllerMode());
++    if(gamenightFramePath() && !gamenightHostFrame().active) sound_manager->setListenerGain(0);
+ 
+ 	// Update sound maker
+ 	ClientMap &map = client->getEnv().getClientMap();
+diff --git a/src/client/inputhandler.cpp b/src/client/inputhandler.cpp
+index e166fd0..4340f98 100644
+--- a/src/client/inputhandler.cpp
++++ b/src/client/inputhandler.cpp
+@@ -1,3 +1,4 @@
++#include "gamenight_controller.h"
+ // Luanti
+ // SPDX-License-Identifier: LGPL-2.1-or-later
+ // Copyright (C) 2010-2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+@@ -225,6 +226,10 @@ bool MyEventReceiver::OnEvent(const SEvent &event)
+ 		return true;
+ 	}
+ 
++    // No shared mouse capture or keyboard movement in a controller-only viewport.
++    if(gamenightControllerMode() && (event.EventType==EET_KEY_INPUT_EVENT ||
++        (event.EventType==EET_MOUSE_INPUT_EVENT && !event.MouseInput.Simulated))) return true;
++
+ 	// This is separate from other keyboard handling so that it also works in menus.
+ 	if (event.EventType == EET_KEY_INPUT_EVENT) {
+ 		KeyPress keyCode(event.KeyInput);
+diff --git a/src/gui/guiFormSpecMenu.cpp b/src/gui/guiFormSpecMenu.cpp
+index 04a2a70..098bebd 100644
+--- a/src/gui/guiFormSpecMenu.cpp
++++ b/src/gui/guiFormSpecMenu.cpp
+@@ -1,3 +1,4 @@
++#include "gamenight_controller.h"
+ // Luanti
+ // SPDX-License-Identifier: LGPL-2.1-or-later
+ // Copyright (C) 2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+@@ -3684,6 +3685,7 @@ void GUIFormSpecMenu::drawSelectedItem()
+ 
+ void GUIFormSpecMenu::drawMenu()
+ {
++    if(gamenightControllerMode()) couchPointerStep();
+ 	if (m_form_src) {
+ 		const std::string &newform = m_form_src->getForm();
+ 		if (newform != m_formspec_string) {
+@@ -3913,6 +3915,12 @@ void GUIFormSpecMenu::drawMenu()
+ 		Draw dragged item stack
+ 	*/
+ 	drawSelectedItem();
++    if(gamenightControllerMode() && m_couch_pointer) {
++        const video::SColor color(255,255,222,105);
++        driver->draw2DRectangle(video::SColor(220,10,10,20),core::rect<s32>(m_pointer.X-3,m_pointer.Y-9,m_pointer.X+4,m_pointer.Y+10));
++        driver->draw2DRectangle(color,core::rect<s32>(m_pointer.X-1,m_pointer.Y-7,m_pointer.X+2,m_pointer.Y+8));
++        driver->draw2DRectangle(color,core::rect<s32>(m_pointer.X-7,m_pointer.Y-1,m_pointer.X+8,m_pointer.Y+2));
++    }
+ 
+ 	skin->setFont(old_font);
+ }
+@@ -4384,6 +4392,38 @@ bool GUIFormSpecMenu::remapClickOutside(const SEvent &event)
+ 
+ bool GUIFormSpecMenu::preprocessEvent(const SEvent& event)
+ {
++    if(gamenightControllerMode()) {
++        if(event.EventType==EET_GAMEPAD_AXIS_EVENT) {
++            const auto axis=event.GamepadAxisEvent.Axis;
++            float v=event.GamepadAxisEvent.Value/32767.f;
++            v=std::abs(v)<0.22f ? 0.f : (v>0 ? (v-.22f)/.78f : (v+.22f)/.78f);
++            if(axis==GamepadAxis::LEFTX) m_couch_x=v;
++            if(axis==GamepadAxis::LEFTY) m_couch_y=v;
++            return true;
++        }
++        if(event.EventType==EET_GAMEPAD_BUTTON_EVENT) {
++            const auto b=event.GamepadButtonEvent.Button;
++            const bool down=event.GamepadButtonEvent.PressedDown;
++            if(!m_couch_pointer) couchPointerStep();
++            if(b==GamepadButton::SOUTH || b==GamepadButton::WEST) {
++                const bool left=b==GamepadButton::SOUTH;
++                const u32 mask=left ? SDL_BUTTON_MASK(1) : SDL_BUTTON_MASK(3);
++                if(down) m_couch_buttons|=mask; else m_couch_buttons&=~mask;
++                couchPointerEvent(left ? (down ? EMIE_LMOUSE_PRESSED_DOWN : EMIE_LMOUSE_LEFT_UP)
++                    : (down ? EMIE_RMOUSE_PRESSED_DOWN : EMIE_RMOUSE_LEFT_UP));
++            } else if(down && (b==GamepadButton::EAST || b==GamepadButton::START || b==GamepadButton::BACK || b==GamepadButton::NORTH)) {
++                SEvent key{};key.EventType=EET_KEY_INPUT_EVENT;key.KeyInput.Key=KEY_ESCAPE;
++                key.KeyInput.PressedDown=true;OnEvent(key);
++            } else if(down && b>=GamepadButton::DPAD_UP && b<=GamepadButton::DPAD_RIGHT) {
++                const int step=std::max(12,m_btn_height);
++                m_pointer.X+=(b==GamepadButton::DPAD_RIGHT ? step : b==GamepadButton::DPAD_LEFT ? -step : 0);
++                m_pointer.Y+=(b==GamepadButton::DPAD_DOWN ? step : b==GamepadButton::DPAD_UP ? -step : 0);
++                couchPointerEvent(EMIE_MOUSE_MOVED);
++            }
++            return true;
++        }
++    }
++
+ 	// This must be done first so that GUIModalMenu can set m_pointer_type
+ 	// correctly.
+ 	if (GUIModalMenu::preprocessEvent(event))
+@@ -5608,3 +5648,25 @@ double GUIFormSpecMenu::calculateImgsize(const parserData &data)
+ 	// size, use the maximum size.
+ 	return std::min(prefer_imgsize, std::min(fitx_imgsize, fity_imgsize));
+ }
++
++void GUIFormSpecMenu::couchPointerEvent(EMOUSE_INPUT_EVENT kind) {
++    auto size=Environment->getVideoDriver()->getScreenSize();
++    m_pointer.X=std::clamp(m_pointer.X,0,static_cast<int>(size.Width)-1);
++    m_pointer.Y=std::clamp(m_pointer.Y,0,static_cast<int>(size.Height)-1);
++    SEvent e{};e.EventType=EET_MOUSE_INPUT_EVENT;
++    e.MouseInput.Event=kind;e.MouseInput.X=m_pointer.X;e.MouseInput.Y=m_pointer.Y;
++    e.MouseInput.ButtonStates=m_couch_buttons;e.MouseInput.Simulated=true;
++    RenderingEngine::get_raw_device()->postEventFromUser(e);
++}
++void GUIFormSpecMenu::couchPointerStep() {
++    const auto now=porting::getTimeMs();
++    if(!m_couch_pointer) {m_pointer=AbsoluteRect.getCenter();m_couch_pointer=true;m_couch_tick=now;}
++    const float dt=std::min(0.05f,(now-m_couch_tick)/1000.f);m_couch_tick=now;
++    // Accumulate subpixel motion so a small stick movement does not disappear.
++
++    const float speed=Environment->getVideoDriver()->getScreenSize().Height*.7f;
++    m_couch_remainder_x+=m_couch_x*dt*speed;m_couch_remainder_y+=m_couch_y*dt*speed;
++    int dx=static_cast<int>(m_couch_remainder_x),dy=static_cast<int>(m_couch_remainder_y);
++    m_couch_remainder_x-=dx;m_couch_remainder_y-=dy;
++    if(dx || dy) {m_pointer.X+=dx;m_pointer.Y+=dy;couchPointerEvent(EMIE_MOUSE_MOVED);}
++}
+diff --git a/src/gui/guiFormSpecMenu.h b/src/gui/guiFormSpecMenu.h
+index 4ae8045..1b875a4 100644
+--- a/src/gui/guiFormSpecMenu.h
++++ b/src/gui/guiFormSpecMenu.h
+@@ -415,6 +415,14 @@ class GUIFormSpecMenu : public GUIModalMenu
+ 	video::SColor m_default_tooltip_color;
+ 
+ private:
++    float m_couch_x=0, m_couch_y=0;
++    float m_couch_remainder_x=0, m_couch_remainder_y=0;
++    u32 m_couch_tick=0;
++    bool m_couch_pointer=false;
++    u32 m_couch_buttons=0;
++    void couchPointerEvent(EMOUSE_INPUT_EVENT event);
++    void couchPointerStep();
++
+ 	IFormSource               *m_form_src;
+ 	TextDest                  *m_text_dst;
+ 	std::string                m_last_formname;
+diff --git a/src/porting.cpp b/src/porting.cpp
+index 4c24e8c..0faee61 100644
+--- a/src/porting.cpp
++++ b/src/porting.cpp
+@@ -1,3 +1,4 @@
++#include "gamenight_controller.h"
+ // Luanti
+ // SPDX-License-Identifier: LGPL-2.1-or-later
+ // Copyright (C) 2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+@@ -754,6 +755,9 @@ void initializePaths()
+ 	migrateCachePath();
+ 
+ #endif // RUN_IN_PLACE
++	if(gamenightControllerMode()) {
++		if(auto isolated=getUserPathEnvVar()) {path_user=*isolated;path_cache=path_user+DIR_DELIM "cache";}
++	}
+ 
+ 	assert(!path_share.empty());
+ 	assert(!path_user.empty());
+diff --git a/src/script/cpp_api/s_env.cpp b/src/script/cpp_api/s_env.cpp
+index 0faf517..48eb6e6 100644
+--- a/src/script/cpp_api/s_env.cpp
++++ b/src/script/cpp_api/s_env.cpp
+@@ -485,3 +485,11 @@ void ScriptApiEnv::triggerLBM(int id, MapBlock *block,
+ 
+ 	lua_pop(L, 1); // Pop error handler
+ }
++
++void ScriptApiEnv::gamenight_Poll()
++{
++    SCRIPTAPI_PRECHECKHEADER
++    lua_getglobal(L, "core");
++    lua_getfield(L, -1, "gamenight_paused_callbacks");
++    if(lua_istable(L, -1)) runCallbacks(0, RUN_CALLBACKS_MODE_FIRST);
++}
+diff --git a/src/script/cpp_api/s_env.h b/src/script/cpp_api/s_env.h
+index e32c6bc..345c97f 100644
+--- a/src/script/cpp_api/s_env.h
++++ b/src/script/cpp_api/s_env.h
+@@ -19,6 +19,8 @@ class ScriptApiEnv : virtual public ScriptApiBase
+ public:
+ 	// Called on environment step
+ 	void environment_Step(float dtime);
++	// Only the isolated GameNight mailbox runs while simulation is paused.
++	void gamenight_Poll();
+ 
+ 	// Called after generating a piece of map
+ 	void environment_OnGenerated(v3s16 minp, v3s16 maxp, u32 blockseed);
+diff --git a/src/server.cpp b/src/server.cpp
+index 5c6cee5..4480e6a 100644
+--- a/src/server.cpp
++++ b/src/server.cpp
+@@ -1,3 +1,4 @@
++#include "gamenight_controller.h"
+ // Luanti
+ // SPDX-License-Identifier: LGPL-2.1-or-later
+ // Copyright (C) 2010-2013 celeron55, Perttu Ahola <celeron55@gmail.com>
+@@ -739,7 +740,9 @@ void Server::AsyncRunStep(float dtime, bool initial_step)
+ 		m_env->reportMaxLagEstimate(max_lag);
+ 
+ 		// Step environment
+-		m_env->step(dtime);
++		if(gamenightFramePath() && !gamenightHostFrame().active)
++            m_env->getScriptIface()->gamenight_Poll();
++        else m_env->step(dtime);
+ 	}
+ 
+ 	static const float map_timer_and_unload_dtime = 2.92;

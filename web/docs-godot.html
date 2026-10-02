@@ -7,9 +7,11 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-godot">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-godot" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot" aria-current="page">Godot 4</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-godot" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot" aria-current="page">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="godot-4">Godot 4</h1>
-<p>The Godot addon exposes lifecycle signals over WebSocket. It is a starting point, not a complete current integration. Read the gaps below before shipping with it.</p>
+<p>The Godot addon handles lifecycle messages, runtime controller frames and live
+player profiles over WebSocket. Your game connects these to its simulation and
+rendering.</p>
 <h2 id="install">Install</h2>
 <p>Copy <code>sdk/godot/addons/gamenight</code> into your project’s <code>addons</code> directory and enable GameNight in Project Settings → Plugins. The plugin registers <code>GameNight</code> and <code>GameNightScreen</code> autoloads.</p>
 <p>The connection reads the launch environment automatically. Keep standalone menus separate from the managed path using <code>GameNight.launched_by_daemon</code>.</p>
@@ -25,7 +27,9 @@ signal disposed(session_id: String)
 </code></pre></div>
 <p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L19">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Connect each signal to your game. Prepare loads a level while hidden; Start begins play. Pause must freeze gameplay, timers and audio. Resume continues the same state. Dispose clears session resources but permits a later Prepare.</p>
-<p>Keep <code>GameNight</code> processing while your scene is paused. Its transport must still receive Resume. Opt out of reconnecting and exit cleanly on host loss in managed mode.</p>
+<p>The autoload processes while the scene tree is paused, so it can receive Resume.
+In managed mode, losing the host clears input and exits the game. Standalone
+development connections may reconnect automatically.</p>
 <h2 id="report-preparation-progress">Report preparation progress</h2>
 <p>The addon provides this implementation:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func notify_progress(session_id: String, percent: int, label: String = &quot;&quot;) -&gt; void:
@@ -34,18 +38,50 @@ signal disposed(session_id: String)
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L181">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L199">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
-<h2 id="current-gaps">Current gaps</h2>
-<p>The addon does not dispatch <code>controller_frame</code> or game <code>party_updated</code> messages. Its <code>party_updated</code> signal currently comes from the overlay-style <code>party_state</code> snapshot. Add the game message handlers and match controller tokens to seats; <code>devices_for_local_seats()</code> uses local enumeration and is not safe for managed ownership.</p>
-<p><code>GameNightScreen</code> currently calls <code>request_start()</code> on focus. That conflicts with the current contract: focus must not start or resume a game. Remove that focus-triggered path before shipping. Setting <code>automatic = false</code> after its <code>_ready()</code> has run does not disconnect existing signals.</p>
-<p>The default connection retries automatically. Managed games need to handle disconnection by stopping and exiting. There is no built-in circular-face renderer in this addon; implement the <a href="/docs/faces">face transform</a> in your scene.</p>
+<h2 id="controllers-and-live-profiles">Controllers and live profiles</h2>
+<p>Use the runtime stream in managed play. A seat's controller token is opaque;
+it is not a Godot joystick index. <code>frame_for_seat</code> resolves the token from the
+latest roster, returns a copy, and returns an empty frame while paused or when
+input is more than 250 ms old.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _physics_process(delta: float) -&gt; void:
+    if GameNight.phase != &quot;running&quot;:
+        return
+    var frame = GameNight.frame_for_seat(0)
+    var movement = Vector2(GameNight.axis(frame, 0), GameNight.axis(frame, 1))
+    # Apply movement to the character assigned to seat 0.
+    if GameNight.button(frame, 0): # A, held; add your own press-edge detection.
+        pass
+</code></pre></div>
+<p>Use <code>GameNight.roster_changed</code> to refresh seat ownership, names, skin colour
+and avatar artwork. The current snapshot is available in <code>GameNight.party</code>.
+<code>devices_for_local_seats()</code> is only for standalone play and returns no native
+devices in managed mode. Back/Select belongs to the host; do not bind native
+Back to a second pause/resume handler.</p>
+<p>For circular faces, use <code>face.gd</code> with a head centre and radius. See the
+<a href="/docs/lobbies#faces-and-names">face helper example</a>. The helper draws the skin
+circle under the artwork and supports historic avatar anchors.</p>
+<h2 id="screen-ownership">Screen ownership</h2>
+<p><code>GameNightScreen</code> follows Start, Pause, Resume and Dispose. OS focus does not
+request Start or Resume. A game preparing in the background stays quiet until
+the runtime explicitly starts it. The helper handles the window and master
+audio bus; your lifecycle callbacks must still pause the simulation and timers.</p>
+<h2 id="godot-lobby-example">Godot lobby example</h2>
+<p>The SDK includes a runnable Living Room project using a separate authenticated
+lobby client. It shows live player names and faces and can join, queue, play
+and resume. See <a href="/docs/lobbies">Build a lobby</a> for launch instructions and the
+runtime-owned controller contract. Its client is independent of the game autoloads.</p>
 <h2 id="before-release">Before release</h2>
-<p>Check the <a href="/docs/lifecycle">lifecycle contract</a> and <a href="/docs/controllers">controller stream</a>, then run <a href="/docs/testing">packaged integration checks</a>. These documentation excerpts are checked against source. There is no Godot runtime test attached to this docs build, and enabling the plugin alone does not prove compatibility.</p>
+<p>Check the <a href="/docs/lifecycle">lifecycle contract</a> and <a href="/docs/controllers">controller stream</a>, then run <a href="/docs/testing">packaged integration checks</a>. Run <code>python scripts/test-godot-sdk.py --godot /path/to/godot</code> for the headless
+adapter regression checks. The lobby has a separate real-daemon flow test.
+These tests and source-checked documentation do not verify your game callbacks,
+physical controllers or platform window behaviour. Enabling the plugin alone
+does not certify a game.</p>
 <h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
 <p>The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="db87909281148db4d29058ea5edf3e01e12bff9be27b50085468a2ac38814c85">Built from repository sources</span></footer>
-<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#current-gaps">Current gaps</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="8f021b8e2fbe839cf42585ef6208b6eb8fc1c3a0a878fb1cbe7a29b1d3c073aa">Built from repository sources</span></footer>
+<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

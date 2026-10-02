@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "game": "mineclonia",
+  "game_version": "0.123.1",
+  "adapter_version": "prototype-2",
+  "modes": [
+    "survival"
+  ],
+  "settings": {
+    "gravity": {
+      "type": "number",
+      "minimum": 0.25,
+      "maximum": 2,
+      "default": 1,
+      "applies": "live",
+      "description": "Shared multiplier, composed with Mineclonia potion and equipment effects."
+    },
+    "jump": {
+      "type": "number",
+      "minimum": 0.25,
+      "maximum": 2,
+      "default": 1,
+      "applies": "live",
+      "description": "Shared jump multiplier. Undo removes only GameNight's factor."
+    }
+  },
+  "mods": {
+    "supported": true,
+    "applies": "save-and-restart",
+    "recipes": {
+      "bounce_pad": {
+        "bounce": {
+          "min": 0,
+          "max": 3,
+          "default": 1.5
+        }
+      }
+    },
+    "generated_code_validation": "bounded recipe to trusted Lua template; separate Mineclonia startup test",
+    "arbitrary_source": false,
+    "undo": "restore previous recipe through the same validation and restart; retain world progress",
+    "validation_status": "isolated engine startup passed; full live restart/reconnect still pending"
+  },
+  "couch": {
+    "verified": false,
+    "implementation": "patched-luanti-5.17.0-windows",
+    "players": 2,
+    "routing": "managed host controller tokens; standalone SDL paths only outside GameNight",
+    "status": "standalone physical input confirmed; three managed lifecycle cycles passed; physical lobby round-trip still pending",
+    "limitations": [
+      "Windows SDL2 only",
+      "two borderless clients, not one split-screen renderer",
+      "text entry requires future on-screen keyboard",
+      "player 2 audio muted",
+      "GameNight names, skin and face artwork not applied to Mineclonia models"
+    ],
+    "standalone_physical_test": "User confirmed both controllers operate independently, 2026-10-02"
+  },
+  "launch": {
+    "players": 2,
+    "requires": "two real joined host seats; wait for both first-world frames",
+    "authority": "linked session owner"
+  }
+}
