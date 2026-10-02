@@ -1,17 +1,17 @@
 import { busy, route } from './state';
-type View={node:HTMLElement;classes:string;title:string;styles:string[];scroll:number};
+type View={node:HTMLElement;classes:string;title:string;styles:string[];scroll:number;metadata:Element[]};
 const views=new Map<string,View>();
 const loads=new Map<string,Promise<View>>();
 const scripts=new Set<string>();
 let active='',sequence=0,started=false;
-const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html'?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
+const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html' || /^\/games\/[a-z0-9-]+$/.test(url.pathname)?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
 function capture(doc:Document,id:string):View {
   const node=document.createElement('div');node.dataset.appView=id;
   for(const child of [...doc.body.children]){
     if(child.id==='site-shell' || child.tagName==='SCRIPT')continue;
     node.append(child);
   }
-  return {node,classes:doc.body.className,title:doc.title,styles:[...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(l=>new URL(l.getAttribute('href')!,location.origin).href),scroll:0};
+  return {node,classes:doc.body.className,title:doc.title,styles:[...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(l=>new URL(l.getAttribute('href')!,location.origin).href),scroll:0,metadata:[...doc.head.querySelectorAll('meta[name="description"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],script[type="application/ld+json"]')].map(n=>n.cloneNode(true) as Element)};
 }
 async function load(url:URL,id:string):Promise<View>{
   if(views.has(id))return views.get(id)!;
@@ -70,7 +70,9 @@ export async function navigate(href:string,replace=false):Promise<void>{
     document.body.className=view.classes;
     for(const link of document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))link.disabled=!link.href.endsWith('/web/site.css') && !view.styles.includes(link.href);
     document.title=view.title;
-    if(replace)history.replaceState(null,'',url);else if(url.href!==location.href)history.pushState(null,'',url);
+    for(const node of document.head.querySelectorAll('meta[name="description"],meta[property^="og:"],meta[name^="twitter:"],link[rel="canonical"],script[type="application/ld+json"]'))node.remove();
+    for(const node of view.metadata)document.head.append(node.cloneNode(true));
+    if(replace)history.replaceState(history.state,'',url);else if(url.href!==location.href)history.pushState(null,'',url);
     const moved=active!==id;active=id;route.set(url.pathname+url.hash);
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     window.dispatchEvent(new CustomEvent('gamenight-page-change',{detail:{page:id}}));
