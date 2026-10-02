@@ -13,7 +13,8 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from host import Host, GAME
 import modding
-from prototype import command
+from prototype import command, read_json
+from capabilities import controls, valid
 
 
 def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
@@ -23,7 +24,7 @@ def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
             # Pairing belongs to the party, even before a game world is ready.
             return {"seats": host.seats(host.status()), "discovery": {"games": [{"id":"mineclonia", "selectable":False,"state":"loading"}], "current":"mineclonia", "agent_receipt":receipt}}
         raise RuntimeError("World heartbeat is stale")
-    state = json.loads(path.read_text())
+    state = read_json(path)
     players = {p["name"] for p in state.get("players") or []}
     seats = [{"index": i, "player": f"Couch{i+1}", "revision": 1}
              for i in range(2) if f"Couch{i+1}" in players]
@@ -44,10 +45,9 @@ def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
         "controls": {"game": "mineclonia", "instance": instance,
                      "revision": state["revision"], "can_undo": state["can_undo"],
                      "launch_players": 2 if host else None,
-                     "mod_recipes": ["bounce_pad"] if host else [],
+                     "mod_recipes": ["bounce_pad"] if host and "bounce" not in state["values"] else [],
                      "can_undo_mod": bool(state.get("can_undo_mod")),
-                     "settings": {k: {"label": k.title(), "min": .25, "max": 2, "value": v}
-                                  for k, v in state["values"].items()}}}}
+                     "settings": controls(state["values"])}}}
 
 
 def execute(root, instance, selection, host=None):
@@ -81,14 +81,14 @@ def execute(root, instance, selection, host=None):
     if c["action"] != "set" and values:
         raise ValueError("Unexpected settings")
     for key,value in values.items():
-        if key not in ("gravity","jump") or type(value) not in (int,float) or not math.isfinite(value) or not .25 <= value <= 2:
+        if not valid(key, value):
             raise ValueError("Unsupported setting or value")
     # Lua validates values, expected revision and durable duplicate requests again.
     result = command(root, c["action"], c.get("values") if c["action"] == "set" else None,
                      expected=c.get("expected_revision"), request_id=selection["id"])
     return {"id": selection["id"], "ok": result["ok"],
             "message": ("Applied to the running world. " + ", ".join(
-                f"{k.title()}: {v:g}×" for k, v in result["state"]["values"].items()))
+                f"{k}: {v:g}" for k, v in result["state"]["values"].items()))
             if result["ok"] else result.get("error", "The host refused the change")}
 
 

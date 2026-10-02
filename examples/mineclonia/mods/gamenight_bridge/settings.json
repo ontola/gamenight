@@ -1,0 +1,79 @@
+{
+  "gravity": {
+    "label": "Gravity",
+    "min": 0.25,
+    "max": 2,
+    "default": 1,
+    "unit": "multiplier",
+    "description": "Downward acceleration. 0.5 is half gravity; 1 is normal.",
+    "physics": "gravity",
+    "applies": "live"
+  },
+  "jump": {
+    "label": "Jump strength",
+    "min": 0.25,
+    "max": 2,
+    "default": 1,
+    "unit": "multiplier",
+    "description": "Jump impulse. 1.5 means 50% stronger jumps.",
+    "physics": "jump",
+    "applies": "live"
+  },
+  "speed": {
+    "label": "Movement speed",
+    "min": 0.25,
+    "max": 3,
+    "default": 1,
+    "unit": "multiplier",
+    "description": "Movement speed for every player. 2 is twice normal.",
+    "physics": "speed",
+    "applies": "live"
+  },
+  "air_acceleration": {
+    "label": "Air steering",
+    "min": 0.1,
+    "max": 3,
+    "default": 1,
+    "unit": "multiplier",
+    "description": "Steering acceleration in mid-air. Lower values make direction changes harder.",
+    "physics": "acceleration_air",
+    "applies": "live"
+  },
+  "crouch_speed": {
+    "label": "Sneaking speed",
+    "min": 0.1,
+    "max": 3,
+    "default": 1,
+    "unit": "multiplier",
+    "description": "Movement while crouching, multiplied with overall speed.",
+    "physics": "speed_crouch",
+    "applies": "live"
+  },
+  "time_of_day": {
+    "label": "Time of day",
+    "min": 0,
+    "max": 24,
+    "default": 12,
+    "unit": "hours",
+    "description": "Set the clock once: 0 midnight, 6 sunrise, 12 noon, 18 sunset. Does not freeze the clock.",
+    "applies": "live"
+  },
+  "time_speed": {
+    "label": "Day/night speed",
+    "min": 0,
+    "max": 240,
+    "default": 72,
+    "unit": "game seconds per real second",
+    "description": "Clock rate. 0 freezes the time, 72 is the normal 20-minute day, 144 is twice as fast.",
+    "applies": "live"
+  },
+  "bounce": {
+    "label": "Bounce pads",
+    "min": 0,
+    "max": 3,
+    "default": 0,
+    "unit": "strength",
+    "description": "Live bounce-pad effect. 0 disables it, 1.5 is normal. Enabling supplies eight reusable pads to each player once; place them on the ground. No restart.",
+    "applies": "live"
+  }
+}

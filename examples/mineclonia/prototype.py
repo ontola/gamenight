@@ -61,6 +61,16 @@ def setup(root):
     for seat in (1, 2):
         write(root / f"client-{seat}.conf", f"fullscreen = false\nscreen_w = 960\nscreen_h = 900\nwindow_maximized = false\npause_on_lost_focus = false\nfps_max = 60\nviewing_range = 60\nsound_volume = {0.5 if seat == 1 else 0}\nname = Couch{seat}\naddress = 127.0.0.1\nremote_port = 30123\n")
 
+def read_json(path):
+    # Windows can briefly deny reads while Luanti atomically replaces a file.
+    for attempt in range(20):
+        try:
+            return json.loads(path.read_text(encoding='utf-8'))
+        except (PermissionError, FileNotFoundError, json.JSONDecodeError):
+            if attempt == 19:
+                raise
+            time.sleep(.01)
+
 def command(root, action, values=None, expected=None, request_id=None):
     directory = root / "world" / "gamenight"
     if not directory.exists():
@@ -76,7 +86,7 @@ def command(root, action, values=None, expected=None, request_id=None):
         state_path = directory / "status.json"
         if time.time() - state_path.stat().st_mtime > 5:
             raise RuntimeError("Bridge heartbeat is stale")
-        state = json.loads(state_path.read_text())
+        state = read_json(state_path)
         request = {"id": request_id or uuid.uuid4().hex, "action": action,
                    "expected_revision": state["revision"] if expected is None else expected}
         if values is not None:
@@ -85,7 +95,7 @@ def command(root, action, values=None, expected=None, request_id=None):
         os.replace(directory / "request.tmp", directory / "request.json")
         for _ in range(100):
             try:
-                response = json.loads((directory / "response.json").read_text())
+                response = read_json(directory / "response.json")
                 if response.get("id") == request["id"]:
                     return response
             except (FileNotFoundError, json.JSONDecodeError):

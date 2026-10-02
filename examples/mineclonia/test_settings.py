@@ -35,6 +35,25 @@ class SettingsTests(unittest.TestCase):
             self.assertFalse(self.settings.change(key, value))
         self.assertEqual(self.settings.pending, {'jump': 2})
 
+    def test_all_live_controls_share_the_contract(self):
+        from capabilities import SPECS, controls, valid
+        values = {k: s['default'] for k, s in SPECS.items()}
+        (self.root / 'world/gamenight/status.json').write_text(json.dumps({'values': values}))
+        self.assertEqual(len(self.settings.specs()), 8)
+        source = json.loads((Path(__file__).parent / 'capabilities.json').read_text())
+        self.assertEqual(set(source['settings']), set(SPECS))
+        for key, spec in SPECS.items():
+            self.assertTrue(valid(key, spec['min']))
+            self.assertTrue(valid(key, spec['max']))
+            for bad in (True, '1', float('nan'), float('inf'), spec['min']-1, spec['max']+1):
+                self.assertFalse(valid(key, bad))
+            self.assertEqual(controls(values)[key]['unit'], spec['unit'])
+            self.assertEqual(controls(values)[key]['applies'], 'live')
+        self.assertTrue(self.settings.change('bounce', 15))
+        self.assertEqual(self.settings.pending['bounce'], 1.5)
+        self.assertTrue(self.settings.change('time_speed', 0))
+        self.assertEqual(self.settings.pending['time_speed'], 0)
+
     def test_async_coalescing_never_blocks_controller_loop(self):
         worker = Mock(); first, second = Future(), Future()
         worker.submit.side_effect = [first, second]

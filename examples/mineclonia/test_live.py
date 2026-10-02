@@ -34,7 +34,7 @@ def main():
         if current["revision"] == revision + 1:
             restored = command(args.root, "undo", expected=revision + 1)
             assert restored["ok"], restored
-            assert restored["state"]["values"] == before["values"]
+            assert all(restored["state"]["values"][key] == before["values"][key] for key in ("gravity", "jump"))
             originals = {p["name"]: p["physics"] for p in before["players"]}
             for player in restored["state"]["players"]:
                 for key in ("gravity", "jump"):

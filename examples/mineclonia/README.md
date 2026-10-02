@@ -75,11 +75,35 @@ Do not certify it until two physical controllers pass the checks below.
 
 ## Reversible live changes
 
-`capabilities.json` describes this adapter's actual settings. `gravity` and `jump`
-are shared multipliers between 0.25 and 2. The bridge uses Mineclonia's
-`playerphysics.add_physics_factor` with its own ID, so it composes with equipment,
-potions and other mods. New/reconnected players receive the active factors.
-Undo removes only this adapter's factor. Keep discards its undo point.
+The running bridge declares eight live numeric controls from
+`mods/gamenight_bridge/settings.json`. The world mod, Python validation, lobby
+controls and assistant discovery use this same contract:
+
+| Control | Range | Effect |
+| --- | --- | --- |
+| Gravity | 0.25–2× | Downward acceleration |
+| Jump strength | 0.25–2× | Jump impulse |
+| Movement speed | 0.25–3× | All players' movement |
+| Air steering | 0.1–3× | Acceleration while airborne |
+| Sneaking speed | 0.1–3× | Crouching speed, combined with movement speed |
+| Time of day | 0–24 hours | Set the clock once; 12 is noon |
+| Day/night speed | 0–240 | Game seconds per real second; 0 freezes, 72 is normal |
+| Bounce pads | 0–3 | Live strength; 0 disables the effect |
+
+Movement uses `playerphysics.add_physics_factor` with GameNight's own ID, so it
+composes with equipment and potion effects. Joining players receive active rules.
+A single request can change several controls atomically. Undo restores just those
+controls, including the previous clock when time was explicitly changed. Keep
+accepts the change. Clock progression does not count as a settings edit.
+
+Bounce pads are registered with the bridge at startup. Enabling them supplies
+eight pads per player once; players place them using normal building controls.
+Strength changes and disabling the effect are live. Undo does not delete placed
+blocks or inventory items. The assistant receives descriptions, units, current
+values, ranges and application timing. It should use `set`, including for a
+request phrased as a bounce-pad “mod”. These controls need no world or client
+restart once this bridge version is loaded. Updating the bridge itself still
+requires a world restart.
 
 The Python adapter writes a bounded JSON request atomically into the isolated
 world's `gamenight` directory. A single-writer lock prevents overlapping requests;
@@ -87,7 +111,7 @@ the mod validates the revision, action and values. IDs and results are retained
 in mod storage. A retry never re-executes an acknowledged action. This file
 mailbox is a trusted local adapter, not an internet API or arbitrary Lua executor.
 
-The bounded `bounce_pad` recipe generates a Lua mod from a trusted template.
+The older, separate `bounce_pad` recipe generates a Lua mod from a trusted template.
 Its only input is a finite bounce strength from 0 to 3. Zero disables bouncing.
 Arbitrary Lua, URLs and filesystem paths are rejected. `modding.py` stages the
 source by SHA-256 and boots a separate, disposable Mineclonia world to check it.
@@ -110,11 +134,11 @@ uses `--daemon-port 17942` to publish the real lobby seats, opaque player IDs,
 controller-binding revisions and active/warm session ID. A phone remains linked
 to its actual lobby player, not a separate diagnostic Couch1 account. World
 status must be fresh before it advertises live controls. Discovery
-includes `controls` with game/instance/revision, numeric setting bounds and
-values, and `can_undo`. A selection's `command` contains `action` (`set`, `undo`,
+includes `controls` with game/instance/revision, setting descriptions, units,
+application timing, numeric bounds, current values, and `can_undo`. A selection's `command` contains `action` (`set`, `undo`,
 `keep`, `launch`, `mod`, `undo_mod`), the exact instance, expected revision, and
 numeric values. `launch` requires `{ "players": 2 }` and two joined controllers.
-It waits for the real daemon to report Running. `mod` takes `{ "bounce": 1.5 }`;
+It waits for the real daemon to report Running. On older bridges, `mod` takes `{ "bounce": 1.5 }`;
 `undo_mod` takes an empty values object. Its receipt
 reports the actual game result. Ordinary queue acknowledgements cannot confirm
 a settings change.
@@ -150,3 +174,14 @@ routing, two-player launch boundaries, mod validation failure and checkpoint
 recovery. Fixtures are not evidence of physical controller operation. The earlier
 three live lifecycle cycles and independent controller test predate this unified
 agent implementation; repeat them before marking this flow verified.
+
+## Real model and engine test
+
+`live_test_world.py --runtime PATH --root NEW_TEST_DIRECTORY` creates a disposable
+world on port 30129 and starts two real clients with controllers disabled. It
+never opens or changes the normal play world. Create a `stop` file inside that
+new directory to save and close its processes. Engine logs remain there.
+The private `deploy/cloud/test-agent-world.py` drives the real model and cloud
+against this world; AI-provider policy and evaluation prompts stay internal.
+Unit checks: `python -m unittest test_settings test_relay test_mod_lifecycle`.
+Physical controller use is not exercised by this live-rules test.

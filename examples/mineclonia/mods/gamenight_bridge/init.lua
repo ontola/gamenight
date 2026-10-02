@@ -21,29 +21,79 @@ if manifest then
         store:set_string("state", core.write_json(state))
     end
 end
+local contract_file = assert(io.open(core.get_modpath("gamenight_bridge") .. "/settings.json", "rb"))
+local specs = assert(core.parse_json(contract_file:read("*a")))
+contract_file:close()
+local saved_time_speed = state.values.time_speed
+for key, spec in pairs(specs) do
+    if state.values[key] == nil then state.values[key] = spec.default end
+end
+-- Read the engine clock rather than resetting it when this adapter starts.
+state.values.time_of_day = (core.get_timeofday() or 0.5) * 24
+state.values.time_speed = saved_time_speed or tonumber(core.settings:get("time_speed")) or 72
+core.settings:set("time_speed", tostring(state.values.time_speed))
 local shutdown_after
 local factor_id = "gamenight:session"
 local function apply(player)
-    for key, value in pairs(state.values) do
-        if value == 1 then
-            playerphysics.remove_physics_factor(player, key, factor_id)
-        else
-            playerphysics.add_physics_factor(player, key, factor_id, value)
+    for key, spec in pairs(specs) do
+        if spec.physics then
+            local value = state.values[key]
+            if value == 1 then
+                playerphysics.remove_physics_factor(player, spec.physics, factor_id)
+            else
+                playerphysics.add_physics_factor(player, spec.physics, factor_id, value)
+            end
+        end
+    end
+    if state.values.bounce > 0 then
+        local meta = player:get_meta()
+        local given = meta:get_int("gamenight:live_pads_count")
+        if given < 8 then
+            local rest = player:get_inventory():add_item("main", "gamenight_bridge:bounce_pad " .. (8-given))
+            meta:set_int("gamenight:live_pads_count", 8-rest:get_count())
         end
     end
 end
+local function apply_world(changed)
+    if changed.time_of_day ~= nil then core.set_timeofday(state.values.time_of_day / 24) end
+    if changed.time_speed ~= nil then core.settings:set("time_speed", tostring(state.values.time_speed)) end
+end
+core.register_node("gamenight_bridge:bounce_pad", {
+    description = "GameNight bounce pad",
+    tiles = {"mcl_core_iron_block.png^[colorize:#ad6cfa:150"},
+    groups = {cracky=1, pickaxey=1}, _mcl_hardness=1, _mcl_blast_resistance=1,
+})
+local cooldown, elapsed, bounce_events = {}, 0, 0
+core.register_globalstep(function(dt)
+    elapsed = elapsed + dt
+    if state.values.bounce <= 0 then return end
+    for _, player in ipairs(core.get_connected_players()) do
+        local pos, name = player:get_pos(), player:get_player_name()
+        local below = core.get_node({x=pos.x, y=pos.y-0.2, z=pos.z})
+        if below.name == "gamenight_bridge:bounce_pad" and elapsed >= (cooldown[name] or 0) then
+            player:add_velocity({x=0, y=8*state.values.bounce, z=0})
+            cooldown[name] = elapsed + 0.8
+            bounce_events = bounce_events + 1
+        end
+    end
+end)
+core.register_on_leaveplayer(function(player) cooldown[player:get_player_name()] = nil end)
 local function persist()
     store:set_string("state", core.write_json(state))
 end
 local function snapshot()
+    state.values.time_of_day = core.get_timeofday() * 24
     local players = {}
     for _, player in ipairs(core.get_connected_players()) do
         table.insert(players, {
             name = player:get_player_name(), position = player:get_pos(),
-            physics = player:get_physics_override(),
+            physics = player:get_physics_override(), velocity = player:get_velocity(),
+            bounce_pads = player:get_inventory():contains_item("main", "gamenight_bridge:bounce_pad"),
         })
     end
     return {revision = state.revision, values = state.values, players = players,
+        bounce_events = bounce_events, time_of_day = core.get_timeofday() * 24,
+        time_speed = tonumber(core.settings:get("time_speed")) or 72,
         mod_values = state.mod_values or {}, can_undo_mod = state.can_undo_mod or false, can_undo = type(state.previous) == "table", game = "mineclonia", game_time = core.get_gametime()}
 end
 local function run(request)
@@ -71,20 +121,27 @@ local function run(request)
         local valid = type(v) == "table" and next(v) ~= nil
         if valid then
             for k, value in pairs(v) do
-                if (k ~= "gravity" and k ~= "jump") or type(value) ~= "number"
-                    or value ~= value or value < 0.25 or value > 2 then valid = false end
+                local spec = specs[k]
+                if not spec or type(value) ~= "number" or value ~= value
+                    or value < spec.min or value > spec.max then valid = false end
             end
         end
         if not valid then
-            result.error = "only gravity and jump factors in [0.25, 2] are supported"
+            result.error = "unsupported setting or value outside the live contract"
         else
-            state.previous = {gravity = state.values.gravity, jump = state.values.jump}
-            for k, value in pairs(v) do state.values[k] = value end
+            state.values.time_of_day = core.get_timeofday() * 24
+            state.previous = {}
+            for k, value in pairs(v) do
+                state.previous[k] = state.values[k]
+                state.values[k] = value
+            end
+            apply_world(v)
             state.revision = state.revision + 1
             result.ok = true
         end
     elseif request.action == "undo" and type(state.previous) == "table" then
-        state.values = state.previous
+        for k, value in pairs(state.previous) do state.values[k] = value end
+        apply_world(state.previous)
         state.previous = false
         state.revision = state.revision + 1
         result.ok = true

@@ -19,7 +19,7 @@ installed releases need newly built packages before the controls appear.
 | Stack Together | 4–40 rows to win; falling speed 50–175% | Next round |
 | Bubble Buddies | 2–12 shared hearts; 1–10 waves; 30–150 seconds per wave | Next run |
 | Pinpals | Simulation speed 60–125% | Next game instance |
-| Mineclonia prototype | Gravity and jump strength 25–200% | Live, after the world acknowledges the change |
+| Mineclonia prototype | Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; [ranges and effects](https://github.com/ontola/gamenight/blob/main/examples/mineclonia/README.md) | Live, after the world acknowledges the change |
 
 The default values preserve the existing games. Blast Party's pickup chance
 controls drops from crates; its two opening prizes remain. Neon Siege's enemy

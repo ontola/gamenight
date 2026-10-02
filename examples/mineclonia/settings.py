@@ -2,7 +2,8 @@
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor
-from prototype import command
+from prototype import command, read_json
+from capabilities import SPECS, valid
 
 
 class Settings:
@@ -17,17 +18,22 @@ class Settings:
 
     def specs(self):
         # Match the already-running world's values, including phone edits.
-        state = json.loads((self.root / 'world/gamenight/status.json').read_text())
+        state = read_json(self.root / 'world/gamenight/status.json')
         values = state.get('values', {})
-        return [{'key': key, 'label': label, 'kind': 'number',
-                 'default': max(25, min(200, round(values.get(key, 1) * 100))),
-                 'min': 25, 'max': 200}
-                for key, label in [('gravity', 'Gravity % (live)'), ('jump', 'Jump strength % (live)')]]
+        return [{'key': key, 'label': s['label'] + (' tenths' if s['unit'] == 'strength' else ' %' if s['unit'] == 'multiplier' else ' (' + s['unit'] + ')') + ' (live)',
+                 'kind': 'number', 'default': round(values.get(key, s['default']) * self.scale(s)),
+                 'min': round(s['min'] * self.scale(s)), 'max': round(s['max'] * self.scale(s))}
+                for key, s in SPECS.items() if key in values]
+
+    @staticmethod
+    def scale(spec):
+        return 100 if spec['unit'] == 'multiplier' else 10 if spec['unit'] == 'strength' else 1
 
     def change(self, key, value):
-        if key not in ('gravity', 'jump') or type(value) is not int or not 25 <= value <= 200:
+        spec = SPECS.get(key)
+        if not spec or type(value) is not int or not valid(key, value / self.scale(spec)):
             return False
-        self.pending[key] = value / 100
+        self.pending[key] = value / self.scale(spec)
         return True
 
     def tick(self, blocked=False):
