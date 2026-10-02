@@ -46,7 +46,8 @@ def main():
             PATH=str(root) + ":/usr/bin:/bin",
         )
         (root / "shelf.json").write_text(json.dumps([
-            {"id": "test-game", "title": "Test Game", "players": "2-4", "min_players": 2, "max_players": 4}
+            {"id": "test-game", "title": "Test Game", "players": "2-4", "min_players": 2, "max_players": 4},
+            {"id": "second-game", "title": "Second Game", "players": "2-4", "min_players": 2, "max_players": 4}
         ]))
         (root / "catalog").mkdir()
         (root / "catalog/test-game.json").write_text(json.dumps({
@@ -56,6 +57,9 @@ def main():
                 "url": "https://example.test/game.zip", "sha256": "a" * 64, "entrypoint": "game"
             }}
         }))
+        second = json.loads((root / "catalog/test-game.json").read_text())
+        second.update(id="second-game", title="Second Game")
+        (root / "catalog/second-game.json").write_text(json.dumps(second))
         (root / "onboarding.json").write_text('{"complete":false}')
         (root / "xdg-open").write_text('#!/bin/sh\nprintf "%s" "$1" > "' + str(root / "opened-url") + '"\n')
         (root / "xdg-open").chmod(0o700)
@@ -133,12 +137,13 @@ def main():
                 # This is the same inbox a second launcher writes for an
                 # already running app. A valid choice is acknowledged and saved.
                 (root / "onboarding.json").write_text('{"complete":true}')
-                (root / "catalog-request.json").write_text('{"game":"test-game"}')
+                (root / "catalog-request.json").write_text('{"game":"second-game"}')
                 for _ in range(100):
                     saved = json.loads((root / "onboarding.json").read_text())
-                    if saved.get("game") == "test-game": break
+                    if saved.get("game") == "second-game" and playlist()["next"] == "second-game": break
                     time.sleep(.1)
-                assert saved.get("game") == "test-game"
+                assert saved.get("game") == "second-game"
+                assert playlist()["next"] == "second-game"
                 assert playlist()["playing"] is None
                 stop()
                 (root / "opened-url").unlink()
@@ -146,12 +151,12 @@ def main():
                 for _ in range(100):
                     try:
                         view = playlist()
-                        if view["next"] == "test-game":
+                        if view["next"] == "second-game":
                             break
                     except (urllib.error.URLError, TimeoutError):
                         pass
                     time.sleep(.1)
-                assert view["next"] == "test-game" and view["playing"] is None, view
+                assert view["next"] == "second-game" and view["playing"] is None, view
                 assert not (root / "opened-url").exists(), "Saved choice should not reopen the picker"
                 print("PASS: first-run capability, safe reconnect, running-app inbox, catalog validation, host acknowledgement, no automatic start and restart recovery")
         except Exception:
