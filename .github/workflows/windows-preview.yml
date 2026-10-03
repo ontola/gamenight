@@ -13,6 +13,17 @@ on:
       - 'vendor/bones/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      automatic:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -35,7 +46,10 @@ concurrency:
 jobs:
   contract:
     uses: ./.github/workflows/love-party.yml
+    with:
+      ref: ${{ inputs.ref || github.sha }}
   package:
+    needs: contract
     runs-on: windows-latest
     timeout-minutes: 60
     permissions:
@@ -43,6 +57,24 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - uses: actions/download-artifact@v4
+        if: inputs.automatic
+        with:
+          name: gamenight-love-party
+          path: dist/release-games
+      - name: Prepare the exact release catalog
+        if: inputs.automatic
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python scripts/prepare-release-catalog.py --pack dist/release-games --version "$env:RELEASE_VERSION"
+      - uses: actions/upload-artifact@v4
+        if: inputs.automatic
+        with:
+          name: release-catalog
+          path: catalog/games/*.json
+          if-no-files-found: error
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-dotnet@v4
         with:
@@ -56,7 +88,7 @@ jobs:
       - name: Install pinned packaging tool
         run: dotnet tool install --global vpk --version 1.2.0
       - name: Authenticate for signing
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && vars.WINDOWS_SIGNING_ENDPOINT != ''
+        if: (github.event_name == 'workflow_dispatch' || inputs.automatic) && github.ref == 'refs/heads/main' && vars.WINDOWS_SIGNING_ENDPOINT != ''
         uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -65,6 +97,7 @@ jobs:
       - name: Build installer and update feed
         shell: pwsh
         env:
+          AUTOMATIC_RELEASE: ${{ inputs.automatic }}
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
           SIGNING_ENDPOINT: ${{ vars.WINDOWS_SIGNING_ENDPOINT }}
@@ -73,12 +106,12 @@ jobs:
         run: |
           $version = if ($env:RELEASE_VERSION) { $env:RELEASE_VERSION } else { "0.1.0-ci.$env:GITHUB_RUN_NUMBER" }
           $channel = if ($env:RELEASE_CHANNEL) { $env:RELEASE_CHANNEL } else { 'preview' }
-          $buildProfile = if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch') { 'release' } else { 'ci' }
+          $buildProfile = if (($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -or $env:AUTOMATIC_RELEASE -eq 'true')) { 'release' } else { 'ci' }
           $params = @{
             Version = $version; Channel = $channel; BuildProfile = $buildProfile
             OutputDir = "$env:RUNNER_TEMP/installer"; TargetDir = "$env:GITHUB_WORKSPACE/target"
           }
-          if ($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:SIGNING_ENDPOINT) {
+          if (($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -or $env:AUTOMATIC_RELEASE -eq 'true') -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:SIGNING_ENDPOINT) {
             if (!$env:SIGNING_ACCOUNT -or !$env:SIGNING_PROFILE) { throw 'Signing configuration is incomplete' }
             $metadata = "$env:RUNNER_TEMP/signing.json"
             @{ Endpoint=$env:SIGNING_ENDPOINT; CodeSigningAccountName=$env:SIGNING_ACCOUNT; CertificateProfileName=$env:SIGNING_PROFILE } |
@@ -133,6 +166,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          AUTOMATIC_RELEASE: ${{ inputs.automatic }}
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |

@@ -1,0 +1,108 @@
+name: Publish preview
+on:
+  workflow_run:
+    workflows: [Build and test]
+    types: [completed]
+    branches: [main]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: automatic-preview
+  cancel-in-progress: false
+jobs:
+  select:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      current: ${{ steps.source.outputs.current }}
+      revision: ${{ steps.source.outputs.revision }}
+      version: ${{ steps.source.outputs.version }}
+    steps:
+      - id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REVISION: ${{ github.event.workflow_run.head_sha }}
+          NUMBER: ${{ github.event.workflow_run.run_number }}
+        run: |
+          echo "revision=$REVISION" >> "$GITHUB_OUTPUT"
+          echo "version=0.2.$NUMBER" >> "$GITHUB_OUTPUT"
+          if [ "$(gh api repos/$GH_REPO/commits/main --jq .sha)" = "$REVISION" ]; then
+            echo 'current=true' >> "$GITHUB_OUTPUT"
+          fi
+  windows:
+    needs: select
+    if: needs.select.outputs.current == 'true'
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+    uses: ./.github/workflows/windows-preview.yml
+    with:
+      ref: ${{ needs.select.outputs.revision }}
+      version: ${{ needs.select.outputs.version }}
+      automatic: true
+  macos:
+    needs: [select, windows]
+    uses: ./.github/workflows/macos-preview.yml
+    with:
+      ref: ${{ needs.select.outputs.revision }}
+      version: ${{ needs.select.outputs.version }}
+      automatic: true
+  publish:
+    needs: [select, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REVISION: ${{ needs.select.outputs.revision }}
+      VERSION: ${{ needs.select.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.select.outputs.revision }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-catalog
+          path: catalog/games
+      - uses: actions/download-artifact@v4
+        with:
+          name: game-contract-windows
+          path: evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: gamenight-love-party
+          path: games
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: gamenight-*-installer
+          path: installers
+      - name: Require exact certified downloads
+        run: python scripts/game-contract.py --gate --platform windows --output evidence --pack games
+      - name: Assemble immutable release
+        run: |
+          mkdir release
+          cp games/*.love release/
+          cp installers/gamenight-windows-installer/* release/
+          cp installers/gamenight-macos-installer/* release/
+          tar -czf release/game-contract-windows.tar.gz -C evidence .
+          tar -czf release/catalog.tar.gz catalog/games
+          python scripts/release-manifest.py release --version "$VERSION" --revision "$REVISION" --run "$GITHUB_RUN_ID"
+      - name: Publish only if this commit is still current
+        run: |
+          if [ "$(gh api repos/$GH_REPO/commits/main --jq .sha)" != "$REVISION" ]; then
+            echo 'Superseded by a newer main commit; keeping the existing release.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if gh release view "v$VERSION" --json isDraft --jq .isDraft > /tmp/draft; then
+            if [ "$(cat /tmp/draft)" = false ]; then exit 0; fi
+          else
+            gh release create "v$VERSION" --draft --prerelease --target "$REVISION" --title "GameNight $VERSION preview" --generate-notes
+          fi
+          gh release upload "v$VERSION" release/* --clobber
+          gh release edit "v$VERSION" --draft=false --prerelease
+          echo "Published https://github.com/$GH_REPO/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"

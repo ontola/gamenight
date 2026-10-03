@@ -30,6 +30,7 @@ jobs:
       - name: Test Mineclonia settings and adapter boundaries
         working-directory: examples/mineclonia
         run: python -m unittest test_settings test_managed test_mod_lifecycle test_host test_relay test_couch
+      - run: python scripts/test-release.py
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked

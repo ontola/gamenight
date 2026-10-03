@@ -124,3 +124,6 @@ Add a game, improve an integration or report a bug we can reproduce.
 GameNight's original code is MIT-licensed. See [LICENSE](LICENSE).
 The lobby and vendored dependencies retain their upstream notices.
 [THIRD_PARTY.md](THIRD_PARTY.md) lists source revisions and asset credits.
+
+Preview installers are published automatically after CI and packaging checks pass.
+See [automatic releases](docs/automatic-releases.md) for the checks and limitations.

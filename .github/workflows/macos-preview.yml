@@ -1,5 +1,16 @@
 name: macOS installer
 on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: true
+      version:
+        type: string
+        required: true
+      automatic:
+        type: boolean
+        default: false
   workflow_dispatch:
     inputs:
       version:
@@ -31,6 +42,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -74,15 +87,23 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.sha }}
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.binaries_run || github.run_id }}
           pattern: binaries-*
           path: binaries
+      - uses: actions/download-artifact@v4
+        if: inputs.automatic
+        with:
+          name: release-catalog
+          path: catalog/games
       - name: Assemble universal app with current assets
         env:
           VERSION: ${{ inputs.version }}
+          SOURCE_REVISION: ${{ inputs.ref }}
           BINARY_RUN: ${{ inputs.binaries_run || github.run_id }}
           LOBBY_RUN: ${{ inputs.lobby_run || inputs.binaries_run || github.run_id }}
           GH_TOKEN: ${{ github.token }}
@@ -94,6 +115,7 @@ jobs:
           done
           binary_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BINARY_RUN" --jq .head_sha)
           lobby_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LOBBY_RUN" --jq .head_sha)
+          if [ -n "$SOURCE_REVISION" ]; then binary_revision="$SOURCE_REVISION"; lobby_revision="$SOURCE_REVISION"; fi
           python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION" --binary-revision "$binary_revision" --lobby-revision "$lobby_revision"
           python3 scripts/test-macos-package.py stage/GameNight.app
       - name: Launch packaged host outside source directory
