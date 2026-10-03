@@ -245,6 +245,19 @@ class ContractTests(unittest.TestCase):
         packager.write_zip(b,{'main.lua':b'return 1\r\n','image.png':b'\r\n'})
         self.assertEqual(a.read_bytes(),b.read_bytes())
 
+    def test_probe_reads_survive_partial_snapshot_writes(self):
+        spec = importlib.util.spec_from_file_location('integration', Path(__file__).with_name('test-love-integration.py'))
+        integration = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(integration)
+        path = mock.Mock()
+        path.read_text.side_effect = ['', '{"phase":', PermissionError('writer owns file'), '{"phase":"paused","steps":42}']
+        self.assertEqual(integration.read_observation(path), {'phase': 'paused', 'steps': 42})
+        path.read_text.side_effect = None
+        for invalid in ('', '{broken', '[]'):
+            path.read_text.return_value = invalid
+            with self.assertRaisesRegex(AssertionError, 'Observation timed out'):
+                integration.read_observation(path, timeout=.01)
+
     def test_missing_executable_is_failed_with_evidence(self):
         log=self.output/'missing.log'
         self.assertFalse(m.run_check([str(self.root/'missing')],{},log))

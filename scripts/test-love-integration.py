@@ -28,6 +28,14 @@ def wait_until(read, predicate, timeout=12):
     raise AssertionError(f"Observation timed out: {last}")
 
 
+def read_observation(path, timeout=2):
+    # The renderer rewrites this file every few frames. Readers can observe
+    # its truncate/write gap (or a Windows sharing violation). Retry only the
+    # read, not the gameplay check; corrupt/missing evidence still times out.
+    return wait_until(lambda: json.loads(path.read_text(encoding='utf-8')),
+                      lambda snapshot: isinstance(snapshot, dict), timeout=timeout)
+
+
 class Game:
     def __init__(self, love, artifact, folder, tag):
         self.file = folder / f'{tag}.json'
@@ -98,7 +106,7 @@ class Game:
         return wait_until(self.read, lambda s: s.get('command') == self.command_id)
 
     def read(self):
-        return json.loads(self.file.read_text())
+        return read_observation(self.file)
 
     def phase(self, value):
         return wait_until(self.read, lambda s: s['phase'] == value)
@@ -240,8 +248,7 @@ def check(love, artifact, output):
                 # Render each winning side through the normal game renderer.
                 for winner in (1, 2):
                     first.command(winner=winner)
-                    wait_until(first.read, lambda s: any(players[winner-1]['name'] in t for t in s['rendered']['text']))
-                names = first.read()
+                    names = wait_until(first.read, lambda s: any(players[winner-1]['name'] in t for t in s['rendered']['text']))
                 observations['results_names'] = names
                 verdict('profile.identity', carried('name') and all(any(p['name'] in t for t in names['rendered']['text']) for p in players),
                         'Updated names retained in state and drawn on both winning-side result screens')
