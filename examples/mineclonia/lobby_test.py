@@ -12,6 +12,8 @@ def main():
     p.add_argument("--lobby-exe",type=Path)
     p.add_argument("--daemon-exe",type=Path)
     p.add_argument("--godot",type=Path,help="Use the public pluggable Godot lobby")
+    p.add_argument("--game-sources",type=Path,help="JSON mapping game ids to local Godot projects")
+    p.add_argument("--first-game",default="mineclonia-prototype")
     p.add_argument("--assistant-url")
     p.add_argument("--join-url")
     p.add_argument("--links-url")
@@ -41,6 +43,16 @@ def main():
             'players':str(players['min'])+'–'+str(players['max']),
             'min_players':players['min'],'max_players':players['max'],
             **{k:entry[k] for k in ('cover','icon','screenshot','tagline','color') if entry.get(k)}})
+    if a.game_sources:
+        if not a.godot:raise SystemExit("--game-sources requires --godot")
+        for game,path in json.loads(a.game_sources.read_text()).items():
+            project=Path(path)
+            if not (project/"project.godot").is_file():raise SystemExit(f"Missing Godot project for {game}")
+            entry=next((item for item in shelf if item["id"]==game),None)
+            if not entry:raise SystemExit(f"Unknown source game: {game}")
+            entry["launch"]={"command":str(a.godot),"args":["--path",str(project)],"cwd":str(project)}
+    first=next((entry for entry in shelf if entry["id"]==a.first_game),None)
+    if not first or a.first_game==lobby_id:raise SystemExit("Choose a playable first game")
     library=folder/"shelf.json";library.write_text(json.dumps(shelf,indent=2))
     env={k:v for k,v in os.environ.items() if not k.startswith("GAMENIGHT")}
     env.update(GAMENIGHT_ADDR=f"127.0.0.1:{a.port}",GAMENIGHT_LIBRARY=str(library),GAMENIGHT_CATALOG=str(catalog),GAMENIGHT_LOBBY_GAME=lobby_id,RUST_LOG="info")
@@ -53,7 +65,8 @@ def main():
     for _ in range(600):
         try:
             with socket.create_connection(("127.0.0.1",a.port),timeout=.2) as sock:
-                sock.sendall(b'{"type":"hello","role":"overlay"}\n{"type":"set_playlist","entries":[{"game":"mineclonia-prototype","title":"Mineclonia"}]}\n{"type":"open_overlay"}\n')
+                commands=[{"type":"hello","role":"overlay"},{"type":"set_playlist","entries":[{"game":first["id"],"title":first["title"]}]},{"type":"open_overlay"}]
+                sock.sendall(("\n".join(json.dumps(c) for c in commands)+"\n").encode())
                 # Do not retry writes because a large welcome snapshot takes
                 # longer than the connect timeout. Repeated set_playlist calls
                 # keep disposing/repreparing the same world during startup.
