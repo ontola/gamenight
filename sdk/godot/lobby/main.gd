@@ -28,6 +28,8 @@ var _capture_path := ""
 var _captured := false
 var _started_at := 0
 var _assistant_url := ""
+var assistant = preload("res://lobby/assistant.gd").new()
+var _talk_owner := ""
 var _fullscreen := false
 var _cursors: Dictionary = {}
 var _links := HTTPRequest.new()
@@ -62,6 +64,9 @@ func _ready() -> void:
 	var configured := OS.get_environment("GAMENIGHT_ASSISTANT_URL")
 	if configured.begins_with("http://127.0.0.1:") or configured.begins_with("https://"):
 		_assistant_url = configured
+	assistant.entry_url = _assistant_url
+	assistant.changed.connect(queue_redraw)
+	add_child(assistant)
 	_fullscreen = OS.get_environment("GAMENIGHT_LOBBY_FULLSCREEN") == "1"
 	font.font_names = PackedStringArray(["Inter", "DejaVu Sans"])
 	bold.font_names = font.font_names
@@ -75,6 +80,7 @@ func _ready() -> void:
 	client.controllers_changed.connect(_controllers_changed)
 	client.connection_changed.connect(func(ok: bool):
 		_buttons.clear()
+		if not ok: _cancel_talk()
 		_message = "" if ok else "Reconnecting… Your party is still here."
 		queue_redraw())
 	client.rejected.connect(func(message: String):
@@ -86,12 +92,16 @@ func _ready() -> void:
 	_started_at = Time.get_ticks_msec()
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--capture="): _capture_path = argument.trim_prefix("--capture=")
+	if not _capture_path.is_empty() and OS.get_cmdline_user_args().has("--capture-narrow"):
+		get_window().mode = Window.MODE_WINDOWED
+		get_window().size = Vector2i(430,900)
+		get_window().content_scale_size = Vector2i.ZERO
 	resized.connect(queue_redraw)
 	queue_redraw()
 
 func _process(_delta: float) -> void:
 	self._delta = minf(_delta, 0.05)
-	if not _cursors.is_empty() or _cards_moving: queue_redraw()
+	if not _cursors.is_empty() or _cards_moving or assistant.state == "listening": queue_redraw()
 	if _message_until > 0 and Time.get_ticks_msec() > _message_until:
 		_message = ""
 		_message_until = 0
@@ -100,6 +110,10 @@ func _process(_delta: float) -> void:
 		_captured = true
 		if OS.get_cmdline_user_args().has("--capture-settings"):
 			_activate("settings")
+			await get_tree().process_frame
+		if OS.get_cmdline_user_args().has("--capture-assistant"):
+			# Preview the listening view without recording a microphone.
+			assistant._set_state("listening", "Listening… Release to send")
 			await get_tree().process_frame
 		await RenderingServer.frame_post_draw
 		var error := get_viewport().get_texture().get_image().save_png(_capture_path)
@@ -116,6 +130,7 @@ func _party_changed(snapshot: Dictionary) -> void:
 	queue_redraw()
 
 func _focus_changed(active: bool) -> void:
+	if not active: _cancel_talk()
 	Engine.max_fps = 60 if active else 15
 	AudioServer.set_bus_mute(0, not active)
 	if DisplayServer.get_name() != "headless" and _capture_path.is_empty():
@@ -151,6 +166,18 @@ func _controllers_changed(controllers: Array) -> void:
 		elif held & (1 << 10): direction = Vector2.UP
 		elif held & (1 << 11): direction = Vector2.DOWN
 		var cursor: Dictionary = _cursors[id]
+		if _talk_owner == id:
+			if pressed & 2: _cancel_talk()
+			elif not held & 1:
+				_talk_owner = ""
+				assistant.release()
+			continue
+		if assistant.state != "idle":
+			if pressed & 2: _cancel_talk()
+			elif pressed & 1 and _talk_owner.is_empty():
+				if assistant.state == "quote": assistant.confirm()
+				elif assistant.state in ["done", "error"]: _cancel_talk()
+			continue
 		if pressed & (1 << 14): _cycle_game(id, -1)
 		if pressed & (1 << 15): _cycle_game(id, 1)
 		var now := Time.get_ticks_msec()
@@ -160,19 +187,24 @@ func _controllers_changed(controllers: Array) -> void:
 		cursor.direction = direction
 		if pressed & 1:
 			var action: String = str(cursor.action)
-			if action.begins_with("select:"): action = "queue"
-			selected = int(cursor.game)
-			_activate(action, id)
+			if action == "assistant":
+				_begin_talk(id)
+				continue
+			else:
+				if action.begins_with("select:"): action = "queue"
+				selected = int(cursor.game)
+				_activate(action, id)
 		if pressed & 2: _activate("settings-close" if not _settings_game.is_empty() else "cancel" if _quit_confirm else "resume")
 		if pressed & 4:
 			selected = int(cursor.game)
 			_activate("play-next")
-		if pressed & (1 << 7): _activate("assistant")
 		if pressed & 8:
 			for seat in party.get("seats", []):
 				if seat.get("controller", "") == id:
 					client.leave(str(seat.get("occupant", {}).get("player_id", "")))
 	_buttons = live
+	if not _talk_owner.is_empty() and _talk_owner not in ["mouse", "keyboard"]:
+		if not live.has(_talk_owner) or _controller_player(_talk_owner).is_empty(): _cancel_talk()
 	for id in _cursors.keys():
 		if not live.has(id) or _controller_player(id).is_empty(): _cursors.erase(id)
 	queue_redraw()
@@ -259,12 +291,38 @@ func _draw_cursors() -> void:
 		ring += 1
 
 func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT: _cancel_talk()
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_cancel_talk()
 		_quit_confirm = true
 		queue_redraw()
 
+func _begin_talk(owner: String) -> void:
+	if not _talk_owner.is_empty() or not client.active or _quit_confirm or not _settings_game.is_empty(): return
+	assistant.start()
+	if assistant.state == "listening": _talk_owner = owner
+
+func _cancel_talk() -> void:
+	_talk_owner = ""
+	assistant.cancel()
+
 func _input(event: InputEvent) -> void:
 	# Host frames drive controllers. Never enumerate Godot devices for ownership.
+	if event is InputEventKey and event.keycode == KEY_C and not event.echo:
+		if event.pressed: _begin_talk("keyboard")
+		elif _talk_owner == "keyboard":
+			_talk_owner = ""
+			assistant.release()
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed and _talk_owner == "mouse":
+		_talk_owner = ""
+		assistant.release()
+		return
+	if assistant.state != "idle" and event is InputEventKey:
+		if event.pressed and not event.echo:
+			if event.keycode == KEY_ESCAPE: _cancel_talk()
+			elif event.keycode in [KEY_ENTER,KEY_SPACE] and assistant.state == "quote": assistant.confirm()
+		return
 	if event is InputEventKey and event.pressed and not event.echo:
 		match event.keycode:
 			KEY_LEFT: _select(-1)
@@ -274,14 +332,14 @@ func _input(event: InputEvent) -> void:
 			KEY_X: _activate("play-next")
 			KEY_A: _activate("queue")
 			KEY_Q: _activate("quit")
-			KEY_C: _activate("assistant")
 	if event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN: _select(1)
 		elif event.button_index == MOUSE_BUTTON_WHEEL_UP: _select(-1)
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			for hit in hits:
 				if hit.rect.has_point(event.position):
-					_activate(hit.action)
+					if hit.action == "assistant": _begin_talk("mouse")
+					else: _activate(hit.action)
 					break
 
 func _select(direction: int) -> void:
@@ -290,6 +348,8 @@ func _select(direction: int) -> void:
 	queue_redraw()
 
 func _activate(action: String, controller: String = "") -> void:
+	if action == "assistant-close": _cancel_talk(); return
+	if action == "assistant-confirm": assistant.confirm(); return
 	if action == "settings-close":
 		_settings_game = ""
 		queue_redraw()
@@ -317,8 +377,6 @@ func _activate(action: String, controller: String = "") -> void:
 			get_tree().quit()
 	elif _quit_confirm:
 		return
-	elif action == "assistant" and not _assistant_url.is_empty():
-		OS.shell_open(_assistant_url)
 	elif action == "start": client.start_next()
 	elif action == "queue-more": _queue_offset += 1
 	elif action == "queue-less": _queue_offset = maxi(0,_queue_offset-1)
@@ -380,6 +438,40 @@ func _button(label: String, rect: Rect2, action: String, primary: bool = false, 
 	_center(label, rect, 17, MUTED if disabled else (PAPER if primary else INK), true)
 	if not disabled: hits.append({"rect": rect, "action": action})
 
+func _pad_icon(label: String, rect: Rect2) -> void:
+	if label in ["A", "X"]:
+		draw_circle(rect.get_center() + Vector2(0, 2), rect.size.y / 2, Color("152620"))
+		draw_circle(rect.get_center(), rect.size.y / 2, Color("303936"))
+		draw_arc(rect.get_center(), rect.size.y / 2 - 1, 0, TAU, 40, Color("718078"), 1, true)
+		_center(label, rect, int(rect.size.y * 0.64), Color("85cf50") if label == "A" else Color("68b9ff"), true)
+	else:
+		# Shoulder triggers have a raised, tapered cap, unlike the face buttons.
+		var points := PackedVector2Array([rect.position + Vector2(5,0), rect.position + Vector2(rect.size.x-5,0), rect.end, Vector2(rect.position.x,rect.end.y)])
+		draw_colored_polygon(points, Color("303936"))
+		points.append(points[0])
+		draw_polyline(points, Color("718078"), 1, true)
+		_center(label, rect, int(rect.size.y * 0.47), PAPER, true)
+
+func _controller_hints(rect: Rect2) -> void:
+	# Display-only: hints never enter mouse hit testing or controller focus.
+	_round(rect, Color("e5ead8"), 12)
+	var compact := rect.size.x < 520
+	var icon := 23.0 if compact else 28.0
+	var text_size := 12 if compact else 16
+	var labels := [["X", "Play next"], ["A", "Queue"], ["LT", "Previous"], ["RT", "Next"]]
+	var widths: Array[float] = []
+	var total := 0.0
+	for hint in labels:
+		var item_width := icon + 7 + bold.get_string_size(hint[1], HORIZONTAL_ALIGNMENT_LEFT, -1, text_size).x
+		widths.append(item_width)
+		total += item_width
+	var gap := clampf((rect.size.x-total-20)/3, 8, 30)
+	var x := rect.get_center().x - (total+gap*3)/2
+	for i in labels.size():
+		_pad_icon(labels[i][0], Rect2(x,rect.get_center().y-icon/2,icon,icon))
+		_text(labels[i][1], Vector2(x+icon+7,rect.get_center().y+text_size*0.35),text_size,INK,true)
+		x += widths[i] + gap
+
 func _draw() -> void:
 	hits.clear()
 	var wide := size.x >= 1050
@@ -389,7 +481,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), PAPER)
 	_text("gamenight", Vector2(margin, 40), 23, GREEN, true)
 	if not _assistant_url.is_empty():
-		_button("Start  Assistant" if wide else "Start", Rect2(width-220 if wide else size.x-168,12,188 if wide else 64,42),"assistant")
+		_button("Hold A · Talk to assistant" if wide else "Hold · Talk", Rect2(width-282 if wide else size.x-222,12,250 if wide else 118,42),"assistant")
 	if not wide: _button("Room",Rect2(size.x-96,12,76,42),"room")
 	var players: Array = party.get("players", [])
 	var seat_count: int = maxi(4, party.get("seats", []).size())
@@ -413,20 +505,11 @@ func _draw() -> void:
 	_draw_up_next(Rect2(margin,185,content,hero_height))
 	var top := 185 + hero_height + 40
 	_text("Games",Vector2(margin,top),23,INK,true)
-	var browsing := _cursors.values().any(func(cursor): return _section(cursor.action) == "games")
-	if browsing:
-		_round(Rect2(width-margin-258,top-24,258,30),Color("e5ead8"),9)
-		_center("LT   Previous / Next   RT",Rect2(width-margin-258,top-24,258,30),14,GREEN,true)
+	_button("Settings",Rect2(width-margin-108,top-28,108,36),"settings",false,games.is_empty())
 	_draw_carousel(margin,top,content,wide)
 	var y := top+219
-	_button("‹",Rect2(margin,y,42,42),"previous",false,games.size()<2)
-	_button("›",Rect2(margin+50,y,42,42),"next",false,games.size()<2)
-	_button("X  Play next",Rect2(width-margin-268,y,144,42),"play-next",false,games.is_empty() or players.is_empty())
-	_button("A  Queue",Rect2(width-margin-116,y,116,42),"queue",true,games.is_empty() or players.is_empty())
-	if wide: _button("Settings",Rect2(margin+108,y,108,42),"settings",false,games.is_empty())
-	else: _button("Settings",Rect2(size.x-198,12,92,42),"settings",false,games.is_empty())
+	_controller_hints(Rect2(margin,y,content,46))
 	if not _message.is_empty(): _text(_message,Vector2(margin,size.y-42),13,GREEN,false,content)
-	_text("LT / RT  Games     Stick  Navigate     A  Queue / Select     X  Play next     Y  Leave     Back  Resume" if wide else "LT / RT Games    A Queue    X Play next",Vector2(margin,size.y-17),11,MUTED,false,content)
 	if wide: _draw_room_tools(Rect2(width,72,292,size.y-105))
 	elif _room_panel:
 		hits.clear()
@@ -443,6 +526,34 @@ func _draw() -> void:
 		_button("Keep playing",Rect2(box.position+Vector2(20,127),Vector2(box.size.x/2-28,45)),"cancel")
 		_button("End night",Rect2(box.position+Vector2(box.size.x/2+8,127),Vector2(box.size.x/2-28,45)),"confirm",true)
 	_draw_cursors()
+	if assistant.state != "idle": _draw_assistant()
+
+func _draw_assistant() -> void:
+	hits.clear()
+	draw_rect(Rect2(Vector2.ZERO,size),Color(0.08,0.15,0.12,0.72))
+	var box := Rect2(size.x/2-minf(280,size.x/2-20),size.y/2-175,minf(560,size.x-40),350)
+	_round(box,PAPER,22)
+	var listening: bool = assistant.state == "listening"
+	var center := Vector2(box.get_center().x,box.position.y+74)
+	var pulse := 40.0 + sin(Time.get_ticks_msec()/180.0)*4.0 if listening else 40.0
+	draw_circle(center,pulse,Color("d9ec9a") if listening else Color("e5ead8"))
+	# Recognizable microphone capsule, pickup curve and stand.
+	_round(Rect2(center-Vector2(8,21),Vector2(16,29)),GREEN,8)
+	draw_arc(center-Vector2(0,6),15,0,PI,24,GREEN,3,true)
+	draw_line(center+Vector2(0,9),center+Vector2(0,21),GREEN,3,true)
+	draw_line(center+Vector2(-10,21),center+Vector2(10,21),GREEN,3,true)
+	_center("Listening…" if listening else "Your assistant",Rect2(box.position+Vector2(18,122),Vector2(box.size.x-36,35)),24,INK,true)
+	var note := "Release to send · B or Esc to cancel" if listening else str(assistant.message)
+	var lines := font.get_multiline_string_size(note,HORIZONTAL_ALIGNMENT_CENTER,box.size.x-40,16)
+	draw_multiline_string(font,Vector2(box.position.x+20,box.position.y+184),note,HORIZONTAL_ALIGNMENT_CENTER,box.size.x-40,16,4,INK)
+	if not assistant.transcript.is_empty():
+		draw_multiline_string(font,Vector2(box.position.x+20,box.position.y+202+minf(lines.y,55)),str(assistant.transcript),HORIZONTAL_ALIGNMENT_CENTER,box.size.x-40,14,2,MUTED)
+	if assistant.state == "quote":
+		_button("A · Send",Rect2(box.position.x+20,box.end.y-56,box.size.x/2-28,38),"assistant-confirm",true)
+		_button("B · Cancel",Rect2(box.get_center().x+8,box.end.y-56,box.size.x/2-28,38),"assistant-close")
+	else:
+		var label := "A · Close" if assistant.state in ["done","error"] else "Close" if assistant.state in ["sending","thinking"] else "Cancel"
+		_button(label,Rect2(box.get_center().x-70,box.end.y-56,140,38),"assistant-close")
 
 func _carousel_layout(margin: float, top: float, content: float, wide: bool) -> Array:
 	if games.is_empty(): return []

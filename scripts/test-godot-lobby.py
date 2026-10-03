@@ -97,7 +97,7 @@ def avatar(style):
     return json.dumps({"v": 1, "w": 48, "h": 48, "px": pixels})
 
 
-def run(godot, capture=None, narrow=False, settings=False, game_ids=None):
+def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assistant=False):
     if capture:
         capture.unlink(missing_ok=True)
     with socket.socket() as probe:
@@ -108,10 +108,13 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None):
         godot_args = ["--path", str(ROOT / "sdk/godot")]
         if capture:
             if not narrow: godot_args += ["--fullscreen"]
+            else: godot_args += ["--windowed"]
             godot_args += ["--resolution", "430x900" if narrow else "3840x2160", "--", "--capture=" + str(capture)]
+            if narrow: godot_args += ["--capture-narrow"]
         else:
             godot_args += ["--headless", "--script", "res://lobby/tests/flow.gd"]
         if settings: godot_args += ["--capture-settings"]
+        if assistant: godot_args += ["--capture-assistant"]
         game_ids = game_ids or ["neon-trails", "bubble-buddies", "blast-party"]
         shelf = []
         for game_id in game_ids:
@@ -131,6 +134,9 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None):
         env = {k: v for k, v in os.environ.items() if not k.startswith("GAMENIGHT")}
         env.update(GAMENIGHT_ADDR=f"127.0.0.1:{port}", GAMENIGHT_LIBRARY=str(temp / "shelf.json"),
                    GAMENIGHT_LOBBY_GAME="godot-lobby", GAMENIGHT_NO_PREWARM="1", GAMENIGHT_NO_MUSIC="1", GAMENIGHT_TEST_NO_CONTROLLERS="1")
+        if capture:
+            # Show the talk control; screenshots never open the microphone or send requests.
+            env['GAMENIGHT_ASSISTANT_URL'] = 'http://127.0.0.1:1/start/preview'
         suffix = ".exe" if os.name == "nt" else ""
         log_path = ROOT / ".local" / ("lobby-capture-narrow.log" if narrow else "lobby-capture.log" if capture else "lobby-flow.log")
         log_path.parent.mkdir(exist_ok=True)
