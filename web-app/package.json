@@ -1,0 +1,7 @@
+{
+  "name": "@gamenight/web",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "node build.mjs", "check": "svelte-check --tsconfig ./tsconfig.json" },
+  "devDependencies": { "svelte": "^5.0.0", "esbuild": "^0.25.0", "typescript": "^5.0.0", "svelte-check": "^4.0.0" }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "asset": "character",
+    "job_id": "4a7d7317-b25f-4c0d-be7f-071de7a5a7e4",
+    "usage": {
+      "type": "generations",
+      "generations": 20.0
+    }
+  },
+  {
+    "asset": "tv",
+    "job_id": "3440af1a-bd31-4e91-bcaf-4132f276b759",
+    "usage": {
+      "type": "generations",
+      "generations": 20.0
+    }
+  },
+  {
+    "asset": "platform",
+    "job_id": "f3519d66-fc65-456c-91bd-3aa73e545bfb",
+    "usage": {
+      "type": "generations",
+      "generations": 1.0
+    }
+  },
+  {
+    "asset": "walk",
+    "job_id": "3ab310fc-34a1-4dfd-8096-d0fe5911e853",
+    "usage": {
+      "type": "generations",
+      "generations": 20.0
+    }
+  },
+  {
+    "asset": "sleep",
+    "job_id": "e4edd2f6-b039-4ef7-8e04-8d4ae0501224",
+    "usage": {
+      "type": "generations",
+      "generations": 20.0
+    }
+  },
+  {
+    "asset": "wake",
+    "job_id": "a55d4b38-3303-4d85-bfd3-665085b8ff9a",
+    "usage": {
+      "type": "generations",
+      "generations": 20.0
+    }
+  }
+]

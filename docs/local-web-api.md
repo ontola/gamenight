@@ -29,3 +29,10 @@ response confirms commands were sent; the protocol does not acknowledge each
 individual profile update. Clients should refresh party state before retrying
 an ambiguous operation. Concurrent fresh joins still rely on snapshot differences;
 request correlation is a future protocol improvement.
+
+### Player session status
+
+`GET /api/profiles/:id/session` reports `linked`, `player_name`, zero-based
+`seat`, party `players` count, `current` (title and phase), and `next` title.
+A stale binding whose player has left is reported as unlinked. The mobile
+Session tab uses this live state instead of showing another sign-in QR.

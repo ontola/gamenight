@@ -19,6 +19,8 @@ fn spawnable_meta(id: &str) -> GameMeta {
         title: id.to_string(),
         tagline: None,
         cover: None,
+        icon: None,
+        screenshot: None,
         color: None,
         emoji: None,
         players: None,

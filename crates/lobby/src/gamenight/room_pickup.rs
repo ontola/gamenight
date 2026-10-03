@@ -1,0 +1,312 @@
+//! Physical, controller-owned acceptance of cloud profiles waiting at the room door.
+#[path = "door_layout.rs"]
+mod layout;
+use layout::{DOOR_X, DOOR_Y, PLAYER_Y};
+use super::{avatar_image, lobby_sign_in_pad, seat_world_position, GameNightBridge};
+use crate::player_links::PlayerLinks;
+use bevy::prelude::*;
+use gamenight_protocol::PlayerId;
+use std::collections::HashMap;
+#[derive(Default, Resource)]
+pub(super) struct Doors {
+    slots: HashMap<String, usize>,
+    holds: HashMap<String, (PlayerId, f32, f64)>,
+}
+#[derive(Component)]
+pub(super) struct Door(String, String);
+#[derive(Component)]
+pub(super) struct Progress(String);
+#[derive(Component)]
+pub(super) struct RoomLabel(String);
+#[derive(Component)]
+pub(super) struct DoorLeaf(String, f32);
+
+pub(super) fn sync(
+    mut commands: Commands,
+    game: Res<bones_bevy_renderer::BonesGame>,
+    links: Res<PlayerLinks>,
+    assets: Res<AssetServer>,
+    mut images: ResMut<Assets<Image>>,
+    time: Res<Time>,
+    mut state: ResMut<Doors>,
+    existing: Query<(Entity, &Door)>,
+    labels: Query<(Entity, &RoomLabel)>,
+    mut bars: Query<(&Progress, &mut Sprite)>,
+    windows: Query<&Window>,
+    mut leaves: Query<(&DoorLeaf, &mut Transform)>,
+) {
+    let snapshot = links.snapshot();
+    let room = snapshot.as_ref().and_then(|s| s.room.as_ref());
+    let active = lobby_sign_in_pad(&game.0).is_some();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let pending: Vec<_> = room
+        .into_iter()
+        .flat_map(|r| r.pending.iter())
+        .filter(|p| active && p.expires > now)
+        .collect();
+    state
+        .slots
+        .retain(|id, _| pending.iter().any(|p| &p.id == id));
+    state
+        .holds
+        .retain(|id, _| pending.iter().any(|p| &p.id == id));
+    let font: Handle<Font> = assets.load("ui/FairfaxSM.ttf");
+    let code = room
+        .filter(|_| active)
+        .map(|r| r.room_code.as_str())
+        .unwrap_or("");
+    for (entity, label) in &labels {
+        if label.0 != code || code.is_empty() {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+    if !code.is_empty() && !labels.iter().any(|(_, label)| label.0 == code) {
+        let origin=if snapshot.as_ref().is_some_and(|s|s.cloud) {
+            std::env::var("GAMENIGHT_CLOUD_URL").unwrap_or_else(|_|"https://gamenight.ontola.io".into())
+        }else{super::lobby_join_url()};
+        let url=room_join_url(&origin,code);
+        let qr=super::generate_qr_bevy_image(&url).map(|mut image|{
+            image.sampler_descriptor=bevy::render::texture::ImageSampler::nearest();
+            images.add(image)
+        });
+        spawn_room_plaque(&mut commands, &assets, code, qr);
+    }
+    for (entity, door) in &existing {
+        if !pending.iter().any(|p| {
+            p.id == door.0
+                && format!(
+                    "{}{}{}",
+                    p.profile.display_name, p.profile.skin_color, p.profile.avatar
+                ) == door.1
+        }) {
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+    let seats = game
+        .0
+        .shared_resource::<GameNightBridge>()
+        .latest_seats
+        .clone();
+    let focused = windows.iter().any(|w| w.focused);
+    for p in pending {
+        if !state.slots.contains_key(&p.id) {
+            let Some(slot) = (0..DOOR_X.len()).find(|s| !state.slots.values().any(|v| v == s)) else {
+                continue;
+            };
+            state.slots.insert(p.id.clone(), slot);
+        }
+        let x = DOOR_X[state.slots[&p.id]];
+        let mark = format!(
+            "{}{}{}",
+            p.profile.display_name, p.profile.skin_color, p.profile.avatar
+        );
+        if !existing.iter().any(|(_, d)| d.0 == p.id && d.1 == mark) {
+            let face = avatar_image(&p.profile.avatar).map(|i| images.add(i));
+            commands
+                .spawn((
+                    Door(p.id.clone(), mark),
+                    SpatialBundle {
+                        transform: Transform::from_xyz(x, DOOR_Y, -910.),
+                        ..default()
+                    },
+                ))
+                .with_children(|parent| {
+                    parent.spawn(SpriteBundle {
+                        sprite: Sprite {
+                            color: Color::rgb_u8(99, 66, 46),
+                            custom_size: Some(Vec2::new(88., 100.)),
+                            ..default()
+                        },
+                        ..default()
+                    });
+                    parent.spawn(SpriteBundle {
+                        sprite: Sprite {
+                            color: Color::rgb_u8(19, 23, 37),
+                            custom_size: Some(Vec2::new(76., 88.)),
+                            ..default()
+                        },
+                        transform: Transform::from_xyz(0., 0., 1.),
+                        ..default()
+                    });
+                    for (path, color, z) in [
+                        (
+                            "player/skins/fishy/fishy-body.png",
+                            Color::rgb_u8(140, 155, 230),
+                            2.,
+                        ),
+                        (
+                            "player/skin-mask.png",
+                            Color::hex(&p.profile.skin_color).unwrap_or(Color::WHITE),
+                            3.,
+                        ),
+                    ] {
+                        parent.spawn(SpriteBundle {
+                            texture: assets.load(path),
+                            sprite: Sprite {
+                                color,
+                                rect: Some(Rect::new(0., 0., 96., 80.)),
+                                custom_size: Some(Vec2::new(96., 80.)),
+                                ..default()
+                            },
+                            transform: Transform::from_xyz(0., 0., z),
+                            ..default()
+                        });
+                    }
+                    if let Some(texture) = face {
+                        parent.spawn(SpriteBundle {
+                            texture,
+                            sprite: Sprite {
+                                custom_size: Some(Vec2::splat(48.)),
+                                ..default()
+                            },
+                            transform: Transform::from_xyz(0., 12., 4.),
+                            ..default()
+                        });
+                    }
+                    parent.spawn(Text2dBundle {
+                        text: Text::from_section(
+                            p.profile.display_name.chars().take(20).collect::<String>(),
+                            TextStyle {
+                                font: font.clone(),
+                                font_size: 12.,
+                                color: Color::WHITE,
+                            },
+                        ),
+                        transform: Transform::from_xyz(0., 58., 5.),
+                        ..default()
+                    });
+                    for side in [-1.0, 1.0] {
+                        parent.spawn((DoorLeaf(p.id.clone(),side),SpriteBundle {
+                            sprite:Sprite{color:Color::rgb_u8(125,82,51),custom_size:Some(Vec2::new(36.,32.)),..default()},
+                            transform:Transform::from_xyz(side*18.,-25.,5.),..default()
+                        }));
+                    }
+                    parent.spawn((
+                        Progress(p.id.clone()),
+                        SpriteBundle {
+                            sprite: Sprite {
+                                color: Color::rgb_u8(180, 155, 255),
+                                custom_size: Some(Vec2::new(0., 4.)),
+                                ..default()
+                            },
+                            transform: Transform::from_xyz(0., -48., 5.),
+                            ..default()
+                        },
+                    ));
+                });
+        }
+        let candidate = if focused {
+            seats
+                .iter()
+                .filter_map(|seat| {
+                    let id = seat.occupant.player_id()?;
+                    if snapshot.as_ref()?.linked.contains(&id) {
+                        return None;
+                    }
+                    let pos = seat_world_position(&game.0, seat.index)?;
+                    ((pos.x - x).abs() < 30. && (pos.y - PLAYER_Y).abs() < 30.).then_some((id, seat.index))
+                })
+                .next()
+        } else {
+            None
+        };
+        if let Some((player, seat)) = candidate {
+            let hold = state.holds.entry(p.id.clone()).or_insert((player, 0., 0.));
+            if hold.0 != player {
+                *hold = (player, 0., 0.);
+            }
+            if time.elapsed_seconds_f64() >= hold.2 {
+                if game.0.shared_resource_mut::<GameNightBridge>().offer_interaction(seat as u32, "Pick up profile", crate::prelude::Vec2::new(x, PLAYER_Y)) {
+                    hold.1 = 2.;
+                    links.pickup(p.id.clone(), player);
+                    hold.2 = time.elapsed_seconds_f64() + 5.;
+                }
+            }
+        } else {
+            state.holds.remove(&p.id);
+        }
+    }
+    for (leaf,mut transform) in &mut leaves {
+        let progress=state.holds.get(&leaf.0).map(|h|(h.1/2.).min(1.)).unwrap_or(0.);
+        transform.translation.x=leaf.1*(18.+36.*progress);
+    }
+    for (id, mut sprite) in &mut bars {
+        sprite.custom_size = Some(Vec2::new(
+            76. * state
+                .holds
+                .get(&id.0)
+                .map(|h| (h.1 / 2.).min(1.))
+                .unwrap_or(0.),
+            4.,
+        ));
+    }
+}
+
+/// A wall-mounted enamel sign, clear of every station and platform. Opaque
+/// backing keeps its contrast independent of the selected room background.
+fn room_join_url(base:&str,code:&str)->String {
+    let end=base.find("://").map(|i|i+3).unwrap_or(0);
+    let authority=base[end..].split(['/', '?', '#']).next().unwrap_or("");
+    format!("{}{authority}/?r={code}",&base[..end])
+}
+
+#[cfg(test)]
+mod url_tests {
+    use super::room_join_url;
+    #[test]
+    fn room_qr_replaces_existing_session_path() {
+        for base in ["http://192.168.0.85:7913", "http://192.168.0.85:7913/session/gn-couch", "http://192.168.0.85:7913/studio?claim=old"] {
+            assert_eq!(room_join_url(base,"ABC234"),"http://192.168.0.85:7913/?r=ABC234");
+        }
+        assert_eq!(room_join_url("https://gamenight.ontola.io/","ABC234"),"https://gamenight.ontola.io/?r=ABC234");
+    }
+}
+
+fn spawn_room_plaque(commands: &mut Commands, assets: &AssetServer, code: &str, qr:Option<Handle<Image>>) {
+    let font: Handle<Font> = assets.load("ui/ark-pixel-16px-latin.ttf");
+    commands.spawn((RoomLabel(code.into()), SpatialBundle {
+        transform: Transform::from_xyz(640., 640., -910.), ..default()
+    })).with_children(|parent| {
+        // Integer-sized, layered rectangles give the frame pixel-art edges;
+        // no rounded vector borders or translucent text over the wallpaper.
+        for (x, y, z, w, h, color) in [
+            (4., -6., 0., 420., 152., Color::rgb_u8(32, 24, 29)),
+            (0., 0., 1., 420., 152., Color::rgb_u8(74, 47, 34)),
+            (0., 2., 2., 412., 144., Color::rgb_u8(202, 153, 84)),
+            (0., 0., 3., 404., 136., Color::rgb_u8(25, 39, 48)),
+            (0., 66., 4., 404., 4., Color::rgb_u8(242, 210, 155)),
+            (0., -66., 4., 404., 4., Color::rgb_u8(101, 72, 44)),
+        ] {
+            parent.spawn(SpriteBundle {
+                sprite: Sprite { color, custom_size: Some(Vec2::new(w,h)), ..default() },
+                transform: Transform::from_xyz(x,y,z), ..default()
+            });
+        }
+        for x in [-192., 192.] {
+            for y in [-55., 55.] {
+                parent.spawn(SpriteBundle {
+                    sprite: Sprite { color: Color::rgb_u8(202,153,84), custom_size: Some(Vec2::splat(4.)), ..default() },
+                    transform: Transform::from_xyz(x,y,5.), ..default()
+                });
+            }
+        }
+        for (text, y, size, color) in [
+            ("GameNight", 35., 24., Color::rgb_u8(224,190,132)),
+            (code, 0., 32., Color::rgb_u8(255,248,222)),
+            ("ROOM CODE", -32., 12., Color::rgb_u8(224,190,132)),
+        ] {
+            parent.spawn(Text2dBundle {
+                text: Text::from_section(text, TextStyle {font:font.clone(), font_size:size, color})
+                    .with_alignment(TextAlignment::Center),
+                transform: Transform::from_xyz(-65.,y,6.), ..default()
+            });
+        }
+        if let Some(texture)=qr {parent.spawn(SpriteBundle{
+            texture,sprite:Sprite{custom_size:Some(Vec2::splat(104.)),..default()},
+            transform:Transform::from_xyz(124.,0.,6.),..default()
+        });}
+    });
+}

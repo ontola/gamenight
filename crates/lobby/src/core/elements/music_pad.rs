@@ -33,6 +33,7 @@ pub struct MusicPadMeta {
     pub cooldown_secs: f32,
     /// `true` skips to the next track, `false` pauses (or resumes).
     pub skips: bool,
+    pub previous: bool,
 }
 
 pub fn game_plugin(game: &mut Game) {
@@ -56,6 +57,7 @@ pub struct MusicPad {
     /// pad without resolving the asset every frame.
     pub size: Vec2,
     pub skips: bool,
+    pub previous: bool,
     /// How far the button is pushed in: 1 the moment somebody lands on it,
     /// easing back to 0 over `PAD_PRESS_SECONDS`. Driven by landings only —
     /// walking across a pad moves nothing, because nothing happened.
@@ -89,6 +91,7 @@ fn hydrate(
             body_size,
             cooldown_secs,
             skips,
+            previous,
         }) = assets.get(element_meta.data).try_cast_ref()
         {
             hydrated.insert(entity, MapElementHydrated);
@@ -114,6 +117,7 @@ fn hydrate(
                 MusicPad {
                     size: *body_size,
                     skips: *skips,
+                    previous: *previous,
                     press: 0.0,
                     cooling: 0.0,
                     cooldown_secs: *cooldown_secs,
@@ -134,9 +138,9 @@ fn update(
     time: Res<Time>,
     // Read-only: a pad press is sent straight out to the daemon, and what's
     // playing comes back the same way everything else about the party does.
-    bridge: Option<Res<crate::gamenight::GameNightBridge>>,
+    bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
 ) {
-    let Some(bridge) = bridge else {
+    let Some(mut bridge) = bridge else {
         // Standalone play: no daemon, so no host music to speak of.
         return;
     };
@@ -147,26 +151,24 @@ fn update(
     let dt = time.delta_seconds();
 
     for (entity, (pad, solid)) in entities.iter_with((&mut pads, &mut solids)) {
-        solid.disabled = !playing;
+        solid.disabled = true;
         pad.cooling = (pad.cooling - dt).max(0.0);
         pad.press = (pad.press - dt / PAD_PRESS_SECONDS).max(0.0);
         let _ = entity;
         if !playing || pad.cooling > 0.0 {
             continue;
         }
-        if player_landed_on(
-            solid.pos,
-            solid.size,
-            &entities,
-            &player_indexes,
-            &bodies,
-            &transforms,
-        )
-        .is_some()
-        {
+        for seat in entities.iter_with((&player_indexes,&bodies,&transforms)).filter_map(|(_, (idx,body,t))| {
+            let feet=body.bounding_box(*t).min.y;
+            (body.is_on_ground && (t.translation.x-solid.pos.x).abs()<=24.
+                && feet>=solid.pos.y-34. && feet<=solid.pos.y+70.).then_some(idx.0)
+        }) {
+            if !bridge.offer_interaction(seat, if pad.previous {"Previous track"} else if pad.skips {"Next track"} else {"Play / pause music"}, Vec2::new(solid.pos.x, solid.pos.y-solid.size.y/2.)) {continue;}
             pad.cooling = pad.cooldown_secs;
             pad.press = 1.0;
-            bridge.control_music(if pad.skips {
+            bridge.control_music(if pad.previous {
+                gamenight_protocol::MediaAction::PreviousTrack
+            } else if pad.skips {
                 gamenight_protocol::MediaAction::NextTrack
             } else {
                 gamenight_protocol::MediaAction::PlayPause

@@ -1,4 +1,4 @@
 image: ./sharky-body.png
 tile_size: [96, 80]
-columns: 14
-rows: 7
+columns: 7
+rows: 1

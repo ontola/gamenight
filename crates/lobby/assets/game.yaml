@@ -303,10 +303,37 @@ core:
 
   lobby_map: /map/levels/gamenight_lobby.map.yaml
 
-  # Empty on purpose. Upstream's fourteen arenas were CC BY-NC and have been
-  # removed; see map/levels/README.md for how to read them out of git history.
-  # This build is a lobby — GameNight always runs `lobby_map` — so there is
-  # nothing to put here until we design arenas of our own.
+  lobby_themes:
+    - id: underwater
+      map: /themes/underwater/room.map.yaml
+      players:
+        - /themes/underwater/fishy/player.player.yaml
+        - /themes/underwater/pescy/player.player.yaml
+        - /themes/underwater/sharky/player.player.yaml
+        - /themes/underwater/orcy/player.player.yaml
+    - id: sky
+      map: /themes/sky/room.map.yaml
+      players:
+        - /themes/sky/fishy/player.player.yaml
+        - /themes/sky/pescy/player.player.yaml
+        - /themes/sky/sharky/player.player.yaml
+        - /themes/sky/orcy/player.player.yaml
+    - id: school
+      map: /themes/school/room.map.yaml
+      players:
+        - /themes/school/fishy/player.player.yaml
+        - /themes/school/pescy/player.player.yaml
+        - /themes/school/sharky/player.player.yaml
+        - /themes/school/orcy/player.player.yaml
+    - id: gameroom
+      map: /themes/gameroom/room.map.yaml
+      players:
+        - /themes/gameroom/fishy/player.player.yaml
+        - /themes/gameroom/pescy/player.player.yaml
+        - /themes/gameroom/sharky/player.player.yaml
+        - /themes/gameroom/orcy/player.player.yaml
+
+
   stable_maps: []
 
   map_tilesets:

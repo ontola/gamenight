@@ -8,6 +8,7 @@
 //! tagged enum (`"type"` field, snake_case). Unknown fields must be ignored by
 //! receivers so the protocol can grow without breaking old SDKs.
 
+pub mod artwork;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -144,11 +145,13 @@ impl std::fmt::Display for GameId {
 pub struct Player {
     pub id: PlayerId,
     pub name: String,
-    /// Accent color (`#rrggbb`) the player picked for themselves. A hint for
-    /// games that color-code characters — not authoritative, games are free
-    /// to ignore it (e.g. team-based games override it).
+    /// Game-controlled clothing/team colour (`#rrggbb`). Games may override
+    /// it without changing the personal `skin_color` preference.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
+    /// Personal skin colour (#rrggbb), independent of game/team clothing colours.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skin_color: Option<String>,
     /// Pixel art the player drew for themselves in the studio.
     ///
     /// Opaque on the wire so the encoding can evolve without a protocol
@@ -160,6 +163,21 @@ pub struct Player {
     /// Games owned in this player's profile library, shared with the party.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub library: Vec<GameId>,
+}
+
+/// Presence is separate from identity: sleeping never releases a seat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PresenceState {
+    Active,
+    Warning,
+    Sleeping,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PlayerPresence {
+    pub player_id: PlayerId,
+    pub state: PresenceState,
 }
 
 /// Who (or what) fills a seat. Games receive seats, never raw controller ids.
@@ -362,10 +380,16 @@ pub struct GameMeta {
     /// One-line pitch shown under the title.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tagline: Option<String>,
-    /// Cover art: a URL or data URI. Absent = overlays generate a cover from
-    /// `color` + `emoji`.
+    /// Portrait cover: PNG data URI, or a shelf-relative PNG resolved by the
+    /// daemon. Web clients also support HTTPS artwork URLs.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cover: Option<String>,
+    /// Square game icon (favicon), used on case spines.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// Gameplay screenshot, displayed on the lobby TV.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screenshot: Option<String>,
     /// Accent color (`#rrggbb`) for generated covers and highlights.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
@@ -545,6 +569,8 @@ pub struct GameSettings {
 /// The one big object overlays render from. Sent whenever anything changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartySnapshot {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub presence: Vec<PlayerPresence>,
     pub players: Vec<Player>,
     pub seats: Vec<Seat>,
     pub playlist: PlaylistSnapshot,
@@ -643,6 +669,19 @@ pub enum Role {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
+    /// Opt into presence and live roster notifications for this prepared session.
+    Participation {
+        session: SessionId,
+        instant_join: bool,
+    },
+    /// Meaningful human input (deadzone filtered, at most once a second per device).
+    /// Games must supply their active session. Overlays omit it.
+    ControllerInput {
+        #[serde(default)]
+        session: Option<SessionId>,
+        controller: String,
+    },
+
     /// Must be the first message on every connection.
     Hello {
         role: Role,
@@ -680,6 +719,10 @@ pub enum ClientMessage {
         name: String,
     },
     /// Change a player's accent-color hint (see [`Player::color`]).
+    SetPlayerSkinColor {
+        player_id: PlayerId,
+        skin_color: String,
+    },
     SetPlayerColor {
         player_id: PlayerId,
         color: String,
@@ -698,8 +741,24 @@ pub enum ClientMessage {
         a: u8,
         b: u8,
     },
+    /// Physical gamepad's ordinal in the host's connected-controller list.
+    BindController {
+        player_id: PlayerId,
+        controller: String,
+    },
     SetPlaylist {
         entries: Vec<PlaylistEntry>,
+    },
+    /// Move an existing entry without interrupting play. Reject stale snapshots.
+    MovePlaylistEntry {
+        expected: PlaylistSnapshot,
+        from: usize,
+        to: usize,
+    },
+    /// Remove one occurrence only, guarded against concurrent playlist edits.
+    RemovePlaylistEntry {
+        expected: PlaylistSnapshot,
+        index: usize,
     },
     /// Skip to the warm session right now, no vote.
     Next,
@@ -708,6 +767,8 @@ pub enum ClientMessage {
     PlayNext {
         game: GameId,
     },
+    /// Change the upcoming game without starting or resuming gameplay.
+    QueueNext { game: GameId },
     Pause,
     Resume,
     /// The party overlay came up: the active game pauses.
@@ -794,6 +855,15 @@ pub enum ClientMessage {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
+    /// Full authoritative roster/presence for an opted-in session. Apply without
+    /// resetting the match. Unknown fields/messages remain optional for old games.
+    PartyUpdated {
+        session: SessionId,
+        seats: Vec<Seat>,
+        players: Vec<Player>,
+        presence: Vec<PlayerPresence>,
+    },
+
     /// Reply to `hello`.
     Welcome {
         protocol_version: u32,

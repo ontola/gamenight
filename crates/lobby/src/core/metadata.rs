@@ -19,6 +19,7 @@ pub trait MatchAssetServerExt {
 impl MatchAssetServerExt for &mut AssetServer {
     fn register_match_assets(self) -> Self {
         CoreMeta::register_schema();
+        LobbyThemeMeta::register_schema();
         PlayerMeta::register_schema();
         ElementMeta::register_schema();
         BulletMeta::register_schema();
@@ -45,8 +46,18 @@ pub struct CoreMeta {
     /// sign and the next-game TV, deliberately not one of `stable_maps`
     /// (those are combat levels, and the lobby is a waiting room).
     pub lobby_map: Handle<MapMeta>,
+    /// Complete optional room/outfit sets, preloaded together to avoid missing frames.
+    pub lobby_themes: SVec<LobbyThemeMeta>,
     pub map_elements: SVec<Handle<ElementMeta>>,
     pub experimental_maps: SVec<Handle<MapMeta>>,
+}
+
+#[derive(Clone, Debug, HasSchema, Default)]
+#[repr(C)]
+pub struct LobbyThemeMeta {
+    pub id: Ustr,
+    pub map: Handle<MapMeta>,
+    pub players: SVec<Handle<PlayerMeta>>,
 }
 
 #[derive(HasSchema, Clone, Debug)]

@@ -331,7 +331,11 @@ mod platform {
 }
 
 /// Everywhere else: no music card, and nothing pretending there could be one.
-#[cfg(not(any(target_os = "macos", target_os = "linux")))]
+#[cfg(target_os = "windows")]
+#[path = "nowplaying_windows.rs"]
+mod platform;
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
 mod platform {
     use super::*;
 

@@ -297,7 +297,8 @@ macro_rules! install_plugins {
 
             session
                 .stages
-                .add_system_to_stage(CoreStage::First, handle_out_of_bounds_items);
+                .add_system_to_stage(CoreStage::First, handle_out_of_bounds_items)
+                .add_system_to_stage(CoreStage::First, clear_interaction_hints);
 
             $(
                 session.install_plugin($module::session_plugin);
@@ -421,4 +422,18 @@ pub fn player_landed_on(
             feet.min.x < right && feet.max.x > left && (feet.min.y - top).abs() <= LANDING_SLOP
         })
         .map(|(_, (idx, ..))| idx.0)
+}
+
+fn clear_interaction_hints(bridge: Option<ResMut<crate::gamenight::GameNightBridge>>) {
+    if let Some(mut bridge) = bridge { bridge.interaction_hints.clear(); }
+}
+
+/// Clear prompts only when the simulation advances, not between rendered frames.
+/// Deliberate station interactions require standing near the post, never a landing edge.
+pub fn players_on_pad(centre: Vec2, size: Vec2, entities: &Res<Entities>, indexes: &Comp<PlayerIdx>, bodies: &Comp<KinematicBody>, transforms: &Comp<Transform>) -> Vec<u32> {
+    entities.iter_with((indexes,bodies,transforms)).filter_map(|(_, (idx,body,transform))| {
+        let feet=body.bounding_box(*transform);
+        (body.is_on_ground && (feet.min.y-(centre.y-size.y/2.)).abs()<=12.
+            && transform.translation.x>=centre.x-size.x/2. && transform.translation.x<=centre.x+size.x/2.).then_some(idx.0)
+    }).collect()
 }

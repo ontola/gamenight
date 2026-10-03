@@ -63,6 +63,14 @@ impl From<tokio_tungstenite::tungstenite::Error> for SdkError {
 /// Session lifecycle events, in the order a game will see them.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameEvent {
+    /// Apply live presence and (when opted in) roster changes without restarting.
+    PartyUpdated {
+        session: SessionId,
+        seats: Vec<Seat>,
+        players: Vec<Player>,
+        presence: Vec<gamenight_protocol::PlayerPresence>,
+    },
+
     /// Warm up: load everything for these seats, then call [`GameNight::ready`].
     Prepare {
         session: SessionId,
@@ -180,6 +188,22 @@ impl GameNight {
             match self.ws.next().await {
                 Some(Ok(Message::Text(text))) => {
                     let event = match parse_server(&text)? {
+                        ServerMessage::PartyUpdated {
+                            session,
+                            seats,
+                            players,
+                            presence,
+                        } => {
+                            self.party.seats = seats.clone();
+                            self.party.players = players.clone();
+                            self.party.presence = presence.clone();
+                            GameEvent::PartyUpdated {
+                                session,
+                                seats,
+                                players,
+                                presence,
+                            }
+                        }
                         ServerMessage::Prepare {
                             session,
                             seats,
@@ -220,6 +244,34 @@ impl GameNight {
                 Some(Err(e)) => return Err(e.into()),
             }
         }
+    }
+
+    /// Opt into AFK notifications; set instant_join only if the game can insert
+    /// players into the current round. Call after Prepare and before ready.
+    pub async fn participation(
+        &mut self,
+        session: SessionId,
+        instant_join: bool,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::Participation {
+            session,
+            instant_join,
+        })
+        .await
+    }
+
+    /// Report real human input, including unassigned devices. Apply deadzones
+    /// before reporting and throttle held input to once per second per device.
+    pub async fn controller_input(
+        &mut self,
+        session: SessionId,
+        controller: String,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::ControllerInput {
+            session: Some(session),
+            controller,
+        })
+        .await
     }
 
     /// Assets loaded, controllers mapped: the session can start instantly.

@@ -36,6 +36,40 @@ pub fn player_state_transition(
     }
 }
 
+/// Presentation only: never changes controller state, velocity or collisions.
+#[derive(Clone, HasSchema, Default)]
+pub struct PresenceAnimation {
+    sleeping: bool,
+    wake_remaining: f32,
+    input_grace: f32,
+}
+impl PresenceAnimation {
+    fn step(&mut self, idle: bool, sleeping: bool, input: bool, dt: f32) -> Option<&'static str> {
+        self.input_grace = (self.input_grace - dt).max(0.0);
+        if input {
+            self.input_grace = 1.0;
+        }
+        if !idle {
+            self.sleeping = false;
+            self.wake_remaining = 0.0;
+            return None;
+        }
+        let sleeping = sleeping && self.input_grace == 0.0;
+        if self.sleeping && !sleeping {
+            self.wake_remaining = 4.0 / 9.0;
+        }
+        self.sleeping = sleeping;
+        if sleeping {
+            return Some("sleep");
+        }
+        if self.wake_remaining > 0.0 {
+            self.wake_remaining = (self.wake_remaining - dt).max(0.0);
+            return Some("wake");
+        }
+        Some("idle")
+    }
+}
+
 pub fn handle_player_state(
     entities: Res<Entities>,
     player_inputs: Res<MatchInputs>,
@@ -47,9 +81,32 @@ pub fn handle_player_state(
     mut audio_center: ResMut<AudioCenter>,
     collision_world: CollisionWorld,
     slippery: CompMut<Slippery>,
+    bridge: Option<Res<crate::gamenight::GameNightBridge>>,
+    time: Res<Time>,
+    mut presence: CompMut<PresenceAnimation>,
 ) {
     let players = entities.iter_with((&player_states, &player_indexes, &mut sprites, &mut bodies));
     for (player_ent, (player_state, player_idx, animation, body)) in players {
+        let control = &player_inputs.players[player_idx.0 as usize].control;
+        let has_input = control.move_direction != Vec2::ZERO
+            || control.jump_pressed
+            || control.shoot_pressed
+            || control.grab_just_pressed
+            || control.ragdoll_just_pressed
+            || control.menu_start_pressed
+            || control.menu_back_pressed
+            || control.menu_confirm_pressed;
+        if !presence.contains(player_ent) {
+            presence.insert(player_ent, PresenceAnimation::default());
+        }
+        let desired = presence.get_mut(player_ent).unwrap().step(
+            player_state.current == *ID,
+            bridge
+                .as_ref()
+                .is_some_and(|bridge| bridge.seat_sleeping(player_idx.0)),
+            has_input,
+            time.delta_seconds(),
+        );
         if player_state.current != *ID {
             continue;
         }
@@ -62,6 +119,14 @@ pub fn handle_player_state(
             animation.current = "idle".into();
         }
 
+        if let Some(desired) = desired {
+            if desired != "idle"
+                || animation.current == ustr("sleep")
+                || animation.current == ustr("wake")
+            {
+                animation.set_current(desired);
+            }
+        }
         let control = &player_inputs.players[player_idx.0 as usize].control;
 
         // If we are jumping
@@ -91,5 +156,26 @@ pub fn handle_player_state(
                 body.velocity.x = (body.velocity.x + meta.stats.slowdown * slide_factor).min(0.0);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PresenceAnimation;
+    #[test]
+    fn sleeping_holds_until_input_and_wake_returns_to_idle() {
+        let mut animation = PresenceAnimation::default();
+        assert_eq!(animation.step(true, true, false, 0.016), Some("sleep"));
+        assert_eq!(animation.step(true, true, false, 2.0), Some("sleep"));
+        assert_eq!(animation.step(true, true, true, 0.016), Some("wake"));
+        assert_eq!(animation.step(true, false, false, 0.5), Some("wake"));
+        assert_eq!(animation.step(true, false, false, 0.016), Some("idle"));
+    }
+    #[test]
+    fn movement_interrupts_sleep_instantly_without_waiting_for_host() {
+        let mut animation = PresenceAnimation::default();
+        animation.step(true, true, false, 0.016);
+        assert_eq!(animation.step(false, true, true, 0.016), None);
+        assert_eq!(animation.step(true, true, false, 0.016), Some("idle"));
     }
 }

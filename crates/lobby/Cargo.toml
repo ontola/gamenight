@@ -74,12 +74,16 @@ serde_json = "1.0"
 # gamenight.rs can reach the real winit `Window` to raise/fullscreen it.
 bevy = "0.11.3"
 bevy_ecs = "0.11.3"
+winit = { version = "0.28", default-features = false }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # Bring jumpy to the front (and hand focus back) exactly like GameNight's
 # native overlay used to: real NSApp activation, no floating panels.
 objc2 = "0.6"
 raw-window-handle = "0.5"
+
+[target."cfg(windows)".build-dependencies]
+winres = "0.1.12"
 
 # anyhow              = "1.0"
 # async-channel       = "1.7"

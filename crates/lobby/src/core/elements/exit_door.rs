@@ -65,6 +65,8 @@ pub struct ExitDoor {
     /// time: a doorway is one person wide, and tracking a set here would mean
     /// carrying a map in a component that is copied every frame.
     occupant: Option<(u32, f32)>,
+    /// Completed dwell stays latched while the host still shows this body.
+    completed: Option<u32>,
 }
 
 fn hydrate(
@@ -99,6 +101,7 @@ fn hydrate(
                     dwell_secs: *dwell_secs,
                     rejoin_block_secs: *rejoin_block_secs,
                     occupant: None,
+                    completed: None,
                 },
             );
         }
@@ -111,17 +114,18 @@ fn update(
     player_indexes: Comp<PlayerIdx>,
     bodies: Comp<KinematicBody>,
     transforms: Comp<Transform>,
-    time: Res<Time>,
     bridge: Option<ResMut<crate::gamenight::GameNightBridge>>,
 ) {
     let Some(mut bridge) = bridge else {
         // Standalone play: no party, so there is nothing to leave.
         return;
     };
-    let dt = time.delta_seconds();
 
     for (door_entity, door) in entities.iter_with(&mut doors) {
-        let Some(door_pos) = transforms.get(door_entity).map(|t| t.translation.truncate()) else {
+        let Some(door_pos) = transforms
+            .get(door_entity)
+            .map(|t| t.translation.truncate())
+        else {
             continue;
         };
         let half = door.size / 2.0;
@@ -141,45 +145,81 @@ fn update(
         let (bottom, top) = (door_pos.y - half.y, door_pos.y + half.y);
         let inside = entities
             .iter_with((&player_indexes, &bodies, &transforms))
-            .find(|(_, (_, body, transform))| {
-                if !body.is_on_ground {
+            .filter(|(_, (idx, body, transform))| {
+                if bridge.seat_player(idx.0).is_none() || !body.is_on_ground {
                     return false;
                 }
                 let b = body.bounding_box(**transform);
                 b.min.x < right && b.max.x > left && b.min.y < top && b.max.y > bottom
             })
-            .map(|(_, (idx, _, _))| idx.0);
+            .map(|(_, (idx, _, _))| idx.0).collect::<Vec<_>>();
 
-        match (inside, door.occupant) {
+        door.progress=0.;
+        for seat in inside {
+            if bridge.offer_interaction(seat, "Leave", Vec2::new(door_pos.x, bottom)) {
+                bridge.request_exit(seat as u8, door.rejoin_block_secs);
+            }
+        }
+    }
+}
+
+impl ExitDoor {
+    fn advance_dwell(&mut self, inside: Option<u32>, dt: f32) -> Option<u32> {
+        if self.completed.is_some() && self.completed == inside {
+            self.progress = 1.0;
+            return None;
+        }
+        self.completed = None;
+        match (inside, self.occupant) {
             (Some(seat), Some((held, elapsed))) if held == seat => {
                 let elapsed = elapsed + dt;
-                if elapsed >= door.dwell_secs {
-                    bridge.request_exit(seat as u8, door.rejoin_block_secs);
-                    door.occupant = None;
-                    door.progress = 0.0;
+                if elapsed >= self.dwell_secs {
+                    self.completed = Some(seat);
+                    self.occupant = None;
+                    self.progress = 1.0;
+                    return Some(seat);
                 } else {
-                    door.occupant = Some((seat, elapsed));
-                    door.progress = elapsed / door.dwell_secs;
+                    self.occupant = Some((seat, elapsed));
+                    self.progress = elapsed / self.dwell_secs;
                 }
             }
             // Somebody new stepped in, or the doorway just became occupied.
             (Some(seat), _) => {
-                door.occupant = Some((seat, 0.0));
-                door.progress = 0.0;
+                self.occupant = Some((seat, 0.0));
+                self.progress = 0.0;
             }
             // Empty. Reset rather than pause: half a step through the door
             // should not be banked against your next walk past it.
             (None, _) => {
-                door.occupant = None;
-                door.progress = 0.0;
+                self.occupant = None;
+                self.progress = 0.0;
             }
         }
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completed_leave_does_not_restart_while_departure_is_pending() {
+        let mut door = ExitDoor {
+            dwell_secs: 1.0,
+            ..Default::default()
+        };
+        assert_eq!(door.advance_dwell(Some(0), 0.0), None);
+        assert_eq!(door.advance_dwell(Some(0), 1.0), Some(0));
+        for _ in 0..4 {
+            assert_eq!(door.advance_dwell(Some(0), 1.0), None);
+            assert_eq!(door.progress, 1.0);
+        }
+        assert_eq!(door.advance_dwell(None, 0.0), None);
+        assert_eq!(door.progress, 0.0);
+        assert_eq!(door.advance_dwell(Some(1), 0.0), None);
+        assert_eq!(door.advance_dwell(Some(1), 1.0), Some(1));
+    }
 
     /// The doorway's metadata must not be mistakable for another element's.
     ///

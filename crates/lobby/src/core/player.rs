@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use crate::prelude::*;
 
+pub mod punch;
 mod state;
 pub use state::*;
 use turborand::GenCore;
@@ -17,6 +18,7 @@ const PLAYER_COLORS: [Color; 4] = [
 
 pub fn plugin(session: &mut SessionBuilder) {
     session.install_plugin(state::plugin);
+    punch::install(session);
 
     // Add other player systems
     session
@@ -932,7 +934,7 @@ fn play_itemless_fin_animations(
     {
         let inventory = player_inventories[player_idx.0 as usize];
 
-        if inventory.is_none() {
+        if inventory.is_none() || matches!(animation_bank.current.as_str(), "sleep" | "wake") {
             player_layers.fin_anim = animation_bank.current;
         }
     }
@@ -958,7 +960,8 @@ fn player_facial_animations(
             &mut emote_states,
         ))
     {
-        if players_killed.contains(player_ent) {
+        if players_killed.contains(player_ent) || matches!(animation_bank.current.as_str(), "sleep" | "wake") {
+            commands.add(Emote::stop_animation(player_ent));
             *emote_state = EmoteState::Neutral;
             player_layer.face_anim = animation_bank.current;
             continue;

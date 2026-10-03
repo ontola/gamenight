@@ -1,3 +1,4 @@
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/87333478?s=200&v=4")]
 // This cfg_attr is needed because `rustdoc::all` includes lints not supported on stable
 #![cfg_attr(doc, allow(unknown_lints))]
@@ -13,12 +14,15 @@ use bones_bevy_renderer::BonesBevyRenderer;
 use bones_framework::prelude::*;
 
 pub mod audio;
+mod branding;
+mod startup_timing;
 pub mod core;
 pub mod debug;
 pub mod fullscreen;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod dev_pads;
 pub mod gamenight;
+mod player_links;
 #[cfg(target_os = "macos")]
 pub mod gamenight_macos;
 pub mod input;
@@ -134,6 +138,7 @@ pub struct GameMusic {
 }
 
 fn main() {
+    let startup_started = std::time::Instant::now();
     if !std::path::Path::new("assets").exists() {
         let manifest_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         if manifest_dir.join("assets").exists() {
@@ -204,17 +209,6 @@ fn main() {
     // to. Opening to a title screen — or letting Start pause into one — is
     // precisely what the lobby exists not to do.
 
-    // The attract overlay: drawn over the running lobby whenever nobody is in
-    // the party. Priority above the game session so it sits on top of the room.
-    game.sessions
-        .create_with(SessionNames::PRESS_START, |builder: &mut SessionBuilder| {
-            builder.install_plugin(ui::press_start::session_plugin);
-        });
-    game.sessions
-        .get_mut(SessionNames::PRESS_START)
-        .unwrap()
-        .priority = 2;
-
     // Scoring menu plugin, activated by game between round tarnsitions when appropriate
     game.sessions
         .create_with(SessionNames::SCORING, |builder: &mut SessionBuilder| {
@@ -251,9 +245,11 @@ fn main() {
     .app();
 
     app.insert_resource(bevy::winit::WinitSettings::game());
+    app.add_systems(bevy::prelude::Update, branding::apply);
     gamenight::install_global_input(&mut app);
     shot::install(&mut app);
 
+    startup_timing::install(&mut app, startup_started);
     app.run();
 }
 

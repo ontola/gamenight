@@ -1,7 +1,6 @@
 use crate::prelude::*;
 
 pub mod notification;
-pub mod press_start;
 pub mod player_image;
 pub mod scoring;
 

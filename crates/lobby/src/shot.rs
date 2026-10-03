@@ -30,6 +30,7 @@ struct Shot {
     path: String,
     at: f32,
     taken: Option<f32>,
+    interval: Option<f32>,
 }
 
 pub fn install(app: &mut App) {
@@ -45,6 +46,8 @@ pub fn install(app: &mut App) {
         path,
         at,
         taken: None,
+        // Optional repeated self-capture leaves the live lobby running.
+        interval: std::env::var("LOBBY_SHOT_INTERVAL").ok().and_then(|v| v.parse::<f32>().ok()).filter(|v| *v >= 1.0),
     });
     app.add_systems(Update, capture);
 }
@@ -59,10 +62,12 @@ fn capture(
     let now = time.elapsed_seconds();
 
     if let Some(taken) = shot.taken {
-        if now - taken > WRITE_GRACE {
-            exit.send(bevy::app::AppExit);
+        if let Some(interval) = shot.interval {
+            if now - taken < interval { return; }
+        } else {
+            if now - taken > WRITE_GRACE { exit.send(bevy::app::AppExit); }
+            return;
         }
-        return;
     }
 
     if now < shot.at {

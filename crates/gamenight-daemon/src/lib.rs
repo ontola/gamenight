@@ -157,7 +157,7 @@ impl Shared {
         // earlier in the evening. A guard against the daemon acting on its own
         // must never override the party acting on purpose.
         match &command {
-            Command::PlayNext { game } | Command::RequestStart { game } => {
+            Command::PlayNext { game } | Command::QueueNext { game } | Command::RequestStart { game } => {
                 if self.quit_games.remove(game) {
                     info!(%game, "the party asked for it again — it may start");
                 }
@@ -168,7 +168,7 @@ impl Shared {
             }
             _ => {}
         }
-        if let Command::PlayNext { game } = &command {
+        if let Command::PlayNext { game } | Command::QueueNext { game } = &command {
             if !self.launch_specs.contains_key(game) {
                 if let Some(prewarm) = &self.prewarm {
                     info!(%game, "playing an uninstalled catalogue game — bumping the prewarm queue");
@@ -255,6 +255,16 @@ impl Shared {
             return;
         };
         let msg = match command {
+            GameCommand::PartyUpdated {
+                seats,
+                players,
+                presence,
+            } => ServerMessage::PartyUpdated {
+                session,
+                seats,
+                players,
+                presence,
+            },
             GameCommand::Prepare { seats, players } => ServerMessage::Prepare {
                 session,
                 game: game.clone(),
@@ -389,6 +399,17 @@ impl Shared {
     }
 }
 
+// Games need party identity and settings, not the lobby's embedded catalog art.
+// Keep Welcome within lightweight clients' frame limits as the catalog grows.
+fn game_welcome_snapshot(mut party: gamenight_protocol::PartySnapshot) -> gamenight_protocol::PartySnapshot {
+    for game in &mut party.library {
+        game.cover = None;
+        game.icon = None;
+        game.screenshot = None;
+    }
+    party
+}
+
 fn send(tx: &Tx, msg: &ServerMessage) {
     // A closed channel means the peer is gone; its reader task cleans up.
     let _ = tx.send(msg.to_json());
@@ -502,6 +523,9 @@ fn spawn_install_progress_pump(
                 {
                     info!(game = %status.game, "background install joined the shelf");
                     let mut s = shared.lock().await;
+                    if let Some(launch) = &meta.launch {
+                        s.launch_specs.insert(meta.id.clone(), launch.clone());
+                    }
                     let fx = s.night.add_to_library(meta);
                     s.apply_effects(fx, None);
                 }
@@ -563,6 +587,8 @@ pub fn bundled_lobby_meta() -> Option<GameMeta> {
         title: "GameNight Lobby".into(),
         tagline: Some("The couch you gather on.".into()),
         cover: None,
+        icon: None,
+        screenshot: None,
         color: Some("#6366f1".into()),
         emoji: Some("🛋️".into()),
         players: Some("1–4".into()),
@@ -622,6 +648,8 @@ pub fn demo_library() -> Vec<GameMeta> {
         title: "Demo Game".into(),
         tagline: Some("A tiny SDK game, warm and waiting.".into()),
         cover: None,
+        icon: None,
+        screenshot: None,
         color: Some("#3ddc97".into()),
         emoji: Some("🎲".into()),
         players: Some("1–4".into()),
@@ -635,12 +663,50 @@ pub fn demo_library() -> Vec<GameMeta> {
 /// Load the shelf from a JSON file (an array of `GameMeta`).
 pub fn load_library(path: &str) -> std::io::Result<Vec<GameMeta>> {
     let text = std::fs::read_to_string(path)?;
-    serde_json::from_str(&text).map_err(|e| {
+    let mut library: Vec<GameMeta> = serde_json::from_str(&text).map_err(|e| {
         std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             format!("bad library file {path}: {e}"),
         )
-    })
+    })?;
+    let root = std::path::Path::new(path)
+        .parent()
+        .unwrap_or(std::path::Path::new("."));
+    for game in &mut library {
+        for artwork in [&mut game.cover, &mut game.icon, &mut game.screenshot] {
+            if let Some(cover) = artwork
+                .clone()
+                .filter(|cover| !cover.contains("://") && !cover.starts_with("data:"))
+            {
+                let relative = std::path::Path::new(&cover);
+                let safe = !relative.is_absolute()
+                    && relative.components().all(|part| {
+                        matches!(
+                            part,
+                            std::path::Component::Normal(_) | std::path::Component::CurDir
+                        )
+                    });
+                *artwork = if safe {
+                    std::fs::File::open(root.join(relative))
+                        .ok()
+                        .and_then(|file| {
+                            use std::io::Read;
+                            let mut bytes = Vec::new();
+                            file.take((gamenight_protocol::artwork::MAX_PNG_BYTES + 1) as u64)
+                                .read_to_end(&mut bytes)
+                                .ok()?;
+                            gamenight_protocol::artwork::png_data_uri(&bytes)
+                        })
+                } else {
+                    None
+                };
+                if artwork.is_none() {
+                    tracing::warn!(game = ?game.id, "cover unavailable; using title/color fallback");
+                }
+            }
+        }
+    }
+    Ok(library)
 }
 
 /// Run the daemon on an already-bound listener until the process is stopped.
@@ -714,8 +780,19 @@ pub async fn run_desktop(
     listener: TcpListener,
     library: Vec<GameMeta>,
     lobby_game: GameId,
+    prewarm: Option<gamenight_installer::PrewarmHandle>,
+    install_progress: Option<mpsc::UnboundedReceiver<gamenight_protocol::InstallStatus>>,
 ) -> std::io::Result<()> {
-    run_inner(listener, library, Some(lobby_game), None, None, true, true).await
+    run_inner(
+        listener,
+        library,
+        Some(lobby_game),
+        prewarm,
+        install_progress,
+        true,
+        true,
+    )
+    .await
 }
 
 /// The one real body behind the `run*` family.
@@ -771,10 +848,21 @@ async fn run_inner(
         }
         s.apply_effects(fx, None);
     }
+    let mut presence_tick = tokio::time::interval(std::time::Duration::from_secs(1));
+    let mut presence_at = std::time::Instant::now();
     let mut lifetime_tick = tokio::time::interval(std::time::Duration::from_millis(200));
     loop {
         let accepted = tokio::select! {
             accepted = listener.accept() => accepted,
+            _ = presence_tick.tick() => {
+                let now = std::time::Instant::now();
+                let elapsed = now.duration_since(presence_at);
+                presence_at = now;
+                let mut s = shared.lock().await;
+                let fx = s.night.handle(Command::PresenceTick { elapsed });
+                s.apply_effects(fx, None);
+                continue;
+            },
             _ = lifetime_tick.tick(), if watched_lobby.is_some() => {
                 let mut s = shared.lock().await;
                 let lobby = watched_lobby.as_ref().expect("guarded");
@@ -969,7 +1057,7 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
-                    party: s.night.snapshot(),
+                    party: game_welcome_snapshot(s.night.snapshot()),
                 },
             );
             s.dispatch(
@@ -1084,6 +1172,28 @@ fn message_to_command(
     let is_game = matches!(registration, Registration::Game(_));
     let command = match msg {
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
+        ClientMessage::Participation {
+            session,
+            instant_join,
+        } => match registration {
+            Registration::Game(game) => Command::Participation {
+                game: game.clone(),
+                session,
+                instant_join,
+            },
+            _ => return Err("only games declare participation".into()),
+        },
+        ClientMessage::ControllerInput {
+            session,
+            controller,
+        } => Command::ControllerInput {
+            game: match registration {
+                Registration::Game(game) => Some(game.clone()),
+                _ => None,
+            },
+            session,
+            controller,
+        },
 
         // Game messages.
         ClientMessage::Ready { session } if is_game => Command::SessionReady { session },
@@ -1146,6 +1256,13 @@ fn message_to_command(
         ClientMessage::RenamePlayer { player_id, name } => {
             Command::RenamePlayer { player_id, name }
         }
+        ClientMessage::SetPlayerSkinColor {
+            player_id,
+            skin_color,
+        } => Command::SetPlayerSkinColor {
+            player_id,
+            skin_color,
+        },
         ClientMessage::SetPlayerColor { player_id, color } => {
             Command::SetPlayerColor { player_id, color }
         }
@@ -1154,9 +1271,23 @@ fn message_to_command(
         }
         ClientMessage::AssignSeat { seat, occupant } => Command::AssignSeat { seat, occupant },
         ClientMessage::SwapSeats { a, b } => Command::SwapSeats { a, b },
+        ClientMessage::BindController {
+            player_id,
+            controller,
+        } => Command::BindController {
+            player_id,
+            controller,
+        },
         ClientMessage::SetPlaylist { entries } => Command::SetPlaylist { entries },
+        ClientMessage::MovePlaylistEntry { expected, from, to } => {
+            Command::MovePlaylistEntry { expected, from, to }
+        }
+        ClientMessage::RemovePlaylistEntry { expected, index } => {
+            Command::RemovePlaylistEntry { expected, index }
+        }
         ClientMessage::Next => Command::Next,
         ClientMessage::PlayNext { game } => Command::PlayNext { game },
+        ClientMessage::QueueNext { game } => Command::QueueNext { game },
         ClientMessage::Pause => Command::Pause,
         ClientMessage::Resume => Command::Resume,
         ClientMessage::OpenOverlay => Command::OverlayOpened,
@@ -1210,5 +1341,58 @@ mod desktop_lifetime_tests {
         )
         .await
         .is_err());
+    }
+}
+
+#[cfg(test)]
+mod local_artwork_tests {
+    #[test]
+    fn shelf_resolves_packaged_png_and_falls_back_for_missing_art() {
+        let root = std::env::temp_dir().join(format!("gamenight-art-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let mut png = vec![0; 33];
+        png[..8].copy_from_slice(b"\x89PNG\r\n\x1a\n");
+        png[12..16].copy_from_slice(b"IHDR");
+        png[16..20].copy_from_slice(&128u32.to_be_bytes());
+        png[20..24].copy_from_slice(&128u32.to_be_bytes());
+        std::fs::write(root.join("icon.png"), &png).unwrap();
+        std::fs::write(root.join("shelf.json"), r##"[{"id":"one","title":"One","cover":"icon.png","icon":"icon.png","screenshot":"icon.png","color":"#44CCAA"},{"id":"two","title":"Two","cover":"missing.png"},{"id":"three","title":"Three","cover":"../icon.png"}]"##).unwrap();
+        let games = super::load_library(root.join("shelf.json").to_str().unwrap()).unwrap();
+        assert_eq!(
+            gamenight_protocol::artwork::decode_png_data_uri(games[0].cover.as_ref().unwrap()),
+            Some(png)
+        );
+        assert_eq!(games[0].icon, games[0].cover);
+        assert_eq!(games[0].screenshot, games[0].cover);
+        assert_eq!(games[0].color.as_deref(), Some("#44CCAA"));
+        assert!(games[1].cover.is_none());
+        assert!(games[2].cover.is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod welcome_artwork_tests {
+    use super::*;
+
+    #[test]
+    fn game_welcome_omits_large_catalog_art_but_preserves_metadata() {
+        let mut night = GameNight::default();
+        let art = "x".repeat(400_000);
+        let game: GameMeta = serde_json::from_value(serde_json::json!({
+            "id": "test", "title": "Test", "cover": art,
+            "icon": art, "screenshot": art, "min_players": 2
+        })).unwrap();
+        night.set_library(vec![game]);
+        let original = night.snapshot();
+        assert!(serde_json::to_vec(&original).unwrap().len() > 1024 * 1024);
+        let compact = game_welcome_snapshot(original.clone());
+        assert!(serde_json::to_vec(&compact).unwrap().len() < 1024 * 1024);
+        assert_eq!(compact.library[0].title, original.library[0].title);
+        assert_eq!(compact.library[0].min_players, original.library[0].min_players);
+        assert!(compact.library[0].cover.is_none());
+        assert!(compact.library[0].icon.is_none());
+        assert!(compact.library[0].screenshot.is_none());
+        assert!(original.library[0].cover.is_some());
     }
 }

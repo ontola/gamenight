@@ -29,10 +29,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     drop(TcpListener::bind(("127.0.0.1", port))?);
     let daemon = root.join("bin/gamenight-daemon.exe");
     let lobby = root.join("bin/lobby.exe");
-    let love = root.join("love/love.exe");
-    let game_dir = root.join("pinpals");
     let lobby_dir = root.join("lobby");
-    for path in [&daemon, &lobby, &love, &game_dir.join("main.lua")] {
+    for path in [&daemon, &lobby, &root.join("catalog/games/pinpals.json")] {
         if !path.is_file() {
             return Err(format!("Missing package file: {}", path.display()).into());
         }
@@ -46,20 +44,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .open(local.join("launcher.lock"))?;
     lock.try_lock()
         .map_err(|_| "GameNight is already running")?;
-    // Versioned content stays outside Velopack's replaceable application folder.
-    let love_dir = data::seed_content(root, &local, "love", "11.5")?;
-    let game_dir = data::seed_content(
-        root,
-        &local,
-        "pinpals",
-        "95ea42fe544cf3906c90aeb556359180964c1e88",
-    )?;
-    let love = love_dir.join("love.exe");
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
     let shelf = serde_json::json!([
-        {"id":"pinpals", "title":"Pinpals", "players":"2", "min_players":2, "max_players":2,
-         "emoji":"", "color":"#f5a742", "launch":{"command":love, "args":[game_dir], "cwd":game_dir}},
         {"id":"lobby", "title":"GameNight", "players":"1-4", "min_players":1, "max_players":4,
          "emoji":"", "color":"#7c5cff", "launch":{"command":lobby, "cwd":lobby_dir,
          "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
@@ -71,7 +58,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .current_dir(root)
         .env("GAMENIGHT_ADDR", format!("127.0.0.1:{port}"))
         .env("GAMENIGHT_LIBRARY", shelf_path)
-        .env("GAMENIGHT_NO_PREWARM", "1")
+        .env("GAMENIGHT_CATALOG", root.join("catalog/games"))
+        .env("GAMENIGHT_INSTALL_DIR", local.join("games"))
+        .env_remove("GAMENIGHT_NO_PREWARM")
         .env("GAMENIGHT_EXIT_WITH_LOBBY", "1")
         .env("GAMENIGHT_STARTUP_GATE", "1")
         .stdin(Stdio::piped())

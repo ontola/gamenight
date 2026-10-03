@@ -24,7 +24,7 @@
       ]
     },
     "cover": {
-      "description": "Real cover art URL. `emoji` + `color` are the generated-poster fallback.",
+      "description": "Portrait cover art. Use a small embedded PNG for offline lobby rendering.",
       "type": [
         "string",
         "null"
@@ -44,6 +44,13 @@
       }
     },
     "emoji": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "icon": {
+      "description": "Square game icon (favicon), used on case spines.",
       "type": [
         "string",
         "null"
@@ -88,6 +95,13 @@
         }
       ]
     },
+    "screenshot": {
+      "description": "Gameplay screenshot, displayed on the lobby TV.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "tagline": {
       "type": [
         "string",
@@ -121,6 +135,17 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "runtime": {
+          "description": "Shared interpreter needed to launch this game (downloaded once).",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RuntimeDownload"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "sha256": {
@@ -278,6 +303,49 @@
         }
       },
       "additionalProperties": false
+    },
+    "RuntimeArgument": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "entry_point"
+          ]
+        },
+        {
+          "description": "Pass the directory containing the game's entrypoint (e.g. LÖVE).",
+          "type": "string",
+          "const": "game_directory"
+        }
+      ]
+    },
+    "RuntimeDownload": {
+      "type": "object",
+      "properties": {
+        "argument": {
+          "$ref": "#/$defs/RuntimeArgument",
+          "default": "entry_point"
+        },
+        "entrypoint": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "url",
+        "sha256",
+        "entrypoint"
+      ]
     }
   }
 }

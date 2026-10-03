@@ -45,8 +45,6 @@ fn hydrate(
     element_handles: Comp<ElementHandle>,
     assets: Res<AssetServer>,
     mut signs: CompMut<QrSign>,
-    mut solids: CompMut<Solid>,
-    transforms: Comp<Transform>,
 ) {
     let mut not_hydrated_bitset = hydrated.bitset().clone();
     not_hydrated_bitset.bit_not();
@@ -59,21 +57,9 @@ fn hydrate(
         if let Ok(QrSignMeta { size }) = assets.get(element_meta.data).try_cast_ref() {
             hydrated.insert(entity, MapElementHydrated);
             signs.insert(entity, QrSign { size: *size });
-            // The sign is a platform, not scenery on a wall: the party can
-            // stand on it, which is also what stops it reading as something
-            // painted on the sky.
-            solids.insert(
-                entity,
-                Solid {
-                    disabled: false,
-                    pos: transforms
-                        .get(entity)
-                        .map(|t| t.translation.truncate())
-                        .unwrap_or_default(),
-                    size: *size + Vec2::splat(SCREEN_FRAME * 2.0),
-                    ..default()
-                },
-            );
+            // Wall display only. The map provides the landing under sign-in;
+            // the QR must not block movement or become an invisible collider.
+
         }
     }
 }

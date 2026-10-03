@@ -41,9 +41,13 @@ async fn start_server(daemon: &str) -> String {
 /// Minimal HTTP POST — keeps this a genuine over-the-wire test without
 /// dragging an HTTP client into the dependency tree.
 async fn post(addr: &str, path: &str, body: &str) -> (u16, String) {
+    http(addr, "POST", path, body).await
+}
+
+async fn http(addr: &str, method: &str, path: &str, body: &str) -> (u16, String) {
     let mut stream = TcpStream::connect(addr).await.unwrap();
     let req = format!(
-        "POST {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
+        "{method} {path} HTTP/1.1\r\nHost: {addr}\r\nContent-Type: application/json\r\n\
          Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
     );
@@ -55,7 +59,11 @@ async fn post(addr: &str, path: &str, body: &str) -> (u16, String) {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = raw
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
+        .to_string();
     (status, body)
 }
 
@@ -119,7 +127,7 @@ fn profile_json(id: &str, username: &str, color: &str, avatar: &str) -> String {
     serde_json::to_string(&Profile {
         id: id.into(),
         username: username.into(),
-        color: color.into(),
+        skin_color: color.into(),
         avatar: avatar.into(),
     })
     .unwrap()
@@ -150,10 +158,12 @@ async fn join_without_claim_adds_a_player() {
     assert_eq!(status, 200, "join failed: {body}");
     assert!(body.contains("\"joined\""), "expected joined, got {body}");
 
-    let party = watcher.wait_for(|p| !p.players.is_empty()).await;
+    let party = watcher
+        .wait_for(|p| p.players.iter().any(|p| p.skin_color.is_some()))
+        .await;
     assert_eq!(party.players.len(), 1);
     assert_eq!(party.players[0].name, "Ada");
-    assert_eq!(party.players[0].color.as_deref(), Some("#ff0000"));
+    assert_eq!(party.players[0].skin_color.as_deref(), Some("#ff0000"));
     assert_eq!(party.players[0].avatar.as_deref(), Some("avatar-a"));
 }
 
@@ -218,7 +228,7 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
         .wait_for(|p| {
             p.players.iter().any(|pl| {
                 pl.name == "Grace"
-                    && pl.color.as_deref() == Some("#00ff00")
+                    && pl.skin_color.as_deref() == Some("#00ff00")
                     && pl.avatar.as_deref() == Some("avatar-g")
             })
         })
@@ -234,7 +244,12 @@ async fn claim_rewrites_the_existing_player_instead_of_adding_one() {
     let claimed = &party.players[0];
     assert_eq!(claimed.id, target, "claim must rewrite the same player id");
     assert_eq!(claimed.name, "Grace");
-    assert_eq!(claimed.color.as_deref(), Some("#00ff00"));
+    assert_eq!(claimed.skin_color.as_deref(), Some("#00ff00"));
+    assert_eq!(
+        claimed.color.as_deref(),
+        Some("#5c9eff"),
+        "profile must not overwrite game clothing colour"
+    );
     assert_eq!(
         claimed.avatar.as_deref(),
         Some("avatar-g"),
@@ -324,7 +339,7 @@ async fn claiming_an_unknown_player_adds_nobody() {
         ),
     )
     .await;
-    assert_eq!(status, 200);
+    assert_eq!(status, 404);
 
     // Give the daemon a moment to have done the wrong thing, if it were going to.
     let mut probe = Watcher::connect(&daemon).await;
@@ -368,7 +383,11 @@ async fn get(addr: &str, path: &str) -> (u16, String) {
         .nth(1)
         .and_then(|s| s.parse().ok())
         .unwrap_or(0);
-    let body = raw.split("\r\n\r\n").nth(1).unwrap_or("").to_string();
+    let body = raw
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body)
+        .unwrap_or("")
+        .to_string();
     (status, body)
 }
 
@@ -384,6 +403,12 @@ async fn session_url_with_claim_serves_a_studio_that_reads_it() {
 
     let (status, body) = get(&server, &format!("/session/gn-couch?claim={}", player.0)).await;
     assert_eq!(status, 200, "the claim URL must serve the studio");
+    assert!(
+        body.contains("/web/storage.js"),
+        "the page must load the shared editor"
+    );
+    let (status, body) = get(&server, "/web/studio.js").await;
+    assert_eq!(status, 200, "the shared script must be served");
     assert!(
         body.contains("claimPlayerId"),
         "the studio page must parse the claim parameter"
@@ -461,7 +486,7 @@ async fn join_reports_the_player_it_created_and_repeats_dont_duplicate() {
         .wait_for(|p| {
             p.players.iter().any(|pl| {
                 pl.name == "Ada Lovelace"
-                    && pl.color.as_deref() == Some("#00ff00")
+                    && pl.skin_color.as_deref() == Some("#00ff00")
                     && pl.avatar.as_deref() == Some("avatar-b")
             })
         })
@@ -808,4 +833,405 @@ async fn browser_cannot_override_the_host_daemon_address() {
     assert_eq!(status, 200);
     let party = watcher.wait_for(|party| !party.players.is_empty()).await;
     assert_eq!(party.players[0].name, "Ada");
+}
+
+#[tokio::test]
+async fn playlist_move_is_live_and_rejects_stale_or_invalid_positions() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    watcher
+        .ws
+        .send(Message::Text(
+            ClientMessage::SetPlaylist {
+                entries: ["a", "b", "c"]
+                    .into_iter()
+                    .map(|id| PlaylistEntry {
+                        game: GameId::new(id),
+                        title: id.into(),
+                    })
+                    .collect(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+    let party = watcher.wait_for(|p| p.playlist.entries.len() == 3).await;
+    let (status, body) = http(&server, "GET", "/api/playlist", "").await;
+    assert_eq!(status, 200);
+    let initial: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(
+        initial["playlist"],
+        serde_json::to_value(&party.playlist).unwrap()
+    );
+    let request = serde_json::json!({ "expected": party.playlist, "from": 2, "to": 0 }).to_string();
+    let (status, body) = post(&server, "/api/playlist", &request).await;
+    assert_eq!(status, 200, "{body}");
+    let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(view["playlist"]["entries"][0]["game"], "c");
+    assert!(view.get("library").is_none());
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 409);
+    let request =
+        serde_json::json!({ "expected": view["playlist"], "from": 99, "to": 0 }).to_string();
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 400);
+    watcher
+        .wait_for(|p| p.playlist.entries[0].game == GameId::new("c"))
+        .await;
+}
+
+#[tokio::test]
+async fn playlist_removal_is_broadcast_and_guarded() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    watcher
+        .ws
+        .send(Message::Text(
+            ClientMessage::SetPlaylist {
+                entries: ["a", "b", "a"]
+                    .into_iter()
+                    .map(|id| PlaylistEntry {
+                        game: GameId::new(id),
+                        title: id.into(),
+                    })
+                    .collect(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+    let before = watcher.wait_for(|p| p.playlist.entries.len() == 3).await;
+    let request =
+        serde_json::json!({"expected": before.playlist, "from": 0, "remove": true}).to_string();
+    let (code, body) = post(&server, "/api/playlist", &request).await;
+    assert_eq!(code, 200, "{body}");
+    let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(view["playlist"]["entries"][0]["game"], "b");
+    assert_eq!(view["playlist"]["entries"][1]["game"], "a");
+    watcher.wait_for(|p| p.playlist.entries.len() == 2).await;
+    assert_eq!(post(&server, "/api/playlist", &request).await.0, 409);
+    for change in [
+        serde_json::json!({"from":99,"remove":true}),
+        serde_json::json!({"from":0}),
+        serde_json::json!({"from":0,"to":1,"remove":true}),
+    ] {
+        let mut req = change;
+        req["expected"] = view["playlist"].clone();
+        assert_eq!(
+            post(&server, "/api/playlist", &req.to_string()).await.0,
+            400
+        );
+    }
+}
+
+#[tokio::test]
+async fn web_reorder_broadcasts_the_new_up_next_to_the_lobby() {
+    use gamenight_protocol::{GameId, PlaylistEntry, SessionPhase};
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let daemon = start_daemon().await;
+        let server = start_server(&daemon).await;
+        let mut lobby = Watcher::connect(&daemon).await;
+        let mut games = Vec::new();
+        for id in ["a", "b", "c"] {
+            let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{daemon}"))
+                .await
+                .unwrap();
+            ws.send(Message::Text(
+                ClientMessage::Hello {
+                    role: Role::Game,
+                    game: Some(GameId::new(id)),
+                    token: None,
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+            games.push(ws);
+        }
+        lobby.wait_for(|p| p.connected_games.len() == 3).await;
+        lobby
+            .ws
+            .send(Message::Text(
+                ClientMessage::SetPlaylist {
+                    entries: ["a", "b", "c"]
+                        .into_iter()
+                        .map(|id| PlaylistEntry {
+                            game: GameId::new(id),
+                            title: id.into(),
+                        })
+                        .collect(),
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        let party = lobby.wait_for(|p| p.warm_session.is_some()).await;
+        let first = party.warm_session.unwrap().id;
+        games[0]
+            .send(Message::Text(
+                ClientMessage::Ready { session: first }.to_json(),
+            ))
+            .await
+            .unwrap();
+        let before = lobby
+            .wait_for(|p| p.active_session.is_some() && p.warm_session.is_some())
+            .await;
+        let request =
+            serde_json::json!({"expected": before.playlist, "from": 2, "to": 1}).to_string();
+        let (status, body) = post(&server, "/api/playlist", &request).await;
+        assert_eq!(status, 200, "{body}");
+        let view: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(view["next"], "c");
+        let updated = lobby
+            .wait_for(|p| {
+                p.warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.game == GameId::new("c"))
+            })
+            .await;
+        assert_eq!(updated.active_session.unwrap().id, first);
+        games[2]
+            .send(Message::Text(
+                ClientMessage::Ready {
+                    session: updated.warm_session.unwrap().id,
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        lobby
+            .wait_for(|p| {
+                p.warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.phase == SessionPhase::Ready)
+            })
+            .await;
+        let (status, body) = http(&server, "GET", "/api/playlist", "").await;
+        assert_eq!(status, 200);
+        let ready: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(ready["next"], "c");
+        assert_eq!(ready["playing"], "a");
+    })
+    .await
+    .expect("playlist update must reach the lobby promptly");
+}
+
+#[tokio::test]
+async fn opted_in_game_receives_a_new_controller_without_a_new_session() {
+    use gamenight_protocol::{GameId, PlaylistEntry};
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        let addr = start_daemon().await;
+        let mut overlay = Watcher::connect(&addr).await;
+        let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .unwrap();
+        game.send(Message::Text(
+            ClientMessage::Hello {
+                role: Role::Game,
+                game: Some(GameId::new("arena")),
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        overlay.wait_for(|p| !p.connected_games.is_empty()).await;
+        overlay
+            .ws
+            .send(Message::Text(
+                ClientMessage::SetPlaylist {
+                    entries: vec![PlaylistEntry {
+                        game: GameId::new("arena"),
+                        title: "Arena".into(),
+                    }],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        let party = overlay.wait_for(|p| p.warm_session.is_some()).await;
+        let session = party.warm_session.unwrap().id;
+        game.send(Message::Text(
+            ClientMessage::Participation {
+                session,
+                instant_join: true,
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        game.send(Message::Text(ClientMessage::Ready { session }.to_json()))
+            .await
+            .unwrap();
+        overlay.wait_for(|p| p.active_session.is_some()).await;
+        game.send(Message::Text(
+            ClientMessage::ControllerInput {
+                session: Some(session),
+                controller: "ordinal:2".into(),
+            }
+            .to_json(),
+        ))
+        .await
+        .unwrap();
+        let party = overlay.wait_for(|p| p.players.len() == 1).await;
+        let player = party.players[0].id;
+        assert_eq!(party.active_session.unwrap().id, session);
+        assert_eq!(party.seats[0].controller.as_deref(), Some("ordinal:2"));
+        loop {
+            if let Message::Text(text) = game.next().await.unwrap().unwrap() {
+                if let ServerMessage::PartyUpdated {
+                    session: update,
+                    players,
+                    presence,
+                    ..
+                } = serde_json::from_str(&text).unwrap()
+                {
+                    if players.len() == 1 {
+                        assert_eq!(update, session);
+                        assert_eq!(players[0].id, player);
+                        assert_eq!(presence[0].player_id, player);
+                        break;
+                    }
+                }
+            }
+        }
+    })
+    .await
+    .expect("live join must reach the running game promptly");
+}
+
+#[tokio::test]
+async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("phone", "Disco", "#336699", "face"),
+    )
+    .await;
+    let (_, joined) = post(&server, "/api/profiles/phone/join", "{}").await;
+    let joined: serde_json::Value = serde_json::from_str(&joined).unwrap();
+    let id = joined["player_id"].as_str().unwrap();
+    let before = Watcher::connect(&daemon).await.party;
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    let links: serde_json::Value = serde_json::from_str(&links).unwrap();
+    assert_eq!(links["linked"][0], id);
+    assert_eq!(
+        post(&server, &format!("/api/player-links/{id}/unlink"), "")
+            .await
+            .0,
+        204
+    );
+    let after = Watcher::connect(&daemon).await.party;
+    assert_eq!(before.players[0].id, after.players[0].id);
+    assert_ne!(before.players[0].name, after.players[0].name);
+    assert!(after.players[0].avatar.as_deref().unwrap_or("").is_empty());
+    assert_eq!(before.seats, after.seats);
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    let links: serde_json::Value = serde_json::from_str(&links).unwrap();
+    assert_eq!(links["linked"].as_array().unwrap().len(), 0);
+    assert_eq!(links["revisions"][id], 1);
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("phone", "Changed", "#cc3344", "other"),
+    )
+    .await;
+    let (_, stale) = post(
+        &server,
+        "/api/profiles/phone/join",
+        &format!(r#"{{"claim":"{id}"}}"#),
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&stale).unwrap()["status"],
+        "unlinked"
+    );
+    assert_eq!(Watcher::connect(&daemon).await.party.players, after.players);
+    let (_, fresh) = post(
+        &server,
+        "/api/profiles/phone/join",
+        &format!(r#"{{"claim":"{id}","link_revision":1}}"#),
+    )
+    .await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&fresh).unwrap()["status"],
+        "claimed"
+    );
+    let (_, links) = http(&server, "GET", "/api/player-links", "").await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&links).unwrap()["linked"][0],
+        id
+    );
+}
+
+#[tokio::test]
+async fn session_tab_tracks_link_unlink_and_does_not_show_a_phone_qr() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let (_, page) = http(&server, "GET", "/mobile", "").await;
+    assert!(!page.contains("Scan QR Code with Phone"));
+    assert!(page.contains("session-link-status"));
+    post(
+        &server,
+        "/api/profiles",
+        &profile_json("session-phone", "Disco", "#336699", "face"),
+    )
+    .await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&status).unwrap()["linked"],
+        false
+    );
+    post(&server, "/api/profiles/session-phone/join", "{}").await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    let status: serde_json::Value = serde_json::from_str(&status).unwrap();
+    assert_eq!(status["linked"], true);
+    assert_eq!(status["player_name"], "Disco");
+    assert_eq!(status["players"], 1);
+    let party = Watcher::connect(&daemon).await.party;
+    post(
+        &server,
+        &format!("/api/player-links/{}/unlink", party.players[0].id.0),
+        "",
+    )
+    .await;
+    let (_, status) = http(&server, "GET", "/api/profiles/session-phone/session", "").await;
+    let status: serde_json::Value = serde_json::from_str(&status).unwrap();
+    assert_eq!(status["linked"], false);
+    assert_eq!(status["players"], 1);
+}
+
+/// A real 48x48 drawing spans multiple socket reads. HTTP success must mean
+/// *all* appearance fields arrived, including when replacing an existing face.
+#[tokio::test]
+async fn large_profile_claim_is_acknowledged_before_success() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut pad = Watcher::connect(&daemon).await;
+    pad.ws.send(Message::Text(ClientMessage::JoinParty {
+        name: "Guest".into(), seat: None, color: Some("#336699".into()),
+        avatar: Some("old drawing".into()), library: vec![],
+    }.to_json())).await.unwrap();
+    let party = pad.wait_for(|p| !p.players.is_empty()).await;
+    let id = party.players[0].id;
+    let avatar = serde_json::json!({"v":1,"w":48,"h":48,"px":vec!["#fa3080";2304]}).to_string();
+    assert!(avatar.len() > 16000);
+    assert_eq!(post(&server, "/api/profiles", &profile_json("large", "Joep", "#633d2b", &avatar)).await.0, 200);
+    // A repeated autosave must acknowledge correctly too, without timing out.
+    for _ in 0..2 {
+        let (status, body) = post(&server, "/api/profiles/large/join",
+            &serde_json::json!({"claim":id}).to_string()).await;
+        assert_eq!(status, 200, "{body}");
+        // No polling/eventual wait: inspect a new connection immediately.
+        let observed = Watcher::connect(&daemon).await.party;
+        let player = observed.players.iter().find(|p| p.id == id).unwrap();
+        assert_eq!(player.name, "Joep");
+        assert_eq!(player.skin_color.as_deref(), Some("#633d2b"));
+        assert_eq!(player.avatar.as_deref(), Some(avatar.as_str()));
+        assert_eq!(player.color.as_deref(), Some("#336699"));
+    }
 }

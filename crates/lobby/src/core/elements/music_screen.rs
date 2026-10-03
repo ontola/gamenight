@@ -45,7 +45,7 @@ pub struct MusicScreen {
 }
 
 fn hydrate(
-    entities: Res<Entities>,
+    mut entities: ResMut<Entities>,
     mut hydrated: CompMut<MapElementHydrated>,
     element_handles: Comp<ElementHandle>,
     assets: Res<AssetServer>,
@@ -57,7 +57,7 @@ fn hydrate(
     not_hydrated_bitset.bit_not();
     not_hydrated_bitset.bit_and(element_handles.bitset());
 
-    for entity in entities.iter_with_bitset(&not_hydrated_bitset) {
+    for entity in entities.iter_with_bitset(&not_hydrated_bitset).collect::<Vec<_>>() {
         let element_handle = element_handles.get(entity).unwrap();
         let element_meta = assets.get(element_handle.0);
 
@@ -73,18 +73,14 @@ fn hydrate(
                     size,
                 },
             );
-            solids.insert(
-                entity,
-                Solid {
-                    disabled: false,
-                    pos: transforms
-                        .get(entity)
-                        .map(|t| t.translation.truncate())
-                        .unwrap_or_default(),
-                    size,
-                    ..default()
-                },
-            );
+            let anchor=transforms.get(entity).map(|t|t.translation.truncate()).unwrap_or_default();
+            let floor=anchor.y-21.;
+            // Match the 280x80 art: lower receiver plus two taller speakers.
+            solids.insert(entity,Solid {disabled:false,pos:Vec2::new(anchor.x,floor+30.),size:Vec2::new(168.,60.),..default()});
+            for dx in [-112.,112.] {
+                let speaker=entities.create();
+                solids.insert(speaker,Solid {disabled:false,pos:Vec2::new(anchor.x+dx,floor+40.),size:Vec2::new(56.,80.),..default()});
+            }
         }
     }
 }
