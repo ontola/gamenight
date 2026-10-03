@@ -49,6 +49,7 @@ jobs:
         run: cargo run -p gamenight-certify -- demo-game -- target/debug/demo-game.exe 1
       - if: runner.os != 'Windows'
         run: |
+          python3 scripts/test-c-transport.py
           cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
           cargo run -p gamenight-certify -- c-game -- /tmp/c-game
       - if: runner.os == 'Windows'

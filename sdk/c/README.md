@@ -21,3 +21,7 @@ cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
 
 Keep polling during pause. Only Start/Resume commands make gameplay active;
 window focus does not. The game owns the next round and exits on host loss.
+The client buffers large profile messages on the heap, with an 8 MiB limit.
+Call `gn_close()` after a disconnect to release the socket and receive buffer.
+This allows artwork to pass through the transport; it does not add face
+rendering support to the C adapter.

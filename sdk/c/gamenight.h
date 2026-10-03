@@ -55,7 +55,8 @@ extern "C" {
 #define GN_MAX_PLAYERS 8
 #define GN_ID_LEN 48   /* uuids are 36 + NUL */
 #define GN_NAME_LEN 64
-#define GN_BUF_LEN 16384
+#define GN_BUF_LEN 16384 /* initial allocation, grown for player artwork */
+#define GN_MAX_MESSAGE_LEN (8 * 1024 * 1024)
 #define GN_MAX_TOKENS 768
 
 /* ---- results ---------------------------------------------------------- */
@@ -123,8 +124,9 @@ typedef struct {
     int fd;
     int connected;
     char game_id[GN_NAME_LEN];
-    char buf[GN_BUF_LEN]; /* inbound line assembly */
+    char *buf; /* inbound line assembly, released by gn_close */
     size_t len;
+    size_t capacity;
 } gn_client;
 
 /* Connect using the GAMENIGHT_* environment the daemon sets when it launches
@@ -449,6 +451,12 @@ gn_result gn_connect(gn_client *c, const char *addr, const char *game_id,
     fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 #endif
 
+    c->buf = (char *)malloc(GN_BUF_LEN);
+    if (!c->buf) {
+        GN_CLOSE(fd);
+        return GN_ERR_SOCKET;
+    }
+    c->capacity = GN_BUF_LEN;
     c->fd = fd;
     c->connected = 1;
 
@@ -596,14 +604,26 @@ int gn_poll(gn_client *c, gn_event *ev) {
             continue; /* blank keepalive line */
         }
 
-        if (c->len + 1 >= GN_BUF_LEN) {
-            /* A message we cannot buffer is one we cannot honour. */
-            c->len = 0;
-            c->connected = 0;
-            return -1;
+        if (c->len + 1 >= c->capacity) {
+            /* Legal face artwork can make a prepare message much larger than
+             * ordinary input frames. Grow on the heap, with a hard bound. */
+            size_t capacity = c->capacity * 2;
+            char *buffer;
+            if (capacity > GN_MAX_MESSAGE_LEN) capacity = GN_MAX_MESSAGE_LEN;
+            if (capacity <= c->capacity) {
+                c->connected = 0;
+                return -1;
+            }
+            buffer = (char *)realloc(c->buf, capacity);
+            if (!buffer) {
+                c->connected = 0;
+                return -1;
+            }
+            c->buf = buffer;
+            c->capacity = capacity;
         }
         {
-            int n = (int)recv(c->fd, c->buf + c->len, GN_BUF_LEN - 1 - c->len, 0);
+            int n = (int)recv(c->fd, c->buf + c->len, c->capacity - 1 - c->len, 0);
             if (n > 0) {
                 c->len += (size_t)n;
                 continue;
@@ -660,6 +680,10 @@ void gn_close(gn_client *c) {
     if (c->fd >= 0) GN_CLOSE(c->fd);
     c->fd = -1;
     c->connected = 0;
+    free(c->buf);
+    c->buf = NULL;
+    c->len = 0;
+    c->capacity = 0;
 }
 
 #endif /* GAMENIGHT_IMPLEMENTATION */

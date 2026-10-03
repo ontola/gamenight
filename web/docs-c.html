@@ -52,7 +52,7 @@
     GN_UNKNOWN /* a message type from a newer daemon: ignore it */
 } gn_event_type;
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/c/gamenight.h#L73">Source: sdk/c/gamenight.h</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/c/gamenight.h#L74">Source: sdk/c/gamenight.h</a></p>
 <p>On Prepare, load your level while hidden, then call <code>gn_ready</code>. Start shows play. Pause freezes simulation and audio; Resume restores them. Dispose frees session resources. Keep the socket alive for the next Prepare.</p>
 <h2 id="what-the-header-does-not-supply">What the header does not supply</h2>
 <p>The current <code>gn_seat</code> carries index, occupant, player ID and name. It does not expose controller tokens, controller frames, clothing colours, skin colours or face artwork. Implement those fields and message handling, or use a JSON client that preserves the full <a href="/docs/protocol">protocol</a>. Do not assign local joystick enumeration to seat indices as a workaround.</p>
@@ -61,8 +61,9 @@
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
 </code></pre></div>
 <p>This builds a timer-based protocol example on POSIX. It is not a playable reference with controller or face support. The docs CI compiles it to detect API drift; release confidence comes from <a href="/docs/testing">testing the actual packaged game</a>.</p>
+<p>The C client grows its receive buffer for player artwork, up to 8 MiB. Call <code>gn_close()</code> when the connection ends to release it. Receiving artwork does not imply that the adapter renders faces; that remains a separate capability.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/c.md">Edit this page</a><span data-source-fingerprint="65cc94b6142620913ca65adbfdf3638fe868cfafbf9ea2dddc96469603da7176">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/c.md">Edit this page</a><span data-source-fingerprint="3505d6f6fce44047e4b719f614eb4e603e5b3746ea394527779427698a2cece1">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/lobbies"><small>Previous</small>Build a lobby</a><a href="/docs/other-engines"><small>Next</small>Unity, Unreal &amp; others</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-header">Add the header</a><a href="#connect-from-the-launch-environment">Connect from the launch environment</a><a href="#event-data">Event data</a><a href="#what-the-header-does-not-supply">What the header does not supply</a><a href="#compile-the-transport-example">Compile the transport example</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

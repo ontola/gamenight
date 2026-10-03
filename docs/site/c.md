@@ -40,3 +40,5 @@ cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
 ```
 
 This builds a timer-based protocol example on POSIX. It is not a playable reference with controller or face support. The docs CI compiles it to detect API drift; release confidence comes from [testing the actual packaged game](/docs/testing).
+
+The C client grows its receive buffer for player artwork, up to 8 MiB. Call `gn_close()` when the connection ends to release it. Receiving artwork does not imply that the adapter renders faces; that remains a separate capability.
