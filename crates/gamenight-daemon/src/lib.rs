@@ -141,9 +141,14 @@ impl Shared {
 
     fn snapshot(&self) -> gamenight_protocol::PartySnapshot {
         let mut party = self.night.snapshot();
-        party.game_issues = self.game_issues.iter().map(|(game, kind)|
-            gamenight_protocol::GameIssue { game: game.clone(), kind: kind.clone() }
-        ).collect();
+        party.game_issues = self
+            .game_issues
+            .iter()
+            .map(|(game, kind)| gamenight_protocol::GameIssue {
+                game: game.clone(),
+                kind: kind.clone(),
+            })
+            .collect();
         party.game_issues.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party
     }
@@ -162,7 +167,9 @@ impl Shared {
         use gamenight_protocol::GameIssueKind;
         let mut ended = Vec::new();
         for (game, pending) in &mut self.pending_launches {
-            if self.lobby_game.as_ref() == Some(game) { continue; }
+            if self.lobby_game.as_ref() == Some(game) {
+                continue;
+            }
             match pending.child.try_wait() {
                 Ok(Some(status)) => {
                     warn!(%game, %status, "game exited before connecting");
@@ -178,7 +185,9 @@ impl Shared {
         for (game, kind) in ended {
             if let Some(mut pending) = self.pending_launches.remove(&game) {
                 let _ = pending.child.start_kill();
-                tokio::spawn(async move { let _ = pending.child.wait().await; });
+                tokio::spawn(async move {
+                    let _ = pending.child.wait().await;
+                });
             }
             self.record_game_issue(game, kind);
         }
@@ -231,8 +240,11 @@ impl Shared {
             }
             Command::Next if !self.quit_games.is_empty() => {
                 let party = self.night.snapshot();
-                if let Some(game) = party.warm_session.map(|s| s.game)
-                    .or_else(|| party.warming.map(|entry| entry.game)) {
+                if let Some(game) = party
+                    .warm_session
+                    .map(|s| s.game)
+                    .or_else(|| party.warming.map(|entry| entry.game))
+                {
                     self.quit_games.remove(&game);
                     self.game_issues.remove(&game);
                 }
@@ -355,7 +367,6 @@ impl Shared {
                     send(tx, &lobby_msg);
                 }
             }
-
         }
     }
 
@@ -482,7 +493,10 @@ impl Shared {
             }
             Err(e) => {
                 warn!(%game, command = %spec.command, error = %e, "failed to launch");
-                self.record_game_issue(game.clone(), gamenight_protocol::GameIssueKind::FailedToStart);
+                self.record_game_issue(
+                    game.clone(),
+                    gamenight_protocol::GameIssueKind::FailedToStart,
+                );
             }
         }
     }
@@ -1440,8 +1454,12 @@ async fn serve(
                         };
                         info!(game = %game_id, %status, "game process exited");
                     }
-                    if s.exit_with_lobby { let _ = child.start_kill(); }
-                    tokio::spawn(async move { let _ = child.wait().await; });
+                    if s.exit_with_lobby {
+                        let _ = child.start_kill();
+                    }
+                    tokio::spawn(async move {
+                        let _ = child.wait().await;
+                    });
                 }
                 s.record_game_issue(game_id.clone(), kind);
             }
@@ -1691,7 +1709,8 @@ mod replacement_lobby_tests {
     type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
     fn test_game(launch: serde_json::Value) -> GameMeta {
-        serde_json::from_value(serde_json::json!({"id":"test", "title":"Test", "launch":launch})).unwrap()
+        serde_json::from_value(serde_json::json!({"id":"test", "title":"Test", "launch":launch}))
+            .unwrap()
     }
 
     #[tokio::test]
@@ -1711,11 +1730,18 @@ mod replacement_lobby_tests {
                 tokio::time::sleep(std::time::Duration::from_millis(10)).await;
                 s.poll_pending_games();
             }
-        }).await.unwrap();
-        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::FailedToStart);
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            s.snapshot().game_issues[0].kind,
+            gamenight_protocol::GameIssueKind::FailedToStart
+        );
         assert!(s.pending_launches.is_empty());
         let update: ServerMessage = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
-        assert!(matches!(update, ServerMessage::PartyState { party } if party.game_issues.len() == 1 && party.warm_session.is_none()));
+        assert!(
+            matches!(update, ServerMessage::PartyState { party } if party.game_issues.len() == 1 && party.warm_session.is_none())
+        );
         s.poll_pending_games();
         assert!(rx.try_recv().is_err(), "no repeated failure broadcasts");
         s.launch(&game);
@@ -1728,7 +1754,11 @@ mod replacement_lobby_tests {
 
     #[test]
     fn retry_next_preserves_issues_for_other_closed_games() {
-        let mut s = Shared::new(vec![test_game(serde_json::Value::Null)], "127.0.0.1:0".into(), None);
+        let mut s = Shared::new(
+            vec![test_game(serde_json::Value::Null)],
+            "127.0.0.1:0".into(),
+            None,
+        );
         s.night.set_lobby_game(Some(GameId::new("lobby")));
         for id in ["test", "other"] {
             s.record_game_issue(GameId::new(id), gamenight_protocol::GameIssueKind::Closed);
@@ -1741,18 +1771,45 @@ mod replacement_lobby_tests {
 
     #[tokio::test]
     async fn spawn_error_and_connection_timeout_are_visible() {
-        let mut s = Shared::new(vec![test_game(serde_json::json!({"command":"missing-gamenight-test-executable"}))], "127.0.0.1:0".into(), None);
+        let mut s = Shared::new(
+            vec![test_game(
+                serde_json::json!({"command":"missing-gamenight-test-executable"}),
+            )],
+            "127.0.0.1:0".into(),
+            None,
+        );
         s.night.set_lobby_game(Some(GameId::new("lobby")));
         let game = GameId::new("test");
         s.launch(&game);
-        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::FailedToStart);
+        assert_eq!(
+            s.snapshot().game_issues[0].kind,
+            gamenight_protocol::GameIssueKind::FailedToStart
+        );
         #[cfg(windows)]
-        let child = tokio::process::Command::new("cmd.exe").args(["/C", "ping -n 30 127.0.0.1 > nul"]).spawn().unwrap();
+        let child = tokio::process::Command::new("cmd.exe")
+            .args(["/C", "ping -n 30 127.0.0.1 > nul"])
+            .spawn()
+            .unwrap();
         #[cfg(not(windows))]
-        let child = tokio::process::Command::new("sleep").arg("30").spawn().unwrap();
-        s.pending_launches.insert(game.clone(), PendingLaunch { token: "test".into(), child, spawned_at: std::time::Instant::now() - LAUNCH_HELLO_TIMEOUT - std::time::Duration::from_secs(1) });
+        let child = tokio::process::Command::new("sleep")
+            .arg("30")
+            .spawn()
+            .unwrap();
+        s.pending_launches.insert(
+            game.clone(),
+            PendingLaunch {
+                token: "test".into(),
+                child,
+                spawned_at: std::time::Instant::now()
+                    - LAUNCH_HELLO_TIMEOUT
+                    - std::time::Duration::from_secs(1),
+            },
+        );
         s.poll_pending_games();
-        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::StartupTimeout);
+        assert_eq!(
+            s.snapshot().game_issues[0].kind,
+            gamenight_protocol::GameIssueKind::StartupTimeout
+        );
         assert!(s.pending_launches.is_empty());
     }
 
@@ -1768,19 +1825,40 @@ mod replacement_lobby_tests {
             loop {
                 let (stream, _) = listener.accept().await.unwrap();
                 let state = server_state.clone();
-                tokio::spawn(async move { let _ = handle_connection(stream, state).await; });
+                tokio::spawn(async move {
+                    let _ = handle_connection(stream, state).await;
+                });
             }
         });
         let mut game = connect(&addr, Role::Game, "test", "").await;
-        assert!(matches!(receive(&mut game).await, ServerMessage::Welcome { .. }));
-        let session = match receive(&mut game).await { ServerMessage::Prepare { session, .. } => session, other => panic!("{other:?}") };
-        game.send(Message::Text(ClientMessage::Ready { session }.to_json())).await.unwrap();
+        assert!(matches!(
+            receive(&mut game).await,
+            ServerMessage::Welcome { .. }
+        ));
+        let session = match receive(&mut game).await {
+            ServerMessage::Prepare { session, .. } => session,
+            other => panic!("{other:?}"),
+        };
+        game.send(Message::Text(ClientMessage::Ready { session }.to_json()))
+            .await
+            .unwrap();
         tokio::time::timeout(std::time::Duration::from_secs(2), async {
             loop {
-                if state.lock().await.snapshot().warm_session.as_ref().is_some_and(|s| s.phase == gamenight_protocol::SessionPhase::Ready) { break; }
+                if state
+                    .lock()
+                    .await
+                    .snapshot()
+                    .warm_session
+                    .as_ref()
+                    .is_some_and(|s| s.phase == gamenight_protocol::SessionPhase::Ready)
+                {
+                    break;
+                }
                 tokio::task::yield_now().await;
             }
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
         let mut overlay = connect(&addr, Role::Overlay, "", "").await;
         receive(&mut overlay).await;
         game.close(None).await.unwrap();
@@ -1794,10 +1872,16 @@ mod replacement_lobby_tests {
             }
         }
         let mut new_overlay = connect(&addr, Role::Overlay, "", "").await;
-        assert!(matches!(receive(&mut new_overlay).await, ServerMessage::Welcome { party, .. } if party.game_issues.len() == 1));
+        assert!(
+            matches!(receive(&mut new_overlay).await, ServerMessage::Welcome { party, .. } if party.game_issues.len() == 1)
+        );
         let mut restarted = connect(&addr, Role::Game, "test", "").await;
-        assert!(matches!(receive(&mut restarted).await, ServerMessage::Welcome { party, .. } if party.game_issues.is_empty()));
-        assert!(matches!(receive(&mut restarted).await, ServerMessage::Prepare { session: fresh, .. } if fresh != session));
+        assert!(
+            matches!(receive(&mut restarted).await, ServerMessage::Welcome { party, .. } if party.game_issues.is_empty())
+        );
+        assert!(
+            matches!(receive(&mut restarted).await, ServerMessage::Prepare { session: fresh, .. } if fresh != session)
+        );
         restarted.close(None).await.unwrap();
         overlay.close(None).await.unwrap();
         new_overlay.close(None).await.unwrap();
@@ -1852,15 +1936,34 @@ mod replacement_lobby_tests {
         let (tx, mut rx) = mpsc::unbounded_channel();
         shared.games.insert(GameId::new("music-test"), tx);
         let mut track = gamenight_protocol::NowPlaying {
-            title: "Test track".into(), artist: String::new(),
-            source: "Test player".into(), playing: true,
+            title: "Test track".into(),
+            artist: String::new(),
+            source: "Test player".into(),
+            playing: true,
         };
-        for value in [Some(track.clone()), {track.playing=false; Some(track.clone())}, None] {
-            shared.dispatch(Command::NowPlaying { track: value.clone() }, None);
+        for value in [
+            Some(track.clone()),
+            {
+                track.playing = false;
+                Some(track.clone())
+            },
+            None,
+        ] {
+            shared.dispatch(
+                Command::NowPlaying {
+                    track: value.clone(),
+                },
+                None,
+            );
             let message: ServerMessage = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
-            let ServerMessage::PartyState { party } = message else { panic!("expected music snapshot") };
+            let ServerMessage::PartyState { party } = message else {
+                panic!("expected music snapshot")
+            };
             assert_eq!(party.now_playing, value);
-            assert!(party.library.iter().all(|g| g.cover.is_none() && g.screenshot.is_none()));
+            assert!(party
+                .library
+                .iter()
+                .all(|g| g.cover.is_none() && g.screenshot.is_none()));
             shared.dispatch(Command::NowPlaying { track: value }, None);
             assert!(rx.try_recv().is_err(), "unchanged poll should send nothing");
         }

@@ -64,7 +64,7 @@ python scripts/package-love-party.py --output dist/party
 cargo build --locked -p gamenight-certify
 python scripts/game-contract.py --output dist/contract --pack dist/party \
   --love /path/to/lovec --certifier target/debug/gamenight-certify
-python scripts/game-contract.py --gate --output dist/contract --pack dist/party
+python scripts/game-contract.py --candidate-gate --output dist/contract --pack dist/party
 ```
 
 On Windows, use `.exe` for the certifier. Inventory-only runs need no game runtime:
@@ -79,7 +79,7 @@ Manual questions are explicitly untested in that report, including CI runs.
 The LÖVE workflow runs on every main push and PR, including protocol, SDK, host,
 catalog and test changes. It uploads Windows evidence and puts the matrix in the
 Actions summary. A Linux job then verifies the downloaded Windows evidence and
-package hashes with the release gate, catching path or packaging differences
+package hashes with the candidate gate, catching path or packaging differences
 before the installer finishes. The main workflow tests the gate and publishes the full catalog
 inventory. The Linux render smoke test is separate; a Windows pass is never reused
 as Linux or macOS proof. Windows CI installs checksum-pinned Mesa beside its test
@@ -91,8 +91,8 @@ while retaining failure logs.
 
 The Windows publication workflow calls the same LÖVE workflow at the same revision,
 downloads that run's packages and evidence, and runs the strict gate **before**
-creating the release draft. PR builds remain usable for development even when
-features are untested. Publication fails on any missing game, required untested
+creating the release draft. PR builds may differ from the published downloads, but still require all mandatory
+and claimed checks to pass. Publication fails on any missing game, required untested
 feature, failed mandatory/claimed check, stale commit, wrong platform, changed requirements, changed
 package, or missing/modified evidence. There is no override for a catalog label.
 
@@ -155,3 +155,17 @@ Back/Select opens the lobby and pauses; Resume continues the same round or resul
 Play next explicitly switches games. Skip only replaces the upcoming game.
 The host retains the preloaded next session across round notifications, even with
 no seated human players. Test multiple round endings and a pause during results.
+
+## CI builds versus publication
+
+Normal pull-request and main-branch CI uses `--candidate-gate` to verify the
+newly built packages. It checks the commit, platform, source cleanliness,
+catalog coverage, required features, artifact hashes and evidence hashes.
+It allows those new packages to differ from the catalog's older published
+version. A passing candidate is not release approval.
+
+Publication still uses `--gate`, including in the Windows installer release
+job. That additionally requires the tested artifact hashes to match the
+catalog downloads. Update the release catalog and verify the corresponding
+packages before publication. Never substitute `--candidate-gate` in a release
+job.

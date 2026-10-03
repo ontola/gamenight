@@ -83,6 +83,38 @@ class ContractTests(unittest.TestCase):
         self.entries[0]['downloads']={'windows':{'sha256':'0'*64}}
         self.assertTrue(self.errors())
 
+    def candidate_errors(self):
+        return m.release_errors(self.report, self.entries, self.rules, 'sha', 'windows', self.output, self.pack,
+                                match_catalog_downloads=False)
+
+    def test_candidate_can_differ_from_published_catalog_but_release_cannot(self):
+        self.entries[0]['downloads'] = {'windows': {'sha256': '0' * 64}}
+        self.assertEqual(self.candidate_errors(), [])
+        self.assertIn('game: tested artifact differs from catalog download', self.errors())
+
+    def test_candidate_still_requires_exact_artifact_and_evidence(self):
+        for target in (self.pack/'game.love', self.log):
+            original = target.read_bytes()
+            target.write_bytes(b'changed')
+            self.assertTrue(self.candidate_errors())
+            target.write_bytes(original)
+        self.check['status'] = 'failed'
+        self.assertTrue(self.candidate_errors())
+
+    def test_candidate_still_requires_current_commit_policy_platform_and_coverage(self):
+        for key, value in [('commit', 'old'), ('platform', 'linux'), ('worktree_dirty', True), ('requirements', {}), ('policies', {})]:
+            original = self.report[key]
+            self.report[key] = value
+            self.assertTrue(self.candidate_errors(), key)
+            self.report[key] = original
+        self.entries.append({'id': 'new', 'title': 'New'})
+        self.assertTrue(self.candidate_errors())
+
+    def test_publication_workflow_keeps_strict_catalog_gate(self):
+        workflow = (Path(__file__).resolve().parents[1]/'.github/workflows/windows-preview.yml').read_text()
+        self.assertIn('source/scripts/game-contract.py --gate --platform windows', workflow)
+        self.assertNotIn('--candidate-gate', workflow)
+
     def test_missing_evidence_blocks_release(self):
         self.check['evidence']=[]
         self.assertTrue(self.errors())

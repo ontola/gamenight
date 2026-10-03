@@ -118,5 +118,7 @@ jobs:
         with:
           name: gamenight-love-party
           path: games
-      - name: Verify portable evidence and exact catalog packages
-        run: python scripts/game-contract.py --gate --platform windows --output evidence --pack games
+      # This workflow certifies the new source build, not the older catalog
+      # downloads. The installer release job separately runs the strict --gate.
+      - name: Verify portable evidence and exact candidate packages
+        run: python scripts/game-contract.py --candidate-gate --platform windows --output evidence --pack games

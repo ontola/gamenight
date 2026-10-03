@@ -259,7 +259,7 @@ def bundled_release_game(entry, os_name, policies):
     return not entrypoint or entrypoint.lower().endswith('.love')
 
 
-def release_errors(report, entries, requirements, commit, os_name, output, pack, policies=None):
+def release_errors(report, entries, requirements, commit, os_name, output, pack, policies=None, *, match_catalog_downloads=True):
     errors = []
     policies = policies or {"version":1,"games":{}}
     if report.get('policies') != policies:
@@ -290,7 +290,7 @@ def release_errors(report, entries, requirements, commit, os_name, output, pack,
         if entry and not bundled_release_game(entry, os_name, policies):
             continue
         download = entries_by_id.get(game['id'], {}).get('downloads', {}).get(os_name, {})
-        if download.get('sha256') and download['sha256'].lower() != game.get('artifact_sha256'):
+        if match_catalog_downloads and download.get('sha256') and download['sha256'].lower() != game.get('artifact_sha256'):
             errors.append(f"{game['id']}: tested artifact differs from catalog download")
         artifact = (pack/(game.get('artifact') or '__missing__')).resolve()
         if not artifact.is_relative_to(pack.resolve()) or not artifact.is_file() or digest(artifact) != game.get('artifact_sha256'):
@@ -322,7 +322,9 @@ def main():
     parser.add_argument('--spaceracer-source', type=Path)
     parser.add_argument('--spaceracer-window-probe', action='store_true',
                         help='Run native window/prewarm and gameplay-frame checks on a Vulkan-capable Windows host')
-    parser.add_argument('--gate', action='store_true', help='Require complete, current evidence before publication')
+    gate = parser.add_mutually_exclusive_group()
+    gate.add_argument('--gate', action='store_true', help='Require current evidence and exact catalog download hashes before publication')
+    gate.add_argument('--candidate-gate', action='store_true', help='Verify unpublished build artifacts and evidence without comparing them to the older published catalog')
     parser.add_argument('--platform', choices=['windows', 'linux', 'mac'],
                         default={'Windows':'windows', 'Linux':'linux', 'Darwin':'mac'}[platform.system()])
     args = parser.parse_args()
@@ -330,12 +332,13 @@ def main():
     requirements = json.loads((ROOT/'contract/requirements.json').read_text())
     entries = catalog()
     policies = json.loads((ROOT/"contract/game-policies.json").read_text())
-    if args.gate:
+    if args.gate or args.candidate_gate:
         if not args.pack:
-            parser.error('--gate requires --pack for artifact verification')
+            parser.error('A gate requires --pack for artifact verification')
         report = json.loads((output/'matrix.json').read_text())
-        errors = release_errors(report, entries, requirements, revision(), args.platform, output, args.pack.resolve(), policies)
-        print('\n'.join(errors) if errors else 'All required contract checks passed')
+        errors = release_errors(report, entries, requirements, revision(), args.platform, output, args.pack.resolve(), policies,
+                                match_catalog_downloads=not args.candidate_gate)
+        print('\n'.join(errors) if errors else ('Candidate build contract checks passed; publication requires --gate' if args.candidate_gate else 'All required contract checks passed'))
         return bool(errors)
     report = new_report(entries, requirements, revision(), args.platform, policies)
     report['worktree_dirty'] = bool(subprocess.check_output(

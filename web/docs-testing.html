@@ -65,7 +65,7 @@ that input path. A passing game-specific CI run is not blanket certification.</p
 cargo build --locked -p gamenight-certify
 python scripts/game-contract.py --output dist/contract --pack dist/party \
   --love /path/to/lovec --certifier target/debug/gamenight-certify
-python scripts/game-contract.py --gate --output dist/contract --pack dist/party
+python scripts/game-contract.py --candidate-gate --output dist/contract --pack dist/party
 </code></pre></div>
 <p>On Windows, use <code>.exe</code> for the certifier. Inventory-only runs need no game runtime:
 <code>python scripts/game-contract.py --output dist/inventory</code>.</p>
@@ -76,7 +76,7 @@ Manual questions are explicitly untested in that report, including CI runs.</p>
 <p>The LÖVE workflow runs on every main push and PR, including protocol, SDK, host,
 catalog and test changes. It uploads Windows evidence and puts the matrix in the
 Actions summary. A Linux job then verifies the downloaded Windows evidence and
-package hashes with the release gate, catching path or packaging differences
+package hashes with the candidate gate, catching path or packaging differences
 before the installer finishes. The main workflow tests the gate and publishes the full catalog
 inventory. The Linux render smoke test is separate; a Windows pass is never reused
 as Linux or macOS proof. Windows CI installs checksum-pinned Mesa beside its test
@@ -87,8 +87,8 @@ replies, as the production daemon does, and kills its own process tree on timeou
 while retaining failure logs.</p>
 <p>The Windows publication workflow calls the same LÖVE workflow at the same revision,
 downloads that run's packages and evidence, and runs the strict gate <strong>before</strong>
-creating the release draft. PR builds remain usable for development even when
-features are untested. Publication fails on any missing game, required untested
+creating the release draft. PR builds may differ from the published downloads, but still require all mandatory
+and claimed checks to pass. Publication fails on any missing game, required untested
 feature, failed mandatory/claimed check, stale commit, wrong platform, changed requirements, changed
 package, or missing/modified evidence. There is no override for a catalog label.</p>
 <p>The matrix covers the whole catalog. The Windows installer release gate covers
@@ -139,8 +139,19 @@ Back/Select opens the lobby and pauses; Resume continues the same round or resul
 Play next explicitly switches games. Skip only replaces the upcoming game.
 The host retains the preloaded next session across round notifications, even with
 no seated human players. Test multiple round endings and a pause during results.</p>
+<h2 id="ci-builds-versus-publication">CI builds versus publication</h2>
+<p>Normal pull-request and main-branch CI uses <code>--candidate-gate</code> to verify the
+newly built packages. It checks the commit, platform, source cleanliness,
+catalog coverage, required features, artifact hashes and evidence hashes.
+It allows those new packages to differ from the catalog's older published
+version. A passing candidate is not release approval.</p>
+<p>Publication still uses <code>--gate</code>, including in the Windows installer release
+job. That additionally requires the tested artifact hashes to match the
+catalog downloads. Update the release catalog and verify the corresponding
+packages before publication. Never substitute <code>--candidate-gate</code> in a release
+job.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="a45a0d2ff810009a18cd1898541f2772ebcc3c5c3b468deb56c166a12d749f7c">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="19431731105128807da31744c0ac121ae7ec3e17375dd64b1b2a99d3d79ee56c">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/faces"><small>Previous</small>Faces &amp; colours</a><a href="/docs/publishing"><small>Next</small>Publish a game</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
