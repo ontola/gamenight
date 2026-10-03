@@ -30,6 +30,51 @@ merged queue panel shows its first entry as Up next, with the remaining games
 alongside it. Select Start game to launch the head of the queue. Back returns to
 the lobby or resumes an overlay-paused game. Y leaves that controller's seat.
 
+The controller hint bar shows **X Play next · A Queue · LT Previous · RT Next**
+with Xbox-style face-button and trigger icons. These hints are not selectable;
+focus stays on the game cards and the other lobby controls.
+
+## Talk to the assistant
+
+When `GAMENIGHT_ASSISTANT_URL` supplies an authenticated session entry, select
+**Talk to assistant** and hold A, or hold the control with the mouse. Keyboard
+users can hold C. A pulsing microphone shows when recording is active. Release
+to transcribe and send; B or Escape cancels before submission. The Menu/Start
+button has no assistant shortcut. The lobby remains open throughout the request
+and shows the assistant's result. Closing a submitted request's panel does not
+undo a game change already sent to the host.
+
+This source example currently transcribes with the installed Windows speech
+recognizer. Enable microphone access for desktop apps and install a Windows
+speech language. Recording lasts at most 20 seconds and stops on release,
+focus loss, controller disconnection or loss of the runtime connection. Audio
+is transcribed locally; only the text reaches the existing assistant API. The
+temporary WAV is deleted after transcription. A process crash may leave that
+file in Godot's user-data directory. The recording effect only runs while the
+talk control is held, up to the 20-second limit.
+
+The current native sign-in path supports the disposable preview's loopback
+`/start/…` entry. It keeps its session cookie in memory and uses the existing
+CSRF-protected assistant endpoints. Redirects are not followed. An ordinary
+hosted `/agent` page cannot share a browser's login with a native process;
+production native sign-in and non-Windows speech adapters remain unimplemented.
+Local AI requests send on release. Paid requests first show the maximum credit
+estimate and require explicit confirmation in the lobby.
+
+`lobby/assistant.gd` and `lobby/transcribe-windows.ps1` belong to the example,
+not the ordinary game addon. The current runner uses the source project;
+packaged exports still need helper extraction and packaging support.
+
+Run `python scripts/test-lobby-assistant.py --godot /path/to/godot` for the
+loopback authentication, transcript, result and credit-confirmation checks.
+Add `--check-windows-speech` to also transcribe generated speech and check that
+the temporary recording is removed, without opening a microphone.
+The lobby flow tests hold/release ownership and disconnect cancellation with
+simulated controller frames. These tests do not validate a physical microphone
+or speech accuracy in a noisy room.
+
+## Queue behaviour
+
 The lobby sends `queue_game` with `first: false` for A and `first: true` for X.
 This is one atomic host command, so simultaneous additions cannot overwrite each
 other's order. It preserves the current game and its position. `next` starts the

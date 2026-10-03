@@ -3,6 +3,16 @@ extends SceneTree
 var view: Control
 var failed := false
 
+class FakeAssistant extends "res://lobby/assistant.gd":
+	var starts := 0
+	var releases := 0
+	func start() -> void:
+		starts += 1
+		_set_state("listening", "Listening…")
+	func release() -> void:
+		releases += 1
+		_set_state("transcribing", "Understanding…")
+
 func _initialize() -> void:
 	call_deferred("run")
 
@@ -44,6 +54,33 @@ func run() -> void:
 	var frames: Array = [{"controller":"test:0", "buttons":0}, {"controller":"test:1", "buttons":0}]
 	view._controllers_changed(frames)
 	check(view._cursors.size() == 2, "each joined controller gets a selection")
+	check(view.hits.all(func(hit): return hit.action not in ["previous","next","play-next","queue"]), "game hints cannot be clicked or focused")
+	var real_assistant = view.assistant
+	var fake := FakeAssistant.new()
+	view.add_child(fake)
+	view.assistant = fake
+	view._cursors["test:0"].action = "assistant"
+	frames[0].buttons = 1 << 7
+	view._controllers_changed(frames)
+	check(fake.starts == 0, "Menu is not a talk shortcut")
+	frames[0].buttons = 1
+	view._controllers_changed(frames)
+	check(fake.starts == 1 and view._talk_owner == "test:0", "holding A on Talk starts listening")
+	view._controllers_changed(frames)
+	check(fake.starts == 1, "held A does not restart recording")
+	frames[0].buttons = 0
+	view._controllers_changed(frames)
+	check(fake.releases == 1 and view._talk_owner.is_empty(), "release sends speech once")
+	view._cancel_talk()
+	view._cursors["test:0"].action = "assistant"
+	frames[0].buttons = 1
+	view._controllers_changed(frames)
+	view._controllers_changed([])
+	check(fake.state == "idle" and fake.releases == 1, "controller disconnect cancels without sending")
+	view.assistant = real_assistant
+	fake.queue_free()
+	frames[0].buttons = 0
+	view._controllers_changed(frames)
 	var second_action: String = view._cursors["test:1"].action
 	frames[0]["axes"] = [0,0,0,0,0,32767]
 	view._controllers_changed(frames)

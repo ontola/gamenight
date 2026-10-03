@@ -31,6 +31,43 @@ X inserts it first among upcoming games. Neither action starts gameplay. The
 merged queue panel shows its first entry as Up next, with the remaining games
 alongside it. Select Start game to launch the head of the queue. Back returns to
 the lobby or resumes an overlay-paused game. Y leaves that controller's seat.</p>
+<p>The controller hint bar shows <strong>X Play next · A Queue · LT Previous · RT Next</strong>
+with Xbox-style face-button and trigger icons. These hints are not selectable;
+focus stays on the game cards and the other lobby controls.</p>
+<h2 id="talk-to-the-assistant">Talk to the assistant</h2>
+<p>When <code>GAMENIGHT_ASSISTANT_URL</code> supplies an authenticated session entry, select
+<strong>Talk to assistant</strong> and hold A, or hold the control with the mouse. Keyboard
+users can hold C. A pulsing microphone shows when recording is active. Release
+to transcribe and send; B or Escape cancels before submission. The Menu/Start
+button has no assistant shortcut. The lobby remains open throughout the request
+and shows the assistant's result. Closing a submitted request's panel does not
+undo a game change already sent to the host.</p>
+<p>This source example currently transcribes with the installed Windows speech
+recognizer. Enable microphone access for desktop apps and install a Windows
+speech language. Recording lasts at most 20 seconds and stops on release,
+focus loss, controller disconnection or loss of the runtime connection. Audio
+is transcribed locally; only the text reaches the existing assistant API. The
+temporary WAV is deleted after transcription. A process crash may leave that
+file in Godot's user-data directory. The recording effect only runs while the
+talk control is held, up to the 20-second limit.</p>
+<p>The current native sign-in path supports the disposable preview's loopback
+<code>/start/…</code> entry. It keeps its session cookie in memory and uses the existing
+CSRF-protected assistant endpoints. Redirects are not followed. An ordinary
+hosted <code>/agent</code> page cannot share a browser's login with a native process;
+production native sign-in and non-Windows speech adapters remain unimplemented.
+Local AI requests send on release. Paid requests first show the maximum credit
+estimate and require explicit confirmation in the lobby.</p>
+<p><code>lobby/assistant.gd</code> and <code>lobby/transcribe-windows.ps1</code> belong to the example,
+not the ordinary game addon. The current runner uses the source project;
+packaged exports still need helper extraction and packaging support.</p>
+<p>Run <code>python scripts/test-lobby-assistant.py --godot /path/to/godot</code> for the
+loopback authentication, transcript, result and credit-confirmation checks.
+Add <code>--check-windows-speech</code> to also transcribe generated speech and check that
+the temporary recording is removed, without opening a microphone.
+The lobby flow tests hold/release ownership and disconnect cancellation with
+simulated controller frames. These tests do not validate a physical microphone
+or speech accuracy in a noisy room.</p>
+<h2 id="queue-behaviour">Queue behaviour</h2>
 <p>The lobby sends <code>queue_game</code> with <code>first: false</code> for A and <code>first: true</code> for X.
 This is one atomic host command, so simultaneous additions cannot overwrite each
 other's order. It preserves the current game and its position. <code>next</code> starts the
@@ -268,7 +305,7 @@ artwork fallback. These checks do not
 certify physical controller drivers, TV focus handoff, media sessions or phone
 camera scanning. Those still need device tests on each release platform.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="1f7f427dcb5a9537cbd515982e0180a86fd089f141b5bdb35be48acb76cb4029">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="98b6db00c8c58fed1358578b8f81f60f896b030855a3b876aa5357ae312152ac">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
