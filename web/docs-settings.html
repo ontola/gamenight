@@ -76,45 +76,60 @@ controls drops from crates; its two opening prizes remain. Neon Siege's enemy
 count remains capped. Disabling gravity also removes gravitational hazards;
 wormholes have their own switch. Pinpals changes simulation speed, including its
 simulation timers, while keeping the physics fixed step.</p>
-<p>Additional source audits found existing declarations in the separate projects:</p>
+<h2 id="godot-game-controls">Godot game controls</h2>
+<p>These independent game repositories use the same typed contract. Source builds
+have been tested against the real daemon, including setting changes and Undo.</p>
 <table>
 <thead>
 <tr>
 <th>Game</th>
-<th>Existing controls</th>
-<th>Audit source</th>
+<th>Controls</th>
+<th>Timing and reference</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>SpaceRacer</td>
-<td>Laps, track difficulty, world, track seed, graphics quality</td>
-<td><code>joepio/spaceracer</code>, <code>src/main.gd</code>, commit <code>c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb</code></td>
-</tr>
-<tr>
-<td>Ballkickers</td>
-<td>Match length, team size</td>
-<td>Local <code>goal-rush</code> checkout, <code>src/party.gd</code> and <code>src/main.gd</code></td>
-</tr>
-<tr>
-<td>Frog Fighter</td>
-<td>Mode, arena</td>
-<td>Local <code>frog-fighter</code> checkout, <code>src/main.gd</code></td>
-</tr>
-<tr>
-<td>Ion Rush</td>
-<td>Laps, graphics quality</td>
-<td>Local game import, <code>src/main.gd</code>; not a catalog release</td>
+<td>Laps, difficulty, world, seed, graphics; boost cost and duration, energy regeneration, crash recovery, weapon pickups</td>
+<td>Boost, energy and recovery controls work during a race. Track rules and pickup stations wait for the next race. <a href="https://github.com/joepio/spaceracer/blob/main/docs/gamenight-settings.md">All ranges</a></td>
 </tr>
 <tr>
 <td>Growing Guns</td>
-<td>1–30 rounds to win (next match), modifier chance 0–100% (next round), card choice time 3–30 seconds (next pick)</td>
-<td><a href="https://github.com/ontola/growing-guns">ontola/growing-guns</a>, <code>scripts/gamenight_settings.gd</code>; added and engine-tested</td>
+<td>Rounds to win, modifier chance, card choice time; gravity, bullet drop, body shot damage, random pickup rate</td>
+<td>Match goal waits for a new match; physics and combat wait for the next round; card time affects the next choice. <a href="https://github.com/ontola/growing-guns/blob/main/docs/gamenight-settings.md">All ranges</a></td>
+</tr>
+<tr>
+<td>Ballkickers</td>
+<td>Match length, matchup; running speed, shot speed, rolling friction, goalkeeper movement, passive super charge, super shots</td>
+<td>Match structure waits for a new match. Movement and ball physics are live; shot changes affect the next shot. <a href="https://github.com/joepio/ballkickers/blob/main/docs/gamenight-settings.md">All ranges</a></td>
+</tr>
+<tr>
+<td>Frog Fighter</td>
+<td>Mode, arena, lives; running speed, jump impulse, frog gravity, damage, supply interval, bot reaction delay</td>
+<td>Mode, arena and lives wait for a new round. Physics are live; jumps, hits, supplies and aiming use the new value on their next event. <a href="https://github.com/joepio/frog-fighter/blob/main/docs/gamenight-settings.md">All ranges</a></td>
 </tr>
 </tbody>
 </table>
-<p>These audits do not certify the options in downloaded release binaries. The
-lobby and retired demo games are not playable catalog entries and are excluded.</p>
+<p>Defaults preserve the existing games. Percentages are relative to those defaults,
+not raw engine units. Growing Guns multiplies its round modifiers and replicates
+the applied round snapshot to network peers. Ballkickers' charge rate only changes
+passive refill; successful actions still earn charge. Frog Fighter's gravity
+control applies to frogs, including rope movement, not every object in the world.</p>
+<p>The host still owns seats and controller assignments. Settings cannot remap
+controllers, create human players or write arbitrary engine variables.</p>
+<p>Run each game's headless settings suite in its own repository. For the complete
+source-to-host path, build the GameNight daemon and run:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">export GODOT=/path/to/godot
+export GAMENIGHT_GODOT_SOURCES='{&quot;spaceracer&quot;:&quot;/path/to/spaceracer&quot;,&quot;growing-guns&quot;:&quot;/path/to/growing-guns&quot;,&quot;ballkickers&quot;:&quot;/path/to/ballkickers&quot;,&quot;frog-fighter&quot;:&quot;/path/to/frog-fighter&quot;}'
+python3 scripts/test-godot-settings.py
+</code></pre></div>
+<p>This launches isolated game processes and a daemon without using physical
+controllers. It verifies the declared controls, received values and Undo.
+The games' simulation tests separately check gameplay effects and apply timing.
+Source checks do not certify older downloadable binaries or physical input.</p>
+<p>Ion Rush still has source declarations for laps and graphics quality in a local
+game import; it is not a catalog release. The lobby and retired demo games are
+not playable catalog entries and are excluded.</p>
 <h2 id="declare-and-apply">Declare and apply</h2>
 <p>The wire protocol accepts <code>toggle</code>, <code>choice</code> and integer <code>number</code> settings. Labels
 must include units and say when a change takes effect. For fractional durations,
@@ -194,7 +209,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="707c8106fd2b693906f0c873dfc8c60f89472a276f62a308aa4b2b769bc54168">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="892e2f6f4799ed6ca96d5d89ddbcb716b332450394f8439d7cd7355db236d725">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

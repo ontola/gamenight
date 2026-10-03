@@ -27,18 +27,44 @@ count remains capped. Disabling gravity also removes gravitational hazards;
 wormholes have their own switch. Pinpals changes simulation speed, including its
 simulation timers, while keeping the physics fixed step.
 
-Additional source audits found existing declarations in the separate projects:
+## Godot game controls
 
-| Game | Existing controls | Audit source |
+These independent game repositories use the same typed contract. Source builds
+have been tested against the real daemon, including setting changes and Undo.
+
+| Game | Controls | Timing and reference |
 | --- | --- | --- |
-| SpaceRacer | Laps, track difficulty, world, track seed, graphics quality | `joepio/spaceracer`, `src/main.gd`, commit `c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb` |
-| Ballkickers | Match length, team size | Local `goal-rush` checkout, `src/party.gd` and `src/main.gd` |
-| Frog Fighter | Mode, arena | Local `frog-fighter` checkout, `src/main.gd` |
-| Ion Rush | Laps, graphics quality | Local game import, `src/main.gd`; not a catalog release |
-| Growing Guns | 1–30 rounds to win (next match), modifier chance 0–100% (next round), card choice time 3–30 seconds (next pick) | [ontola/growing-guns](https://github.com/ontola/growing-guns), `scripts/gamenight_settings.gd`; added and engine-tested |
+| SpaceRacer | Laps, difficulty, world, seed, graphics; boost cost and duration, energy regeneration, crash recovery, weapon pickups | Boost, energy and recovery controls work during a race. Track rules and pickup stations wait for the next race. [All ranges](https://github.com/joepio/spaceracer/blob/main/docs/gamenight-settings.md) |
+| Growing Guns | Rounds to win, modifier chance, card choice time; gravity, bullet drop, body shot damage, random pickup rate | Match goal waits for a new match; physics and combat wait for the next round; card time affects the next choice. [All ranges](https://github.com/ontola/growing-guns/blob/main/docs/gamenight-settings.md) |
+| Ballkickers | Match length, matchup; running speed, shot speed, rolling friction, goalkeeper movement, passive super charge, super shots | Match structure waits for a new match. Movement and ball physics are live; shot changes affect the next shot. [All ranges](https://github.com/joepio/ballkickers/blob/main/docs/gamenight-settings.md) |
+| Frog Fighter | Mode, arena, lives; running speed, jump impulse, frog gravity, damage, supply interval, bot reaction delay | Mode, arena and lives wait for a new round. Physics are live; jumps, hits, supplies and aiming use the new value on their next event. [All ranges](https://github.com/joepio/frog-fighter/blob/main/docs/gamenight-settings.md) |
 
-These audits do not certify the options in downloaded release binaries. The
-lobby and retired demo games are not playable catalog entries and are excluded.
+Defaults preserve the existing games. Percentages are relative to those defaults,
+not raw engine units. Growing Guns multiplies its round modifiers and replicates
+the applied round snapshot to network peers. Ballkickers' charge rate only changes
+passive refill; successful actions still earn charge. Frog Fighter's gravity
+control applies to frogs, including rope movement, not every object in the world.
+
+The host still owns seats and controller assignments. Settings cannot remap
+controllers, create human players or write arbitrary engine variables.
+
+Run each game's headless settings suite in its own repository. For the complete
+source-to-host path, build the GameNight daemon and run:
+
+~~~sh
+export GODOT=/path/to/godot
+export GAMENIGHT_GODOT_SOURCES='{"spaceracer":"/path/to/spaceracer","growing-guns":"/path/to/growing-guns","ballkickers":"/path/to/ballkickers","frog-fighter":"/path/to/frog-fighter"}'
+python3 scripts/test-godot-settings.py
+~~~
+
+This launches isolated game processes and a daemon without using physical
+controllers. It verifies the declared controls, received values and Undo.
+The games' simulation tests separately check gameplay effects and apply timing.
+Source checks do not certify older downloadable binaries or physical input.
+
+Ion Rush still has source declarations for laps and graphics quality in a local
+game import; it is not a catalog release. The lobby and retired demo games are
+not playable catalog entries and are excluded.
 
 ## Declare and apply
 
