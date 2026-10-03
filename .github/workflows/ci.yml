@@ -33,6 +33,12 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo build --workspace --locked
       - if: runner.os == 'Linux'
+        name: Test live settings in all shared games
+        run: |
+          sudo apt-get install -y love
+          python3 scripts/test-live-settings.py
+
+      - if: runner.os == 'Linux'
         name: Test first-launch catalog handoff and recovery
         run: python3 scripts/test-onboarding.py
       - if: runner.os != 'Windows'

@@ -13,11 +13,16 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from host import Host, GAME
 import modding
+import game_controls
 from prototype import command, read_json
 from capabilities import controls, valid
 
 
 def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
+    if host:
+        session=game_controls.current(host.status())
+        if not session or session.get("game") != GAME:
+            return game_controls.snapshot(host,receipt)
     path = root / "world" / "gamenight" / "status.json"
     if not path.exists() or time.time() - path.stat().st_mtime > 5:
         if host and allow_loading:
@@ -40,8 +45,9 @@ def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
         instance = session["id"]
         phase = "playing" if session.get("phase") == "running" else "ready" if session.get("phase") in ("paused", "ready") else "loading"
     return {"seats": seats, "discovery": {
-        "games": [{"id": "mineclonia", "selectable": True, "state": phase}],
+        "games": game_controls.snapshot(host, receipt)["discovery"]["games"] if host else [{"id": "mineclonia", "selectable": True, "state": phase}],
         "current": "mineclonia", "agent_receipt": receipt,
+        "acknowledged": receipt["id"] if receipt and receipt.get("ok") else None,
         "controls": {"game": "mineclonia", "instance": instance,
                      "revision": state["revision"], "can_undo": state["can_undo"],
                      "launch_players": 2 if host else None,
@@ -51,6 +57,8 @@ def snapshot(root, instance, receipt=None, host=None, allow_loading=False):
 
 
 def execute(root, instance, selection, host=None):
+    if host and (selection.get("game") != "mineclonia" or not selection.get("command")):
+        return game_controls.execute(host,selection)
     current = snapshot(root, instance, host=host)
     if selection.get("expires", 0) <= time.time():
         raise ValueError("Request expired")

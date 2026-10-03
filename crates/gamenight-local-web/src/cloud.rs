@@ -1,5 +1,6 @@
 //! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
 pub(crate) mod discovery;
+mod settings;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
 use axum::{
     extract::{Path, State},
@@ -283,6 +284,7 @@ impl Bridge {
     pub async fn run(self, state: SharedState) {
         let mut applied: HashMap<String, (Seat, u64)> = HashMap::new();
         let mut acknowledged: Option<String> = None;
+        let mut receipt: Option<serde_json::Value> = None;
         loop {
             tokio::time::sleep(Duration::from_secs(3)).await;
             let Some((seats, party)) = self.snapshot(&state).await else {
@@ -311,12 +313,15 @@ impl Bridge {
                 *self.session.lock().unwrap() = token.clone();
                 applied.clear();
                 acknowledged = None;
+                receipt = None;
             }
+            let mut discovery = discovery::snapshot(&party, &acknowledged);
+            discovery["agent_receipt"] = receipt.clone().unwrap_or(serde_json::Value::Null);
             let Ok(response) = self
                 .http
                 .post(format!("{}/v1/lobbies/poll", self.origin))
                 .bearer_auth(token.unwrap())
-                .json(&serde_json::json!({"seats":seats,"discovery":discovery::snapshot(&party, &acknowledged)}))
+                .json(&serde_json::json!({"seats":seats,"discovery":discovery}))
                 .send()
                 .await
             else {
@@ -335,7 +340,19 @@ impl Bridge {
                 continue;
             };
             if let Some(selection) = &updates.selection {
-                if acknowledged.as_ref() != Some(&selection.id)
+                if selection.command.is_some() {
+                    if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {
+                        let result = if seats.contains(&selection.seat)
+                            && updates.updates.iter().any(|u| u.seat == selection.seat)
+                        {
+                            settings::apply(&state, selection).await
+                        } else {
+                            Err("Player is no longer linked to this room".into())
+                        };
+                        receipt = Some(serde_json::json!({"id":selection.id,"ok":result.is_ok(),
+                            "message":match result {Ok(())=>"Host accepted the settings. They take effect at the time specified by the game.".to_string(),Err(e)=>e}}));
+                    }
+                } else if acknowledged.as_ref() != Some(&selection.id)
                     && seats.contains(&selection.seat)
                     && updates.updates.iter().any(|u| u.seat == selection.seat)
                     && discovery::apply(&state, selection).await

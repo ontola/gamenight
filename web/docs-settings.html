@@ -155,12 +155,34 @@ It applies them on a worker, coalesces repeated edits and retries mailbox
 conflicts. Mod installation waits for an in-flight settings update. These two
 controls do not install arbitrary mods. Edits made directly through the separate
 world bridge are not automatically republished into GameNight's setting values.</p>
+<h2 id="phone-and-lobby-assistant">Phone and lobby assistant</h2>
+<p>The standard desktop cloud bridge and the custom lobby relay publish these same
+declarations for the active game, or the prepared game if none is running. Numeric
+values, toggles and named choices all use the same contract. No engine-specific
+model integration is needed: declare your settings and handle <code>setting_changed</code>.</p>
+<p>The assistant sends a typed batch through <code>control_settings</code>. The daemon checks
+the player, game session and settings revision, then validates every value before
+changing any of them. Undo restores the preceding batch; Keep clears that undo.
+A stale request is refused instead of overwriting a newer change. Normal
+<code>set_setting</code> writes also advance the revision.</p>
+<p>Host acceptance does not mean a next-round setting is already active in gameplay.
+Keep the timing in the label and description. The assistant must not promise an
+immediate gameplay change when your game waits for a new round or match. Account
+configs store these scalar values, not world saves or arbitrary mod code.</p>
+<p>Voice and account features belong to the optional GameNight service. The public
+game contract remains usable offline, without an AI provider.</p>
 <h2 id="verify-changes">Verify changes</h2>
 <p>From the repository root:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python scripts/test-love-simulation.py --love /path/to/love
+# Linux, with LÖVE installed: real host and game processes, no display needed.
+cargo build -p gamenight-daemon
+python scripts/test-live-settings.py
 cd examples/mineclonia
 python -m unittest test_settings test_managed test_mod_lifecycle
 </code></pre></div>
+<p>The live-settings process test checks typed batches, stale/invalid rejection and
+undo against observations from all eight running games. It does not test a
+microphone, physical controllers or newly downloaded release packages.</p>
 <p>The LÖVE suite checks all eight active modules: declarations, host message
 routing, invalid values, snapshots and gameplay effects. It stages the Pinpals
 modules as the release pack does. <code>--settings-output settings.json</code> exports the
@@ -172,7 +194,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="6ce8cf01678f73aad332b810017635b96915097e903de6c16dcaece0bec9b981">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="707c8106fd2b693906f0c873dfc8c60f89472a276f62a308aa4b2b769bc54168">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

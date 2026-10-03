@@ -174,7 +174,7 @@ function love.update(dt)
 		end
 	end
 	Probe.commands(mode, state)
-	Probe.observe(bridge and bridge.phase or "standalone", state, remaining)
+	Probe.observe(bridge and bridge.phase or "standalone", state, remaining, mode)
 	if not state or (bridge and bridge.phase ~= "running") then
 		return
 	end

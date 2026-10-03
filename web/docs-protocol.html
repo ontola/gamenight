@@ -495,6 +495,33 @@ sessions, skips and replays, and because the daemon keeps the values they
 also survive your process crashing. The <code>declare_settings</code> after your
 reconnect answers with a <code>setting_changed</code> for every value the party had
 moved off its default.</p>
+<h3 id="atomic-settings-batches">Atomic settings batches</h3>
+<p>Remote controls should use <code>control_settings</code> rather than sending independent
+<code>set_setting</code> writes. Read <code>revision</code> and <code>can_undo</code> from the game's entry in
+<code>party.settings</code>, and use the current active/warm session ID and seated player ID:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{
+  &quot;type&quot;: &quot;control_settings&quot;,
+  &quot;game&quot;: &quot;my-game&quot;,
+  &quot;session&quot;: &quot;&lt;session UUID&gt;&quot;,
+  &quot;expected_revision&quot;: 4,
+  &quot;player_id&quot;: &quot;&lt;player UUID&gt;&quot;,
+  &quot;action&quot;: &quot;set&quot;,
+  &quot;values&quot;: {&quot;items&quot;: false, &quot;arena&quot;: &quot;volcano&quot;}
+}
+</code></pre></div>
+<p>Every key and value is validated before any state or SDK notification changes.
+Wrong types, unknown keys, stale revisions and departed players receive <code>error</code>.
+A successful request sends <strong>only its requesting overlay</strong>:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;:&quot;settings_accepted&quot;,&quot;game&quot;:&quot;my-game&quot;,&quot;session&quot;:&quot;&lt;session UUID&gt;&quot;,&quot;revision&quot;:5}
+</code></pre></div>
+<p>Then the updated party snapshot is broadcast. This receipt confirms daemon
+acceptance, not a rendered gameplay effect. Games still receive the existing
+<code>setting_changed</code> messages and apply them at their declared time.</p>
+<p>Use <code>action: &quot;undo&quot;</code> with empty <code>values</code> to restore the preceding change, or
+<code>action: &quot;keep&quot;</code> to discard undo. Both require the current revision and advance
+it once. Redeclaring settings clears undo and advances the revision. Setting
+values survive sessions within the daemon; these revisions do not make them
+durable across a daemon restart.</p>
 <h3 id="how-a-game-launches">How a game launches</h3>
 <p>The daemon is the launcher: when the next playlist entry needs warming and no
 process for that title is connected, the daemon spawns one using the library
@@ -743,7 +770,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="718538fbaa636266baf63209855de742e0611b05681ba3bd789e53cd86071937">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="d7d5377787b4ad040a8170902030374b9e840c244844ce0e71df8d0185578640">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

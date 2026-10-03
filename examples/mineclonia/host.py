@@ -11,7 +11,7 @@ class Host:
     def __init__(self, port=17942):
         self.port = port
 
-    def request(self, message=None):
+    def request(self, message=None, receipt=False):
         with socket.create_connection(("127.0.0.1", self.port), timeout=4) as sock:
             sock.sendall(b'{"type":"hello","role":"overlay"}\n')
             stream = sock.makefile("rb")
@@ -20,9 +20,11 @@ class Host:
                 sock.sendall((json.dumps(message)+"\n").encode())
                 # Wait for an observed response, not merely a successful write.
                 response = json.loads(stream.readline(16777216))
+                while receipt and response.get("type") not in ("settings_accepted","error"):
+                    response = json.loads(stream.readline(16777216))
                 if response.get("type") == "error":
                     raise RuntimeError(response.get("message", "Host rejected command"))
-            return welcome["party"]
+            return response if receipt and message else welcome["party"]
 
     def status(self):
         return self.request()

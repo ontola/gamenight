@@ -375,6 +375,42 @@ also survive your process crashing. The `declare_settings` after your
 reconnect answers with a `setting_changed` for every value the party had
 moved off its default.
 
+### Atomic settings batches
+
+Remote controls should use `control_settings` rather than sending independent
+`set_setting` writes. Read `revision` and `can_undo` from the game's entry in
+`party.settings`, and use the current active/warm session ID and seated player ID:
+
+```json
+{
+  "type": "control_settings",
+  "game": "my-game",
+  "session": "<session UUID>",
+  "expected_revision": 4,
+  "player_id": "<player UUID>",
+  "action": "set",
+  "values": {"items": false, "arena": "volcano"}
+}
+```
+
+Every key and value is validated before any state or SDK notification changes.
+Wrong types, unknown keys, stale revisions and departed players receive `error`.
+A successful request sends **only its requesting overlay**:
+
+```json
+{"type":"settings_accepted","game":"my-game","session":"<session UUID>","revision":5}
+```
+
+Then the updated party snapshot is broadcast. This receipt confirms daemon
+acceptance, not a rendered gameplay effect. Games still receive the existing
+`setting_changed` messages and apply them at their declared time.
+
+Use `action: "undo"` with empty `values` to restore the preceding change, or
+`action: "keep"` to discard undo. Both require the current revision and advance
+it once. Redeclaring settings clears undo and advances the revision. Setting
+values survive sessions within the daemon; these revisions do not make them
+durable across a daemon restart.
+
 ### How a game launches
 
 The daemon is the launcher: when the next playlist entry needs warming and no

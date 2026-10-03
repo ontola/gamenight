@@ -1467,6 +1467,78 @@ mod night_tests {
     }
 
     #[test]
+    fn typed_batches_are_atomic_scoped_and_undoable() {
+        use gamenight_protocol::SettingsAction;
+        use std::collections::BTreeMap;
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Player", Some(0), None));
+        let player = night.snapshot().players[0].id;
+        let g = GameId::new("g1");
+        night.set_library(vec![meta("g1")]);
+        night.handle(Command::GameConnected { game: g.clone() });
+        night.handle(Command::DeclareSettings {
+            game: g.clone(),
+            settings: vec![
+                toggle("items", true),
+                SettingSpec {
+                    key: "arena".into(),
+                    label: "Arena".into(),
+                    description: None,
+                    kind: SettingKind::Choice {
+                        default: "earth".into(),
+                        options: vec!["earth".into(), "moon".into()],
+                    },
+                },
+            ],
+        });
+        let session = night.snapshot().warm_session.unwrap().id;
+        let values = BTreeMap::from([
+            ("items".into(), SettingValue::Toggle(false)),
+            ("arena".into(), SettingValue::Choice("moon".into())),
+        ]);
+        let cmd = |revision, action, values| Command::ControlSettings {
+            game: g.clone(),
+            session,
+            player_id: player,
+            expected_revision: revision,
+            action,
+            values,
+        };
+        let original = night.snapshot().settings;
+        let mut bad = values.clone();
+        bad.insert("arena".into(), SettingValue::Choice("invented".into()));
+        let fx = night.handle(cmd(0, SettingsAction::Set, bad));
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        assert!(setting_pushed(&fx).is_none());
+        assert_eq!(night.snapshot().settings, original);
+        let fx = night.handle(cmd(0, SettingsAction::Set, values.clone()));
+        assert_eq!(
+            fx.iter()
+                .filter(|e| matches!(e, Effect::SettingChanged { .. }))
+                .count(),
+            2
+        );
+        assert_eq!(night.snapshot().settings[0].revision, 1);
+        assert_eq!(night.snapshot().settings[0].values, values);
+        assert!(night
+            .handle(cmd(0, SettingsAction::Set, values))
+            .iter()
+            .any(|e| matches!(e, Effect::Reject { .. })));
+        night.handle(cmd(1, SettingsAction::Undo, BTreeMap::new()));
+        assert_eq!(night.snapshot().settings[0].values, original[0].values);
+        assert!(!night.snapshot().settings[0].can_undo);
+        night.handle(Command::LeaveParty { player_id: player });
+        assert!(night
+            .handle(cmd(
+                2,
+                SettingsAction::Set,
+                BTreeMap::from([("items".into(), SettingValue::Toggle(false))])
+            ))
+            .iter()
+            .any(|e| matches!(e, Effect::Reject { .. })));
+    }
+
+    #[test]
     fn settings_declare_set_and_validate() {
         let mut night = GameNight::default();
         let g = GameId::new("g1");

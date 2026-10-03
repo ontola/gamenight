@@ -608,12 +608,24 @@ pub struct SettingSpec {
     pub kind: SettingKind,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SettingsAction {
+    Set,
+    Undo,
+    Keep,
+}
+
 /// A game's declared settings plus their current values, as broadcast in
 /// every [`PartySnapshot`]. Values are effective (defaults merged in) and
 /// survive the game process reconnecting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GameSettings {
     pub game: GameId,
+    #[serde(default)]
+    pub revision: u64,
+    #[serde(default)]
+    pub can_undo: bool,
     pub specs: Vec<SettingSpec>,
     pub values: std::collections::BTreeMap<String, SettingValue>,
 }
@@ -879,6 +891,18 @@ pub enum ClientMessage {
         value: SettingValue,
     },
 
+    /// Atomically validate a settings batch against a live session and revision.
+    /// Undo restores the last batch. Keep discards that undo snapshot.
+    ControlSettings {
+        game: GameId,
+        session: SessionId,
+        expected_revision: u64,
+        player_id: PlayerId,
+        action: SettingsAction,
+        #[serde(default)]
+        values: std::collections::BTreeMap<String, SettingValue>,
+    },
+
     // -- game (SDK) messages ------------------------------------------------
     /// Assets loaded, controllers mapped — the session can start instantly.
     Ready {
@@ -987,6 +1011,13 @@ pub enum ServerMessage {
     /// Tear everything down; the session id will never be used again.
     Dispose {
         session: SessionId,
+    },
+    /// Sent only to the requesting overlay after an accepted settings batch.
+    /// A host acknowledgement, not proof that a next-round change is in play.
+    SettingsAccepted {
+        game: GameId,
+        session: SessionId,
+        revision: u64,
     },
     /// A match setting changed; sent to the game that declared it. Apply it
     /// live if a match is running, otherwise from the next match. Also sent

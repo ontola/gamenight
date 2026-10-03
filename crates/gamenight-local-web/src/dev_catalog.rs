@@ -87,6 +87,7 @@ pub async fn next(
         .as_secs()
         + 30;
     let selection = discovery::Selection {
+        command: None,
         id: request.request_id,
         game: request.game,
         seat,

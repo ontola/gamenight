@@ -88,15 +88,43 @@ conflicts. Mod installation waits for an in-flight settings update. These two
 controls do not install arbitrary mods. Edits made directly through the separate
 world bridge are not automatically republished into GameNight's setting values.
 
+## Phone and lobby assistant
+
+The standard desktop cloud bridge and the custom lobby relay publish these same
+declarations for the active game, or the prepared game if none is running. Numeric
+values, toggles and named choices all use the same contract. No engine-specific
+model integration is needed: declare your settings and handle `setting_changed`.
+
+The assistant sends a typed batch through `control_settings`. The daemon checks
+the player, game session and settings revision, then validates every value before
+changing any of them. Undo restores the preceding batch; Keep clears that undo.
+A stale request is refused instead of overwriting a newer change. Normal
+`set_setting` writes also advance the revision.
+
+Host acceptance does not mean a next-round setting is already active in gameplay.
+Keep the timing in the label and description. The assistant must not promise an
+immediate gameplay change when your game waits for a new round or match. Account
+configs store these scalar values, not world saves or arbitrary mod code.
+
+Voice and account features belong to the optional GameNight service. The public
+game contract remains usable offline, without an AI provider.
+
 ## Verify changes
 
 From the repository root:
 
 ```sh
 python scripts/test-love-simulation.py --love /path/to/love
+# Linux, with LÖVE installed: real host and game processes, no display needed.
+cargo build -p gamenight-daemon
+python scripts/test-live-settings.py
 cd examples/mineclonia
 python -m unittest test_settings test_managed test_mod_lifecycle
 ```
+
+The live-settings process test checks typed batches, stale/invalid rejection and
+undo against observations from all eight running games. It does not test a
+microphone, physical controllers or newly downloaded release packages.
 
 The LÖVE suite checks all eight active modules: declarations, host message
 routing, invalid values, snapshots and gameplay effects. It stages the Pinpals

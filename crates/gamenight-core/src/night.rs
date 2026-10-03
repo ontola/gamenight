@@ -11,7 +11,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use gamenight_protocol::{
     GameId, GameMeta, GameSettings, InstallState, InstallStatus, MediaAction, NowPlaying,
     PartySnapshot, Player, PlayerId, PlaylistEntry, Seat, SeatOccupant, SessionId, SessionPhase,
-    SettingSpec, SettingValue, VoteOption,
+    SettingSpec, SettingValue, SettingsAction, VoteOption,
 };
 
 use crate::playlist::Playlist;
@@ -180,6 +180,14 @@ pub enum Command {
         key: String,
         value: SettingValue,
     },
+    ControlSettings {
+        game: GameId,
+        session: SessionId,
+        expected_revision: u64,
+        player_id: PlayerId,
+        action: SettingsAction,
+        values: std::collections::BTreeMap<String, SettingValue>,
+    },
 }
 
 /// A lifecycle command the daemon must deliver to a game process.
@@ -219,6 +227,11 @@ pub enum Effect {
     /// A match-setting value changed (or needs re-hydrating after a
     /// reconnect): deliver it to the process serving `game`, if connected.
     /// Not session-scoped — settings outlive sessions.
+    SettingsAccepted {
+        game: GameId,
+        session: SessionId,
+        revision: u64,
+    },
     SettingChanged {
         game: GameId,
         key: String,
@@ -269,6 +282,7 @@ pub struct GameNight {
     /// Match settings per game, as declared by the games themselves. Values
     /// live here (not in the game) so they survive process reconnects.
     settings: Vec<GameSettings>,
+    settings_previous: HashMap<GameId, std::collections::BTreeMap<String, SettingValue>>,
     /// The party overlay is showing (on every screen — server-authoritative).
     overlay_open: bool,
     /// The overlay is what paused the active session, so closing it resumes.
@@ -327,6 +341,7 @@ impl GameNight {
             next_up: None,
             library: Vec::new(),
             settings: Vec::new(),
+            settings_previous: HashMap::new(),
             overlay_open: false,
             overlay_paused: false,
             lobby_game: None,
@@ -690,6 +705,22 @@ impl GameNight {
             Command::DeclareSettings { game, settings } => {
                 self.on_declare_settings(game, settings, &mut fx)
             }
+            Command::ControlSettings {
+                game,
+                session,
+                expected_revision,
+                player_id,
+                action,
+                values,
+            } => self.on_control_settings(
+                game,
+                session,
+                expected_revision,
+                player_id,
+                action,
+                values,
+                &mut fx,
+            ),
             Command::SetSetting { game, key, value } => {
                 self.on_set_setting(game, key, value, &mut fx)
             }
@@ -1581,7 +1612,10 @@ impl GameNight {
             }
             values.insert(spec.key.clone(), value);
         }
+        self.settings_previous.remove(&game);
         self.settings.push(GameSettings {
+            revision: old.as_ref().map_or(0, |s| s.revision + 1),
+            can_undo: false,
             game,
             specs,
             values,
@@ -1626,10 +1660,123 @@ impl GameNight {
             });
             return;
         }
+        let previous = entry.values.clone();
         let changed = entry.values.insert(key.clone(), value.clone()) != Some(value.clone());
         if changed {
+            self.settings_previous.insert(game.clone(), previous);
+            entry.revision += 1;
+            entry.can_undo = true;
             fx.push(Effect::SettingChanged { game, key, value });
         }
+        fx.push(Effect::StateChanged);
+    }
+
+    #[allow(clippy::too_many_arguments)] // Mirrors the bounded protocol command fields.
+    fn on_control_settings(
+        &mut self,
+        game: GameId,
+        session: SessionId,
+        expected_revision: u64,
+        player_id: PlayerId,
+        action: SettingsAction,
+        values: std::collections::BTreeMap<String, SettingValue>,
+        fx: &mut Vec<Effect>,
+    ) {
+        let reject = |fx: &mut Vec<Effect>, reason: &str| {
+            fx.push(Effect::Reject {
+                reason: reason.into(),
+            })
+        };
+        if !self.connected_games.contains(&game)
+            || !self
+                .active
+                .iter()
+                .chain(self.warm.iter())
+                .any(|s| s.game == game && s.id == session)
+            || !self
+                .seats
+                .iter()
+                .any(|s| s.occupant.player_id() == Some(player_id))
+        {
+            reject(fx, "The game session or player is no longer connected");
+            return;
+        }
+        let Some(entry) = self.settings.iter_mut().find(|s| s.game == game) else {
+            reject(fx, "This game has not declared settings");
+            return;
+        };
+        if entry.revision != expected_revision {
+            reject(fx, "Settings changed; read the current revision and retry");
+            return;
+        }
+        let next = match action {
+            SettingsAction::Set if !values.is_empty() => values,
+            SettingsAction::Undo if values.is_empty() => match self.settings_previous.get(&game) {
+                Some(previous) => previous.clone(),
+                None => {
+                    reject(fx, "No settings change to undo");
+                    return;
+                }
+            },
+            SettingsAction::Keep if values.is_empty() => {
+                if !entry.can_undo {
+                    reject(fx, "No settings change to keep");
+                    return;
+                }
+                self.settings_previous.remove(&game);
+                entry.can_undo = false;
+                entry.revision += 1;
+                fx.push(Effect::SettingsAccepted {
+                    game,
+                    session,
+                    revision: entry.revision,
+                });
+                fx.push(Effect::StateChanged);
+                return;
+            }
+            _ => {
+                reject(fx, "Unsupported settings action or empty change");
+                return;
+            }
+        };
+        // Validate the entire batch before any mutation or SDK notification.
+        for (key, value) in &next {
+            if !entry
+                .specs
+                .iter()
+                .any(|s| s.key == *key && s.kind.validate(value).is_ok())
+            {
+                reject(fx, &format!("Unsupported setting or value: {key}"));
+                return;
+            }
+        }
+        if action == SettingsAction::Set {
+            self.settings_previous.insert(
+                game.clone(),
+                next.keys()
+                    .map(|k| (k.clone(), entry.values[k].clone()))
+                    .collect(),
+            );
+            entry.can_undo = true;
+        } else {
+            self.settings_previous.remove(&game);
+            entry.can_undo = false;
+        }
+        for (key, value) in next {
+            if entry.values.insert(key.clone(), value.clone()) != Some(value.clone()) {
+                fx.push(Effect::SettingChanged {
+                    game: game.clone(),
+                    key,
+                    value,
+                });
+            }
+        }
+        entry.revision += 1;
+        fx.push(Effect::SettingsAccepted {
+            game,
+            session,
+            revision: entry.revision,
+        });
         fx.push(Effect::StateChanged);
     }
 

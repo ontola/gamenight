@@ -242,6 +242,7 @@ impl GameNight {
                         ServerMessage::ControllerFrame { controllers } => {
                             GameEvent::ControllerFrame { controllers }
                         }
+                        ServerMessage::SettingsAccepted { .. } => continue,
                         ServerMessage::Error { message } => {
                             return Err(SdkError::Rejected(message))
                         }

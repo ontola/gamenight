@@ -9,8 +9,22 @@ class Contract(unittest.TestCase):
   with tempfile.TemporaryDirectory() as folder:
    state=snapshot(Path(folder),'test',host=host,allow_loading=True)
    self.assertEqual(state['seats'],host.seats.return_value)
-   self.assertNotIn('controls',state['discovery'])
-   with self.assertRaises(RuntimeError):snapshot(Path(folder),'test',host=host)
+   self.assertIsNone(state['discovery']['controls'])
+   self.assertEqual(snapshot(Path(folder),'test',host=host)['seats'],state['seats'])
+ def test_other_game_uses_declared_controls_without_a_mineclonia_world(self):
+  host=Mock()
+  host.status.return_value={"active_session":{"id":"game-1","game":"neon-siege"},
+    "connected_games":["neon-siege"],"library":[{"id":"neon-siege"},{"id":"mineclonia-prototype"},{"id":"lobby"}],
+    "settings":[{"game":"neon-siege","revision":3,"can_undo":True,
+      "specs":[{"key":"wormholes","kind":"toggle","label":"Wormholes"}],"values":{"wormholes":False}}]}
+  host.seats.return_value=[{"index":0,"player":"guest","revision":1}]
+  with tempfile.TemporaryDirectory() as folder:
+   state=snapshot(Path(folder),'test',host=host,receipt={"id":"done","ok":True})
+   c=state["discovery"]["controls"]
+   self.assertEqual(c["game"],"neon-siege")
+   self.assertEqual(c["settings"]["wormholes"]["value"],False)
+   self.assertEqual({g["id"] for g in state["discovery"]["games"]},{"neon-siege","mineclonia"})
+   self.assertEqual(state["discovery"]["acknowledged"],"done")
  def request(self):
   return {"id":"request-1","game":"mineclonia","expires":int(time.time())+60,"seat":{"index":0,"player":"Couch1","revision":1},"command":{"action":"set","instance":"world-1","expected_revision":2,"values":{"gravity":.5}}}
  def test_reject_before_mailbox(self):

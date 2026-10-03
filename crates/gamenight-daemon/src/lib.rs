@@ -250,6 +250,22 @@ impl Shared {
                     self.kill_all_children();
                     broadcast = true;
                 }
+                Effect::SettingsAccepted {
+                    game,
+                    session,
+                    revision,
+                } => {
+                    if let Some(tx) = origin {
+                        send(
+                            tx,
+                            &ServerMessage::SettingsAccepted {
+                                game,
+                                session,
+                                revision,
+                            },
+                        );
+                    }
+                }
                 Effect::Reject { reason } => {
                     warn!(%reason, "command rejected");
                     if let Some(tx) = origin {
@@ -1597,6 +1613,21 @@ fn message_to_command(
         ClientMessage::OpenOverlay => Command::OverlayOpened,
         ClientMessage::CloseOverlay => Command::OverlayClosed,
         ClientMessage::Vote { player_id, option } => Command::Vote { player_id, option },
+        ClientMessage::ControlSettings {
+            game,
+            session,
+            expected_revision,
+            player_id,
+            action,
+            values,
+        } => Command::ControlSettings {
+            game,
+            session,
+            expected_revision,
+            player_id,
+            action,
+            values,
+        },
         ClientMessage::SetSetting { game, key, value } => Command::SetSetting { game, key, value },
         ClientMessage::MediaControl { action } => Command::MediaControl { action },
     };
