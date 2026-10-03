@@ -11,7 +11,7 @@
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="integrating-your-game-with-gamenight">Integrating your game with GameNight</h1>
 <p>GameNight supplies the party, seats and lifecycle. Your game owns gameplay,
 rounds and results. Players can stay in a game until they choose another one.</p>
-<p>Start from the <a href="https://github.com/ontola/gamenight/blob/main/games/love-party/README.md">shared LÖVE runner</a> for a Lua game.
+<p>Start from the <a href="https://github.com/ontola/gamenight-games/blob/main/love-party/README.md">shared LÖVE runner</a> for a Lua game.
 The <a href="/docs/protocol">wire reference</a> defines messages; the
 <a href="https://github.com/ontola/gamenight/blob/main/contract/requirements.json">release requirements</a> define what must work.
 A successful handshake alone is not a complete integration.</p>
@@ -73,7 +73,7 @@ is an index into SDL or another engine's local gamepad list.</p>
 <code>controllers[].controller</code> to <code>seats[].controller</code>. Do not enumerate local pads
 and assign the first pad to the first seat. Enumeration can differ between the
 host and game, especially after disconnects.</p>
-<p>Use <a href="https://github.com/ontola/gamenight/blob/main/games/love-party/shared/input.lua">the shared input adapter</a> or implement
+<p>Use <a href="https://github.com/ontola/gamenight-games/blob/main/love-party/shared/input.lua">the shared input adapter</a> or implement
 <a href="/docs/protocol#bundled-games-authoritative-controller-input">the frame contract</a>.
 Rust games receive the same stream as <code>GameEvent::ControllerFrame</code> from
 <code>GameNight::next_event()</code>. Keep the latest frame and look up each non-AI seat by
@@ -90,7 +90,7 @@ when seats or profiles change.</p>
 <p>Back/Select requests the lobby with <code>request_overlay</code>. The host pauses the game.
 From the lobby, Back/Select can resume a paused game. Accept one transition per
 press, require release, and guard against the same held press reaching the newly
-focused window. The bundled <a href="https://github.com/ontola/gamenight/blob/main/games/love-party/shared/back_gate.lua">Back gate</a>
+focused window. The bundled <a href="https://github.com/ontola/gamenight-games/blob/main/love-party/shared/back_gate.lua">Back gate</a>
 requires one second of release before another accepted press.</p>
 <p><strong>Never start or resume automatically on window focus.</strong> Focus can change while
 the host is opening the lobby. Only explicit host Start/Resume commands change
@@ -98,7 +98,7 @@ the running state. <code>request_start</code> exists for an explicit user reques
 focus-event handler.</p>
 <p>Use a borderless window covering the display, not exclusive fullscreen. Configure
 it before reporting Ready so switching does not change display resolution. The
-bundled <a href="https://github.com/ontola/gamenight/blob/main/games/love-party/shared/window.lua">window helper</a> prepares off-screen,
+bundled <a href="https://github.com/ontola/gamenight-games/blob/main/love-party/shared/window.lua">window helper</a> prepares off-screen,
 then hides/shows the window. Its Windows path adds one off-screen pixel row to
 avoid exclusive-like presentation on affected drivers. Retain that behavior when
 reusing the helper. Test focus changes on the target OS; one platform's result is
@@ -167,7 +167,7 @@ a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
 repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="0ff7d08344be3cb55248ecf064f25e84fd497dc0fdd60d9526214b4348fcc1bb">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="4c4cdce55c752e6c94d5c0dd0cec965e36d96eb2186c4b59574801119f86e932">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#submit-a-game">Submit a game</a><a href="#connect">Connect</a><a href="#prepare-before-taking-the-screen">Prepare before taking the screen</a><a href="#controllers-belong-to-players">Controllers belong to players</a><a href="#back-focus-and-fullscreen">Back, focus and fullscreen</a><a href="#rounds-continue-inside-the-session">Rounds continue inside the session</a><a href="#live-players-and-settings">Live players and settings</a><a href="#player-faces-and-colours">Player faces and colours</a><a href="#artwork-for-the-catalog-and-lobby">Artwork for the catalog and lobby</a><a href="#verify-before-shipping">Verify before shipping</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

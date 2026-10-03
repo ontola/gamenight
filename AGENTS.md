@@ -26,3 +26,12 @@ Before creating, changing or publishing a five-second store video, read
 [docs/gameplay-previews.md](docs/gameplay-previews.md). Require a varied montage
 of quick, readable gameplay cuts; encoding and playback checks alone do not
 meet the preview quality bar. Apply this when adding a playable catalog entry too.
+
+# Game source boundaries
+
+Keep game source outside this repository. LÖVE games and Pinpals live in
+`ontola/gamenight-games`; both lobby implementations stay public here. Run
+`python scripts/fetch-game-sources.py` before building docs or game packages.
+CI uses the revision in `game-sources.json`. For development, explicitly set
+`GAMENIGHT_GAMES_DIR` to the game checkout. Push game changes before updating
+the pin and regenerating the docs. Never overwrite a dirty game checkout.

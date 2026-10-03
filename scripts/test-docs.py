@@ -37,6 +37,14 @@ class DocumentationTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Broken docs link"):
                     docs.outputs()
 
+    def test_game_excerpts_link_to_pinned_external_source(self):
+        page = next(p for p in docs.PAGES if p["slug"] == "love")
+        html = docs.render(page)[0]
+        self.assertIn("gamenight-games/blob/" + docs.MANIFEST["revision"], html)
+        self.assertNotIn("gamenight/blob/main/games/", html)
+        with self.assertRaisesRegex(ValueError, "invalid documentation source"):
+            docs.source("games/../../not-ours.md")
+
     def test_paths_cannot_escape_repository(self):
         with self.assertRaisesRegex(ValueError, "invalid documentation source"):
             docs.source("../not-ours.md")

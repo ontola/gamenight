@@ -4,6 +4,7 @@
 Install docs/site/requirements.txt. --check fails when docs or watched code drift.
 No network, timestamps or Git working-tree state are used in generated output.
 """
+from game_sources import game_sources, MANIFEST
 import argparse
 import hashlib
 import html
@@ -33,11 +34,24 @@ def slugify(text):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9 _-]", "", text).replace(" ", "-")).strip("-")
 
 
-def source(path):
-    file = (ROOT / path).resolve()
-    if not file.is_relative_to(ROOT) or not file.is_file():
+def source_file(path):
+    # games/ is a stable documentation namespace for the separately pinned source.
+    external = path.startswith("games/")
+    base = game_sources() if external else ROOT
+    file = (base / (path.removeprefix("games/") if external else path)).resolve()
+    if not file.is_relative_to(base) or not file.exists():
         raise ValueError(f"Missing or invalid documentation source: {path}")
-    return file.read_text(encoding="utf-8")
+    return file
+
+
+def source_url(path):
+    if path.startswith("games/"):
+        return MANIFEST["repository"].removesuffix(".git") + "/blob/" + MANIFEST["revision"] + "/" + quote(path.removeprefix("games/"))
+    return REPO + quote(path)
+
+
+def source(path):
+    return source_file(path).read_text(encoding="utf-8")
 
 
 def expand(markdown, watched):
@@ -60,7 +74,7 @@ def expand(markdown, watched):
                 raise ValueError(f"Code excerpt moved or disappeared: {path}: {markers}")
         line = text.count("\n", 0, start) + 1
         code = textwrap.dedent(text[start:end]).strip()
-        return f"```{language}\n{code}\n```\n\n[Source: {path}]({REPO}{path}#L{line})"
+        return f"```{language}\n{code}\n```\n\n[Source: {path}]({source_url(path)}#L{line})"
     return re.sub(r"^::: source (\w+) (\S+)(.*)$", excerpt, markdown, flags=re.M)
 
 
@@ -91,9 +105,11 @@ def render(page):
             url = urlsplit(href)
             if not url.scheme and not href.startswith(("/", "#")):
                 target = (ROOT / page["source"]).parent.joinpath(unquote(url.path)).resolve()
-                if not target.is_relative_to(ROOT) or not target.exists():
+                if not target.is_relative_to(ROOT):
                     raise ValueError(f"Broken source link in {page['source']}: {href}")
-                href = mapped.get(target, REPO + quote(target.relative_to(ROOT).as_posix()))
+                relative = target.relative_to(ROOT).as_posix()
+                source_file(relative)
+                href = mapped.get(target, source_url(relative))
                 if url.fragment:
                     href += "#" + url.fragment
                 child.attrSet("href", href)

@@ -1,4 +1,5 @@
 """Build deterministic LÖVE games and an optional local GameNight shelf."""
+from game_sources import game_sources
 import argparse
 import hashlib
 import json
@@ -33,7 +34,7 @@ def main():
     args = parser.parse_args()
     if args.base_url and not args.base_url.startswith("https://"):
         parser.error("--base-url must use HTTPS")
-    source = Path(__file__).resolve().parents[1] / "games/love-party"
+    source = game_sources() / "love-party"
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     files = {str(p.relative_to(source)).replace("\\", "/"): p.read_bytes()

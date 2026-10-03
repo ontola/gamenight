@@ -14,7 +14,7 @@ resume, reset the Back gate. Require release and at least one second before anot
 switch. Holding the button and replayed events after focus changes must not switch twice.
 Keep polling host messages while paused, but stop simulation, timers and audio.
 
-Reference: `games/love-party/shared/back_gate.lua`, `shared/lifecycle.lua` and `main.lua`.
+Reference: `love-party/shared/back_gate.lua`, `shared/lifecycle.lua` and `main.lua` in [the game-source repository](https://github.com/ontola/gamenight-games/tree/main/love-party).
 Regression cases: open lobby, hold Back, release, resume, hold again; repeat both
 ways with a short tap and a long press. Focus changes alone must do nothing.
 

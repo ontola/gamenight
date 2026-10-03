@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run the shared LÖVE suite with the same Pinpals modules as the release pack."""
+from game_sources import game_sources
 import argparse
 import os
 import json
@@ -22,9 +23,9 @@ def main():
         parser.error('LÖVE executable not found')
     with tempfile.TemporaryDirectory(prefix='gamenight-party-tests-') as temporary:
         source = Path(temporary) / 'party'
-        shutil.copytree(ROOT / 'games/love-party', source)
+        shutil.copytree(game_sources() / 'love-party', source)
         for folder in ('core', 'sim', 'app', 'data'):
-            shutil.copytree(ROOT / 'games/pinpals' / folder, source / folder)
+            shutil.copytree(game_sources() / 'pinpals' / folder, source / folder)
         env = dict(os.environ, GNLOVE_TEST='1', GNLOVE_HEADLESS='1')
         declaration_file = Path(temporary) / 'settings.json'
         env['GNLOVE_SETTINGS_OUTPUT'] = str(declaration_file)

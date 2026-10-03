@@ -80,7 +80,11 @@ python scripts/run-local.py --studio --shelf /path/to/games.json
 The shelf lists your games and their launch commands. GameNight adds the lobby.
 Without a shelf, the script uses a terminal SDK demo for testing the protocol.
 
-The [shared LÖVE package](games/love-party/README.md) contains eight games:
+Game sources live outside this repository. Both GameNight lobbies stay here:
+[the Godot lobby](sdk/godot/lobby) and [the Rust lobby](crates/lobby).
+The SDKs, catalog and integration checks also belong here.
+
+The [shared LÖVE package](https://github.com/ontola/gamenight-games/tree/main/love-party) contains eight games:
 Neon Trails, Blast Party, Neon Siege, Ricochet Club, Volley Trouble,
 Stack Together, Bubble Buddies and Pinpals.
 
@@ -92,8 +96,14 @@ from [GitHub Releases](https://github.com/joepio/spaceracer/releases).
 The GameNight protocol ID is `spaceracer`, including for local debug builds.
 
 ```sh
+python scripts/fetch-game-sources.py
 python scripts/package-love-party.py --output dist/party
 ```
+
+`game-sources.json` pins the game-source revision used by CI and release builds.
+The fetch command creates a sibling `gamenight-games` checkout and refuses to
+overwrite local changes. For game development, set `GAMENIGHT_GAMES_DIR` to your
+working checkout. Commit and push game changes before updating the pin.
 
 The host prepares games in the background. Each game handles its own rounds
 and score screen. Use Back/Select to return to the lobby when you want to switch.

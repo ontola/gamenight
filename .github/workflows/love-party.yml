@@ -16,6 +16,8 @@ jobs:
       GALLIUM_DRIVER: llvmpipe
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch pinned game sources
+        run: python scripts/fetch-game-sources.py
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Install verified LÖVE runtime
@@ -93,6 +95,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch pinned game sources
+        run: python scripts/fetch-game-sources.py
       - name: Install renderer with software OpenGL
         run: sudo apt-get update && sudo apt-get install -y love xvfb libgl1-mesa-dri
       - run: python3 scripts/package-love-party.py --output dist/party

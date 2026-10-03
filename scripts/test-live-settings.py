@@ -5,6 +5,8 @@ Reusable by the private model test. Requires love and a built gamenight-daemon.
 import contextlib,json,os,shutil,socket,subprocess,sys,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from game_sources import game_sources
 sys.path.insert(0,str(ROOT/"examples/mineclonia"))
 from host import Host
 from game_controls import controls,execute
@@ -23,9 +25,9 @@ def wait_for(fn,timeout=12):
 def running(game):
     with tempfile.TemporaryDirectory(prefix="gn-settings-") as tmp:
         root=Path(tmp);source=root/"party"
-        shutil.copytree(ROOT/"games/love-party",source)
+        shutil.copytree(game_sources()/"love-party",source)
         for folder in ("core","sim","app","data"):
-            shutil.copytree(ROOT/"games/pinpals"/folder,source/folder)
+            shutil.copytree(game_sources()/"pinpals"/folder,source/folder)
         with socket.socket() as sock:
             sock.bind(("127.0.0.1",0));port=sock.getsockname()[1]
         (root/"library.json").write_text(json.dumps([{"id":game,"title":game}]))

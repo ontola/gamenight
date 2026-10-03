@@ -1,14 +1,17 @@
 # LÖVE / Lua
 
-Use the shared runner in `games/love-party`. It handles the GameNight connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.
+Use the [shared runner](https://github.com/ontola/gamenight-games/tree/main/love-party) in the separate `ontola/gamenight-games` repository. It handles the GameNight connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.
 
 ## Run the reference game
 
 Install LÖVE 11.5, clone the repository and run from its root:
 
 ```sh
-love games/love-party
+python scripts/fetch-game-sources.py
+love ../gamenight-games/love-party
 ```
+
+The fetch command checks out the revision in `game-sources.json` beside the host repository. For local edits, set `GAMENIGHT_GAMES_DIR` to your game checkout before testing or packaging.
 
 This starts the standalone menu. The host supplies `GAMENIGHT=1`, its address, game ID and launch token when launching a managed build. Do not set a made-up token yourself.
 

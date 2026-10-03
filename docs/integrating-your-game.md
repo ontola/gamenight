@@ -3,7 +3,7 @@
 GameNight supplies the party, seats and lifecycle. Your game owns gameplay,
 rounds and results. Players can stay in a game until they choose another one.
 
-Start from the [shared LÖVE runner](../games/love-party/README.md) for a Lua game.
+Start from the [shared LÖVE runner](https://github.com/ontola/gamenight-games/blob/main/love-party/README.md) for a Lua game.
 The [wire reference](protocol.md) defines messages; the
 [release requirements](../contract/requirements.json) define what must work.
 A successful handshake alone is not a complete integration.
@@ -87,7 +87,7 @@ Managed bundled games consume the host's `controller_frame` stream and match
 and assign the first pad to the first seat. Enumeration can differ between the
 host and game, especially after disconnects.
 
-Use [the shared input adapter](../games/love-party/shared/input.lua) or implement
+Use [the shared input adapter](https://github.com/ontola/gamenight-games/blob/main/love-party/shared/input.lua) or implement
 [the frame contract](protocol.md#bundled-games-authoritative-controller-input).
 Rust games receive the same stream as `GameEvent::ControllerFrame` from
 `GameNight::next_event()`. Keep the latest frame and look up each non-AI seat by
@@ -107,7 +107,7 @@ when seats or profiles change.
 Back/Select requests the lobby with `request_overlay`. The host pauses the game.
 From the lobby, Back/Select can resume a paused game. Accept one transition per
 press, require release, and guard against the same held press reaching the newly
-focused window. The bundled [Back gate](../games/love-party/shared/back_gate.lua)
+focused window. The bundled [Back gate](https://github.com/ontola/gamenight-games/blob/main/love-party/shared/back_gate.lua)
 requires one second of release before another accepted press.
 
 **Never start or resume automatically on window focus.** Focus can change while
@@ -117,7 +117,7 @@ focus-event handler.
 
 Use a borderless window covering the display, not exclusive fullscreen. Configure
 it before reporting Ready so switching does not change display resolution. The
-bundled [window helper](../games/love-party/shared/window.lua) prepares off-screen,
+bundled [window helper](https://github.com/ontola/gamenight-games/blob/main/love-party/shared/window.lua) prepares off-screen,
 then hides/shows the window. Its Windows path adds one off-screen pixel row to
 avoid exclusive-like presentation on affected drivers. Retain that behavior when
 reusing the helper. Test focus changes on the target OS; one platform's result is
