@@ -204,5 +204,35 @@ html{scrollbar-gutter:stable}
 @media(max-width:650px){#site-shell .site-nav{grid-template-columns:minmax(0,1fr) max-content;gap:10px}#site-shell .site-room-actions{width:auto;gap:8px}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 12px}#site-shell .site-links{justify-content:flex-end;gap:8px}#site-shell .site-links a{flex:none;margin-inline:0}}
 @media(max-width:380px){#site-shell .site-logo{font-size:18px;gap:6px}#site-shell .site-logo img{width:26px;height:26px}#site-shell .site-room-actions{gap:6px}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 8px;font-size:13px}}
 
-/* Joined rooms include Playlist and Assistant. Keep every link reachable on phones. */
-@media(max-width:650px){#site-shell .site-links{flex-wrap:wrap;justify-content:flex-start;gap:4px 8px}}
+/* Mobile navigation: stable primary tabs, secondary actions in a modal menu. */
+#site-shell .site-menu-toggle{display:none}
+#site-shell .site-menu-dialog{box-sizing:border-box;width:calc(100% - 24px);max-width:420px;max-height:calc(100dvh - 32px);margin:auto;padding:12px;border:1px solid #343b53;border-radius:20px;background:#14182a;color:#eef0fc;box-shadow:0 24px 80px #0008;font:16px/1.5 system-ui,sans-serif}
+#site-shell .site-menu-dialog::backdrop{background:#040610b8;backdrop-filter:blur(4px)}
+body:has(.site-menu-dialog[open]){overflow:hidden}
+#site-shell .site-menu-heading{display:flex;align-items:center;justify-content:space-between;padding:4px 4px 12px 12px}
+#site-shell .site-menu-heading h2{margin:0;font-size:18px}
+#site-shell .site-menu-heading button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #343b53;border-radius:12px;background:#20253a;color:#eef0fc;font:28px/1 system-ui;cursor:pointer}
+#site-shell .site-menu-dialog nav{display:grid;gap:4px}
+#site-shell .site-menu-dialog nav :is(a,button){display:flex;align-items:center;justify-content:space-between;box-sizing:border-box;width:100%;min-height:52px;padding:12px 16px;border:0;border-radius:12px;background:transparent;color:#eef0fc;text-decoration:none;font:600 16px/1.5 system-ui;cursor:pointer}
+#site-shell .site-menu-dialog nav :is(a,button):hover{background:#ffffff0a}
+#site-shell .site-menu-dialog nav span{color:#9298b5}
+#site-shell .site-menu-dialog nav .site-menu-leave{color:#ffb6bb;border-top:1px solid #343b53;border-radius:0 0 12px 12px;margin-top:8px}
+#site-shell :is(button,a):focus-visible{outline:2px solid #b6acff;outline-offset:2px}
+@media(max-width:900px){
+  #site-shell{position:sticky;top:0;z-index:40;min-height:0;padding-top:env(safe-area-inset-top);background:#0d1020f5;backdrop-filter:blur(16px)}
+  #site-shell .site-nav{grid-template-columns:minmax(0,1fr) auto;min-height:0;padding:12px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left));gap:12px 8px}
+  #site-shell .site-logo{grid-column:1;grid-row:1;gap:8px;font-size:20px;min-height:44px}
+  #site-shell .site-logo img{width:28px;height:28px}
+  #site-shell .site-room-actions{grid-column:2;grid-row:1;gap:8px;min-height:44px;width:auto}
+  #site-shell .site-room-actions .btn-primary{min-height:44px;padding:10px 14px;font-size:14px}
+  #site-shell .site-menu-toggle{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #343b53;border-radius:12px;background:#181d30;color:#eef0fc;cursor:pointer}
+  #site-shell .site-menu-toggle:hover{background:#262d44}
+  #site-shell .site-links{grid-column:1/-1;grid-row:2;display:flex;flex-wrap:nowrap;justify-content:stretch;width:100%;gap:4px;padding:4px;box-sizing:border-box;border:1px solid #252b42;border-radius:14px;background:#15192a}
+  #site-shell .site-links a{flex:1 1 0;min-width:0;max-width:none;min-height:44px;margin:0;padding:10px 4px;border:0;border-radius:10px;font-size:13px;line-height:1.4;overflow:visible;text-overflow:clip}
+  #site-shell .site-links a[aria-current]{background:#343054;color:#fff;box-shadow:inset 0 0 0 1px #74679d66}
+  #site-shell .site-links a:hover{background:#ffffff0b}
+  #site-shell .site-links a[aria-current]:hover{background:#403960}
+  #site-shell .site-links .site-desktop-link,#site-shell .site-room-actions .site-desktop-action{display:none}
+  #site-shell .site-menu-dialog{margin:auto auto max(12px,env(safe-area-inset-bottom));}
+}
+@media(prefers-reduced-motion:no-preference){#site-shell .site-links a,#site-shell .site-menu-toggle{transition:background .15s ease,color .15s ease}}

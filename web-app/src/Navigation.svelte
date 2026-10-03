@@ -2,6 +2,12 @@
   import { room, route, busy, signedIn, assistantUrl } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
+  let menuDialog: HTMLDialogElement;
+  function openLeave() {
+    menuDialog.close();
+    leaveError='';
+    leaveDialog.showModal();
+  }
   let leaving = false;
   let leaveError = '';
   async function leave() {
@@ -41,7 +47,7 @@
   <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a>
   <div class="site-links">
     <a href="/catalog" aria-current={($route.startsWith('/catalog') || $route.startsWith('/games/'))?'page':undefined}>Games</a>
-    <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
+    <a class="site-desktop-link" href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
     <a href={$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$signedIn?'You':'Sign in'}</a>
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
     {#if $room===true && $assistantUrl}
@@ -49,11 +55,22 @@
     {/if}
   </div>
   <div class="site-room-actions">
-    <a class="site-host" href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined}>Host</a>
+    <a class="site-host site-desktop-action" href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined}>Host</a>
     <button class="btn-primary" data-room-join hidden={$room===true} onclick={join}>Join</button>
-    <button class="btn-primary" data-room-leave hidden={$room!==true} onclick={()=>{leaveError='';leaveDialog.showModal();}}>Leave room</button>
+    <button class="btn-primary site-desktop-action" data-room-leave hidden={$room!==true} onclick={openLeave}>Leave room</button>
+    <button class="site-menu-toggle" aria-label="Open menu" aria-haspopup="dialog" onclick={()=>menuDialog.showModal()}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
   </div>
 </nav>
+<dialog class="site-menu-dialog" aria-labelledby="site-menu-title" bind:this={menuDialog} onclick={(event)=>{if(event.target===menuDialog)menuDialog.close();}}>
+  <div class="site-menu-heading"><h2 id="site-menu-title">Menu</h2><button aria-label="Close menu" onclick={()=>menuDialog.close()}>×</button></div>
+  <nav aria-label="More navigation">
+    <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined} onclick={()=>menuDialog.close()}>Docs <span aria-hidden="true">↗</span></a>
+    <a href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined} onclick={()=>menuDialog.close()}>Host a room <span aria-hidden="true">→</span></a>
+    {#if $room===true}<button class="site-menu-leave" onclick={openLeave}>Leave room <span aria-hidden="true">→</span></button>{/if}
+  </nav>
+</dialog>
 <dialog class="leave-room-dialog" bind:this={leaveDialog} oncancel={(event)=>{if(leaving)event.preventDefault();}} onclick={(event)=>{if(event.target===leaveDialog && !leaving)leaveDialog.close();}}>
   <section>
     <h2>Leave this room?</h2>
