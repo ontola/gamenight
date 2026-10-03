@@ -156,6 +156,7 @@ impl Shared {
     /// `origin` receives any `Reject` effects.
     fn dispatch(&mut self, command: Command, origin: Option<&Tx>) {
         debug!(?command, "dispatch");
+        let previous_music = self.night.now_playing().cloned();
         // `Effect::Launch` only ever fires for a library entry that already
         // has a launch spec (`gamenight_core::maybe_warm`'s guard) — a
         // catalogue-only game that isn't installed yet never reaches
@@ -199,6 +200,19 @@ impl Shared {
         }
         let effects = self.night.handle(command);
         self.apply_effects(effects, origin);
+        // Games need live host-music state, including pause/stop, so they
+        // can yield only their soundtrack. Do not stream large catalog art
+        // or every unrelated party update to background games.
+        if self.night.now_playing() != previous_music.as_ref() {
+            let music = ServerMessage::PartyState {
+                party: game_welcome_snapshot(self.night.snapshot()),
+            };
+            for (id, tx) in &self.games {
+                if !self.lobby_connections.contains(id) {
+                    send(tx, &music);
+                }
+            }
+        }
         self.sync_prewarm_players();
     }
 
@@ -289,6 +303,7 @@ impl Shared {
                     send(tx, &lobby_msg);
                 }
             }
+
         }
     }
 
@@ -1676,6 +1691,29 @@ mod replacement_lobby_tests {
         .await
         .unwrap();
         ws
+    }
+
+    #[test]
+    fn host_music_updates_reach_games_without_catalog_art_or_repeated_polls() {
+        let game: GameMeta = serde_json::from_value(serde_json::json!({
+            "id":"music-test", "title":"Test", "cover":"embedded-cover", "screenshot":"embedded-shot"
+        })).unwrap();
+        let mut shared = Shared::new(vec![game], "127.0.0.1:1".into(), None);
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        shared.games.insert(GameId::new("music-test"), tx);
+        let mut track = gamenight_protocol::NowPlaying {
+            title: "Test track".into(), artist: String::new(),
+            source: "Test player".into(), playing: true,
+        };
+        for value in [Some(track.clone()), {track.playing=false; Some(track.clone())}, None] {
+            shared.dispatch(Command::NowPlaying { track: value.clone() }, None);
+            let message: ServerMessage = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+            let ServerMessage::PartyState { party } = message else { panic!("expected music snapshot") };
+            assert_eq!(party.now_playing, value);
+            assert!(party.library.iter().all(|g| g.cover.is_none() && g.screenshot.is_none()));
+            shared.dispatch(Command::NowPlaying { track: value }, None);
+            assert!(rx.try_recv().is_err(), "unchanged poll should send nothing");
+        }
     }
 
     #[tokio::test]

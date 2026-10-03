@@ -145,7 +145,11 @@ func _leave_the_screen(epoch: int) -> void:
 		# fullscreen window is a two-step move — out of the Space, then into
 		# the Dock — and asking for the destination while the first step is
 		# still animating gets the whole thing restarted.
-		if mode == DisplayServer.WINDOW_MODE_FULLSCREEN \
+		if OS.get_name() == "Windows":
+			if now - asked_at >= WINDOW_RETRY_MS:
+				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MINIMIZED)
+				asked_at = now
+		elif mode == DisplayServer.WINDOW_MODE_FULLSCREEN \
 				or mode == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN:
 			if now - asked_at >= EXIT_FULLSCREEN_RETRY_MS:
 				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
@@ -190,7 +194,7 @@ func _claim_the_screen(epoch: int) -> void:
 			return
 		var now := Time.get_ticks_msec()
 		if now - asked_at >= WINDOW_RETRY_MS:
-			if mode == DisplayServer.WINDOW_MODE_MINIMIZED:
+			if mode == DisplayServer.WINDOW_MODE_MINIMIZED and OS.get_name() != "Windows":
 				DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
 			else:
 				# FULLSCREEN, not EXCLUSIVE: on macOS the exclusive one is a

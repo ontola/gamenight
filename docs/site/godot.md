@@ -83,3 +83,32 @@ does not certify a game.
 ## Optional performance diagnostics
 
 The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
+
+
+## Yield your soundtrack to host music
+
+The welcome snapshot and subsequent `GameNight.party_updated` snapshots include
+`now_playing` when GameNight detects a host music player. Check `playing`, not
+just whether a track exists: paused tracks still have metadata. When it is true,
+mute your music bus only. Keep effects audible and preserve the player's own
+music preference. Restore that preference when host music pauses or disappears.
+
+```gdscript
+func _ready():
+    GameNight.party_updated.connect(_host_music)
+    _host_music(GameNight.party)
+
+func _host_music(party: Dictionary):
+    var track = party.get("now_playing", {})
+    var playing = track is Dictionary and bool(track.get("playing", false))
+    AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), playing)
+```
+
+Use a dedicated `Music` bus. Growing Guns uses `MusicA` and `MusicB` for its two
+soundtrack layers. Do not mute `Master`: that also silences game effects.
+
+For a game that prepares before being played, set `display/window/size/mode` to
+`1` (Minimized) and `display/window/size/no_focus` to `true` at engine startup.
+Minimizing in `_ready()` is too late to prevent the initial window appearing.
+Use `GameNightScreen` for Start/Resume and explicitly claim the screen in your
+standalone launch path. OS focus must never request gameplay.

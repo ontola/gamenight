@@ -80,8 +80,30 @@ physical controllers or platform window behaviour. Enabling the plugin alone
 does not certify a game.</p>
 <h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
 <p>The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
+<h2 id="yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</h2>
+<p>The welcome snapshot and subsequent <code>GameNight.party_updated</code> snapshots include
+<code>now_playing</code> when GameNight detects a host music player. Check <code>playing</code>, not
+just whether a track exists: paused tracks still have metadata. When it is true,
+mute your music bus only. Keep effects audible and preserve the player's own
+music preference. Restore that preference when host music pauses or disappears.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _ready():
+    GameNight.party_updated.connect(_host_music)
+    _host_music(GameNight.party)
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="d98e9701ba64219f57ad1946333bc015015aa53b787efb26c75f9bdf5f74eeb1">Built from repository sources</span></footer>
+func _host_music(party: Dictionary):
+    var track = party.get(&quot;now_playing&quot;, {})
+    var playing = track is Dictionary and bool(track.get(&quot;playing&quot;, false))
+    AudioServer.set_bus_mute(AudioServer.get_bus_index(&quot;Music&quot;), playing)
+</code></pre></div>
+<p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
+soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
+<p>For a game that prepares before being played, set <code>display/window/size/mode</code> to
+<code>1</code> (Minimized) and <code>display/window/size/no_focus</code> to <code>true</code> at engine startup.
+Minimizing in <code>_ready()</code> is too late to prevent the initial window appearing.
+Use <code>GameNightScreen</code> for Start/Resume and explicitly claim the screen in your
+standalone launch path. OS focus must never request gameplay.</p>
+
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="847beaeab5a9432e99318664b92d1db9c8c1b29e3bb5ede0b963e34dc35d139c">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
