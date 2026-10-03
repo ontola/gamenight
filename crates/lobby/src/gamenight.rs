@@ -1358,6 +1358,7 @@ struct PlayerMenuState {
 #[derive(Clone)]
 enum MenuAction {
     Assistant,
+    ChooseLobby,
     /// Detach the phone profile while keeping the controller seated.
     Unlink,
     Leave,
@@ -1370,7 +1371,7 @@ enum MenuAction {
 }
 
 fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
-    let mut actions = vec![MenuAction::Leave];
+    let mut actions = vec![MenuAction::Leave, MenuAction::ChooseLobby];
     if assistant::url().is_some() { actions.insert(0, MenuAction::Assistant); }
     if has_inactive { actions.push(MenuAction::PruneInactive); }
     actions.push(MenuAction::Quit);
@@ -1382,6 +1383,7 @@ impl MenuAction {
     fn label(&self) -> String {
         match self {
             MenuAction::Assistant => "Session assistant".to_string(),
+            MenuAction::ChooseLobby => "Select other lobby".to_string(),
             MenuAction::Unlink => "Unlink".to_string(),
             MenuAction::Leave => "Leave".to_string(),
             MenuAction::PruneInactive => "Remove inactive players".to_string(),
@@ -2133,6 +2135,7 @@ fn global_input_system(
                         if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
                                 MenuAction::Assistant => { assistant::open(); input.open_menus.remove(&player_id); }
+                                MenuAction::ChooseLobby => { assistant::open_lobby_chooser(); input.open_menus.remove(&player_id); }
                                 MenuAction::Unlink => {
                                     links.unlink(player_id);
                                     if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.highlight = 0; }

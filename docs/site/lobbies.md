@@ -298,6 +298,18 @@ path and an absolute existing `cwd` when supplied:
 }}]
 ```
 
+Both bundled lobbies have **Select other lobby** in their Start menu. In Living
+Room, press Start on a controller, M on a keyboard, or click **Start · Menu**.
+The platformer uses the player's existing Start menu. The chooser opens on the
+host computer and lists each installed lobby by name. Saving does not interrupt
+the current game: the selected lobby is used the next time GameNight starts.
+
+Living Room shows **Current game** and **Up next** side by side, or stacked in a
+narrow window. Current game shows the game's screenshot and **Resume**, even
+when other games are queued. If there is no current game, only Up next is shown.
+Resume keeps the current session and queue intact;
+**Start game** under Up next advances the queue.
+
 Launch `gamenight-launcher --choose-lobby`, or open
 `http://127.0.0.1:7913/host/lobby` on the host while the installed app runs.
 Choose the bundled platformer or a registered replacement. The choice is saved

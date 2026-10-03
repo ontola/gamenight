@@ -60,7 +60,7 @@ pub async fn get(ConnectInfo(peer): ConnectInfo<SocketAddr>) -> Result<Json<Valu
         return Err(StatusCode::FORBIDDEN);
     }
     let (config, registrations) = paths()?;
-    let mut entries = vec![json!({"id":"lobby","title":"GameNight platformer"})];
+    let mut entries = vec![json!({"id":"lobby","title":"Clubhouse (platformer)"})];
     entries.extend(
         choices(&registrations)
             .into_iter()

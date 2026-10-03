@@ -283,6 +283,16 @@ path and an absolute existing <code>cwd</code> when supplied:</p>
   &quot;env&quot;:{&quot;GAMENIGHT_LOBBY_API&quot;:&quot;1&quot;}
 }}]
 </code></pre></div>
+<p>Both bundled lobbies have <strong>Select other lobby</strong> in their Start menu. In Living
+Room, press Start on a controller, M on a keyboard, or click <strong>Start · Menu</strong>.
+The platformer uses the player's existing Start menu. The chooser opens on the
+host computer and lists each installed lobby by name. Saving does not interrupt
+the current game: the selected lobby is used the next time GameNight starts.</p>
+<p>Living Room shows <strong>Current game</strong> and <strong>Up next</strong> side by side, or stacked in a
+narrow window. Current game shows the game's screenshot and <strong>Resume</strong>, even
+when other games are queued. If there is no current game, only Up next is shown.
+Resume keeps the current session and queue intact;
+<strong>Start game</strong> under Up next advances the queue.</p>
 <p>Launch <code>gamenight-launcher --choose-lobby</code>, or open
 <code>http://127.0.0.1:7913/host/lobby</code> on the host while the installed app runs.
 Choose the bundled platformer or a registered replacement. The choice is saved
@@ -305,7 +315,7 @@ artwork fallback. These checks do not
 certify physical controller drivers, TV focus handoff, media sessions or phone
 camera scanning. Those still need device tests on each release platform.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="98b6db00c8c58fed1358578b8f81f60f896b030855a3b876aa5357ae312152ac">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="d3c19c10fddbdc6331d0353a881394b2fb8a6b01a22ee86e678228c71d6eb548">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

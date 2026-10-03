@@ -11,6 +11,17 @@ pub(super) fn url() -> Option<String> {
 
 pub(super) fn open() {
     let Some(url) = url() else { return; };
+    open_url(url);
+}
+
+pub(super) fn open_lobby_chooser() {
+    let url = std::env::var("GAMENIGHT_LOBBY_CHOOSER_URL").ok()
+        .filter(|s| s.starts_with("http://127.0.0.1:") && !s.contains(['\n','\r']))
+        .unwrap_or_else(|| "http://127.0.0.1:7913/host/lobby".into());
+    open_url(url);
+}
+
+fn open_url(url: String) {
     // An argument, never shell code. This is a deliberate user-triggered window.
     #[cfg(target_os = "windows")]
     let result = std::process::Command::new("explorer.exe").arg(url).spawn();
@@ -18,7 +29,7 @@ pub(super) fn open() {
     let result = std::process::Command::new("open").arg(url).spawn();
     #[cfg(target_os = "linux")]
     let result = std::process::Command::new("xdg-open").arg(url).spawn();
-    if result.is_err() { bevy::log::warn!("Could not open session assistant"); }
+    if result.is_err() { bevy::log::warn!("Could not open GameNight page"); }
 }
 
 #[derive(Component)]

@@ -26,14 +26,22 @@ def main():
         if probe.connect_ex(("127.0.0.1",a.port))==0:raise SystemExit("Test daemon already running")
     shelf=[{"id":"mineclonia-prototype","title":"Mineclonia (controller test)","min_players":2,"max_players":2,"players":"2",
         "launch":{"command":sys.executable,"args":[str(Path(__file__).with_name("managed.py")),"--root",str(a.root)],"cwd":str(a.root)}},
-        {"id":"lobby","title":"GameNight","min_players":1,"max_players":4,"players":"1–4",
+        {"id":"lobby","title":"Clubhouse","min_players":1,"max_players":4,"players":"1–4",
         "launch":{"command":str(lobby),"cwd":str(a.runtime/"lobby"),"env":{"BEVY_ASSET_ROOT":str(a.runtime/"lobby")}}}]
     lobby_id = "lobby"
+    config=folder/"selected-lobby.json"
+    registrations=folder/"local-games.json"
     if a.godot:
         lobby_id = "godot-lobby"
         project = Path(__file__).resolve().parents[2]/"sdk/godot"
-        shelf[-1] = {"id":lobby_id,"title":"GameNight Living Room","min_players":1,"max_players":4,"players":"1–4",
+        replacement = {"id":lobby_id,"title":"Living Room","min_players":1,"max_players":4,"players":"1–4",
             "launch":{"command":str(a.godot),"args":["--path",str(project)],"env":{"GAMENIGHT_LOBBY_API":"1","GAMENIGHT_LOBBY_FULLSCREEN":"1"}}}
+        registrations.write_text(json.dumps([replacement]))
+        preference=json.loads(config.read_text()) if config.is_file() else {"id":lobby_id}
+        if preference.get("id")=="lobby" and lobby.is_file(): lobby_id="lobby"
+        else:
+            shelf[-1]=replacement
+            config.write_text(json.dumps({"id":lobby_id}))
     catalog=Path(__file__).resolve().parents[2]/"catalog/games"
     for path in sorted(catalog.glob('*.json')):
         entry=json.loads(path.read_text(encoding='utf8'))
@@ -56,6 +64,7 @@ def main():
     library=folder/"shelf.json";library.write_text(json.dumps(shelf,indent=2))
     env={k:v for k,v in os.environ.items() if not k.startswith("GAMENIGHT")}
     env.update(GAMENIGHT_ADDR=f"127.0.0.1:{a.port}",GAMENIGHT_LIBRARY=str(library),GAMENIGHT_CATALOG=str(catalog),GAMENIGHT_LOBBY_GAME=lobby_id,RUST_LOG="info")
+    env.update(GAMENIGHT_WEB="1",GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(registrations))
     if a.assistant_url: env["GAMENIGHT_ASSISTANT_URL"]=a.assistant_url
     if a.join_url: env["GAMENIGHT_JOIN_URL"]=a.join_url
     if a.links_url: env["GAMENIGHT_LINKS_URL"]=a.links_url

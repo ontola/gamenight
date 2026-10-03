@@ -97,7 +97,7 @@ def avatar(style):
     return json.dumps({"v": 1, "w": 48, "h": 48, "px": pixels})
 
 
-def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assistant=False):
+def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assistant=False, menu=False):
     if capture:
         capture.unlink(missing_ok=True)
     with socket.socket() as probe:
@@ -115,6 +115,7 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assist
             godot_args += ["--headless", "--script", "res://lobby/tests/flow.gd"]
         if settings: godot_args += ["--capture-settings"]
         if assistant: godot_args += ["--capture-assistant"]
+        if menu: godot_args += ["--capture-menu"]
         game_ids = game_ids or ["neon-trails", "bubble-buddies", "blast-party"]
         shelf = []
         for game_id in game_ids:
@@ -165,6 +166,11 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assist
                 for game_id in game_ids:
                     threading.Thread(target=game_loop, args=(port, game_id, stop), daemon=True).start()
                 if capture:
+                    overlay.until(lambda p: all(g in p.get("connected_games", []) for g in game_ids))
+                    overlay.send({"type":"play_next","game":game_ids[0]})
+                    overlay.until(lambda p: p.get("active_session", {}).get("phase") == "running")
+                    overlay.send({"type":"open_overlay"})
+                    overlay.until(lambda p: p.get("active_session", {}).get("phase") == "paused")
                     deadline = time.monotonic() + 25
                     while not capture.is_file() and time.monotonic() < deadline:
                         time.sleep(0.1)
@@ -205,6 +211,7 @@ def main():
         run(str(Path(godot).resolve()), target / "godot-lobby-desktop.png")
         run(str(Path(godot).resolve()), target / "godot-lobby-narrow.png", narrow=True)
         run(str(Path(godot).resolve()), target / "godot-lobby-settings.png", settings=True)
+        run(str(Path(godot).resolve()), target / "godot-lobby-menu.png", menu=True)
 
 
 if __name__ == "__main__":

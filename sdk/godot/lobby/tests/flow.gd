@@ -62,7 +62,12 @@ func run() -> void:
 	view._cursors["test:0"].action = "assistant"
 	frames[0].buttons = 1 << 7
 	view._controllers_changed(frames)
-	check(fake.starts == 0, "Menu is not a talk shortcut")
+	check(fake.starts == 0 and view._menu_open, "Start opens menu without recording")
+	await process_frame
+	check(view.hits.any(func(hit): return hit.action == "choose-lobby"), "Start menu exposes the lobby chooser")
+	check(view.hits.all(func(hit): return not hit.action.begins_with("select:")), "menu prevents underlying game actions")
+	view._activate("menu-close")
+	view._cursors["test:0"].action = "assistant"
 	frames[0].buttons = 1
 	view._controllers_changed(frames)
 	check(fake.starts == 1 and view._talk_owner == "test:0", "holding A on Talk starts listening")
@@ -122,6 +127,8 @@ func run() -> void:
 	check(view.party.playlist.entries[-1].game == view.games[view.selected].id, "A appends at the end")
 	check(view.party.playlist.entries[0] == before[0], "A preserves the first game")
 	check(view.party.get("active_session", {}).is_empty(), "A never starts gameplay")
+	check(view._current_game().is_empty(), "no current card before a game starts")
+	check(view.hits.all(func(hit): return hit.action != "resume"), "no Resume when there is no current game")
 	view._activate("settings")
 	await wait_until(func(): return not view._settings().is_empty(),"game declares editable settings")
 	view._change_setting(0,1)
@@ -142,8 +149,17 @@ func run() -> void:
 	await wait_until(func(): return not view.client.active, "lobby yields to game")
 	view.client.open_lobby()
 	await wait_until(func(): return view.client.active and view.party.get("active_session", {}).get("phase") == "paused", "return pauses game")
-	key(KEY_ESCAPE)
-	await wait_until(func(): return view.party.get("active_session", {}).get("phase") == "running", "resume keeps same session")
+	await process_frame
+	var current_session: Dictionary = view.party.active_session.duplicate(true)
+	var queued: Array = view._upcoming().duplicate(true)
+	check(not queued.is_empty(), "resume test has an upcoming game")
+	check(view._current_game().id == current_session.game, "Current uses the active game rather than queue head")
+	check(view.hits.any(func(hit): return hit.action == "resume"), "Resume remains visible with a nonempty queue")
+	check(view.hits.any(func(hit): return hit.action == "start"), "Up next keeps its independent Start action")
+	view._activate("resume")
+	await wait_until(func(): return view.party.get("active_session", {}).get("phase") == "running", "Resume button returns to game")
+	check(view.party.active_session.id == current_session.id, "Resume preserves session id")
+	check(view._upcoming() == queued, "Resume does not advance the queue")
 	view.client.open_lobby()
 	await wait_until(func(): return view.client.active, "return again")
 	var player_id: String = view.party.players[0].id

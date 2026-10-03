@@ -104,7 +104,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
     let mut shelf = serde_json::json!([
-        {"id":"lobby", "title":"GameNight", "players":"1-4", "min_players":1, "max_players":4,
+        {"id":"lobby", "title":"Clubhouse", "players":"1-4", "min_players":1, "max_players":4,
          "emoji":"", "color":"#7c5cff", "launch":{"command":lobby, "cwd":lobby_dir,
          "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
     ]);

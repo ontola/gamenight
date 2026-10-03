@@ -24,6 +24,8 @@ var _textures: Dictionary = {}
 var _message := "Connecting to GameNight…"
 var _message_until := 0
 var _quit_confirm := false
+var _menu_open := false
+var _menu_index := 0
 var _capture_path := ""
 var _captured := false
 var _started_at := 0
@@ -108,6 +110,9 @@ func _process(_delta: float) -> void:
 		queue_redraw()
 	if not _capture_path.is_empty() and not _captured and client.connected and Time.get_ticks_msec() - _started_at > 3500:
 		_captured = true
+		if OS.get_cmdline_user_args().has("--capture-menu"):
+			_activate("menu")
+			await get_tree().process_frame
 		if OS.get_cmdline_user_args().has("--capture-settings"):
 			_activate("settings")
 			await get_tree().process_frame
@@ -118,7 +123,9 @@ func _process(_delta: float) -> void:
 		await RenderingServer.frame_post_draw
 		var error := get_viewport().get_texture().get_image().save_png(_capture_path)
 		print("LOBBY_CAPTURE ", _capture_path, " ", error)
-		get_tree().quit(error)
+		# The capture runner owns shutdown. Exiting here races the host watchdog
+		# and can leave a restarted capture window behind on Windows.
+		if error != OK: push_error("Could not save lobby capture")
 
 func _party_changed(snapshot: Dictionary) -> void:
 	var previous_id: String = str(games[selected].get("id", "")) if not games.is_empty() else ""
@@ -177,6 +184,15 @@ func _controllers_changed(controllers: Array) -> void:
 			elif pressed & 1 and _talk_owner.is_empty():
 				if assistant.state == "quote": assistant.confirm()
 				elif assistant.state in ["done", "error"]: _cancel_talk()
+			continue
+		if pressed & (1 << 7): _activate("menu")
+		if _menu_open:
+			if direction != Vector2.ZERO and direction != cursor.direction: _move_cursor(id,direction)
+			cursor.direction = direction
+			if pressed & 1:
+				if cursor.action == "assistant": _begin_talk(id)
+				else: _activate(str(cursor.action),id)
+			if pressed & 2: _activate("menu-close")
 			continue
 		if pressed & (1 << 14): _cycle_game(id, -1)
 		if pressed & (1 << 15): _cycle_game(id, 1)
@@ -324,7 +340,21 @@ func _input(event: InputEvent) -> void:
 			elif event.keycode in [KEY_ENTER,KEY_SPACE] and assistant.state == "quote": assistant.confirm()
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
+		if _menu_open:
+			if event.keycode in [KEY_ESCAPE,KEY_M]: _activate("menu-close")
+			elif not hits.is_empty():
+				if event.keycode == KEY_UP: _menu_index = posmod(_menu_index-1,hits.size())
+				elif event.keycode == KEY_DOWN: _menu_index = posmod(_menu_index+1,hits.size())
+				elif event.keycode in [KEY_ENTER,KEY_SPACE]:
+					var action: String = hits[clampi(_menu_index,0,hits.size()-1)].action
+					if action == "assistant":
+						_message = "Hold C to talk, then release to send."
+						_message_until = Time.get_ticks_msec()+5000
+					else: _activate(action)
+			queue_redraw()
+			return
 		match event.keycode:
+			KEY_M: _activate("menu")
 			KEY_LEFT: _select(-1)
 			KEY_RIGHT: _select(1)
 			KEY_ENTER, KEY_SPACE: _activate("confirm" if _quit_confirm else "start")
@@ -348,6 +378,20 @@ func _select(direction: int) -> void:
 	queue_redraw()
 
 func _activate(action: String, controller: String = "") -> void:
+	if action == "menu" or action == "menu-close":
+		_menu_open = not _menu_open if action == "menu" else false
+		_menu_index = 0
+		for id in _cursors: _cursors[id].action = "choose-lobby" if _menu_open else "select:%d" % selected
+		queue_redraw()
+		return
+	if action == "choose-lobby":
+		var url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
+		if not url.begins_with("http://127.0.0.1:"): url = "http://127.0.0.1:7913/host/lobby"
+		OS.shell_open(url)
+		return
+	if _menu_open:
+		if action in ["quit", "room"]: _menu_open = false
+		else: return
 	if action == "assistant-close": _cancel_talk(); return
 	if action == "assistant-confirm": assistant.confirm(); return
 	if action == "settings-close":
@@ -417,6 +461,22 @@ func _unavailable(game: Dictionary) -> String:
 	# min_players may be satisfied by host-supplied bots.
 	return ""
 
+func _mask_card_corners(rect: Rect2) -> void:
+	# Clip the complete illustrated card, not each header/footer separately.
+	# Canvas draw calls share one layer, so cover only the four outside arcs.
+	var radius := 20.0
+	for corner in 4:
+		var right := corner in [1,2]
+		var bottom := corner in [2,3]
+		var point := Vector2(rect.end.x if right else rect.position.x,rect.end.y if bottom else rect.position.y)
+		var center := point + Vector2(-radius if right else radius,-radius if bottom else radius)
+		var polygon := PackedVector2Array([point])
+		var start := PI + corner*PI/2
+		for step in 17:
+			var angle := start+step*PI/32
+			polygon.append(center+Vector2(cos(angle),sin(angle))*radius)
+		draw_colored_polygon(polygon,PAPER)
+
 func _round(rect: Rect2, color: Color, radius: int = 16, border: Color = Color.TRANSPARENT, width: int = 0) -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = color
@@ -480,9 +540,9 @@ func _draw() -> void:
 	var content := width - margin * 2
 	draw_rect(Rect2(Vector2.ZERO, size), PAPER)
 	_text("gamenight", Vector2(margin, 40), 23, GREEN, true)
-	if not _assistant_url.is_empty():
+	_button("Start · Menu" if wide else "Menu",Rect2(margin+170 if wide else size.x-120,12,145 if wide else 100,42),"menu")
+	if wide and not _assistant_url.is_empty():
 		_button("Hold A · Talk to assistant" if wide else "Hold · Talk", Rect2(width-282 if wide else size.x-222,12,250 if wide else 118,42),"assistant")
-	if not wide: _button("Room",Rect2(size.x-96,12,76,42),"room")
 	var players: Array = party.get("players", [])
 	var seat_count: int = maxi(4, party.get("seats", []).size())
 	var spacing := content / seat_count
@@ -501,8 +561,8 @@ func _draw() -> void:
 			faces.draw_face(self,player,center,19)
 			_center(str(player.name),Rect2(left+4,125,spacing-8,24),13,INK,true)
 			hits.append({"rect":Rect2(left+6,78,spacing-12,78),"action":"leave:"+str(player.id)})
-	var hero_height := clampf(size.y-535,220,330) if wide else 320.0
-	_draw_up_next(Rect2(margin,185,content,hero_height))
+	var hero_height := clampf(size.y-535,280,330) if wide else (320.0 if _current_game().is_empty() else 372.0)
+	_draw_playback(Rect2(margin,185,content,hero_height),wide)
 	var top := 185 + hero_height + 40
 	_text("Games",Vector2(margin,top),23,INK,true)
 	_button("Settings",Rect2(width-margin-108,top-28,108,36),"settings",false,games.is_empty())
@@ -525,6 +585,7 @@ func _draw() -> void:
 		_center("End game night?",Rect2(box.position+Vector2(16,20),Vector2(box.size.x-32,44)),27,INK,true)
 		_button("Keep playing",Rect2(box.position+Vector2(20,127),Vector2(box.size.x/2-28,45)),"cancel")
 		_button("End night",Rect2(box.position+Vector2(box.size.x/2+8,127),Vector2(box.size.x/2-28,45)),"confirm",true)
+	if _menu_open: _draw_menu()
 	_draw_cursors()
 	if assistant.state != "idle": _draw_assistant()
 
@@ -602,6 +663,68 @@ func _next_game() -> Dictionary:
 		if game.id == upcoming[0].game: return game
 	return {}
 
+func _current_game() -> Dictionary:
+	var session: Dictionary = party.get("active_session", {})
+	if session.is_empty() or session.get("game") == client.lobby_id: return {}
+	for game in games:
+		if game.id == session.get("game"): return game
+	return {"id":session.get("game"),"title":str(session.get("game","Current game"))}
+
+func _draw_playback(rect: Rect2, wide: bool) -> void:
+	if _current_game().is_empty():
+		_draw_up_next(rect)
+		return
+	if wide:
+		var current_width := (rect.size.x-16)*0.40
+		_draw_current(Rect2(rect.position,Vector2(current_width,rect.size.y)),false)
+		_draw_up_next(Rect2(rect.position+Vector2(current_width+16,0),Vector2(rect.size.x-current_width-16,rect.size.y)))
+	else:
+		_draw_current(Rect2(rect.position,Vector2(rect.size.x,96)),true)
+		_draw_up_next(Rect2(rect.position+Vector2(0,108),Vector2(rect.size.x,rect.size.y-108)))
+
+func _draw_current(rect: Rect2, compact: bool) -> void:
+	var game := _current_game()
+	_round(rect,Color("233d36"),20)
+	var image := _artwork(str(game.get("screenshot",game.get("cover",""))))
+	var art := Rect2(rect.position,Vector2(100,rect.size.y)) if compact else rect
+	if image != null:
+		var source_size := art.size / maxf(art.size.x/image.get_width(),art.size.y/image.get_height())
+		draw_texture_rect_region(image,art,Rect2((image.get_size()-source_size)/2,source_size))
+	var inset := Vector2(114,0) if compact else Vector2(18,0)
+	if not compact:
+		draw_rect(Rect2(rect.position,Vector2(rect.size.x,42)),Color(0.05,0.12,0.1,0.92))
+	_text("CURRENT GAME",rect.position+inset+Vector2(0,25),14,LIME,true)
+	var band := Rect2(rect.position+Vector2(0,rect.size.y-116),Vector2(rect.size.x,116))
+	if not compact: draw_rect(band,Color(0.05,0.12,0.1,0.94))
+	var title_at := rect.position+inset+Vector2(0,47) if compact else band.position+Vector2(18,33)
+	_text(str(game.get("title","Nothing playing yet")),title_at,16 if compact else 23,PAPER,true,rect.size.x-inset.x-18)
+	if not game.is_empty():
+		var session: Dictionary = party.get("active_session",{})
+		var resumable: bool = session.get("phase") in ["paused","running"]
+		if not compact: _text("Paused" if session.get("phase")=="paused" else str(session.get("phase","")).capitalize(),band.position+Vector2(18,59),14,PAPER)
+		var button_at := rect.position+inset+Vector2(0,56) if compact else band.position+Vector2(18,70)
+		_button("Resume" if resumable else "Preparing…",Rect2(button_at,Vector2(150,34)),"resume",true,not resumable)
+	elif not compact:
+		_text("Start a game from Up next.",band.position+Vector2(18,64),14,PAPER,false,rect.size.x-36)
+
+	_mask_card_corners(rect)
+
+func _draw_menu() -> void:
+	hits.clear()
+	draw_rect(Rect2(Vector2.ZERO,size),Color(0.08,0.15,0.12,0.72))
+	var box := Rect2(size.x/2-minf(230,size.x/2-20),size.y/2-210,minf(460,size.x-40),420)
+	_round(box,PAPER,22)
+	_center("Living Room",Rect2(box.position+Vector2(20,20),Vector2(box.size.x-40,40)),26,INK,true)
+	_button("Select other lobby",Rect2(box.position+Vector2(24,82),Vector2(box.size.x-48,46)),"choose-lobby",true)
+	_center("Opens on this computer. Applies next launch.",Rect2(box.position+Vector2(20,132),Vector2(box.size.x-40,32)),13,MUTED)
+	if size.x < 1050: _button("Room",Rect2(box.position+Vector2(24,178),Vector2(box.size.x-48,42)),"room")
+	if not _assistant_url.is_empty(): _button("Hold A · Talk to assistant",Rect2(box.position+Vector2(24,232),Vector2(box.size.x-48,42)),"assistant")
+	_button("End game night",Rect2(box.position+Vector2(24,300),Vector2(box.size.x-48,42)),"quit")
+	_button("Back",Rect2(box.position+Vector2(24,354),Vector2(box.size.x-48,42)),"menu-close")
+
+	if _cursors.is_empty() and not hits.is_empty():
+		_round(hits[clampi(_menu_index,0,hits.size()-1)].rect.grow(3),Color.TRANSPARENT,14,GREEN,2)
+
 func _draw_up_next(rect: Rect2) -> void:
 	var game := _next_game()
 	var upcoming := _upcoming()
@@ -614,14 +737,13 @@ func _draw_up_next(rect: Rect2) -> void:
 		var source_size := hero.size / maxf(hero.size.x/image.get_width(),hero.size.y/image.get_height())
 		draw_texture_rect_region(image,hero,Rect2((image.get_size()-source_size)/2,source_size))
 	# The head of this queue is the only Up next display, even during preload.
-	_round(Rect2(hero.position,Vector2(hero.size.x,42)),Color(0.05,0.12,0.1,0.92),12)
+	draw_rect(Rect2(hero.position,Vector2(hero.size.x,42)),Color(0.05,0.12,0.1,0.92))
 	_text("UP NEXT",hero.position+Vector2(18,28),16,LIME,true)
 	var band := Rect2(hero.position+Vector2(0,hero.size.y-116),Vector2(hero.size.x,116))
-	_round(band,Color(0.05,0.12,0.1,0.94),12)
+	draw_rect(band,Color(0.05,0.12,0.1,0.94))
 	_text(str(game.get("title","Your queue is empty")),band.position+Vector2(18,33),23,PAPER,true,hero.size.x-36)
 	_text(_status(game) if not game.is_empty() else "A adds a game. X puts it first.",band.position+Vector2(18,59),14,PAPER,false,hero.size.x-36)
 	if not game.is_empty(): _button("Start game",Rect2(band.position+Vector2(18,70),Vector2(150,36)),"start",true)
-	elif not party.get("active_session",{}).is_empty(): _button("Resume game",Rect2(band.position+Vector2(18,70),Vector2(150,36)),"resume",true)
 	if not upcoming.is_empty(): _button("×",Rect2(hero.end.x-40,hero.position.y+5,32,32),"remove:%d" % upcoming[0].index)
 	if list_width > 0:
 		var x := hero.end.x+16
@@ -651,6 +773,8 @@ func _draw_up_next(rect: Rect2) -> void:
 			_button("‹",Rect2(rect.end.x-44,hero.end.y+8,30,32),"queue-less",false,_queue_offset==0)
 			_button("›",Rect2(rect.end.x-44,hero.end.y+47,30,32),"queue-more",false,_queue_offset>=upcoming.size()-3)
 		if upcoming.size()<=1: _text("Add games with A",Vector2(rect.position.x+18,hero.end.y+40),14,MUTED)
+
+	_mask_card_corners(rect)
 
 func _links_received(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
