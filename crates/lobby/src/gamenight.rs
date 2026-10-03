@@ -64,6 +64,7 @@ pub enum NextGameStatus {
     /// only true thing the screen can say.
     Downloading(String, Option<u8>),
     DownloadFailed(String),
+    Stopped(String),
     /// Genuinely nothing to play — an empty shelf.
     Empty,
     /// The party has to choose before anything else happens.
@@ -165,6 +166,7 @@ pub struct GameNightBridge {
     /// already running — so the TV sat on "Loading…" for a game that had
     /// in fact already started.
     latest_warming: Option<gamenight_protocol::PlaylistEntry>,
+    latest_game_issues: Vec<gamenight_protocol::GameIssue>,
     optimistic_next: Option<(GameId, std::time::Instant)>,
     skip_pending: bool,
     /// The playlist, straight from the snapshot. Kept so the TV's SKIP pad
@@ -275,7 +277,7 @@ impl GameNightBridge {
     pub fn tv_button(&self) -> TvButton {
         match self.next_game_status() {
             NextGameStatus::Live { .. } => TvButton::Back,
-            NextGameStatus::Ready(_) => TvButton::Play,
+            NextGameStatus::Ready(_) | NextGameStatus::Stopped(_) => TvButton::Play,
             NextGameStatus::Loading(_, _) if self.can_play_next_game() => TvButton::Play,
 
             _ => TvButton::Disabled,
@@ -436,6 +438,11 @@ impl GameNightBridge {
     }
 
     pub fn upcoming_game_status(&self) -> NextGameStatus {
+        if let Some(entry) = &self.latest_warming {
+            if self.optimistic_game().is_none() && self.latest_game_issues.iter().any(|i| i.game == entry.game) {
+                return NextGameStatus::Stopped(entry.title.clone());
+            }
+        }
         if let Some(id) = self.optimistic_game() {
             let title = self.latest_library.iter().find(|m| &m.id == id).map(|m|m.title.clone()).unwrap_or_else(||id.0.clone());
             return NextGameStatus::Loading(title, None);
@@ -622,6 +629,7 @@ pub fn game_plugin(game: &mut Game) {
         latest_library: Vec::new(),
         latest_warm: None,
         latest_warming: None,
+        latest_game_issues: Vec::new(),
         optimistic_next: None,
         skip_pending: false,
         latest_playlist: Vec::new(),
@@ -739,6 +747,7 @@ fn gamenight_bridge_system(
             || at.elapsed() >= Duration::from_secs(5)) { bridge.optimistic_next = None; }
         bridge.latest_warm = party.warm_session;
         bridge.latest_warming = party.warming;
+        bridge.latest_game_issues = party.game_issues;
         bridge.latest_playlist = party.playlist.entries;
         bridge.vote_open = party.vote.open;
         bridge.latest_installs = party.installs;
@@ -3780,6 +3789,11 @@ fn sync_next_game_tv_system(
             Color::rgba(0.55, 0.85, 1.0, 0.95),
             t.clone(),
         ),
+        NextGameStatus::Stopped(title) => (
+            "GAME STOPPED".to_string(),
+            Color::rgba(1.0, 0.55, 0.4, 0.95),
+            format!("{title} · press Play to retry"),
+        ),
         NextGameStatus::DownloadFailed(title) => (
             "DOWNLOAD FAILED".to_string(),
             Color::rgba(1.0, 0.55, 0.4, 0.95),
@@ -3799,6 +3813,7 @@ fn sync_next_game_tv_system(
 
     let next_line = match upcoming {
         NextGameStatus::Ready(_) => "READY".to_string(),
+        NextGameStatus::Stopped(_) => "STOPPED · PLAY TO RETRY".to_string(),
         NextGameStatus::Loading(_, progress) => progress.map(|p|format!("PRELOADING {}%",p.percent)).unwrap_or_else(||"PRELOADING...".into()),
         NextGameStatus::Downloading(_, progress) => progress.map(|p|format!("DOWNLOADING {p}%")).unwrap_or_else(||"DOWNLOADING...".into()),
         NextGameStatus::DownloadFailed(_) => "DOWNLOAD FAILED".to_string(),
@@ -4249,6 +4264,7 @@ mod next_game_status_tests {
             latest_library: Vec::new(),
             latest_warm: None,
             latest_warming: None,
+        latest_game_issues: Vec::new(),
         optimistic_next: None,
         skip_pending: false,
             latest_playlist: Vec::new(),

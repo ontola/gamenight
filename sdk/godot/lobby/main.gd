@@ -743,7 +743,7 @@ func _draw_up_next(rect: Rect2) -> void:
 	draw_rect(band,Color(0.05,0.12,0.1,0.94))
 	_text(str(game.get("title","Your queue is empty")),band.position+Vector2(18,33),23,PAPER,true,hero.size.x-36)
 	_text(_status(game) if not game.is_empty() else "A adds a game. X puts it first.",band.position+Vector2(18,59),14,PAPER,false,hero.size.x-36)
-	if not game.is_empty(): _button("Start game",Rect2(band.position+Vector2(18,70),Vector2(150,36)),"start",true)
+	if not game.is_empty(): _button("Retry" if not _game_issue(game).is_empty() else "Start game",Rect2(band.position+Vector2(18,70),Vector2(150,36)),"start",true)
 	if not upcoming.is_empty(): _button("×",Rect2(hero.end.x-40,hero.position.y+5,32,32),"remove:%d" % upcoming[0].index)
 	if list_width > 0:
 		var x := hero.end.x+16
@@ -814,8 +814,22 @@ func _draw_room_tools(rect: Rect2) -> void:
 	_button("Pause" if track.get("playing",false) else "Play",Rect2(x+24+bw,y+112,bw,42),"media:play_pause",false,track.is_empty())
 	_button("Next",Rect2(x+32+bw*2,y+112,bw,42),"media:next_track",false,track.is_empty())
 
+func _game_issue(game: Dictionary) -> String:
+	for issue in party.get("game_issues", []):
+		if issue.get("game") == game.get("id"):
+			return {
+				"closed": "Game closed",
+				"disconnected": "Game disconnected",
+				"exited_unexpectedly": "Game exited unexpectedly",
+				"failed_to_start": "Could not start game",
+				"startup_timeout": "Game did not connect"
+			}.get(str(issue.get("kind")), "Game stopped")
+	return ""
+
 func _status(game: Dictionary) -> String:
 	if not client.connected: return "Connecting to your party…"
+	var issue := _game_issue(game)
+	if not issue.is_empty(): return issue + " · Retry to load it again"
 	if not _unavailable(game).is_empty(): return _unavailable(game)
 	var warm: Dictionary = party.get("warm_session", {})
 	if warm.get("game") == game.get("id"):

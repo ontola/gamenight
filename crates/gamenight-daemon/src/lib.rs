@@ -36,8 +36,8 @@ type Tx = mpsc::UnboundedSender<String>;
 /// before the process even starts — a short timeout here doesn't fail
 /// faster, it kills a genuinely-in-progress compile and restarts it from
 /// scratch, which can never finish if every retry gets killed just as
-/// slowly. Only an actually-dead child (`try_wait` returns `Some`) retries
-/// immediately regardless of this timeout.
+/// slowly. The lifetime watchdog reports dead children immediately; failed or timed-out
+/// games require an explicit retry.
 const LAUNCH_HELLO_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// A game process the daemon spawned that hasn't said hello yet.
@@ -81,6 +81,7 @@ struct Shared {
     /// so this is "don't bring it back on your own", not "banned for the
     /// night".
     quit_games: std::collections::HashSet<GameId>,
+    game_issues: HashMap<GameId, gamenight_protocol::GameIssueKind>,
     /// The background catalogue prewarm, if one is running — lets `launch`
     /// bump a game to the front of the download queue instead of silently
     /// no-oping when there's no launch spec for it yet.
@@ -122,6 +123,7 @@ impl Shared {
             running_children: HashMap::new(),
             quitting: None,
             quit_games: std::collections::HashSet::new(),
+            game_issues: HashMap::new(),
             prewarm,
             // A fresh night genuinely has nobody seated, so recording that up
             // front keeps the first real join the first signal ever sent.
@@ -137,6 +139,51 @@ impl Shared {
         }
     }
 
+    fn snapshot(&self) -> gamenight_protocol::PartySnapshot {
+        let mut party = self.night.snapshot();
+        party.game_issues = self.game_issues.iter().map(|(game, kind)|
+            gamenight_protocol::GameIssue { game: game.clone(), kind: kind.clone() }
+        ).collect();
+        party.game_issues.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+        party
+    }
+
+    fn record_game_issue(&mut self, game: GameId, kind: gamenight_protocol::GameIssueKind) {
+        self.quit_games.insert(game.clone());
+        self.game_issues.insert(game.clone(), kind);
+        self.quitting = Some(game.clone());
+        self.dispatch(Command::GameDisconnected { game }, None);
+        self.quitting = None;
+    }
+
+    /// Check launches even when no UI command arrives. Lobby recovery has its
+    /// own watchdog; games stay stopped until the party deliberately retries.
+    fn poll_pending_games(&mut self) {
+        use gamenight_protocol::GameIssueKind;
+        let mut ended = Vec::new();
+        for (game, pending) in &mut self.pending_launches {
+            if self.lobby_game.as_ref() == Some(game) { continue; }
+            match pending.child.try_wait() {
+                Ok(Some(status)) => {
+                    warn!(%game, %status, "game exited before connecting");
+                    ended.push((game.clone(), GameIssueKind::FailedToStart));
+                }
+                Ok(None) if pending.spawned_at.elapsed() > LAUNCH_HELLO_TIMEOUT => {
+                    ended.push((game.clone(), GameIssueKind::StartupTimeout));
+                }
+                Err(error) => warn!(%game, %error, "could not inspect game process"),
+                _ => {}
+            }
+        }
+        for (game, kind) in ended {
+            if let Some(mut pending) = self.pending_launches.remove(&game) {
+                let _ = pending.child.start_kill();
+                tokio::spawn(async move { let _ = pending.child.wait().await; });
+            }
+            self.record_game_issue(game, kind);
+        }
+    }
+
     /// Keep the download queue pointed at games this many people can actually
     /// play. Called after every command, because "how many are playing" is
     /// answered by people picking up controllers throughout the evening, not
@@ -144,7 +191,7 @@ impl Shared {
     /// downloading next, not just what's playable now.
     fn sync_prewarm_players(&mut self) {
         let Some(prewarm) = &self.prewarm else { return };
-        let players = self.night.snapshot().players.len().min(u8::MAX as usize) as u8;
+        let players = self.snapshot().players.len().min(u8::MAX as usize) as u8;
         if self.prewarm_players == Some(players) {
             return;
         }
@@ -177,13 +224,18 @@ impl Shared {
             | Command::QueueNext { game }
             | Command::QueueGame { game, .. }
             | Command::RequestStart { game } => {
+                self.game_issues.remove(game);
                 if self.quit_games.remove(game) {
                     info!(%game, "the party asked for it again — it may start");
                 }
             }
             Command::Next if !self.quit_games.is_empty() => {
-                info!("the party asked for the next game — nothing is off-limits");
-                self.quit_games.clear();
+                let party = self.night.snapshot();
+                if let Some(game) = party.warm_session.map(|s| s.game)
+                    .or_else(|| party.warming.map(|entry| entry.game)) {
+                    self.quit_games.remove(&game);
+                    self.game_issues.remove(&game);
+                }
             }
             _ => {}
         }
@@ -205,7 +257,7 @@ impl Shared {
         // or every unrelated party update to background games.
         if self.night.now_playing() != previous_music.as_ref() {
             let music = ServerMessage::PartyState {
-                party: game_welcome_snapshot(self.night.snapshot()),
+                party: game_welcome_snapshot(self.snapshot()),
             };
             for (id, tx) in &self.games {
                 if !self.lobby_connections.contains(id) {
@@ -290,13 +342,13 @@ impl Shared {
         }
         if broadcast {
             let msg = ServerMessage::PartyState {
-                party: self.night.snapshot(),
+                party: self.snapshot(),
             };
             for tx in self.overlays.values() {
                 send(tx, &msg);
             }
             let lobby_msg = ServerMessage::PartyState {
-                party: lobby_snapshot(self.night.snapshot()),
+                party: lobby_snapshot(self.snapshot()),
             };
             for id in &self.lobby_connections {
                 if let Some(tx) = self.games.get(id) {
@@ -345,19 +397,8 @@ impl Shared {
         if self.games.contains_key(game) {
             return;
         }
-        // A spawn is in flight: keep waiting unless it died or stalled.
-        if let Some(pending) = self.pending_launches.get_mut(game) {
-            let died = matches!(pending.child.try_wait(), Ok(Some(_)));
-            let stalled = pending.spawned_at.elapsed() > LAUNCH_HELLO_TIMEOUT;
-            if !died && !stalled {
-                return;
-            }
-            let mut stale = self.pending_launches.remove(game).expect("checked");
-            warn!(%game, died, "launched process never said hello, retrying");
-            let _ = stale.child.start_kill();
-            tokio::spawn(async move {
-                let _ = stale.child.wait().await;
-            });
+        if self.pending_launches.contains_key(game) {
+            return; // The lifetime watchdog owns failed/expired launches.
         }
         // Never respawn a game on the way out of its own disconnect. Losing
         // the active game makes the night pick what to play next, and with a
@@ -439,7 +480,10 @@ impl Shared {
                     },
                 );
             }
-            Err(e) => warn!(%game, command = %spec.command, error = %e, "failed to launch"),
+            Err(e) => {
+                warn!(%game, command = %spec.command, error = %e, "failed to launch");
+                self.record_game_issue(game.clone(), gamenight_protocol::GameIssueKind::FailedToStart);
+            }
         }
     }
 
@@ -961,6 +1005,7 @@ async fn run_inner(
                     s.kill_all_children();
                     return Ok(());
                 }
+                s.poll_pending_games();
                 let Some(lobby) = watched_lobby.as_ref() else { continue };
                 if !s.exit_with_lobby && !s.runtime_input { continue; }
                 let child = if let Some(pending) = s.pending_launches.get_mut(lobby) {
@@ -1200,15 +1245,17 @@ async fn serve(
                 s.running_children.insert(game_id.clone(), pending.child);
             }
             info!(game = %game_id, launched = s.running_children.contains_key(&game_id), "game connected");
+            s.game_issues.remove(&game_id);
+            s.quit_games.remove(&game_id);
             s.games.insert(game_id.clone(), tx.clone());
             send(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
                     party: if role == Role::Lobby {
-                        lobby_snapshot(s.night.snapshot())
+                        lobby_snapshot(s.snapshot())
                     } else {
-                        game_welcome_snapshot(s.night.snapshot())
+                        game_welcome_snapshot(s.snapshot())
                     },
                 },
             );
@@ -1240,7 +1287,7 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
-                    party: s.night.snapshot(),
+                    party: s.snapshot(),
                 },
             );
             Registration::Overlay(id)
@@ -1283,7 +1330,7 @@ async fn serve(
                     send(
                         &tx,
                         &ServerMessage::PartyState {
-                            party: s.night.snapshot(),
+                            party: s.snapshot(),
                         },
                     );
                 } else {
@@ -1304,7 +1351,7 @@ async fn serve(
                     send(
                         &tx,
                         &ServerMessage::PartyState {
-                            party: s.night.snapshot(),
+                            party: s.snapshot(),
                         },
                     );
                     s.shutdown_requested = true;
@@ -1383,31 +1430,20 @@ async fn serve(
             Registration::Game(game_id) => {
                 info!(game = %game_id, "game disconnected");
                 s.games.remove(game_id);
-                // If we spawned this process, reap it (crash or clean exit —
-                // GameDisconnected reconciles the night either way).
+                let mut kind = gamenight_protocol::GameIssueKind::Disconnected;
                 if let Some(mut child) = s.running_children.remove(game_id) {
-                    if s.exit_with_lobby {
-                        let _ = child.start_kill();
+                    if let Ok(Some(status)) = child.try_wait() {
+                        kind = if status.success() {
+                            gamenight_protocol::GameIssueKind::Closed
+                        } else {
+                            gamenight_protocol::GameIssueKind::ExitedUnexpectedly
+                        };
+                        info!(game = %game_id, %status, "game process exited");
                     }
-                    tokio::spawn(async move {
-                        let _ = child.wait().await;
-                    });
+                    if s.exit_with_lobby { let _ = child.start_kill(); }
+                    tokio::spawn(async move { let _ = child.wait().await; });
                 }
-                // Reconciling a lost game decides what to play next, and that
-                // decision must not be allowed to bring this one back — see
-                // `launch`. The guard covers exactly this dispatch.
-                s.quitting = Some(game_id.clone());
-                // And keep it closed. Whether this was Cmd+Q, a crash or a
-                // clean exit, bringing it back unasked is the daemon arguing
-                // with the person holding the keyboard.
-                s.quit_games.insert(game_id.clone());
-                s.dispatch(
-                    Command::GameDisconnected {
-                        game: game_id.clone(),
-                    },
-                    None,
-                );
-                s.quitting = None;
+                s.record_game_issue(game_id.clone(), kind);
             }
             Registration::Overlay(id) => {
                 info!(overlay = id, "overlay disconnected");
@@ -1653,6 +1689,120 @@ fn message_to_command(
 mod replacement_lobby_tests {
     use super::*;
     type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
+
+    fn test_game(launch: serde_json::Value) -> GameMeta {
+        serde_json::from_value(serde_json::json!({"id":"test", "title":"Test", "launch":launch})).unwrap()
+    }
+
+    #[tokio::test]
+    async fn exited_before_hello_is_reported_once_and_only_retries_on_request() {
+        #[cfg(windows)]
+        let launch = serde_json::json!({"command":"cmd.exe","args":["/C","exit","7"]});
+        #[cfg(not(windows))]
+        let launch = serde_json::json!({"command":"/bin/sh","args":["-c","exit 7"]});
+        let mut s = Shared::new(vec![test_game(launch)], "127.0.0.1:0".into(), None);
+        s.night.set_lobby_game(Some(GameId::new("lobby")));
+        let (tx, mut rx) = mpsc::unbounded_channel();
+        s.overlays.insert(0, tx);
+        let game = GameId::new("test");
+        s.launch(&game);
+        tokio::time::timeout(std::time::Duration::from_secs(3), async {
+            while s.game_issues.is_empty() {
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                s.poll_pending_games();
+            }
+        }).await.unwrap();
+        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::FailedToStart);
+        assert!(s.pending_launches.is_empty());
+        let update: ServerMessage = serde_json::from_str(&rx.try_recv().unwrap()).unwrap();
+        assert!(matches!(update, ServerMessage::PartyState { party } if party.game_issues.len() == 1 && party.warm_session.is_none()));
+        s.poll_pending_games();
+        assert!(rx.try_recv().is_err(), "no repeated failure broadcasts");
+        s.launch(&game);
+        assert!(s.pending_launches.is_empty(), "no automatic restart loop");
+        s.dispatch(Command::QueueNext { game: game.clone() }, None);
+        assert!(s.game_issues.is_empty());
+        assert!(s.pending_launches.contains_key(&game));
+        s.kill_all_children();
+    }
+
+    #[test]
+    fn retry_next_preserves_issues_for_other_closed_games() {
+        let mut s = Shared::new(vec![test_game(serde_json::Value::Null)], "127.0.0.1:0".into(), None);
+        s.night.set_lobby_game(Some(GameId::new("lobby")));
+        for id in ["test", "other"] {
+            s.record_game_issue(GameId::new(id), gamenight_protocol::GameIssueKind::Closed);
+        }
+        s.dispatch(Command::Next, None);
+        assert!(!s.game_issues.contains_key(&GameId::new("test")));
+        assert!(s.game_issues.contains_key(&GameId::new("other")));
+        assert!(s.quit_games.contains(&GameId::new("other")));
+    }
+
+    #[tokio::test]
+    async fn spawn_error_and_connection_timeout_are_visible() {
+        let mut s = Shared::new(vec![test_game(serde_json::json!({"command":"missing-gamenight-test-executable"}))], "127.0.0.1:0".into(), None);
+        s.night.set_lobby_game(Some(GameId::new("lobby")));
+        let game = GameId::new("test");
+        s.launch(&game);
+        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::FailedToStart);
+        #[cfg(windows)]
+        let child = tokio::process::Command::new("cmd.exe").args(["/C", "ping -n 30 127.0.0.1 > nul"]).spawn().unwrap();
+        #[cfg(not(windows))]
+        let child = tokio::process::Command::new("sleep").arg("30").spawn().unwrap();
+        s.pending_launches.insert(game.clone(), PendingLaunch { token: "test".into(), child, spawned_at: std::time::Instant::now() - LAUNCH_HELLO_TIMEOUT - std::time::Duration::from_secs(1) });
+        s.poll_pending_games();
+        assert_eq!(s.snapshot().game_issues[0].kind, gamenight_protocol::GameIssueKind::StartupTimeout);
+        assert!(s.pending_launches.is_empty());
+    }
+
+    #[tokio::test]
+    async fn closed_preload_notifies_peers_and_reconnection_prepares_fresh_session() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let mut initial = Shared::new(vec![test_game(serde_json::Value::Null)], addr.clone(), None);
+        initial.night.set_lobby_game(Some(GameId::new("lobby")));
+        let state = Arc::new(Mutex::new(initial));
+        let server_state = state.clone();
+        let server = tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let state = server_state.clone();
+                tokio::spawn(async move { let _ = handle_connection(stream, state).await; });
+            }
+        });
+        let mut game = connect(&addr, Role::Game, "test", "").await;
+        assert!(matches!(receive(&mut game).await, ServerMessage::Welcome { .. }));
+        let session = match receive(&mut game).await { ServerMessage::Prepare { session, .. } => session, other => panic!("{other:?}") };
+        game.send(Message::Text(ClientMessage::Ready { session }.to_json())).await.unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            loop {
+                if state.lock().await.snapshot().warm_session.as_ref().is_some_and(|s| s.phase == gamenight_protocol::SessionPhase::Ready) { break; }
+                tokio::task::yield_now().await;
+            }
+        }).await.unwrap();
+        let mut overlay = connect(&addr, Role::Overlay, "", "").await;
+        receive(&mut overlay).await;
+        game.close(None).await.unwrap();
+        loop {
+            if let ServerMessage::PartyState { party } = receive(&mut overlay).await {
+                if !party.game_issues.is_empty() {
+                    assert!(party.warm_session.is_none());
+                    assert!(!party.connected_games.contains(&GameId::new("test")));
+                    break;
+                }
+            }
+        }
+        let mut new_overlay = connect(&addr, Role::Overlay, "", "").await;
+        assert!(matches!(receive(&mut new_overlay).await, ServerMessage::Welcome { party, .. } if party.game_issues.len() == 1));
+        let mut restarted = connect(&addr, Role::Game, "test", "").await;
+        assert!(matches!(receive(&mut restarted).await, ServerMessage::Welcome { party, .. } if party.game_issues.is_empty()));
+        assert!(matches!(receive(&mut restarted).await, ServerMessage::Prepare { session: fresh, .. } if fresh != session));
+        restarted.close(None).await.unwrap();
+        overlay.close(None).await.unwrap();
+        new_overlay.close(None).await.unwrap();
+        server.abort();
+    }
 
     #[test]
     fn lobby_snapshot_keeps_art_but_omits_launch_internals() {

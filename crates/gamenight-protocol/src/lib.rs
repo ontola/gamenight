@@ -630,9 +630,31 @@ pub struct GameSettings {
     pub values: std::collections::BTreeMap<String, SettingValue>,
 }
 
+/// A stopped game process. Exit codes cannot reliably distinguish a forced
+/// close from a crash; only label a known unsuccessful exit as unexpected.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GameIssueKind {
+    Closed,
+    Disconnected,
+    ExitedUnexpectedly,
+    FailedToStart,
+    StartupTimeout,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameIssue {
+    pub game: GameId,
+    pub kind: GameIssueKind,
+}
+
 /// The one big object overlays render from. Sent whenever anything changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartySnapshot {
+    /// Stopped processes awaiting an explicit retry. Takes precedence over
+    /// warming/loading hints. Runtime-owned, including failures before hello.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub game_issues: Vec<GameIssue>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub presence: Vec<PlayerPresence>,
     pub players: Vec<Player>,

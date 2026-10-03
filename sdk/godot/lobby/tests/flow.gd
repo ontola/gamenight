@@ -185,6 +185,15 @@ func run() -> void:
 	check(art.decode(picture.save_png_to_buffer()) != null,"artwork decodes PNG")
 	check(art.decode(picture.save_jpg_to_buffer()) != null,"artwork decodes JPEG")
 	check(art.decode(PackedByteArray([1,2,3])) == null,"bad artwork has title fallback")
+	var actual_party: Dictionary = view.party.duplicate(true)
+	var next_game: Dictionary = view._next_game()
+	view.party["game_issues"] = [{"game": next_game.id, "kind": "disconnected"}]
+	check(view._status(next_game) == "Game disconnected · Retry to load it again", "closed preload has useful status instead of Ready")
+	view.queue_redraw()
+	await process_frame
+	await process_frame
+	check(view.hits.any(func(hit): return hit.action == "start"), "retry remains actionable")
+	view.party = actual_party
 	print("LOBBY_FLOW_", "FAIL" if failed else "PASS")
 	key(KEY_Q)
 	await process_frame

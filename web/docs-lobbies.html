@@ -314,8 +314,24 @@ checks (requires local port 7913). The lobby flow also checks settings and
 artwork fallback. These checks do not
 certify physical controller drivers, TV focus handoff, media sessions or phone
 camera scanning. Those still need device tests on each release platform.</p>
+<h2 id="closed-games-and-failed-launches">Closed games and failed launches</h2>
+<p>Read <code>party.game_issues</code> before showing loading or ready status. Each item has a
+<code>game</code> ID and a <code>kind</code>: <code>closed</code>, <code>disconnected</code>, <code>exited_unexpectedly</code>,
+<code>failed_to_start</code>, or <code>startup_timeout</code>. <code>warming</code> still identifies the intended
+next game; an issue means its process is stopped, not currently loading.</p>
+<p>The host clears the lost session and broadcasts the issue to connected lobbies
+and overlays. It also checks every 200 ms for processes that exit before sending
+<code>hello</code>. Startup has a ten-minute connection deadline to allow development builds.
+A missing executable is reported immediately. Games remain stopped until an
+explicit queue/start command retries them. Show a Retry action using <code>next</code> for
+the head of the queue, or <code>queue_next</code> for a specific game without starting it.</p>
+<p>A clean process exit can be labelled “Game closed”. A broken connection alone
+cannot prove a crash or a deliberate quit; show “Game disconnected”. An observed
+nonzero exit is “Game exited unexpectedly”. These states describe evidence, not
+user intent. Reconnecting games clear their issue and must prepare again before
+being shown as ready.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="d3c19c10fddbdc6331d0353a881394b2fb8a6b01a22ee86e678228c71d6eb548">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="9c4d35cf5afe77f7e7a163634fa595fd7341caf8258f5e9b376d8d4d210c4169">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

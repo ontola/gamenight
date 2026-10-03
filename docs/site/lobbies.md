@@ -335,3 +335,23 @@ checks (requires local port 7913). The lobby flow also checks settings and
 artwork fallback. These checks do not
 certify physical controller drivers, TV focus handoff, media sessions or phone
 camera scanning. Those still need device tests on each release platform.
+
+## Closed games and failed launches
+
+Read `party.game_issues` before showing loading or ready status. Each item has a
+`game` ID and a `kind`: `closed`, `disconnected`, `exited_unexpectedly`,
+`failed_to_start`, or `startup_timeout`. `warming` still identifies the intended
+next game; an issue means its process is stopped, not currently loading.
+
+The host clears the lost session and broadcasts the issue to connected lobbies
+and overlays. It also checks every 200 ms for processes that exit before sending
+`hello`. Startup has a ten-minute connection deadline to allow development builds.
+A missing executable is reported immediately. Games remain stopped until an
+explicit queue/start command retries them. Show a Retry action using `next` for
+the head of the queue, or `queue_next` for a specific game without starting it.
+
+A clean process exit can be labelled “Game closed”. A broken connection alone
+cannot prove a crash or a deliberate quit; show “Game disconnected”. An observed
+nonzero exit is “Game exited unexpectedly”. These states describe evidence, not
+user intent. Reconnecting games clear their issue and must prepare again before
+being shown as ready.

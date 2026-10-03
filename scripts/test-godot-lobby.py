@@ -51,8 +51,9 @@ class Peer:
 GAME_SETTINGS = {}
 
 
-def game_loop(port, game_id, stop):
+def game_loop(port, game_id, stop, peers):
     peer = Peer(port, "game", game_id)
+    peers[game_id] = peer
     peer.send({"type":"declare_settings","settings":GAME_SETTINGS.get(game_id, [
         {"key":"items","label":"Pickups","kind":"toggle","default":True},
         {"key":"rounds","label":"Rounds","kind":"number","default":3,"min":1,"max":5},
@@ -97,7 +98,7 @@ def avatar(style):
     return json.dumps({"v": 1, "w": 48, "h": 48, "px": pixels})
 
 
-def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assistant=False, menu=False):
+def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assistant=False, menu=False, stopped=False):
     if capture:
         capture.unlink(missing_ok=True)
     with socket.socket() as probe:
@@ -142,6 +143,7 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assist
         log_path = ROOT / ".local" / ("lobby-capture-narrow.log" if narrow else "lobby-capture.log" if capture else "lobby-flow.log")
         log_path.parent.mkdir(exist_ok=True)
         stop = threading.Event()
+        peers = {}
         with log_path.open("w") as log:
             options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
             target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
@@ -164,13 +166,16 @@ def run(godot, capture=None, narrow=False, settings=False, game_ids=None, assist
                     player = next(p for p in state["players"] if p["name"] == name)
                     overlay.send({"type": "set_player_skin_color", "player_id": player["id"], "skin_color": skins[i]})
                 for game_id in game_ids:
-                    threading.Thread(target=game_loop, args=(port, game_id, stop), daemon=True).start()
+                    threading.Thread(target=game_loop, args=(port, game_id, stop, peers), daemon=True).start()
                 if capture:
                     overlay.until(lambda p: all(g in p.get("connected_games", []) for g in game_ids))
                     overlay.send({"type":"play_next","game":game_ids[0]})
                     overlay.until(lambda p: p.get("active_session", {}).get("phase") == "running")
                     overlay.send({"type":"open_overlay"})
                     overlay.until(lambda p: p.get("active_session", {}).get("phase") == "paused")
+                    if stopped:
+                        peers[game_ids[1]].socket.shutdown(socket.SHUT_RDWR)
+                        overlay.until(lambda p: any(issue["game"] == game_ids[1] for issue in p.get("game_issues", [])))
                     deadline = time.monotonic() + 25
                     while not capture.is_file() and time.monotonic() < deadline:
                         time.sleep(0.1)
@@ -212,6 +217,7 @@ def main():
         run(str(Path(godot).resolve()), target / "godot-lobby-narrow.png", narrow=True)
         run(str(Path(godot).resolve()), target / "godot-lobby-settings.png", settings=True)
         run(str(Path(godot).resolve()), target / "godot-lobby-menu.png", menu=True)
+        run(str(Path(godot).resolve()), target / "godot-lobby-stopped.png", stopped=True)
 
 
 if __name__ == "__main__":

@@ -74,7 +74,12 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         {
             state = "playing";
         }
-        games.push(json!({"id":game.id,"selectable":selectable,"state":state,"percent":percent,"failure":install.filter(|i|i.state==InstallState::Failed).map(|i|failure_hint(i.label.as_deref()))}));
+        let issue = party.game_issues.iter().find(|issue| issue.game == game.id);
+        if issue.is_some() {
+            state = "stopped";
+            percent = None;
+        }
+        games.push(json!({"id":game.id,"selectable":selectable,"state":state,"percent":percent,"issue":issue,"failure":install.filter(|i|i.state==InstallState::Failed).map(|i|failure_hint(i.label.as_deref()))}));
     }
     for install in &party.installs {
         if games.iter().any(|g| g["id"] == install.game.0) {
