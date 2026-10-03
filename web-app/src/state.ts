@@ -1,5 +1,6 @@
 import { writable } from 'svelte/store';
 export const signedIn = writable(document.body.dataset.local==='true');
+export const assistantUrl = writable('');
 export const room = writable<boolean|null>(null);
 export const player = writable(sessionStorage.getItem('gamenight_nav_name') || localStorage.getItem('gamenight_player_name') || 'Your player');
 export const route = writable(location.pathname + location.hash);
@@ -18,6 +19,7 @@ window.updateRoomNavigation = connected => {
   window.gamenightRoomConnected=connected;
   sessionStorage.setItem('gamenight_room_connected',String(connected));
   room.set(connected);
+  if(!connected)assistantUrl.set('');
   if(changed)window.dispatchEvent(new CustomEvent('gamenight-room-change',{detail:{connected}}));
   queueMicrotask(()=>route.set(location.pathname+location.hash));
 };

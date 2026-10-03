@@ -203,3 +203,6 @@ html{scrollbar-gutter:stable}
 #site-shell .site-host:focus-visible{outline:2px solid #b6acff;outline-offset:3px}
 @media(max-width:650px){#site-shell .site-nav{grid-template-columns:minmax(0,1fr) max-content;gap:10px}#site-shell .site-room-actions{width:auto;gap:8px}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 12px}#site-shell .site-links{justify-content:flex-end;gap:8px}#site-shell .site-links a{flex:none;margin-inline:0}}
 @media(max-width:380px){#site-shell .site-logo{font-size:18px;gap:6px}#site-shell .site-logo img{width:26px;height:26px}#site-shell .site-room-actions{gap:6px}#site-shell .site-room-actions :is(.btn-primary,.site-host){padding:10px 8px;font-size:13px}}
+
+/* Joined rooms include Playlist and Assistant. Keep every link reachable on phones. */
+@media(max-width:650px){#site-shell .site-links{flex-wrap:wrap;justify-content:flex-start;gap:4px 8px}}

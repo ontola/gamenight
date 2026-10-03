@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { room, route, busy, signedIn } from './state';
+  import { room, route, busy, signedIn, assistantUrl } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
   let leaving = false;
@@ -44,6 +44,9 @@
     <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
     <a href={$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$signedIn?'You':'Sign in'}</a>
     <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
+    {#if $room===true && $assistantUrl}
+      <a href={$assistantUrl} aria-current={$route==='/agent'?'page':undefined}>Assistant</a>
+    {/if}
   </div>
   <div class="site-room-actions">
     <a class="site-host" href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined}>Host</a>

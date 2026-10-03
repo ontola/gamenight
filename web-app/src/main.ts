@@ -2,7 +2,7 @@ import { mount } from 'svelte';
 import Navigation from './Navigation.svelte';
 import { startRouter, navigate } from './router';
 import './toast.js';
-import { signedIn } from './state';
+import { signedIn, assistantUrl } from './state';
 const shell=document.getElementById('site-shell');
 if(shell){
   startRouter();
@@ -25,6 +25,8 @@ if(shell){
       const state=await response.json();
       if(!local)signedIn.set(true);
       window.updateRoomNavigation?.(local?!!state.linked:state.status==='connected');
+      // A host advertises its assistant; standalone local servers need not have one.
+      assistantUrl.set(state.assistant_url === '/agent' ? '/agent' : '');
     }catch{ /* Keep known state during a transient network failure. */ }
   }
   void refreshRoom();
