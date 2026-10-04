@@ -1,0 +1,57 @@
+name: Upload a GameNight build
+description: Upload and promote an immutable game package using a game-scoped portal key.
+inputs:
+  token:
+    description: Publishing key from the GameNight developer portal
+    required: true
+  game:
+    description: Registered game ID
+    required: true
+  file:
+    description: Exported ZIP, LÖVE package or executable
+    required: true
+  platform:
+    description: windows, mac or linux
+    required: true
+  entrypoint:
+    description: Executable path inside the ZIP, or bare package filename
+    required: true
+  version:
+    description: Immutable developer version
+    required: true
+  channel:
+    description: preview or stable
+    default: preview
+  server:
+    description: GameNight server origin
+    default: https://gamenight.ontola.io
+outputs:
+  build-id:
+    description: Immutable build ID
+    value: ${{ steps.upload.outputs.build_id }}
+  sha256:
+    description: Verified package checksum
+    value: ${{ steps.upload.outputs.sha256 }}
+  portal-url:
+    description: Publishing workspace URL
+    value: ${{ steps.upload.outputs.portal_url }}
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - name: Upload and promote
+      id: upload
+      shell: bash
+      env:
+        GAMENIGHT_API_TOKEN: ${{ inputs.token }}
+        GN_GAME: ${{ inputs.game }}
+        GN_FILE: ${{ inputs.file }}
+        GN_PLATFORM: ${{ inputs.platform }}
+        GN_ENTRYPOINT: ${{ inputs.entrypoint }}
+        GN_VERSION: ${{ inputs.version }}
+        GN_CHANNEL: ${{ inputs.channel }}
+        GN_SERVER: ${{ inputs.server }}
+        GN_ACTION_PATH: ${{ github.action_path }}
+      run: python "$GN_ACTION_PATH/scripts/gamenight-publish.py" --server "$GN_SERVER" push --game "$GN_GAME" --file "$GN_FILE" --platform "$GN_PLATFORM" --entrypoint "$GN_ENTRYPOINT" --version "$GN_VERSION" --channel "$GN_CHANNEL"

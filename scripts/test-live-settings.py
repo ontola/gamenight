@@ -84,7 +84,7 @@ def assert_values(probe,values):
 def main():
     for game,values in CASES.items():
         with running(game) as (host,probe,processes):
-            before=json.loads(probe.read_text())["settings"];c=controls(host.status())
+            before=wait_for(lambda:json.loads(probe.read_text())["settings"]);c=controls(host.status())
             bad=selection(host,dict(values,unknown_option=1))
             try:execute(host,bad);raise AssertionError("Invalid batch accepted")
             except RuntimeError:pass

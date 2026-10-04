@@ -421,8 +421,57 @@ pub fn load_dir(dir: &Path) -> Result<Vec<CatalogEntry>, Vec<String>> {
     }
 
     if problems.is_empty() {
+        // The launcher opts into a verified, atomically replaced hosted snapshot.
+        // A missing/corrupt snapshot leaves the shipped offline catalog available.
+        if let Some(path) = std::env::var_os("GAMENIGHT_PUBLISHED_CATALOG") {
+            if let Ok(text) = std::fs::read_to_string(path) {
+                if let Ok(feed) = serde_json::from_str::<PublishedCatalog>(&text) {
+                    if feed.schema == 1 && validate_published(&feed.games).is_ok() {
+                        for remote in feed.games {
+                            if let Some(existing) = entries.iter_mut().find(|e| e.id == remote.id) {
+                                *existing = remote;
+                            } else {
+                                entries.push(remote);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         entries.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(entries)
+    } else {
+        Err(problems)
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PublishedCatalog {
+    pub schema: u32,
+    pub revision: String,
+    pub games: Vec<CatalogEntry>,
+}
+
+pub fn validate_published(entries: &[CatalogEntry]) -> Result<(), Vec<String>> {
+    let mut problems = Vec::new();
+    let mut ids = std::collections::HashSet::new();
+    for e in entries {
+        problems.extend(validate(e, &format!("{}.json", e.id)));
+        if matches!(e.id.as_str(), "lobby" | "demo-game")
+            || e.bundled.is_some()
+            || !ids.insert(&e.id)
+        {
+            problems.push(format!("{}: duplicate or protected hosted entry", e.id));
+        }
+        for download in e.downloads.values() {
+            if !download.url.starts_with("https://") {
+                problems.push(format!("{}: hosted downloads must use HTTPS", e.id));
+            }
+        }
+    }
+    if problems.is_empty() {
+        Ok(())
     } else {
         Err(problems)
     }

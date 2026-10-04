@@ -18,6 +18,7 @@
 //! of whatever else `prewarm_all` was going to fetch next.
 
 use std::collections::{HashMap, VecDeque};
+pub mod catalog_refresh;
 use std::path::{Path, PathBuf};
 
 use futures_util::StreamExt;
@@ -210,11 +211,60 @@ pub async fn already_installed(entry: &CatalogEntry, root: &Path) -> Option<Inst
     } else {
         None
     };
+    remember_entry(entry, &game_dir).await;
     Some(InstalledGame {
         executable,
         dir: game_dir,
         runtime,
     })
+}
+
+async fn remember_entry(entry: &CatalogEntry, game_dir: &Path) {
+    let manifest = game_dir.join(".gamenight-entry.json");
+    if manifest.is_file() {
+        return;
+    }
+    if let Ok(bytes) = serde_json::to_vec(entry) {
+        let stage = game_dir.join(format!(".entry-{}", uuid::Uuid::new_v4()));
+        if tokio::fs::write(&stage, bytes).await.is_ok() {
+            let _ = tokio::fs::rename(&stage, manifest).await;
+        }
+        let _ = tokio::fs::remove_file(stage).await;
+    }
+}
+
+/// Keep a previous complete version playable when a newly promoted version is not installed.
+pub async fn available_installed(entry: &CatalogEntry, root: &Path) -> Option<InstalledGame> {
+    if let Some(installed) = already_installed(entry, root).await {
+        return Some(installed);
+    }
+    entry.auto_download_here()?;
+    let mut directories = tokio::fs::read_dir(root.join(&entry.id)).await.ok()?;
+    let mut candidates = Vec::new();
+    while let Ok(Some(directory)) = directories.next_entry().await {
+        let path = directory.path().join(".gamenight-entry.json");
+        if let Ok(metadata) = tokio::fs::metadata(&path).await {
+            candidates.push((metadata.modified().ok(), path));
+        }
+    }
+    candidates.sort_by_key(|a| std::cmp::Reverse(a.0));
+    for (_, path) in candidates {
+        let Ok(bytes) = tokio::fs::read(path).await else {
+            continue;
+        };
+        let Ok(previous) = serde_json::from_slice::<CatalogEntry>(&bytes) else {
+            continue;
+        };
+        if previous.id != entry.id
+            || !gamenight_catalog::validate(&previous, &format!("{}.json", previous.id)).is_empty()
+        {
+            continue;
+        }
+        if let Some(installed) = already_installed(&previous, root).await {
+            return Some(installed);
+        }
+    }
+    None
 }
 
 /// Ensure `entry`'s direct download for this platform is present and
@@ -266,6 +316,7 @@ async fn install_inner(
     };
     let game_dir = root.join(&entry.id).join(dl.sha256.to_ascii_lowercase());
     let executable = ensure_artifact(dl, &game_dir, progress).await?;
+    remember_entry(entry, &game_dir).await;
     Ok(InstalledGame {
         dir: game_dir,
         executable,
@@ -723,6 +774,41 @@ mod tests {
             "downloads": downloads
         }))
         .unwrap()
+    }
+
+    #[tokio::test]
+    async fn newer_missing_version_keeps_previous_complete_installation() {
+        let previous = bare_binary_entry("offline-update", &"a".repeat(64));
+        let newer = bare_binary_entry("offline-update", &"b".repeat(64));
+        let root = tmp_dir("offline-update");
+        let folder = root.join(&previous.id).join("a".repeat(64));
+        tokio::fs::create_dir_all(&folder).await.unwrap();
+        tokio::fs::write(folder.join("game-bin"), "binary")
+            .await
+            .unwrap();
+        tokio::fs::write(
+            folder.join(".gamenight-install.json"),
+            serde_json::json!({"sha256":"a".repeat(64),"url":"https://example.com/game-bin"})
+                .to_string(),
+        )
+        .await
+        .unwrap();
+        tokio::fs::write(
+            folder.join(".gamenight-entry.json"),
+            serde_json::to_vec(&previous).unwrap(),
+        )
+        .await
+        .unwrap();
+        assert!(already_installed(&newer, &root).await.is_none());
+        assert_eq!(
+            available_installed(&newer, &root).await.unwrap().dir,
+            folder
+        );
+        tokio::fs::remove_file(folder.join("game-bin"))
+            .await
+            .unwrap();
+        assert!(available_installed(&newer, &root).await.is_none());
+        tokio::fs::remove_dir_all(root).await.unwrap();
     }
 
     #[tokio::test]
