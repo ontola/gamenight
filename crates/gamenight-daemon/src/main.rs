@@ -53,7 +53,7 @@ async fn main() -> std::io::Result<()> {
                         continue;
                     }
                     if let Some(installed) =
-                        gamenight_installer::already_installed(entry, &root).await
+                        gamenight_installer::available_installed(entry, &root).await
                     {
                         tracing::info!(
                             game = %entry.id,
@@ -71,6 +71,37 @@ async fn main() -> std::io::Result<()> {
             // catalogue order to get there.
             let (handle, signals) = gamenight_installer::prewarm_channel();
             let (reporter, progress) = gamenight_installer::progress_channel();
+            if let (Ok(url), Some(cache)) = (
+                std::env::var("GAMENIGHT_CATALOG_FEED"),
+                std::env::var_os("GAMENIGHT_PUBLISHED_CATALOG"),
+            ) {
+                let directory = catalog_dir.clone();
+                let install_root = root.clone();
+                let update_reporter = reporter.clone();
+                tokio::spawn(async move {
+                    let cache = std::path::PathBuf::from(cache);
+                    let mut interval = tokio::time::interval(std::time::Duration::from_secs(900));
+                    loop {
+                        interval.tick().await;
+                        match gamenight_installer::catalog_refresh::refresh(&url, &cache).await {
+                            Ok(true) => {
+                                tracing::info!("Published game catalog refreshed");
+                                gamenight_installer::prewarm_all_reporting(
+                                    &directory,
+                                    &install_root,
+                                    None,
+                                    Some(update_reporter.clone()),
+                                )
+                                .await;
+                            }
+                            Ok(false) => {}
+                            Err(error) => {
+                                tracing::warn!(%error, "Keeping the offline game catalog")
+                            }
+                        }
+                    }
+                });
+            }
             tokio::spawn(async move {
                 gamenight_installer::prewarm_all_reporting(
                     &catalog_dir,

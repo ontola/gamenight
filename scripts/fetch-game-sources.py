@@ -1,12 +1,16 @@
 """Fetch the pinned games into a sibling checkout without overwriting local work."""
 from pathlib import Path
 import subprocess
-from game_sources import ROOT, MANIFEST
+import os
+from game_sources import ROOT, MANIFEST, game_sources
 
 def git(folder, *args):
     return subprocess.check_output(["git", "-C", str(folder), *args], text=True).strip()
 
 def main():
+    if os.environ.get("GAMENIGHT_GAMES_DIR"):
+        print(f"Using explicit development game sources: {game_sources()}")
+        return
     folder = ROOT.parent / "gamenight-games"
     if folder.exists():
         if not (folder / ".git").exists():

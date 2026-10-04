@@ -133,6 +133,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_LIBRARY", shelf_path)
         .env("GAMENIGHT_CATALOG", root.join("catalog/games"))
         .env("GAMENIGHT_INSTALL_DIR", local.join("games"))
+        .env(
+            "GAMENIGHT_PUBLISHED_CATALOG",
+            local.join("published-catalog.json"),
+        )
+        .env(
+            "GAMENIGHT_CATALOG_FEED",
+            std::env::var("GAMENIGHT_CATALOG_FEED")
+                .unwrap_or_else(|_| "https://gamenight.ontola.io/v1/game-catalog".into()),
+        )
         .env_remove("GAMENIGHT_NO_PREWARM")
         .env("GAMENIGHT_EXIT_WITH_LOBBY", "1")
         .env("GAMENIGHT_STARTUP_GATE", "1")

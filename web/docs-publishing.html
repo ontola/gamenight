@@ -9,9 +9,100 @@
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-publishing">Documentation <span aria-hidden="true">☰</span></button>
 <nav class="docs-sidebar" id="docs-nav-publishing" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing" aria-current="page">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="publish-a-game">Publish a game</h1>
-<p><a href="/developers">Send us your game</a> when you want help getting into the catalog. Start with an email and a short message. You do not need to finish an integration before contacting us.</p>
+<p>Use the <a href="/developers/publishing">developer portal</a> to upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.</p>
 <h2 id="prepare-a-release">Prepare a release</h2>
-<p>Once the integration is ready, use the <a href="/developers/releases">release workspace</a>. Provide a versioned build for one platform, its SHA-256, player limits and controls. Keep download URLs immutable so evidence continues to identify the tested file.</p>
+<p>For a new game, start with a <a href="/developers/releases">submission</a>, or <a href="/developers">contact us</a> for integration help. Then choose <strong>Set up</strong> in the publishing portal. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.</p>
+<ol>
+<li>Choose your game, then <strong>Versions</strong>.</li>
+<li>Enter a version and platform. Upload a ZIP containing your exported executable and assets, or a standalone executable. Alternatively, import a direct HTTPS URL from S3 or another host. URL imports require the filename; signed URLs must remain valid throughout the import and must not redirect.</li>
+<li>Set the executable path relative to the ZIP root, such as <code>Game.exe</code> or <code>Game.app/Contents/MacOS/Game</code>. For a bare file, use its filename. Add release notes.</li>
+<li>After package verification, choose <strong>Use as preview</strong>, test the exact build, then <strong>Publish to gamers</strong>.</li>
+</ol>
+<p>Packages may be at most 512 MiB, with at most 2 GiB extracted from a ZIP. Use a ZIP for executables with DLLs, PCK files or other assets. LÖVE packages need a platform runtime registered by GameNight. GameNight copies URL imports into its own storage; gamers never depend on an expiring source URL.</p>
+<p>A version identifies immutable bytes for one game and platform. Retrying the same version and checksum returns the same build. Changed bytes require a new version. Interrupted uploads can be retried. Choosing an older ready build for stable rolls back that platform without uploading again.</p>
+<p>Previews are private to the owner and their game-scoped keys. Public releases remain downloadable after rollback so cached catalogs still work. The portal shows upload failures and publishing activity.</p>
+<h2 id="connect-github-actions">Connect GitHub Actions</h2>
+<p>In <strong>API keys</strong>, create a named key for your game. Upload-only is the default; enable publishing permission only when CI should publish stable releases. Copy the secret immediately: it is shown once. Store it as <code>GAMENIGHT_API_TOKEN</code> in repository Actions secrets, or an environment secret when using a protected environment.</p>
+<p>Add this step after packaging and testing:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-yaml">- name: Upload GameNight preview
+  id: gamenight
+  uses: ontola/gamenight@main
+  with:
+    token: ${{ secrets.GAMENIGHT_API_TOKEN }}
+    game: my-game
+    file: dist/my-game-windows.zip
+    platform: windows
+    entrypoint: Game.exe
+    version: ${{ github.sha }}
+    channel: preview
+</code></pre></div>
+<p>Pin the action to a reviewed commit SHA for reproducible CI. It calculates the checksum, streams the upload, promotes the preview and adds a portal link to the Actions summary. Outputs are <code>build-id</code>, <code>sha256</code> and <code>portal-url</code>.</p>
+<p>Use <code>channel: stable</code> for automated public releases. That requires a publish-scoped key and GameNight distribution approval. Never provide secrets to pull-request code from untrusted forks. Build/test PRs without publishing; publish from trusted main or version-tag workflows.</p>
+<p>Keys are restricted to one game. The portal lists expiry and last use. Create a replacement, update your CI secret, then revoke the old key. Revocation is immediate, including before an upload completes. Keys expire after 90 days by default; choose 30 days or up to one year. CI keys cannot create more keys or edit account details.</p>
+<p>The shared first-party pack uses a <code>gamenight-&lt;game-id&gt;</code> GitHub environment per game, each holding its <code>GAMENIGHT_API_TOKEN</code>. Native repositories use a <code>gamenight</code> environment. Set the repository variable <code>GAMENIGHT_PUBLISH_ENABLED=true</code> after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.</p>
+<h2 id="other-ci-systems-and-local-previews">Other CI systems and local previews</h2>
+<p><a href="/developers/gamenight-publish.py">Download the Python uploader</a>. It requires Python 3.11 or later and no third-party packages. Set <code>GAMENIGHT_API_TOKEN</code> in your shell or CI secret environment, then:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python gamenight-publish.py push --game my-game --file dist/game.zip --platform windows --entrypoint Game.exe --version 1.2.0 --channel preview --changelog &quot;New arenas&quot;
+</code></pre></div>
+<p>Download and verify a native preview without publishing it:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python gamenight-publish.py preview --game my-game --output .local/preview
+</code></pre></div>
+<p>Point <code>GAMENIGHT_LIBRARY</code> at the printed <code>shelf.json</code> when running a development host. On Windows the local launcher accepts this file through <code>-Shelf</code>. Downloading does not execute the game; start it through GameNight and test the <a href="/docs/lifecycle">lifecycle</a>. Runtime-based games use the registered LÖVE runtime alongside the <code>.love</code> file; the preview catalog includes the runtime checksum and entrypoint.</p>
+<h2 id="publishing-api">Publishing API</h2>
+<p>Authenticate with <code>Authorization: Bearer YOUR_API_KEY</code>. Browser operations use the existing session and CSRF protection. Browser and CI requests use the same release service.</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /v1/developer/games/{game}/builds</code></td>
+<td>Create or recover an immutable build</td>
+</tr>
+<tr>
+<td><code>PUT /v1/developer/builds/{build}/content</code></td>
+<td>Stream and verify package bytes</td>
+</tr>
+<tr>
+<td><code>POST /v1/developer/builds/{build}/import</code></td>
+<td>Copy a direct HTTPS URL into GameNight</td>
+</tr>
+<tr>
+<td><code>GET /v1/developer/builds/{build}</code></td>
+<td>Read state, checksum, size and processing error</td>
+</tr>
+<tr>
+<td><code>POST /v1/developer/games/{game}/releases</code></td>
+<td>Promote a ready build to preview or stable</td>
+</tr>
+<tr>
+<td><code>GET /v1/developer/games/{game}/preview-catalog</code></td>
+<td>Get your private preview manifest</td>
+</tr>
+<tr>
+<td><code>GET /v1/game-catalog</code></td>
+<td>Get public game updates</td>
+</tr>
+</tbody>
+</table>
+<p>Create a build with:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{
+  &quot;version&quot;: &quot;1.2.0&quot;,
+  &quot;platform&quot;: &quot;windows&quot;,
+  &quot;filename&quot;: &quot;game.zip&quot;,
+  &quot;entrypoint&quot;: &quot;Game.exe&quot;,
+  &quot;sha256&quot;: &quot;YOUR_64_HEX_SHA256&quot;,
+  &quot;changelog&quot;: &quot;New arenas&quot;
+}
+</code></pre></div>
+<p>The response contains <code>id</code> and <code>state</code>. Upload to the content endpoint, or import with <code>{&quot;url&quot;:&quot;https://your-storage.example/game.zip&quot;}</code>. For imports the expected checksum is optional; GameNight always records the actual checksum. Promote with <code>{&quot;build&quot;:&quot;BUILD_ID&quot;,&quot;channel&quot;:&quot;preview&quot;}</code>. Build states are <code>awaiting_upload</code>, <code>uploading</code>, <code>ready</code> and <code>failed</code>; release results are <code>preview_ready</code> or <code>live</code>. Invalid input returns 422, immutable-version conflicts return 409, and invalid/revoked keys return 401. Retry network failures using the same version and package.</p>
+<h2 id="catalog-updates">Catalog updates</h2>
+<p>New desktop builds refresh the trusted HTTPS publishing catalog in the background at launch and every 15 minutes. Downloads are checksum-verified and extracted into separate version directories. The shipped catalog and last valid cached update keep offline play available. Updates download during play; existing shelf entries keep their launch path until the next GameNight launch. Restart GameNight to activate updates. Failed downloads leave the previous installed version available.</p>
+<p>Store metadata and artifact hashes use the promoted release. Uploads do not inherit old certification. Package verification checks hashes, ZIP safety and the entrypoint; it does not execute uploaded code or certify gameplay. Test controllers, player joining/leaving, return to lobby and continuous rounds against the actual release.</p>
+<p>The first public release requires distribution approval. Subsequent updates can use the same approved game and publish-scoped key. <strong>Store page</strong> edits update title, description, player counts and website without rebuilding the app. Pricing intent and a proposed EUR price are saved privately; checkout, payouts and paid delivery are not enabled. Public releases remain free.</p>
 <p>Private repository access, AI-assisted code processing and game distribution each need agreement. Sharing a repository does not grant permission to distribute the game. Listing is free; checkout and developer payouts are not implemented.</p>
 <h2 id="supply-the-artwork">Supply the artwork</h2>
 <p>Use a portrait cover for the next-game display, a square icon for game spines and a gameplay screenshot for the TV. These are separate assets. If artwork is absent, the title remains readable; a random icon is not a substitute for a cover.</p>
@@ -28,7 +119,7 @@
 <p>Run the <a href="/docs/testing">integration checks</a> against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.</p>
 <p>The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="2a5111808e876f2771cc674df10a7152267b26c1ba18f5b046dc1fe85c251bd5">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="5584a49692ab8eee370ad279a197e999c1d36155bdacaa4648ce2fb7ff123d0f">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/settings"><small>Next</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#prepare-a-release">Prepare a release</a><a href="#supply-the-artwork">Supply the artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#prepare-a-release">Prepare a release</a><a href="#connect-github-actions">Connect GitHub Actions</a><a href="#other-ci-systems-and-local-previews">Other CI systems and local previews</a><a href="#publishing-api">Publishing API</a><a href="#catalog-updates">Catalog updates</a><a href="#supply-the-artwork">Supply the artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
