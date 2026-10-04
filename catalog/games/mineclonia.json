@@ -3,7 +3,7 @@
   "id": "mineclonia",
   "title": "Mineclonia",
   "tagline": "Build, mine and explore with 1–4 local players in an experimental voxel sandbox.",
-  "developer": "Mineclonia contributors Â· GameNight integration by Ontola",
+  "developer": "Mineclonia contributors · GameNight integration by Ontola",
   "players": {
     "min": 1,
     "max": 4,
@@ -32,8 +32,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight-mineclonia/releases/download/v0.1.2/mineclonia-windows.zip",
-      "sha256": "b99021db59007c7728100029d8eb2baa92d61d71caa6f255dab7c81090d62657",
+      "url": "https://github.com/ontola/gamenight-mineclonia/releases/download/v0.1.3/mineclonia-windows.zip",
+      "sha256": "f194308f4ca66fe03ce199cd421718fec7e623d60ee2437348c65e3fca12c30b",
       "size_mb": 55,
       "entrypoint": "Mineclonia.exe"
     }
