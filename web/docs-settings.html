@@ -208,8 +208,26 @@ Run a real host/world test
 before claiming a downloaded build or a physical controller session is verified.</p>
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
+<h2 id="new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</h2>
+<p>Settings alone cannot add new game behavior. Mineclonia's maintained adapter now
+has a separate, experimental <a href="https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/MODDING.md">generated Lua mod path</a>.
+The host advertises a versioned SDK, the installed source, and failed-validation
+feedback. The assistant can produce a complete program defining new items,
+blocks and multiplayer callbacks, then edit that source in a follow-up request.</p>
+<p>The public adapter owns staging, the guarded Lua API, isolated engine validation,
+world checkpoints, restart/reconnect and source undo. Private account/model code
+only proposes a scoped change and reports its host-confirmed result. New content
+currently requires reconnecting the players; existing live settings still apply
+without a restart. Undo changes behavior while retaining subsequent play and
+persistent counters. Failed installation restores the saved checkpoint.</p>
+<p>This is an optional Mineclonia integration, not a new requirement for every game
+or a promise of arbitrary Luanti API access. Read the
+<a href="https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/mod_sdk/API.txt">SDK contract and limits</a>
+and the adapter's verification notes before enabling it. The historical
+<code>examples/mineclonia</code> directory contains the earlier fixed-recipe prototype;
+new modding work lives in <code>ontola/gamenight-mineclonia</code>.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="892e2f6f4799ed6ca96d5d89ddbcb716b332450394f8439d7cd7355db236d725">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="d7bb8148a3742de79ba64fbd1fd9d116441668b2c9b2f5806acd7c3cf84419dc">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -163,3 +163,26 @@ before claiming a downloaded build or a physical controller session is verified.
 
 Build new `.love` packages with `scripts/package-love-party.py`. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.
+
+
+## New behavior through a game mod SDK
+
+Settings alone cannot add new game behavior. Mineclonia's maintained adapter now
+has a separate, experimental [generated Lua mod path](https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/MODDING.md).
+The host advertises a versioned SDK, the installed source, and failed-validation
+feedback. The assistant can produce a complete program defining new items,
+blocks and multiplayer callbacks, then edit that source in a follow-up request.
+
+The public adapter owns staging, the guarded Lua API, isolated engine validation,
+world checkpoints, restart/reconnect and source undo. Private account/model code
+only proposes a scoped change and reports its host-confirmed result. New content
+currently requires reconnecting the players; existing live settings still apply
+without a restart. Undo changes behavior while retaining subsequent play and
+persistent counters. Failed installation restores the saved checkpoint.
+
+This is an optional Mineclonia integration, not a new requirement for every game
+or a promise of arbitrary Luanti API access. Read the
+[SDK contract and limits](https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/mod_sdk/API.txt)
+and the adapter's verification notes before enabling it. The historical
+`examples/mineclonia` directory contains the earlier fixed-recipe prototype;
+new modding work lives in `ontola/gamenight-mineclonia`.

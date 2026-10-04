@@ -1,3 +1,7 @@
+> Historical prototype. The maintained adapter and generated Lua mod SDK live in
+> [ontola/gamenight-mineclonia](https://github.com/ontola/gamenight-mineclonia).
+> This copy only supports the earlier fixed recipes and live settings.
+
 # Mineclonia couch prototype
 
 This is an isolated experiment, not a catalog game. A patched Luanti 5.17.0
