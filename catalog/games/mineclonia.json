@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "id": "mineclonia",
   "title": "Mineclonia",
-  "tagline": "Build, mine and explore solo or together with up to four local players.",
+  "tagline": "Build, mine and explore with 1–4 local players in an experimental voxel sandbox.",
   "developer": "Mineclonia contributors Â· GameNight integration by Ontola",
   "players": {
     "min": 1,
