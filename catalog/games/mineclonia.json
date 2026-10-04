@@ -21,7 +21,7 @@
     "protocol": 1
   },
   "requirements": {
-    "disk_mb": 180,
+    "disk_mb": 300,
     "ram_mb": 4096,
     "cpu": "Modern quad-core; one game view per local player and a shared server",
     "gpu": "OpenGL 3.3-capable GPU; graphics load increases with more local views"
