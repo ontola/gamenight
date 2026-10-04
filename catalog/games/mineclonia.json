@@ -2,11 +2,11 @@
   "$schema": "../schema.json",
   "id": "mineclonia",
   "title": "Mineclonia",
-  "tagline": "Build, mine and explore together in an experimental two-player voxel sandbox.",
+  "tagline": "Build, mine and explore solo or together with up to four local players.",
   "developer": "Mineclonia contributors Â· GameNight integration by Ontola",
   "players": {
-    "min": 2,
-    "max": 2,
+    "min": 1,
+    "max": 4,
     "best": 2
   },
   "price": "free",
@@ -23,8 +23,8 @@
   "requirements": {
     "disk_mb": 180,
     "ram_mb": 4096,
-    "cpu": "Modern quad-core; runs two game views and a local server",
-    "gpu": "OpenGL 3.3-capable GPU; two views increase graphics load"
+    "cpu": "Modern quad-core; one game view per local player and a shared server",
+    "gpu": "OpenGL 3.3-capable GPU; graphics load increases with more local views"
   },
   "links": {
     "homepage": "https://codeberg.org/mineclonia/mineclonia",
@@ -32,8 +32,8 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight-mineclonia/releases/download/v0.1.0/mineclonia-windows.zip",
-      "sha256": "7f837364456b37f125579c0ef5b8f911afb54f69f14eb6a8f3548040d190bc37",
+      "url": "https://github.com/ontola/gamenight-mineclonia/releases/download/v0.1.1/mineclonia-windows.zip",
+      "sha256": "a788460cb5e76722582ae9d3a26c045a630b50d331a72a41f996444fd29c07d6",
       "size_mb": 55,
       "entrypoint": "Mineclonia.exe"
     }
