@@ -15,7 +15,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--headless", action="store_true")
-    parser.add_argument("--studio", action="store_true")
+    parser.add_argument("--offline", action="store_true", help="Disable the hosted profile connection")
     parser.add_argument("--lobby", choices=["platformer", "godot"], default="platformer")
     parser.add_argument("--godot", default="godot", help="Godot 4 executable for --lobby godot")
     parser.add_argument("--shelf", type=Path)
@@ -82,8 +82,9 @@ def main():
         env["GAMENIGHT_LOBBY_GAME"] = lobby_id
         if args.lobby == "godot":
             env["GAMENIGHT_EXIT_WITH_LOBBY"] = "1"
-    if args.studio or args.lobby == "godot":
-        env["GAMENIGHT_WEB"] = "1"
+    env["GAMENIGHT_HOST_SERVICES"] = "1"
+    if args.offline:
+        env["GAMENIGHT_OFFLINE"] = "1"
     log_path = local / "gamenight.log"
     print(f"Starting GameNight. Logs: {log_path}\nPress Ctrl+C to stop.", flush=True)
     options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}

@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-settings">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-settings" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings" aria-current="page">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-settings" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings" aria-current="page">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="game-settings">Game settings</h1>
 <p>GameNight can display a game's settings in the lobby and phone interface. Games
 must declare their options and implement the changes. Having the protocol or SDK
@@ -180,6 +180,16 @@ the player, game session and settings revision, then validates every value befor
 changing any of them. Undo restores the preceding batch; Keep clears that undo.
 A stale request is refused instead of overwriting a newer change. Normal
 <code>set_setting</code> writes also advance the revision.</p>
+<p>The assistant's game dropdown follows the party queue. Players can select the
+current game or configure a prepared <strong>Up next</strong> game before it starts. Later
+queue entries stay visible while they wait for the host to prepare them and
+declare their settings. Selecting a game does not launch it or reorder the queue.</p>
+<p>Discovery exposes <code>controls</code> for the current (or first prepared) session and
+<code>next_controls</code> for a distinct prepared next session. AI requests, manual changes
+and saved configs carry the selected session ID. The cloud and daemon both
+recheck that session and the settings revision. If the host replaces it, an old
+request is refused. Settings remain scoped to a game, so repeated queue entries
+for the same game share settings and appear once in this picker.</p>
 <p>Host acceptance does not mean a next-round setting is already active in gameplay.
 Keep the timing in the label and description. The assistant must not promise an
 immediate gameplay change when your game waits for a new round or match. Account
@@ -208,8 +218,57 @@ Run a real host/world test
 before claiming a downloaded build or a physical controller session is verified.</p>
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
+<h2 id="new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</h2>
+<p>Settings alone cannot add new game behavior. Mineclonia's maintained adapter now
+has a separate, experimental <a href="https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/MODDING.md">generated Lua mod path</a>.
+The host advertises a versioned SDK, the installed source, and failed-validation
+feedback. The assistant can produce a complete program defining new items,
+blocks and multiplayer callbacks, then edit that source in a follow-up request.</p>
+<p>The public adapter owns staging, the guarded Lua API, isolated engine validation,
+world checkpoints, restart/reconnect and source undo. Private account/model code
+only proposes a scoped change and reports its host-confirmed result. New content
+currently requires reconnecting the players; existing live settings still apply
+without a restart. Undo changes behavior while retaining subsequent play and
+persistent counters. Failed installation restores the saved checkpoint.</p>
+<p>This is an optional Mineclonia integration, not a new requirement for every game
+or a promise of arbitrary Luanti API access. Read the
+<a href="https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/mod_sdk/API.txt">SDK contract and limits</a>
+and the adapter's verification notes before enabling it. The historical
+<code>examples/mineclonia</code> directory contains the earlier fixed-recipe prototype;
+new modding work lives in <code>ontola/gamenight-mineclonia</code>.</p>
+<h2 id="documented-game-functions">Documented game functions</h2>
+<p>Games can expose actions beyond settings through a documented registry and one
+<code>call_game_function(name, arguments)</code> interface. Mineclonia's development adapter
+is the first implementation. It publishes <code>controls.game_api</code> with version,
+function names, descriptions, parameter types/ranges, return descriptions and
+whether each call changes game state. The assistant builds its output schema
+from these declarations; adding a registered function requires no cloud action
+specific to that function.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;action&quot;:&quot;call&quot;,&quot;game&quot;:&quot;mineclonia&quot;,&quot;values&quot;:{&quot;name&quot;:&quot;inventory.give&quot;,&quot;arguments&quot;:{&quot;target&quot;:&quot;self&quot;,&quot;item&quot;:&quot;mcl_tools:sword_diamond&quot;,&quot;count&quot;:2}}}
+</code></pre></div>
+<p>The host supplies the bound player identity and checks the session, revision and
+arguments again. The world resolves an exact registered handler and reports
+observed data in its receipt. It preserves duplicate request receipts, and
+mutations reserve a persisted revision before applying their effects. Failed
+handlers may have partial effects; observe the new state before another request.
+Mutating calls clear settings Undo. Reversing a function effect requires a
+game-specific reverse function.</p>
+<p>Mineclonia currently exposes player listing, item search, inventory inspection,
+item grants, healing and teleporting. These calls work live without a restart.
+Names, arguments and apply timing belong to the game's docs. Other games need
+their own discovery and execution adapter before their functions can be called.</p>
+<p>Version 1 accepts named scalar arguments and structured results. The assistant
+currently proposes one call per request, with returned data available for a
+follow-up; automatic sequences of dependent calls remain future work. New Lua
+mod registrations still use the separate validation and reconnect workflow.
+The registry does not automatically export all engine globals.</p>
+<p>Read the <a href="https://github.com/ontola/gamenight-mineclonia/blob/b2275e4e80d953ee1a93b592dd962511abbaf0ef/GAME_FUNCTIONS.md">function contract and extension example</a>, including its
+bounds, handler responsibilities and <a href="https://github.com/ontola/gamenight-mineclonia/tree/b2275e4e80d953ee1a93b592dd962511abbaf0ef/verification/functions-2026-10-05">two-client engine evidence</a>.
+The phone flow was checked with disposable host/provider fixtures. Physical
+controllers, speech recognition and a real model were not exercised by these
+function checks. Published store packages still require a separate release.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="892e2f6f4799ed6ca96d5d89ddbcb716b332450394f8439d7cd7355db236d725">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="bc18fbc75af0f45934dfef2cef7410efb81a3b208d64ab71bd7a845a34fcd8d1">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a><a href="#documented-game-functions">Documented game functions</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

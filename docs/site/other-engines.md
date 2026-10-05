@@ -1,5 +1,8 @@
 # Unity, Unreal and other engines
 
+Use [Your first game](/docs/first-game) for local host setup, a launchable shelf
+and the path from testing to publication.
+
 There is no maintained Unity or Unreal plugin in this repository. Use the open protocol to write an adapter, or [ask for integration help](/developers). Do not assume a game is supported because its engine can open a socket.
 
 ## Open the connection

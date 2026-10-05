@@ -21,7 +21,7 @@ The metadata labels describe the entry's implementation stage:
 
 | level | meaning |
 |---|---|
-| `certified` | speaks the protocol **and** passes [`gamenight-certify`](../crates/gamenight-certify) — party-ready |
+| `certified` | historical protocol-certifier metadata; does not certify controllers, rendering or release readiness |
 | `integrated` | speaks the protocol; not (yet) certified |
 | `adapter` | launchable by the daemon but silent — no protocol; transitions are kill-and-relaunch |
 | `planned` | wishlist: metadata so the shelf can show it, no integration yet |

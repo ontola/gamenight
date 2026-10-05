@@ -13,7 +13,7 @@ pub fn game(url: &str) -> Option<&str> {
     .then_some(id)
 }
 
-pub fn request(directory: &Path, game: &str) -> io::Result<()> {
+pub fn request(directory: &Path, game: Option<&str>) -> io::Result<()> {
     fs::create_dir_all(directory)?;
     let temporary = directory.join(format!("catalog-request-{}.tmp", std::process::id()));
     fs::write(&temporary, serde_json::json!({"game":game}).to_string())?;

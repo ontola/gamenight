@@ -87,7 +87,7 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         }
         games.push(json!({"id":install.game,"selectable":true,"state":install.state,"percent":install.percent,"failure":(install.state==InstallState::Failed).then(||failure_hint(install.label.as_deref()))}));
     }
-    json!({"controls":super::settings::controls(party),"session":party.active_session,"playlist":party.playlist,"games":games,"current":party.active_session.as_ref().or(party.warm_session.as_ref()).map(|s| &s.game),"next":party.warming.as_ref().map(|s| &s.game).or_else(|| party.warm_session.as_ref().map(|s| &s.game)),"acknowledged":acknowledged})
+    json!({"next_controls":super::settings::next_controls(party),"controls":super::settings::controls(party),"session":party.active_session,"playlist":party.playlist,"games":games,"current":party.active_session.as_ref().or(party.warm_session.as_ref()).map(|s| &s.game),"next":party.warming.as_ref().map(|s| &s.game).or_else(|| party.warm_session.as_ref().map(|s| &s.game)),"acknowledged":acknowledged})
 }
 
 fn failure_hint(label: Option<&str>) -> &'static str {

@@ -9,7 +9,7 @@ final class LinkReceiver: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) { NSApp.terminate(nil) }
     }
     func application(_ application: NSApplication, open urls: [URL]) {
-        guard let url = urls.last, url.scheme == "gamenight", url.host == "play" else {
+        guard let url = urls.last, url.scheme == "gamenight", (url.host == "play" || url.absoluteString == "gamenight://lobby") else {
             NSApp.terminate(nil); return
         }
         let contents = Bundle.main.bundleURL.deletingLastPathComponent().deletingLastPathComponent()

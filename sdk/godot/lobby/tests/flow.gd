@@ -66,7 +66,44 @@ func run() -> void:
 	await process_frame
 	check(view.hits.any(func(hit): return hit.action == "choose-lobby"), "Start menu exposes the lobby chooser")
 	check(view.hits.all(func(hit): return not hit.action.begins_with("select:")), "menu prevents underlying game actions")
+	view._activate("choose-lobby")
+	check(view._chooser_open and view._menu_open,"chooser stays inside the lobby")
+	# The local host API supplies lobby choices. Only saving is mocked here.
+	view._chooser.cancel_request()
+	view._chooser_received(HTTPRequest.RESULT_SUCCESS,200,PackedStringArray(),JSON.stringify({"selected":"godot-lobby","choices":[{"id":"lobby","title":"Clubhouse"},{"id":"godot-lobby","title":"Living Room"}]}).to_utf8_buffer())
+	await process_frame
+	await process_frame
+	check(view.hits.any(func(hit): return hit.action=="lobby:lobby"),"in-lobby chooser exposes Clubhouse")
+	check(view.hits.all(func(hit): return hit.action.begins_with("lobby:") or hit.action=="menu-close"),"chooser blocks game inputs")
 	view._activate("menu-close")
+	check(view._menu_open and not view._chooser_open,"B returns to Start menu")
+	view._activate("menu-close")
+	for child in view.get_children():
+		if child is Timer: child.stop()
+	view._links.cancel_request()
+	view._room_panel = true
+	view._room = {"pending":[{"id":"profile-a","display_name":"Sam","skin_color":"#bf855b"},{"id":"profile-b","display_name":"Kim","skin_color":"#905c40"},{"id":"profile-c","display_name":"Lee"}]}
+	view.queue_redraw()
+	await process_frame
+	await process_frame
+	check(view.hits.any(func(hit): return hit.action=="pickup:profile-a"),"pending profile has a pickup action")
+	view._activate("pickup:profile-a")
+	check(view._pickup_pending.is_empty(),"mouse cannot assign a profile to an arbitrary controller")
+	view._activate("pickup-page:1")
+	await process_frame
+	await process_frame
+	check(view.hits.any(func(hit): return hit.action=="pickup:profile-c"),"every pending profile remains reachable")
+	view._pickup_pending = "profile-c"
+	view._pickup_player = str(view.party.players[1].id)
+	view._pickup_received(HTTPRequest.RESULT_SUCCESS,500,PackedStringArray(),PackedByteArray())
+	check(view._pickup_pending.is_empty(),"pickup failure permits retry")
+	view._room = {}
+	view._pickup_page = 0
+	view._room_panel = false
+	view.party.seats[0]["controller"] = "test:0"
+	view.party.seats[1]["controller"] = "test:1"
+	frames[0].buttons = 0
+	view._controllers_changed(frames)
 	view._cursors["test:0"].action = "assistant"
 	frames[0].buttons = 1
 	view._controllers_changed(frames)

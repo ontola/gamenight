@@ -1356,6 +1356,7 @@ fn random_guest_avatar() -> String {
 }
 
 struct PlayerMenuState {
+    lobby_choices: Option<Vec<(String, String)>>,
     highlight: usize,
     has_inactive: bool,
     was_linked: Option<bool>,
@@ -1368,6 +1369,8 @@ struct PlayerMenuState {
 enum MenuAction {
     Assistant,
     ChooseLobby,
+    SelectLobby(String, String),
+    BackToPlayer,
     /// Detach the phone profile while keeping the controller seated.
     Unlink,
     Leave,
@@ -1388,11 +1391,21 @@ fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
     actions
 }
 
+fn player_menu_actions(state: &PlayerMenuState, linked: bool) -> Vec<MenuAction> {
+    if let Some(choices) = &state.lobby_choices {
+        let mut actions: Vec<_> = choices.iter().map(|(id,title)| MenuAction::SelectLobby(id.clone(),title.clone())).collect();
+        actions.push(MenuAction::BackToPlayer);
+        actions
+    } else { menu_actions(linked,state.has_inactive) }
+}
+
 impl MenuAction {
     fn label(&self) -> String {
         match self {
             MenuAction::Assistant => "Session assistant".to_string(),
             MenuAction::ChooseLobby => "Select other lobby".to_string(),
+            MenuAction::SelectLobby(_, title) => title.clone(),
+            MenuAction::BackToPlayer => "Back".into(),
             MenuAction::Unlink => "Unlink".to_string(),
             MenuAction::Leave => "Leave".to_string(),
             MenuAction::PruneInactive => "Remove inactive players".to_string(),
@@ -1528,13 +1541,13 @@ impl GlobalInput {
         info!(open = !self.open_menus.contains_key(&player_id), "gamenight: player Start menu toggled");
         if self.open_menus.remove(&player_id).is_none() {
             self.open_menus
-                .insert(player_id, PlayerMenuState { highlight: 0, has_inactive: false, was_linked: None });
+                .insert(player_id, PlayerMenuState { lobby_choices: None, highlight: 0, has_inactive: false, was_linked: None });
         }
     }
 
     fn move_highlight(&mut self, player_id: PlayerId, delta: isize, linked: bool) {
         if let Some(state) = self.open_menus.get_mut(&player_id) {
-            let len = menu_actions(linked, state.has_inactive).len() as isize;
+            let len = player_menu_actions(state, linked).len() as isize;
             state.highlight = (((state.highlight as isize) + delta).rem_euclid(len)) as usize;
         }
     }
@@ -2140,11 +2153,20 @@ fn global_input_system(
                 if let Some(&player_id) = input.pad_player.get(&id) {
                     let highlight = input.open_menus.get(&player_id).map(|s| s.highlight);
                     if let Some(highlight) = highlight {
-                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)), input.open_menus.get(&player_id).is_some_and(|m| m.has_inactive));
+                        let actions = player_menu_actions(&input.open_menus[&player_id], links.snapshot().is_some_and(|s| s.linked.contains(&player_id)));
                         if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
                                 MenuAction::Assistant => { assistant::open(); input.open_menus.remove(&player_id); }
-                                MenuAction::ChooseLobby => { assistant::open_lobby_chooser(); input.open_menus.remove(&player_id); }
+                                MenuAction::ChooseLobby => {
+                                    if let Some(menu) = input.open_menus.get_mut(&player_id) {
+                                        menu.lobby_choices = Some(links.snapshot().map(|s| s.lobbies.into_iter().map(|l|(l.id,l.title)).collect()).unwrap_or_default());
+                                        menu.highlight = 0;
+                                    }
+                                }
+                                MenuAction::SelectLobby(id, _) => { links.choose_lobby(id); }
+                                MenuAction::BackToPlayer => {
+                                    if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.lobby_choices = None; menu.highlight = 0; }
+                                }
                                 MenuAction::Unlink => {
                                     links.unlink(player_id);
                                     if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.highlight = 0; }
@@ -2254,8 +2276,8 @@ fn sync_player_menus_system(
         let link_state = links.snapshot();
         let linked = link_state.as_ref().is_some_and(|s| s.linked.contains(&player_id));
         let join_url = link_state.as_ref().filter(|_| !linked).and_then(|s| s.join_url(player_id, &lobby_join_url()));
-        let content = format!("{seat_index}|{name}|{linked}|{:?}|{}|{}",
-            join_url, state.highlight, state.has_inactive);
+        let content = format!("{seat_index}|{name}|{linked}|{:?}|{}|{}|{:?}|{}",
+            join_url, state.highlight, state.has_inactive, state.lobby_choices, links.lobby_notice());
         if roots.iter().any(|(_, root, previous)| root.0 == player_id && previous.0 == content) {
             continue;
         }
@@ -2302,14 +2324,16 @@ fn sync_player_menus_system(
                     color: Color::WHITE,
                 },
             ));
-            if let Some(code) = code {
+            if state.lobby_choices.is_some() {
+                parent.spawn(TextBundle::from_section(format!("Choose lobby for next launch. {}", links.lobby_notice()), TextStyle { font: font.clone(), font_size:16.0, color:Color::WHITE }));
+            } else if let Some(code) = code {
                 parent.spawn(ImageBundle { image: code.into(), style: Style { width: Val::Px(176.0), height: Val::Px(176.0), margin: UiRect::all(Val::Px(8.0)), ..default() }, ..default() });
                 parent.spawn(TextBundle::from_section("Scan to sign in", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
             } else if !linked {
                 parent.spawn(TextBundle::from_section("Connecting to sign-in…", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
             }
-            for (i, action) in menu_actions(linked, state.has_inactive).iter().enumerate() {
-                let highlighted = i == state.highlight.min(menu_actions(linked, state.has_inactive).len() - 1);
+            for (i, action) in player_menu_actions(state, linked).iter().enumerate() {
+                let highlighted = i == state.highlight.min(player_menu_actions(state, linked).len() - 1);
                 // Every row is an action now, so every row looks alike; the
                 // highlight is the only thing that distinguishes them.
                 let base = Color::rgb(0.25, 0.25, 0.25);

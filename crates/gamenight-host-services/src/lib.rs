@@ -1,21 +1,15 @@
+//! Native host controls and the outbound hosted-service client. No web pages.
 use axum::{
-    extract::{Path, Query, State},
-    http::{HeaderValue, StatusCode},
-    response::{Html, IntoResponse, Response},
+    extract::{Path, State},
+    http::StatusCode,
     routing::{get, post},
     Json, Router,
 };
 mod cloud;
-mod dev_catalog;
-mod dev_web;
 pub mod host_lobby;
 mod local_room;
 mod memory;
 mod onboarding;
-mod playlist;
-mod docs_pages {
-    include!("../../../web/docs-routes.rs");
-}
 use gamenight_protocol::{ClientMessage, PlayerId};
 use qrcode::render::svg;
 use qrcode::QrCode;
@@ -64,7 +58,6 @@ pub struct JoinSessionRequest {
 }
 
 pub struct ServerState {
-    onboarding: Option<onboarding::Handoff>,
     local_room: local_room::Room,
     join_base: String,
     memory: memory::Memory,
@@ -89,7 +82,6 @@ pub struct ServerState {
 impl ServerState {
     pub fn new(daemon_addr: String) -> Self {
         Self {
-            onboarding: None,
             local_room: local_room::Room::new(),
             join_base: gamenight_protocol::web_base_url(),
             memory: memory::Memory::default(),
@@ -104,103 +96,49 @@ impl ServerState {
 
 pub type SharedState = Arc<Mutex<ServerState>>;
 
+/// Native control API only. Player pages and authentication live in the hosted service.
+/// Never expose this listener on a LAN interface.
 pub fn create_router(state: SharedState) -> Router {
     Router::new()
-        .route("/host/lobby", get(host_lobby::page))
         .route(
             "/api/host/lobby",
             get(host_lobby::get).post(host_lobby::select),
         )
         .route("/api/host/recovery", post(host_lobby::recover))
-        .route("/onboarding", get(onboarding::page))
-        .route("/api/onboarding", post(onboarding::claim))
-        .route("/api/onboarding/reconnect", post(onboarding::reconnect))
-        .route("/api/dev-catalog/room", get(dev_catalog::status))
-        .route("/api/dev-catalog/next", post(dev_catalog::next))
-        .route(
-            "/favicon.ico",
-            get(|| async {
-                (
-                    [("content-type", "image/x-icon")],
-                    include_bytes!("../../../web/favicon.ico").as_slice(),
-                )
-            }),
-        )
-        .route(
-            "/apple-touch-icon.png",
-            get(|| async {
-                (
-                    [("content-type", "image/png")],
-                    include_bytes!("../../../web/apple-touch-icon.png").as_slice(),
-                )
-            }),
-        )
-        .route("/studio", get(serve_studio))
-        .route(
-            "/docs",
-            get(|| async { serve_docs(Path(String::new())).await }),
-        )
-        .route("/docs/:page", get(serve_docs))
-        .route("/web/:asset", get(serve_web_asset))
-        .route(
-            "/web/fonts/ark-pixel-16px-latin.ttf",
-            get(|| async {
-                (
-                    [("content-type", "font/ttf")],
-                    include_bytes!("../../../web/fonts/ark-pixel-16px-latin.ttf").as_slice(),
-                )
-            }),
-        )
-        .route(
-            "/assets/jsQR.js",
-            get(|| async {
-                (
-                    [(axum::http::header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../assets/jsQR.js"),
-                )
-            }),
-        )
-        .route(
-            "/assets/qr-scanner.js",
-            get(|| async {
-                (
-                    [(axum::http::header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../../../web/qr-scanner.js"),
-                )
-            }),
-        )
-        .route("/assets/characters/:theme", get(serve_character))
-        .route("/mobile", get(serve_studio))
-        .route("/session/:session_id", get(serve_studio))
-        .route(
-            "/api/playlist",
-            get(playlist::get).post(playlist::move_entry),
-        )
         .route("/api/player-links", get(player_links))
-        .route("/api/local-room/join", post(local_room::join))
-        .route("/api/profiles/:id/remember", post(local_room::remember))
-        .route(
-            "/api/profiles/:id/main-player",
-            post(local_room::main_player),
-        )
-        .route("/api/local-room/cancel/:id", post(local_room::cancel))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
-        .route("/api/profiles", post(save_profile))
-        .route("/api/profiles/:id", get(get_profile))
-        .route("/api/profiles/:id/join", post(join_session))
-        .route("/api/profiles/:id/session", get(profile_session))
-        .route("/qr", get(serve_qr))
-        .route("/qr/:session_id", get(serve_session_qr))
-        .route("/", get(serve_studio))
-        .layer(axum::middleware::from_fn(dev_web::assets))
+        .layer(axum::middleware::from_fn(native_only))
         .with_state(state)
+}
+
+async fn native_only(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    use axum::response::IntoResponse;
+    // Browsers must use the hosted service. Reject browser-origin requests,
+    // including loopback DNS rebinding, rather than exposing a second player API.
+    if request.headers().contains_key("origin") || request.headers().contains_key("sec-fetch-mode")
+    {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    let peer = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>();
+    if !peer.is_some_and(|p| p.0.ip().is_loopback()) {
+        return StatusCode::FORBIDDEN.into_response();
+    }
+    next.run(request).await
 }
 
 pub async fn run_server(
     addr: std::net::SocketAddr,
     state: SharedState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if !addr.ip().is_loopback() {
+        return Err("Native host services must bind to loopback".into());
+    }
     let memory = memory::Memory::load(memory::path())?;
     {
         let mut local = state.lock().unwrap();
@@ -216,18 +154,9 @@ pub async fn run_server(
         tokio::spawn(bridge.run(state.clone()));
     }
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    let port = listener.local_addr()?.port();
-    let host =
-        gamenight_protocol::lan_ip().unwrap_or(std::net::IpAddr::V4(std::net::Ipv4Addr::LOCALHOST));
-    state.lock().unwrap().join_base = format!("http://{}", std::net::SocketAddr::new(host, port));
-    onboarding::start(&state, port);
+    onboarding::start(&state);
     let app = create_router(state);
-    // Log the address a phone can actually use, not just the bind address —
-    // `0.0.0.0` is not something anyone can type into a browser.
-    tracing::info!(
-        "🌐 GameNight Web Server & Studio bound to {addr}, reachable at {}",
-        gamenight_protocol::web_base_url()
-    );
+    tracing::info!("GameNight native control API listening on {addr}; player pages are hosted");
     axum::serve(
         listener,
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
@@ -236,6 +165,7 @@ pub async fn run_server(
     Ok(())
 }
 
+#[cfg(test)]
 async fn profile_session(
     Path(id): Path<String>,
     State(state): State<SharedState>,
@@ -264,7 +194,11 @@ async fn player_links(State(state): State<SharedState>) -> Json<serde_json::Valu
         .cloud
         .as_ref()
         .map(|b| b.waiting())
-        .unwrap_or_else(|| state.local_room.snapshot(&state.profiles));
+        .unwrap_or_else(|| {
+            let mut room = state.local_room.snapshot(&state.profiles);
+            room["room_code"] = "".into();
+            room
+        });
     let base = state
         .cloud
         .as_ref()
@@ -302,18 +236,17 @@ fn add_room_artwork(room: &mut serde_json::Value, base: &str) {
 mod lobby_room_tests {
     use super::*;
     #[tokio::test]
-    async fn native_room_api_supplies_current_code_link_and_qr() {
+    async fn offline_room_never_advertises_a_nonfunctional_local_join_url() {
         let state = Arc::new(Mutex::new(ServerState::new("unused".into())));
-        state.lock().unwrap().join_base = "http://192.0.2.10:17935".into();
         let Json(value) = player_links(State(state)).await;
-        let room = &value["room"];
-        assert_eq!(
-            room["join_url"],
-            format!(
-                "http://192.0.2.10:17935/?r={}",
-                room["room_code"].as_str().unwrap()
-            )
-        );
+        assert_eq!(value["room"]["room_code"], "");
+        assert!(value["room"].get("join_url").is_none());
+    }
+    #[test]
+    fn hosted_room_qr_points_to_central_player_interface() {
+        let mut room = serde_json::json!({"room_code":"ABC234"});
+        add_room_artwork(&mut room, "https://gamenight.ontola.io");
+        assert_eq!(room["join_url"], "https://gamenight.ontola.io/?r=ABC234");
         assert!(room["qr_svg"].as_str().unwrap().contains("<svg"));
     }
     #[test]
@@ -427,6 +360,7 @@ async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState
     }
 }
 
+#[cfg(test)]
 async fn get_profile(
     Path(id): Path<String>,
     State(state): State<SharedState>,
@@ -440,6 +374,7 @@ async fn get_profile(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
+#[cfg(test)]
 async fn save_profile(
     State(state): State<SharedState>,
     Json(profile): Json<Profile>,
@@ -691,140 +626,6 @@ async fn join_session_inner(
     }
 }
 
-async fn serve_qr() -> Response {
-    // LAN address, not loopback: these codes exist to be scanned by a phone.
-    let url = format!("{}/mobile", gamenight_protocol::web_base_url());
-    let code = QrCode::new(url.as_bytes()).unwrap();
-    let svg_xml = code
-        .render::<svg::Color>()
-        .min_dimensions(200, 200)
-        .dark_color(svg::Color("#6366f1"))
-        .light_color(svg::Color("#0f172a"))
-        .build();
-
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            HeaderValue::from_static("image/svg+xml"),
-        )],
-        svg_xml,
-    )
-        .into_response()
-}
-
-async fn serve_session_qr(Path(session_id): Path<String>) -> Response {
-    let url = format!(
-        "{}/session/{}",
-        gamenight_protocol::web_base_url(),
-        session_id
-    );
-    let code = QrCode::new(url.as_bytes()).unwrap();
-    let svg_xml = code
-        .render::<svg::Color>()
-        .min_dimensions(220, 220)
-        .dark_color(svg::Color("#6366f1"))
-        .light_color(svg::Color("#0f172a"))
-        .build();
-
-    (
-        [(
-            axum::http::header::CONTENT_TYPE,
-            HeaderValue::from_static("image/svg+xml"),
-        )],
-        svg_xml,
-    )
-        .into_response()
-}
-
-// Embed the lobby assets so installed/offline studios use the same artwork.
-async fn serve_character(Path(theme): Path<String>) -> Response {
-    let png: &'static [u8] = match theme.as_str() {
-        "living-room" => include_bytes!("../../lobby/assets/player/skins/fishy/fishy-body.png"),
-        "underwater" => include_bytes!("../../lobby/assets/themes/underwater/fishy/body.png"),
-        "sky" => include_bytes!("../../lobby/assets/themes/sky/fishy/body.png"),
-        "school" => include_bytes!("../../lobby/assets/themes/school/fishy/body.png"),
-        "gameroom" => include_bytes!("../../lobby/assets/themes/gameroom/fishy/body.png"),
-        _ => return StatusCode::NOT_FOUND.into_response(),
-    };
-    (
-        [("content-type", "image/png"), ("cache-control", "no-cache")],
-        png,
-    )
-        .into_response()
-}
-
-async fn serve_studio(
-    State(state): State<SharedState>,
-    Query(query): Query<HashMap<String, String>>,
-) -> Response {
-    let bridge = state.lock().unwrap().cloud.clone();
-    if let Some(bridge) = bridge {
-        if let Some(url) = bridge.pairing_url(&query).await {
-            return axum::response::Redirect::to(&url).into_response();
-        }
-    }
-    if let Some(response) = dev_web::studio().await {
-        return response;
-    }
-    Html(STUDIO_HTML).into_response()
-}
-
-pub static STUDIO_HTML: &str = include_str!("../../../web/studio.html");
-
-async fn serve_web_asset(Path(asset): Path<String>) -> Response {
-    let (mime, data) = match asset.as_str() {
-        "docs.css" => ("text/css", include_str!("../../../web/docs.css")),
-        "docs.js" => ("text/javascript", include_str!("../../../web/docs.js")),
-        "storage.js" => ("text/javascript", include_str!("../../../web/storage.js")),
-        "site.css" => ("text/css", include_str!("../../../web/site.css")),
-        "studio.css" => ("text/css", include_str!("../../../web/studio.css")),
-        "studio.js" => ("text/javascript", include_str!("../../../web/studio.js")),
-        "account.js" => ("text/javascript", include_str!("../../../web/account.js")),
-        "shell.js" => ("text/javascript", include_str!("../../../web/shell.js")),
-        "icon.svg" => ("image/svg+xml", include_str!("../../../web/icon.svg")),
-        _ => return StatusCode::NOT_FOUND.into_response(),
-    };
-    ([("content-type", mime)], data).into_response()
-}
-
-async fn serve_docs(Path(page): Path<String>) -> Response {
-    match docs_pages::page(&page) {
-        Some(html) => Html(
-            html.replace("<body>", "<body data-local=\"true\">")
-                .replace(
-                    "href=\"/developers",
-                    "href=\"https://gamenight.ontola.io/developers",
-                ),
-        )
-        .into_response(),
-        None => StatusCode::NOT_FOUND.into_response(),
-    }
-}
-
-#[cfg(test)]
-mod docs_tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn documentation_is_public_and_unknown_pages_are_not_served() {
-        for slug in ["", "love", "rust", "godot", "c", "faces", "protocol"] {
-            let response = serve_docs(Path(slug.into())).await;
-            assert_eq!(response.status(), StatusCode::OK);
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-                .await
-                .unwrap();
-            let html = String::from_utf8(body.to_vec()).unwrap();
-            assert!(html.contains("data-local=\"true\""));
-            assert!(html.contains("aria-label=\"Documentation\""));
-            assert!(!html.contains("href=\"/developers"));
-        }
-        assert_eq!(
-            serve_docs(Path("../private".into())).await.status(),
-            StatusCode::NOT_FOUND
-        );
-    }
-}
-
 #[cfg(test)]
 mod room_pickup_tests {
     use super::*;
@@ -851,6 +652,26 @@ mod room_pickup_tests {
                 .await,
                 expected
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod claim_flow_tests;
+mod playlist;
+
+#[cfg(test)]
+mod network_boundary_tests {
+    use super::*;
+    #[tokio::test]
+    async fn native_services_refuse_lan_and_wildcard_binds() {
+        for ip in ["0.0.0.0:0", "192.0.2.1:0", "[::]:0"] {
+            let state = Arc::new(Mutex::new(ServerState::new("unused".into())));
+            assert!(run_server(ip.parse().unwrap(), state)
+                .await
+                .unwrap_err()
+                .to_string()
+                .contains("loopback"));
         }
     }
 }

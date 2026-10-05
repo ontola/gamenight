@@ -15,7 +15,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::Message;
 
-use gamenight_local_web::{create_router, Profile, ServerState};
+use crate::{Profile, ServerState};
 use gamenight_protocol::{ClientMessage, PartySnapshot, PlayerId, Role, ServerMessage};
 
 /// Spawn a daemon on an ephemeral port. Empty library so nothing auto-fills
@@ -33,7 +33,12 @@ async fn start_server(daemon: &str) -> String {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap().to_string();
     tokio::spawn(async move {
-        axum::serve(listener, create_router(state)).await.unwrap();
+        axum::serve(
+            listener,
+            test_router(state).into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
     });
     addr
 }
@@ -391,39 +396,49 @@ async fn get(addr: &str, path: &str) -> (u16, String) {
     (status, body)
 }
 
-/// The two halves of the claim flow have to agree on the URL shape. The lobby
-/// renders `<join_url>?claim=<player_id>` onto the QR above a character's
-/// head; that has to land on the studio page, and that page has to actually
-/// read the parameter back out. A silent mismatch here would look exactly
-/// like "scanning the QR does nothing".
 #[tokio::test]
-async fn session_url_with_claim_serves_a_studio_that_reads_it() {
-    let server = start_server("127.0.0.1:7912").await;
-    let player = PlayerId::new();
-
-    let (status, body) = get(&server, &format!("/session/gn-couch?claim={}", player.0)).await;
-    assert_eq!(status, 200, "the claim URL must serve the studio");
-    assert!(
-        body.contains("/web/storage.js"),
-        "the page must load the shared editor"
-    );
-    let (status, body) = get(&server, "/web/studio.js").await;
-    assert_eq!(status, 200, "the shared script must be served");
-    assert!(
-        body.contains("claimPlayerId"),
-        "the studio page must parse the claim parameter"
-    );
-    assert!(
-        body.contains("get('claim')"),
-        "the studio page must read `claim` from the query string"
-    );
-    assert!(
-        body.contains("claimPlayerId || boundPlayerId"),
-        "the page must prefer a scanned character, then the one it already joined"
-    );
-    assert!(
-        body.contains("claim: target"),
-        "the studio page must forward the claim id to the join endpoint"
+async fn local_host_never_serves_browser_pages() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let state = Arc::new(Mutex::new(ServerState::new("127.0.0.1:1".into())));
+    tokio::spawn(async move {
+        axum::serve(
+            listener,
+            crate::create_router(state)
+                .into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await
+        .unwrap();
+    });
+    for path in [
+        "/",
+        "/studio",
+        "/mobile",
+        "/session/gn-couch",
+        "/host/lobby",
+        "/onboarding",
+        "/docs",
+        "/docs/godot",
+        "/web/studio.js",
+        "/catalog",
+        "/api/profiles",
+        "/api/local-room/join",
+    ] {
+        assert_eq!(get(&address, path).await.0, 404, "{path}");
+    }
+    let (status, body) = get(&address, "/api/player-links").await;
+    assert_eq!(status, 200);
+    assert!(!body.contains("http://"));
+    let client = reqwest::Client::new();
+    assert_eq!(
+        client
+            .get(format!("http://{address}/api/player-links"))
+            .header("Origin", "https://evil.invalid")
+            .send()
+            .await
+            .unwrap()
+            .status(),
+        403
     );
 }
 
@@ -748,26 +763,6 @@ async fn re_claiming_your_own_seat_still_works() {
         .wait_for(|p| p.players.iter().any(|pl| pl.name == "Ada Again"))
         .await;
     assert_eq!(party.players.len(), 1, "no duplicate was created");
-}
-
-#[tokio::test]
-async fn local_studio_excludes_commerce() {
-    let server = start_server("127.0.0.1:7912").await;
-    assert_eq!(get(&server, "/api/store").await.0, 404);
-    assert_eq!(
-        post(&server, "/api/profiles/test/buy", r#"{"game_id":"demo"}"#)
-            .await
-            .0,
-        404
-    );
-    let (status, body) = get(&server, "/studio").await;
-    assert_eq!(status, 200);
-    for removed in ["buyGame", "owned_games", "tab-store", "/api/store"] {
-        assert!(
-            !body.contains(removed),
-            "commerce leaked into studio: {removed}"
-        );
-    }
 }
 
 async fn save_test_profile(server: &str) {
@@ -1169,12 +1164,9 @@ async fn unlink_preserves_player_and_rejects_old_phone_until_new_qr_is_scanned()
 }
 
 #[tokio::test]
-async fn session_tab_tracks_link_unlink_and_does_not_show_a_phone_qr() {
+async fn profile_sync_tracks_link_and_unlink() {
     let daemon = start_daemon().await;
     let server = start_server(&daemon).await;
-    let (_, page) = http(&server, "GET", "/mobile", "").await;
-    assert!(!page.contains("Scan QR Code with Phone"));
-    assert!(page.contains("session-link-status"));
     post(
         &server,
         "/api/profiles",
@@ -1256,4 +1248,22 @@ async fn large_profile_claim_is_acknowledged_before_success() {
         assert_eq!(player.avatar.as_deref(), Some(avatar.as_str()));
         assert_eq!(player.color.as_deref(), Some("#336699"));
     }
+}
+
+// Only tests can access these adapters. Hosted profile sync calls the Rust
+// functions directly; no installed HTTP route accepts arbitrary phone profiles.
+fn test_router(state: crate::SharedState) -> axum::Router {
+    use axum::routing::{get, post};
+    axum::Router::new()
+        .route("/api/profiles", post(crate::save_profile))
+        .route("/api/profiles/:id", get(crate::get_profile))
+        .route("/api/profiles/:id/join", post(crate::join_session))
+        .route("/api/profiles/:id/session", get(crate::profile_session))
+        .route(
+            "/api/playlist",
+            get(crate::playlist::get).post(crate::playlist::move_entry),
+        )
+        .route("/api/player-links/:id/unlink", post(crate::unlink_player))
+        .route("/api/player-links", get(crate::player_links))
+        .with_state(state)
 }

@@ -6,10 +6,10 @@ async fn main() {
         .await
         .unwrap();
     tokio::spawn(gamenight_daemon::run_with_library(listener, Vec::new()));
-    let state = Arc::new(Mutex::new(gamenight_local_web::ServerState::new(
+    let state = Arc::new(Mutex::new(gamenight_host_services::ServerState::new(
         "127.0.0.1:17912".into(),
     )));
-    gamenight_local_web::run_server("127.0.0.1:17913".parse().unwrap(), state)
+    gamenight_host_services::run_server("127.0.0.1:17913".parse().unwrap(), state)
         .await
         .unwrap();
 }

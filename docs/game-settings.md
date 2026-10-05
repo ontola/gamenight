@@ -127,6 +127,18 @@ changing any of them. Undo restores the preceding batch; Keep clears that undo.
 A stale request is refused instead of overwriting a newer change. Normal
 `set_setting` writes also advance the revision.
 
+The assistant's game dropdown follows the party queue. Players can select the
+current game or configure a prepared **Up next** game before it starts. Later
+queue entries stay visible while they wait for the host to prepare them and
+declare their settings. Selecting a game does not launch it or reorder the queue.
+
+Discovery exposes `controls` for the current (or first prepared) session and
+`next_controls` for a distinct prepared next session. AI requests, manual changes
+and saved configs carry the selected session ID. The cloud and daemon both
+recheck that session and the settings revision. If the host replaces it, an old
+request is refused. Settings remain scoped to a game, so repeated queue entries
+for the same game share settings and appear once in this picker.
+
 Host acceptance does not mean a next-round setting is already active in gameplay.
 Keep the timing in the label and description. The assistant must not promise an
 immediate gameplay change when your game waits for a new round or match. Account
@@ -163,3 +175,66 @@ before claiming a downloaded build or a physical controller session is verified.
 
 Build new `.love` packages with `scripts/package-love-party.py`. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.
+
+
+## New behavior through a game mod SDK
+
+Settings alone cannot add new game behavior. Mineclonia's maintained adapter now
+has a separate, experimental [generated Lua mod path](https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/MODDING.md).
+The host advertises a versioned SDK, the installed source, and failed-validation
+feedback. The assistant can produce a complete program defining new items,
+blocks and multiplayer callbacks, then edit that source in a follow-up request.
+
+The public adapter owns staging, the guarded Lua API, isolated engine validation,
+world checkpoints, restart/reconnect and source undo. Private account/model code
+only proposes a scoped change and reports its host-confirmed result. New content
+currently requires reconnecting the players; existing live settings still apply
+without a restart. Undo changes behavior while retaining subsequent play and
+persistent counters. Failed installation restores the saved checkpoint.
+
+This is an optional Mineclonia integration, not a new requirement for every game
+or a promise of arbitrary Luanti API access. Read the
+[SDK contract and limits](https://github.com/ontola/gamenight-mineclonia/blob/14942693d888b2ee5c37cbed7d4a515b5f73a339/mod_sdk/API.txt)
+and the adapter's verification notes before enabling it. The historical
+`examples/mineclonia` directory contains the earlier fixed-recipe prototype;
+new modding work lives in `ontola/gamenight-mineclonia`.
+
+
+## Documented game functions
+
+Games can expose actions beyond settings through a documented registry and one
+`call_game_function(name, arguments)` interface. Mineclonia's development adapter
+is the first implementation. It publishes `controls.game_api` with version,
+function names, descriptions, parameter types/ranges, return descriptions and
+whether each call changes game state. The assistant builds its output schema
+from these declarations; adding a registered function requires no cloud action
+specific to that function.
+
+```json
+{"action":"call","game":"mineclonia","values":{"name":"inventory.give","arguments":{"target":"self","item":"mcl_tools:sword_diamond","count":2}}}
+```
+
+The host supplies the bound player identity and checks the session, revision and
+arguments again. The world resolves an exact registered handler and reports
+observed data in its receipt. It preserves duplicate request receipts, and
+mutations reserve a persisted revision before applying their effects. Failed
+handlers may have partial effects; observe the new state before another request.
+Mutating calls clear settings Undo. Reversing a function effect requires a
+game-specific reverse function.
+
+Mineclonia currently exposes player listing, item search, inventory inspection,
+item grants, healing and teleporting. These calls work live without a restart.
+Names, arguments and apply timing belong to the game's docs. Other games need
+their own discovery and execution adapter before their functions can be called.
+
+Version 1 accepts named scalar arguments and structured results. The assistant
+currently proposes one call per request, with returned data available for a
+follow-up; automatic sequences of dependent calls remain future work. New Lua
+mod registrations still use the separate validation and reconnect workflow.
+The registry does not automatically export all engine globals.
+
+Read the [function contract and extension example](https://github.com/ontola/gamenight-mineclonia/blob/b2275e4e80d953ee1a93b592dd962511abbaf0ef/GAME_FUNCTIONS.md), including its
+bounds, handler responsibilities and [two-client engine evidence](https://github.com/ontola/gamenight-mineclonia/tree/b2275e4e80d953ee1a93b592dd962511abbaf0ef/verification/functions-2026-10-05).
+The phone flow was checked with disposable host/provider fixtures. Physical
+controllers, speech recognition and a real model were not exercised by these
+function checks. Published store packages still require a separate release.

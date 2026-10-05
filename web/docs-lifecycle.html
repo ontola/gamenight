@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-lifecycle">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-lifecycle" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle" aria-current="page">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-lifecycle" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle" aria-current="page">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="integrating-your-game-with-gamenight">Integrating your game with GameNight</h1>
 <p>GameNight supplies the party, seats and lifecycle. Your game owns gameplay,
 rounds and results. Players can stay in a game until they choose another one.</p>
@@ -24,14 +24,15 @@ Keep the private conversation link to read replies and follow up.</p>
 or AI tools. For assisted work, agree repository access, code handling and any AI use
 first. Private repositories can stay private. GameNight prepares a pull request;
 you review and merge it, then supply the resulting build for testing.</p>
-<p>When ready for review, use the <a href="https://gamenight.ontola.io/developers/releases">release workspace</a>.
-Submit one platform build with a version, player limits and controls. Its SHA-256
-is required before approval. The workspace holds private feedback and revisions;
-each revised build needs a new review. Code access does not grant distribution
-permission. Staff review the package, rights and test evidence before approving
-catalog publication. Listing is free. The first flow supports free releases;
-commercial interest is accepted, but purchases, payouts and timed trials are not
-enabled by submitting a game.</p>
+<p>Start with <a href="/docs/first-game">Your first game</a> for local setup and the release
+handoff. The <a href="https://gamenight.ontola.io/developers/releases">release workspace</a>
+holds the initial submission, private feedback and distribution review. Editing
+that submission creates a new revision and invalidates its approval.</p>
+<p>After distribution approval, routine build updates use the
+<a href="/docs/publishing">publishing portal</a> or CI without resubmitting the initial
+application. Every new package still needs testing; approval is not certification.
+Code access does not grant distribution permission. Listing is free; purchases,
+payouts and timed trials are not enabled by submitting a game.</p>
 <p>Run the <a href="/docs/testing">contract checks</a> before review and share
 their results. Also test physical controllers, joining/leaving, pause/resume and
 returning to the lobby on each supported platform. Automated test coverage varies
@@ -167,7 +168,7 @@ a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
 repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="4c4cdce55c752e6c94d5c0dd0cec965e36d96eb2186c4b59574801119f86e932">Built from repository sources</span></footer>
-<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="d6b28660302ca50b39d678bdf29b645bbbac9646e9350f3ef0037018d510d216">Built from repository sources</span></footer>
+<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/first-game"><small>Previous</small>Your first game</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#submit-a-game">Submit a game</a><a href="#connect">Connect</a><a href="#prepare-before-taking-the-screen">Prepare before taking the screen</a><a href="#controllers-belong-to-players">Controllers belong to players</a><a href="#back-focus-and-fullscreen">Back, focus and fullscreen</a><a href="#rounds-continue-inside-the-session">Rounds continue inside the session</a><a href="#live-players-and-settings">Live players and settings</a><a href="#player-faces-and-colours">Player faces and colours</a><a href="#artwork-for-the-catalog-and-lobby">Artwork for the catalog and lobby</a><a href="#verify-before-shipping">Verify before shipping</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -5,9 +5,10 @@ const path=require('node:path');
 (async()=>{
   const nodes=new Map();
   function node(id){if(!nodes.has(id))nodes.set(id,{children:Array.from({length:6},()=>({textContent: ""})),hidden:false,disabled:false,textContent:'',listeners:{},addEventListener(n,fn){this.listeners[n]=fn;},close(){this.open=false;},append(){},prepend(){},setAttribute(){}});return nodes.get(id);}
+  let navigationState;
   let state={status:'connected',room_code:'ABC234'}, poll, failLeave=false, joins=0, failJoin=false;
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
-  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{showToast(text){node('room-status').textContent=text;},localStorage:storage,initAccountSettings(){}},sessionStorage:storage,
+  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement:()=>node('new')},window:{addEventListener(){},updateRoomNavigation(connected,waiting=false){navigationState={connected,waiting};},showToast(text){node('room-status').textContent=text;},localStorage:storage,initAccountSettings(){}},sessionStorage:storage,
     location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,
     setTimeout(fn){poll=fn;return 1;},clearTimeout(){},fetch:async(url,options)=>{
       let data={}; let status=200;
@@ -19,6 +20,7 @@ const path=require('node:path');
         status=failJoin?429:200;
         if(!failJoin)state={status:'waiting',expires:Date.now()/1000+300};
       }
+      if(url==='/v1/rooms/cancel'){state={status:'none'};status=204;}
       if(url==='/v1/pairing/unlink'){
         assert.equal(options.headers['X-GameNight-CSRF'],'csrf');
         status=failLeave?500:204;
@@ -44,6 +46,16 @@ const path=require('node:path');
   await node('room-form').listeners.submit({preventDefault(){}});
   await joining;assert.equal(joins,1);assert.equal(input.value,'ABC234');
   assert.equal(input.readOnly,false);assert.equal(node('room-cancel').hidden,false);
+  assert.deepEqual(navigationState,{connected:false,waiting:true});
+  assert.equal(node('qr-open').hidden,true);assert.equal(node('room-form').hidden,true);
+  await poll();assert.deepEqual(navigationState,{connected:false,waiting:true});
+  await node('room-cancel').listeners.click();
+  assert.deepEqual(navigationState,{connected:false,waiting:false});
+  assert.equal(node('qr-open').hidden,false);
+  state={status:'connected',room_code:'ABC234'};await poll();
+  assert.deepEqual(navigationState,{connected:true,waiting:false});
+  state={status:'none'};await poll();
+  assert.deepEqual(navigationState,{connected:false,waiting:false});
   input.value='';await input.listeners.input();assert.equal(joins,1);
   failJoin=true;input.value='ab-c234';await input.listeners.input();
   assert.equal(joins,2);assert.match(node('room-status').textContent,/Too many/);

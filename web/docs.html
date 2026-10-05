@@ -7,9 +7,11 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-start">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-start" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs" aria-current="page">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-start" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs" aria-current="page">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="bring-your-game-to-the-couch">Bring your game to the couch</h1>
 <p>GameNight puts local multiplayer games in one lobby. Players pick a game, keep their controller and profile, and return to the lobby with Back. Your game keeps its engine and runs in its own process.</p>
+<p>Follow <a href="/docs/first-game">Your first game</a> to run your own build in the lobby,
+test it, upload a private preview and publish a release.</p>
 <h2 id="pick-your-engine">Pick your engine</h2>
 <table>
 <thead>
@@ -33,7 +35,7 @@
 <tr>
 <td><a href="/docs/godot">Godot 4</a></td>
 <td>Godot addon</td>
-<td>Lifecycle signals; controller streaming and window behaviour need work</td>
+<td>Lifecycle, host controller frames, screen ownership and a face helper</td>
 </tr>
 <tr>
 <td><a href="/docs/c">C / C++</a></td>
@@ -56,9 +58,14 @@
 <p><a href="/developers">Tell us about it</a>. An email and a link are enough to start. We can help with integration, or you can work through these guides yourself.</p>
 <h2 id="how-these-docs-stay-current">How these docs stay current</h2>
 <p>These pages are built from Markdown in the public repository. Code excerpts are read from source, not pasted copies. CI checks generated pages, internal links and watched implementation files. The Rust example compiles against the SDK; the C example compiles against the header.</p>
-<p>An implementation change makes the docs check fail until someone reviews and regenerates the affected pages. This catches drift; it cannot prove every explanation is correct. Godot snippets are source-checked, not runtime-certified. Physical controller and window tests still matter.</p>
+<p>Changes to watched implementation files make the docs check fail until someone
+reviews and regenerates the affected pages. Godot adapter behavior has headless
+regression tests; those do not certify your game's callbacks or physical devices.
+Publishing backend changes are reviewed in the private repository too. Checks
+catch structural drift, not every outdated explanation. Physical controller and
+window tests still matter.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/overview.md">Edit this page</a><span data-source-fingerprint="12824b0cb99f826f9269714070767c5d0a8465b7d4f9004f569970cc44fbd40c">Built from repository sources</span></footer>
-<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/lifecycle"><small>Next</small>Game lifecycle</a></nav></article>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/overview.md">Edit this page</a><span data-source-fingerprint="c540b314a65aac7e1debd42bd77191bb0139c17fe973ab077b9a71d275e66f53">Built from repository sources</span></footer>
+<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/first-game"><small>Next</small>Your first game</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#pick-your-engine">Pick your engine</a><a href="#what-a-good-integration-does">What a good integration does</a><a href="#have-a-game-already">Have a game already?</a><a href="#how-these-docs-stay-current">How these docs stay current</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

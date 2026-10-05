@@ -14,13 +14,6 @@ pub(super) fn open() {
     open_url(url);
 }
 
-pub(super) fn open_lobby_chooser() {
-    let url = std::env::var("GAMENIGHT_LOBBY_CHOOSER_URL").ok()
-        .filter(|s| s.starts_with("http://127.0.0.1:") && !s.contains(['\n','\r']))
-        .unwrap_or_else(|| "http://127.0.0.1:7913/host/lobby".into());
-    open_url(url);
-}
-
 fn open_url(url: String) {
     // An argument, never shell code. This is a deliberate user-triggered window.
     #[cfg(target_os = "windows")]
