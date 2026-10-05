@@ -127,6 +127,18 @@ changing any of them. Undo restores the preceding batch; Keep clears that undo.
 A stale request is refused instead of overwriting a newer change. Normal
 `set_setting` writes also advance the revision.
 
+The assistant's game dropdown follows the party queue. Players can select the
+current game or configure a prepared **Up next** game before it starts. Later
+queue entries stay visible while they wait for the host to prepare them and
+declare their settings. Selecting a game does not launch it or reorder the queue.
+
+Discovery exposes `controls` for the current (or first prepared) session and
+`next_controls` for a distinct prepared next session. AI requests, manual changes
+and saved configs carry the selected session ID. The cloud and daemon both
+recheck that session and the settings revision. If the host replaces it, an old
+request is refused. Settings remain scoped to a game, so repeated queue entries
+for the same game share settings and appear once in this picker.
+
 Host acceptance does not mean a next-round setting is already active in gameplay.
 Keep the timing in the label and description. The assistant must not promise an
 immediate gameplay change when your game waits for a new round or match. Account

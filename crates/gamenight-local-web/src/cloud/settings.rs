@@ -21,10 +21,33 @@ pub(crate) struct Command {
     pub values: BTreeMap<String, SettingValue>,
 }
 pub(crate) fn controls(party: &PartySnapshot) -> Option<Value> {
-    let session = party
+    controls_for(party, false)
+}
+
+pub(crate) fn next_controls(party: &PartySnapshot) -> Option<Value> {
+    let warm = party.warm_session.as_ref()?;
+    if party
         .active_session
         .as_ref()
-        .or(party.warm_session.as_ref())?;
+        .is_none_or(|active| active.id == warm.id)
+    {
+        return None;
+    }
+    if party.warming.as_ref().is_some_and(|s| s.game != warm.game) {
+        return None;
+    }
+    controls_for(party, true)
+}
+
+fn controls_for(party: &PartySnapshot, upcoming: bool) -> Option<Value> {
+    let session = if upcoming {
+        party.warm_session.as_ref()?
+    } else {
+        party
+            .active_session
+            .as_ref()
+            .or(party.warm_session.as_ref())?
+    };
     if !party.connected_games.contains(&session.game) {
         return None;
     }
@@ -204,6 +227,27 @@ mod tests {
             advertised["settings"]["arena"]["options"],
             json!(["earth", "moon"])
         );
+        let mut upcoming_party = party.clone();
+        let active = upcoming_party.warm_session.clone().unwrap();
+        let mut upcoming = active.clone();
+        upcoming.id = SessionId(uuid::Uuid::new_v4());
+        upcoming.game = GameId("next".into());
+        upcoming_party.active_session = Some(active.clone());
+        upcoming_party.warm_session = Some(upcoming.clone());
+        upcoming_party.connected_games.push(upcoming.game.clone());
+        let mut upcoming_settings = upcoming_party.settings[0].clone();
+        upcoming_settings.game = upcoming.game.clone();
+        upcoming_party.settings.push(upcoming_settings);
+        assert_eq!(
+            controls(&upcoming_party).unwrap()["instance"],
+            json!(active.id)
+        );
+        assert_eq!(
+            next_controls(&upcoming_party).unwrap()["instance"],
+            json!(upcoming.id)
+        );
+        upcoming_party.warm_session = None;
+        assert!(next_controls(&upcoming_party).is_none());
         let mut selection=Selection {
             edit:None,id:"batch".into(),game:"test".into(),
             seat:Seat {index:0,player:player.0.to_string(),revision:0},

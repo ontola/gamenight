@@ -180,6 +180,16 @@ the player, game session and settings revision, then validates every value befor
 changing any of them. Undo restores the preceding batch; Keep clears that undo.
 A stale request is refused instead of overwriting a newer change. Normal
 <code>set_setting</code> writes also advance the revision.</p>
+<p>The assistant's game dropdown follows the party queue. Players can select the
+current game or configure a prepared <strong>Up next</strong> game before it starts. Later
+queue entries stay visible while they wait for the host to prepare them and
+declare their settings. Selecting a game does not launch it or reorder the queue.</p>
+<p>Discovery exposes <code>controls</code> for the current (or first prepared) session and
+<code>next_controls</code> for a distinct prepared next session. AI requests, manual changes
+and saved configs carry the selected session ID. The cloud and daemon both
+recheck that session and the settings revision. If the host replaces it, an old
+request is refused. Settings remain scoped to a game, so repeated queue entries
+for the same game share settings and appear once in this picker.</p>
 <p>Host acceptance does not mean a next-round setting is already active in gameplay.
 Keep the timing in the label and description. The assistant must not promise an
 immediate gameplay change when your game waits for a new round or match. Account
@@ -227,7 +237,7 @@ and the adapter's verification notes before enabling it. The historical
 <code>examples/mineclonia</code> directory contains the earlier fixed-recipe prototype;
 new modding work lives in <code>ontola/gamenight-mineclonia</code>.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="d7bb8148a3742de79ba64fbd1fd9d116441668b2c9b2f5806acd7c3cf84419dc">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="24f95fa4baa32f93cd9b025a176998b207208c5a0dac49270ff9380c836ee4b9">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

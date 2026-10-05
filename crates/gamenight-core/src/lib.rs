@@ -1539,6 +1539,61 @@ mod night_tests {
     }
 
     #[test]
+    fn prepared_next_settings_do_not_change_the_running_game() {
+        use gamenight_protocol::SettingsAction;
+        use std::collections::BTreeMap;
+        let (mut night, active) = night_in_progress();
+        night.set_library(vec![meta("g1"), meta("g2")]);
+        night.handle(Command::GameConnected {
+            game: GameId::new("g2"),
+        });
+        for game in ["g1", "g2"] {
+            night.handle(Command::DeclareSettings {
+                game: GameId::new(game),
+                settings: vec![toggle("items", true)],
+            });
+        }
+        night.handle(Command::QueueNext {
+            game: GameId::new("g2"),
+        });
+        let snap = night.snapshot();
+        let next = snap.warm_session.unwrap().id;
+        let player = snap.players[0].id;
+        let change = |session| Command::ControlSettings {
+            game: GameId::new("g2"),
+            session,
+            player_id: player,
+            expected_revision: 0,
+            action: SettingsAction::Set,
+            values: BTreeMap::from([("items".into(), SettingValue::Toggle(false))]),
+        };
+        assert!(night
+            .handle(change(active))
+            .iter()
+            .any(|e| matches!(e, Effect::Reject { .. })));
+        let fx = night.handle(change(next));
+        assert!(!fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        let snap = night.snapshot();
+        assert_eq!(snap.active_session.unwrap().id, active);
+        assert_eq!(
+            snap.settings
+                .iter()
+                .find(|s| s.game == GameId::new("g1"))
+                .unwrap()
+                .values["items"],
+            SettingValue::Toggle(true)
+        );
+        assert_eq!(
+            snap.settings
+                .iter()
+                .find(|s| s.game == GameId::new("g2"))
+                .unwrap()
+                .values["items"],
+            SettingValue::Toggle(false)
+        );
+    }
+
+    #[test]
     fn settings_declare_set_and_validate() {
         let mut night = GameNight::default();
         let g = GameId::new("g1");
