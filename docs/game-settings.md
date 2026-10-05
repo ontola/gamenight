@@ -198,3 +198,41 @@ or a promise of arbitrary Luanti API access. Read the
 and the adapter's verification notes before enabling it. The historical
 `examples/mineclonia` directory contains the earlier fixed-recipe prototype;
 new modding work lives in `ontola/gamenight-mineclonia`.
+
+
+## Documented game functions
+
+Games can expose actions beyond settings through a documented registry and one
+`call_game_function(name, arguments)` interface. Mineclonia's development adapter
+is the first implementation. It publishes `controls.game_api` with version,
+function names, descriptions, parameter types/ranges, return descriptions and
+whether each call changes game state. The assistant builds its output schema
+from these declarations; adding a registered function requires no cloud action
+specific to that function.
+
+```json
+{"action":"call","game":"mineclonia","values":{"name":"inventory.give","arguments":{"target":"self","item":"mcl_tools:sword_diamond","count":2}}}
+```
+
+The host supplies the bound player identity and checks the session, revision and
+arguments again. The world resolves an exact registered handler and reports
+observed data in its receipt. It preserves duplicate request receipts, and
+mutations reserve a persisted revision before applying their effects. Failed
+handlers may have partial effects; observe the new state before another request.
+
+Mineclonia currently exposes player listing, item search, inventory inspection,
+item grants, healing and teleporting. These calls work live without a restart.
+Names, arguments and apply timing belong to the game's docs. Other games need
+their own discovery and execution adapter before their functions can be called.
+
+Version 1 accepts named scalar arguments and structured results. The assistant
+currently proposes one call per request, with returned data available for a
+follow-up; automatic sequences of dependent calls remain future work. New Lua
+mod registrations still use the separate validation and reconnect workflow.
+The registry does not automatically export all engine globals.
+
+Read the [function contract and extension example](https://github.com/ontola/gamenight-mineclonia/blob/664816072b2473701a88743a186e680b6c6c5715/GAME_FUNCTIONS.md), including its
+bounds, handler responsibilities and [two-client engine evidence](https://github.com/ontola/gamenight-mineclonia/tree/664816072b2473701a88743a186e680b6c6c5715/verification/functions-2026-10-05).
+The phone flow was checked with disposable host/provider fixtures. Physical
+controllers, speech recognition and a real model were not exercised by these
+function checks. Published store packages still require a separate release.

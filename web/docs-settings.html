@@ -236,8 +236,37 @@ or a promise of arbitrary Luanti API access. Read the
 and the adapter's verification notes before enabling it. The historical
 <code>examples/mineclonia</code> directory contains the earlier fixed-recipe prototype;
 new modding work lives in <code>ontola/gamenight-mineclonia</code>.</p>
+<h2 id="documented-game-functions">Documented game functions</h2>
+<p>Games can expose actions beyond settings through a documented registry and one
+<code>call_game_function(name, arguments)</code> interface. Mineclonia's development adapter
+is the first implementation. It publishes <code>controls.game_api</code> with version,
+function names, descriptions, parameter types/ranges, return descriptions and
+whether each call changes game state. The assistant builds its output schema
+from these declarations; adding a registered function requires no cloud action
+specific to that function.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;action&quot;:&quot;call&quot;,&quot;game&quot;:&quot;mineclonia&quot;,&quot;values&quot;:{&quot;name&quot;:&quot;inventory.give&quot;,&quot;arguments&quot;:{&quot;target&quot;:&quot;self&quot;,&quot;item&quot;:&quot;mcl_tools:sword_diamond&quot;,&quot;count&quot;:2}}}
+</code></pre></div>
+<p>The host supplies the bound player identity and checks the session, revision and
+arguments again. The world resolves an exact registered handler and reports
+observed data in its receipt. It preserves duplicate request receipts, and
+mutations reserve a persisted revision before applying their effects. Failed
+handlers may have partial effects; observe the new state before another request.</p>
+<p>Mineclonia currently exposes player listing, item search, inventory inspection,
+item grants, healing and teleporting. These calls work live without a restart.
+Names, arguments and apply timing belong to the game's docs. Other games need
+their own discovery and execution adapter before their functions can be called.</p>
+<p>Version 1 accepts named scalar arguments and structured results. The assistant
+currently proposes one call per request, with returned data available for a
+follow-up; automatic sequences of dependent calls remain future work. New Lua
+mod registrations still use the separate validation and reconnect workflow.
+The registry does not automatically export all engine globals.</p>
+<p>Read the <a href="https://github.com/ontola/gamenight-mineclonia/blob/664816072b2473701a88743a186e680b6c6c5715/GAME_FUNCTIONS.md">function contract and extension example</a>, including its
+bounds, handler responsibilities and <a href="https://github.com/ontola/gamenight-mineclonia/tree/664816072b2473701a88743a186e680b6c6c5715/verification/functions-2026-10-05">two-client engine evidence</a>.
+The phone flow was checked with disposable host/provider fixtures. Physical
+controllers, speech recognition and a real model were not exercised by these
+function checks. Published store packages still require a separate release.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="24f95fa4baa32f93cd9b025a176998b207208c5a0dac49270ff9380c836ee4b9">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="3f0ebf6642027bf3fb73a6119ee14f574d92aba2158c6d6ac18a67e4d4337b93">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a><a href="#documented-game-functions">Documented game functions</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
