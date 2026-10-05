@@ -21,7 +21,7 @@ followed by the same arguments. This applies to that process only.
 ./scripts/dev-windows.ps1 -Action stop
 ./scripts/dev-windows.ps1 -Action build -Component lobby
 ./scripts/dev-windows.ps1 -Action start
-# Use -Component host for daemon/local-web Rust changes; all for shared protocol changes.
+# Use -Component host for daemon/host-services Rust changes; all for shared protocol changes.
 ```
 
 The default preview is lobby-only, connected to gamenight.ontola.io. Supply
@@ -41,20 +41,15 @@ the normal death/respawn flow; isolated hits expire. Spawn invulnerability and
 solid obstacles are respected. The fist is hand-pixelled in `punch_visual.rs`;
 its wind-up/extension/retraction reuse that drawing and the player's skin colour.
 
-The launcher sets `GAMENIGHT_DEV_WEB_DIR` to the public `web` directory.
-Refresh the **local** studio after HTML/CSS/JS edits; no build or restart is
-needed. Local URLs carrying pairing parameters still redirect to cloud sign-in.
-Changes to this local directory do not update the hosted site. Clear the env
-variable to use embedded production files. Missing development files return an
-error rather than silently showing stale embedded content. Only known public
-web assets are served; arbitrary repository files are not exposed.
+The native launcher connects to the hosted GameNight service. Player pages and
+sign-in are maintained and previewed in the internal repository. No local
+website or embedded HTML is served by the native build.
 
 `-Action sync` stages only changed lobby assets/packs; restart runs it as well.
 Size/timestamps provide the fast path; changed files are hashed before copying.
 If an external tool deliberately preserves both size and timestamp while editing,
 delete `.dev-assets.json` to force a full comparison. Removed files
-are deleted only when listed in the previous staging manifest. Web files are
-served directly, not staged. Asset/map changes may require restart to reload.
+are deleted only when listed in the previous staging manifest. Web files are not part of the native build. Asset/map changes may require restart to reload.
 
 ## Timing
 

@@ -39,7 +39,8 @@ def main():
         env = {k: v for k, v in os.environ.items() if not k.startswith("GAMENIGHT_")}
         env.update(
             GAMENIGHT_ADDR=f"127.0.0.1:{daemon_port}",
-            GAMENIGHT_WEB_ADDR=f"127.0.0.1:{web_port}",
+            GAMENIGHT_HOST_SERVICES_ADDR=f"127.0.0.1:{web_port}",
+            GAMENIGHT_CLOUD_URL="https://127.0.0.1:1", GAMENIGHT_PLAYER_MEMORY=str(root / "players.json"),
             GAMENIGHT_NO_PREWARM="1", GAMENIGHT_NO_LOBBY_WATCH="1", GAMENIGHT_NO_MUSIC="1",
             GAMENIGHT_LIBRARY=str(root / "shelf.json"), GAMENIGHT_CATALOG=str(root / "catalog"),
             GAMENIGHT_ONBOARDING_FILE=str(root / "onboarding.json"), GAMENIGHT_DATA_DIR=str(root),
@@ -76,26 +77,23 @@ def main():
                     child.wait()
             children.clear()
 
-        def claim(ticket, game):
-            request = urllib.request.Request(
-                f"http://127.0.0.1:{web_port}/api/onboarding",
-                data=json.dumps({"ticket": ticket, "game": game}).encode(),
-                headers={"Content-Type": "application/json"},
-            )
-            try:
-                with urllib.request.urlopen(request, timeout=15) as response:
-                    return response.status, json.load(response)
-            except urllib.error.HTTPError as error:
-                return error.code, None
+        def request(game):
+            temporary = root / "request.tmp"
+            temporary.write_text(json.dumps({"game":game}))
+            temporary.replace(root / "catalog-request.json")
 
-        def playlist():
-            with urllib.request.urlopen(f"http://127.0.0.1:{web_port}/api/playlist", timeout=15) as response:
-                return json.load(response)
+        def wait_saved(game):
+            for _ in range(100):
+                saved = json.loads((root / "onboarding.json").read_text())
+                if saved.get("game") == game:
+                    return saved
+                time.sleep(.1)
+            raise AssertionError("Host did not accept selection")
 
         try:
             with (root / "log").open("w") as log:
                 def start():
-                    for name in ["gamenight-daemon", "gamenight-local-web"]:
+                    for name in ["gamenight-daemon", "gamenight-host-services"]:
                         children.append(subprocess.Popen([str(binary / name)], env=env, stdout=log, stderr=log))
                 start()
                 for _ in range(100):
@@ -103,65 +101,31 @@ def main():
                         break
                     time.sleep(.1)
                 opened = urllib.parse.urlparse((root / "opened-url").read_text())
-                assert opened.scheme == "https" and opened.netloc == "gamenight.ontola.io"
-                params = urllib.parse.parse_qs(opened.fragment)
-                ticket = params["desktop"][0]
-                assert params["port"] == [str(web_port)] and len(ticket) == 32
-                assert claim("wrong", "test-game")[0] == 403
-                for game in ["../../anything", "lobby", "demo-game", "unknown"]:
-                    assert claim(ticket, game)[0] == 422
-                status, body = claim(ticket, "test-game")
-                assert status == 200 and body["accepted"], (status, body)
-                saved = json.loads((root / "onboarding.json").read_text())
-                assert saved == {"complete": False, "game": "test-game"}
-                assert claim(ticket, "test-game")[0] == 200
-                assert claim(ticket, "another-game")[0] == 409
-                view = playlist()
-                assert view["next"] == "test-game" and view["playing"] is None, view
-                # Local recovery refreshes a capability without restarting; a
-                # foreign website cannot obtain one through the same endpoint.
-                def reconnect(origin):
-                    request = urllib.request.Request(
-                        f"http://127.0.0.1:{web_port}/api/onboarding/reconnect",
-                        data=b"{}", headers={"Content-Type":"application/json","Origin":origin})
+                assert opened.scheme == "https" and opened.netloc == "127.0.0.1:1"
+                assert opened.fragment == "setup=linux"
+                for path in ["/", "/studio", "/onboarding", "/host/lobby", "/docs", "/api/onboarding"]:
                     try:
-                        with urllib.request.urlopen(request, timeout=10) as response:
-                            return response.status, json.load(response)
+                        urllib.request.urlopen(f"http://127.0.0.1:{web_port}{path}")
+                        raise AssertionError(f"Local page still served: {path}")
                     except urllib.error.HTTPError as error:
-                        return error.code, None
-                assert reconnect("https://evil.example")[0] == 403
-                code, fresh = reconnect(f"http://127.0.0.1:{web_port}")
-                assert code == 200 and fresh["ticket"] != ticket
-                assert claim(ticket, "test-game")[0] == 403
-                assert claim(fresh["ticket"], "test-game")[0] == 200
-                # This is the same inbox a second launcher writes for an
-                # already running app. A valid choice is acknowledged and saved.
-                (root / "onboarding.json").write_text('{"complete":true}')
-                (root / "catalog-request.json").write_text('{"game":"second-game"}')
-                for _ in range(100):
-                    saved = json.loads((root / "onboarding.json").read_text())
-                    if saved.get("game") == "second-game" and playlist()["next"] == "second-game": break
-                    time.sleep(.1)
-                assert saved.get("game") == "second-game"
-                assert playlist()["next"] == "second-game"
-                assert playlist()["playing"] is None
+                        assert error.code == 404
+                request("../../anything")
+                time.sleep(.5)
+                assert json.loads((root / "onboarding.json").read_text()) == {"complete":False}
+                request("test-game")
+                assert wait_saved("test-game")["complete"] is False
+                request("second-game")
+                wait_saved("second-game")
                 stop()
-                (root / "opened-url").unlink()
                 start()
+                time.sleep(2)
+                assert json.loads((root / "onboarding.json").read_text())["game"] == "second-game"
+                request(None)
                 for _ in range(100):
-                    try:
-                        view = playlist()
-                        if view["next"] == "second-game":
-                            break
-                    except (urllib.error.URLError, TimeoutError):
-                        pass
+                    if json.loads((root / "onboarding.json").read_text()) == {"complete":True}: break
                     time.sleep(.1)
-                assert view["next"] == "second-game" and view["playing"] is None, view
-                assert not (root / "opened-url").exists(), "Saved choice should not reopen the picker"
-                print("PASS: first-run capability, safe reconnect, running-app inbox, catalog validation, host acknowledgement, no automatic start and restart recovery")
-        except Exception:
-            print((root / "log").read_text(), file=sys.stderr)
-            raise
+                else: raise AssertionError("Lobby-only handoff not accepted")
+                print("PASS: hosted setup, native game selection, interrupted download recovery, no local pages")
         finally:
             stop()
 

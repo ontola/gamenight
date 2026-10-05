@@ -45,35 +45,8 @@ impl Drop for Worker {
         }
     }
 }
-pub fn open_lobby_settings() -> std::io::Result<()> {
-    open(&format!(
-        "http://127.0.0.1:{}/host/lobby",
-        gamenight_protocol::DEFAULT_WEB_PORT
-    ))
-}
 fn valid_url(url: &str) -> bool {
-    if url
-        == format!(
-            "http://127.0.0.1:{}/host/lobby?recovery=1",
-            gamenight_protocol::DEFAULT_WEB_PORT
-        )
-    {
-        return true;
-    }
-
-    let Some(args) = url.strip_prefix("https://gamenight.ontola.io/play#desktop=") else {
-        return false;
-    };
-    let Some((ticket, rest)) = args.split_once("&port=") else {
-        return false;
-    };
-    let Some((port, platform)) = rest.split_once("&platform=") else {
-        return false;
-    };
-    ticket.len() == 32
-        && ticket.bytes().all(|b| b.is_ascii_hexdigit())
-        && port.parse::<u16>().is_ok_and(|port| port >= 1024)
-        && ["windows", "mac", "linux"].contains(&platform)
+    ["windows", "mac", "linux"].iter().any(|platform| url == format!("{}/play#setup={platform}", gamenight_protocol::web_base_url().trim_end_matches('/')))
 }
 fn open(url: &str) -> std::io::Result<()> {
     #[cfg(windows)]
@@ -107,22 +80,8 @@ fn open(url: &str) -> std::io::Result<()> {
 mod tests {
     use super::*;
     #[test]
-    fn browser_request_cannot_open_arbitrary_urls_or_partial_writes() {
-        let good="https://gamenight.ontola.io/play#desktop=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&port=7913&platform=windows";
-        assert!(valid_url(good));
-        assert!(valid_url("http://127.0.0.1:7913/host/lobby?recovery=1"));
-        assert!(!valid_url("http://192.0.2.1:7913/host/lobby?recovery=1"));
-        assert!(!valid_url(
-            "http://127.0.0.1:7913/host/lobby?recovery=1&url=evil"
-        ));
-        for bad in [
-            "file:///tmp/anything",
-            "https://evil.test/play",
-            &good[..good.len() - 1],
-            &good.replace("port=7913", "port=0"),
-            &format!("{good}&url=file:///anything"),
-        ] {
-            assert!(!valid_url(bad));
-        }
+    fn only_hosted_setup_can_be_opened() {
+        assert!(valid_url("https://gamenight.ontola.io/play#setup=windows"));
+        for url in ["http://127.0.0.1:7913/host/lobby", "file:///tmp/code", "https://evil.test/play#setup=windows", "https://gamenight.ontola.io/play#setup=windows&url=evil"] { assert!(!valid_url(url)); }
     }
 }

@@ -127,18 +127,18 @@ async fn main() -> std::io::Result<()> {
             )
         });
 
-    // Optional LAN character studio. Local games do not require an HTTP server.
-    if std::env::var_os("GAMENIGHT_WEB").is_some() {
+    // Native loopback API and outbound cloud relay. No locally hosted pages.
+    if std::env::var_os("GAMENIGHT_HOST_SERVICES").is_some() {
         let web_daemon_addr = addr.clone();
         tokio::spawn(async move {
             let state = std::sync::Arc::new(std::sync::Mutex::new(
-                gamenight_local_web::ServerState::new(web_daemon_addr),
+                gamenight_host_services::ServerState::new(web_daemon_addr),
             ));
-            // All interfaces, not loopback: phones on the same network have to
-            // be able to reach the join pages.
-            let server_addr =
-                std::net::SocketAddr::from(([0, 0, 0, 0], gamenight_protocol::DEFAULT_WEB_PORT));
-            let _ = gamenight_local_web::run_server(server_addr, state).await;
+            // This API is for native processes on this computer, never phones.
+            let address = std::env::var("GAMENIGHT_HOST_SERVICES_ADDR")
+                .unwrap_or_else(|_| format!("127.0.0.1:{}", gamenight_protocol::DEFAULT_WEB_PORT));
+            let Ok(server_addr) = address.parse() else { tracing::error!("Invalid native service address"); return; };
+            if let Err(error) = gamenight_host_services::run_server(server_addr, state).await { tracing::error!(%error, "Native host services failed"); }
         });
     }
 

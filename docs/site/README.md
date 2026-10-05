@@ -23,9 +23,14 @@ in the page manifest; their hashes appear in generated pages, so CI requires a
 docs review after changes even if an excerpt itself is unchanged.
 
 The compiler checks the Rust lifecycle example and C transport example in CI.
-Source checking is not runtime certification. The Godot adapter's gaps are
-documented explicitly; no Godot runtime pass is claimed. New APIs should gain
-executable examples where the engine's test tooling permits it.
+Godot adapter and lobby regressions run in the separate Godot integration job.
+These tests do not certify third-party games or physical input. New APIs should
+gain executable examples where the engine's test tooling permits it.
+
+Watch the implementation a page actually documents. The publishing guide watches
+the public uploader and Action; the private backend has its own documentation
+contract check. Keep private operations out of the public guides, but explain
+any developer-visible manual handoff or unavailable self-service feature.
 
 Review prose before regeneration. A changed fingerprint signals work to review;
 blindly regenerating it cannot make an outdated explanation correct.

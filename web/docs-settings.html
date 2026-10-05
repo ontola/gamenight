@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-settings">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-settings" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings" aria-current="page">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-settings" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings" aria-current="page">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="game-settings">Game settings</h1>
 <p>GameNight can display a game's settings in the lobby and phone interface. Games
 must declare their options and implement the changes. Having the protocol or SDK
@@ -250,7 +250,9 @@ specific to that function.</p>
 arguments again. The world resolves an exact registered handler and reports
 observed data in its receipt. It preserves duplicate request receipts, and
 mutations reserve a persisted revision before applying their effects. Failed
-handlers may have partial effects; observe the new state before another request.</p>
+handlers may have partial effects; observe the new state before another request.
+Mutating calls clear settings Undo. Reversing a function effect requires a
+game-specific reverse function.</p>
 <p>Mineclonia currently exposes player listing, item search, inventory inspection,
 item grants, healing and teleporting. These calls work live without a restart.
 Names, arguments and apply timing belong to the game's docs. Other games need
@@ -260,13 +262,13 @@ currently proposes one call per request, with returned data available for a
 follow-up; automatic sequences of dependent calls remain future work. New Lua
 mod registrations still use the separate validation and reconnect workflow.
 The registry does not automatically export all engine globals.</p>
-<p>Read the <a href="https://github.com/ontola/gamenight-mineclonia/blob/664816072b2473701a88743a186e680b6c6c5715/GAME_FUNCTIONS.md">function contract and extension example</a>, including its
-bounds, handler responsibilities and <a href="https://github.com/ontola/gamenight-mineclonia/tree/664816072b2473701a88743a186e680b6c6c5715/verification/functions-2026-10-05">two-client engine evidence</a>.
+<p>Read the <a href="https://github.com/ontola/gamenight-mineclonia/blob/b2275e4e80d953ee1a93b592dd962511abbaf0ef/GAME_FUNCTIONS.md">function contract and extension example</a>, including its
+bounds, handler responsibilities and <a href="https://github.com/ontola/gamenight-mineclonia/tree/b2275e4e80d953ee1a93b592dd962511abbaf0ef/verification/functions-2026-10-05">two-client engine evidence</a>.
 The phone flow was checked with disposable host/provider fixtures. Physical
 controllers, speech recognition and a real model were not exercised by these
 function checks. Published store packages still require a separate release.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="3f0ebf6642027bf3fb73a6119ee14f574d92aba2158c6d6ac18a67e4d4337b93">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="bc18fbc75af0f45934dfef2cef7410efb81a3b208d64ab71bd7a845a34fcd8d1">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a><a href="#new-behavior-through-a-game-mod-sdk">New behavior through a game mod SDK</a><a href="#documented-game-functions">Documented game functions</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

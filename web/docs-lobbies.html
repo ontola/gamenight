@@ -7,7 +7,7 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-lobbies">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-lobbies" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies" aria-current="page">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-lobbies" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies" aria-current="page">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="build-a-lobby">Build a lobby</h1>
 <p>A lobby is a persistent party interface, implemented as a separate executable.
 The runtime owns players, controller bindings and game sessions. The lobby
@@ -209,11 +209,10 @@ alive. Only explicit player requests start or resume games; window focus is
 not such a request. The Godot example uses window minimisation and restoration.</p>
 <p>Player and controller state survives a replacement lobby disconnect. A socket
 failure can reconnect to the same process. A dead process gets up to three
-restart attempts before opening the local recovery page. The game is paused
-and players remain registered. Recovery offers Retry lobby, Resume game and
-End game night. Retry resets the restart budget; it does not erase the party.
-The installed launcher keeps browser requests available throughout the session.
-Development hosts need <code>GAMENIGHT_WEB=1</code> to serve the recovery page. <code>quit_party</code>
+restart attempts, then pauses the game and retains players. Reopening the
+installed application requests <code>retry_lobby</code> and raises the lobby. Retry resets
+the restart budget; it does not erase the party. No recovery website is opened.
+<code>quit_party</code>
 is the deliberate exit path. The legacy platformer retains its old input and
 disconnect behaviour until it adopts this role.</p>
 <h2 id="faces-and-names">Faces and names</h2>
@@ -251,18 +250,17 @@ ratio, keeps players in a compact strip and gives Up Next a large game image.
 Guests get their random face and hat from the host. Music depends on an active
 OS media session; it does not provide a streaming service itself.</p>
 <h2 id="phone-joining-and-profile-pickup">Phone joining and profile pickup</h2>
-<p>The public local-web server supplies <code>GET /api/player-links</code>. Its <code>room</code>
-contains the current <code>code</code>, <code>join_url</code> and <code>qr_svg</code>; the URL uses the actual
-LAN host and web port for a local room, or the registered cloud room's origin.
-Do not build a QR from the lobby's WebSocket address. Unregistered rooms do not
-get a QR. <code>scripts/run-local.py --lobby godot</code> starts local-web automatically.</p>
-<p>The Godot view defaults to <code>http://127.0.0.1:7913</code>. Set <code>GAMENIGHT_LINKS_URL</code>
-only when running a different local-web bridge. Phone profiles waiting for
-pickup are returned in the same response. A local controller selects its
-profile and the native lobby posts to
+<p>The public <code>gamenight-host-services</code> client supplies <code>GET /api/player-links</code> on
+loopback. Its <code>room</code> contains the registered <code>room_code</code>, hosted <code>join_url</code>
+and <code>qr_svg</code>. All phone pages, sign-in and profile editing belong to the hosted
+service. Never construct a QR from the host's local API or WebSocket address.
+Offline and unregistered rooms do not advertise a join code or QR.</p>
+<p>The Godot view defaults to <code>http://127.0.0.1:7913</code>. <code>GAMENIGHT_LINKS_URL</code> can
+select a different loopback bridge. Waiting profiles arrive through the outbound
+cloud relay. A controller selects its profile and the native lobby posts to
 <code>/api/room-pickup/{pending_id}/{player_id}</code> with
-<code>X-GameNight-Local-Pickup: 1</code>. Pickup requires a loopback connection and this
-header; a phone cannot assign itself to another controller through this API.</p>
+<code>X-GameNight-Local-Pickup: 1</code>. The API rejects browser-origin and LAN requests.
+<code>GAMENIGHT_OFFLINE=1</code> disables the cloud connection, not native guest play.</p>
 <h2 id="game-settings-and-artwork">Game settings and artwork</h2>
 <p>The Settings button opens the selected game's declared settings. Toggles,
 bounded integers and choices map to <code>set_setting</code>; the view reads the accepted
@@ -293,16 +291,19 @@ narrow window. Current game shows the game's screenshot and <strong>Resume</stro
 when other games are queued. If there is no current game, only Up next is shown.
 Resume keeps the current session and queue intact;
 <strong>Start game</strong> under Up next advances the queue.</p>
-<p>Launch <code>gamenight-launcher --choose-lobby</code>, or open
-<code>http://127.0.0.1:7913/host/lobby</code> on the host while the installed app runs.
-Choose the bundled platformer or a registered replacement. The choice is saved
-in <code>selected-lobby.json</code> and applies on the next launch. Missing executables
-fall back to the bundled lobby. Registration does not download or install a
-third-party lobby. Only install code you trust.</p>
-<p>The preference and recovery controls are host-only. They reject LAN requests;
-mutations also require <code>X-GameNight-Host: 1</code>. The recovery page uses
-<code>retry_lobby</code>, <code>close_overlay</code> and <code>quit_party</code> through a trusted local overlay.
-Retry is available only after the automatic restart budget is exhausted.</p>
+<p>Use <strong>Select other lobby</strong> inside either lobby's Start menu. The selection
+stays in the native UI. It saves <code>selected-lobby.json</code> for the next launch.
+Missing executables fall back to the bundled lobby. Registration does not
+download or install a third-party lobby. Only install code you trust.</p>
+<p>The preference and recovery APIs are loopback-only; mutations require
+<code>X-GameNight-Host: 1</code>. They serve JSON, never browser views.</p>
+<h2 id="desktop-display-checks">Desktop display checks</h2>
+<p>Living Room uses a borderless window sized to the full monitor, including after
+returning from a game or restoring a minimized window. While it has focus, it
+covers the taskbar; losing focus releases that stacking position so Alt-Tab
+still works. Run <code>godot --path sdk/godot --script res://lobby/tests/display.gd</code>
+on a real desktop to exercise startup, restore and game-return sizing. Headless
+tests cannot verify monitor bounds or taskbar coverage.</p>
 <h2 id="automated-coverage">Automated coverage</h2>
 <p><code>python scripts/test-godot-sdk.py --godot /path/to/godot</code> checks the shared game
 adapter's seat mapping, profile updates, lifecycle guards, stale input and
@@ -331,7 +332,7 @@ nonzero exit is “Game exited unexpectedly”. These states describe evidence, 
 user intent. Reconnecting games clear their issue and must prepare again before
 being shown as ready.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="35c451c535603952a9fabefac9078c39403f569d3dd720006189d385e9d24190">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="aa76f11c95ac3b53bdbdc8a09b8860cba43f5e03817d639a3eaeb37a3a860fe6">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#desktop-display-checks">Desktop display checks</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

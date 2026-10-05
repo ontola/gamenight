@@ -1,5 +1,8 @@
 # Godot 4
 
+Use [Your first game](/docs/first-game) for local host setup, a launchable shelf
+and the path from testing to publication.
+
 The Godot addon handles lifecycle messages, runtime controller frames and live
 player profiles over WebSocket. Your game connects these to its simulation and
 rendering.

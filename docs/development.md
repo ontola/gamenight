@@ -32,9 +32,14 @@ lobby and runs the terminal example. Ctrl+C stops the launcher and its host.
 The script uses `GAMENIGHT_NO_PREWARM` to disable catalogue downloading; normal
 session prewarming remains enabled.
 
-The daemon's HTTP studio is optional. `--studio` enables LAN QR pairing on
-port 7913. The control protocol stays on loopback port 7912 (or the launcher's `--port`). Only use the
-studio on a trusted LAN; see [security scope](../SECURITY.md).
+Player pages and sign-in use the hosted GameNight service by default. QR codes
+point there, never at a localhost or LAN website. `--offline` disables cloud
+sync; controllers, guest faces and local games still work. Offline sessions do
+not advertise room codes that phones cannot use.
 
-The [local web API](local-web-api.md) documents profile operations, join outcomes
-and daemon failure semantics.
+Native lobby controls use a loopback-only JSON API on port 7913. It serves no
+HTML or static assets and rejects browser requests. The game protocol stays on
+loopback port 7912 (or `--port`). Website preview servers belong to the internal
+repository and are never bundled into the public application.
+
+See [native host services](local-web-api.md) for the boundary.

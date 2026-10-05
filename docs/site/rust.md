@@ -1,5 +1,8 @@
 # Rust / Bevy
 
+Use [Your first game](/docs/first-game) for local host setup, a launchable shelf
+and the path from testing to publication.
+
 Use `gamenight-sdk` for the WebSocket connection and typed events. The SDK is engine-independent. It does not create windows, pause Bevy systems, draw faces or apply controller state for you.
 
 ## Add the SDK

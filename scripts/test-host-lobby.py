@@ -9,13 +9,14 @@ with tempfile.TemporaryDirectory(prefix='gamenight-host-ui-') as folder:
  games.write_text(json.dumps([{'id':'living-room','title':'Living Room','launch':{'command':sys.executable,'env':{'GAMENIGHT_LOBBY_API':'1'}}}]))
  shelf.write_text('[]')
  with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
+ with socket.socket() as s:s.bind(('127.0.0.1',0));service_port=s.getsockname()[1]
  env={k:v for k,v in os.environ.items() if not k.startswith('GAMENIGHT')}
- env.update(GAMENIGHT_ADDR=f'127.0.0.1:{port}',GAMENIGHT_LIBRARY=str(shelf),GAMENIGHT_WEB='1',GAMENIGHT_NO_LOBBY_WATCH='1',GAMENIGHT_NO_PREWARM='1',GAMENIGHT_NO_MUSIC='1',GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(games))
+ env.update(GAMENIGHT_ADDR=f'127.0.0.1:{port}',GAMENIGHT_HOST_SERVICES_ADDR=f'127.0.0.1:{service_port}',GAMENIGHT_LIBRARY=str(shelf),GAMENIGHT_HOST_SERVICES='1',GAMENIGHT_OFFLINE='1',GAMENIGHT_PLAYER_MEMORY=str(p/'memory.json'),GAMENIGHT_NO_LOBBY_WATCH='1',GAMENIGHT_NO_PREWARM='1',GAMENIGHT_NO_MUSIC='1',GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(games))
  with (p/'server.log').open('w') as log:
   options={"creationflags":subprocess.CREATE_NEW_PROCESS_GROUP} if os.name=="nt" else {"start_new_session":True}
   proc=subprocess.Popen([os.environ.get("GAMENIGHT_TEST_DAEMON",str(target))],env=env,stdout=log,stderr=log,**options)
   try:
-   base='http://127.0.0.1:7913'
+   base=f'http://127.0.0.1:{service_port}'
    for attempt in range(100):
     try: urllib.request.urlopen(base+'/api/host/lobby',timeout=1);break
     except Exception: time.sleep(.1)
@@ -34,13 +35,12 @@ with tempfile.TemporaryDirectory(prefix='gamenight-host-ui-') as folder:
    assert call('/api/host/recovery',{'action':'retry'},False)[0]==403
    assert call('/api/host/recovery',{'action':'retry'})[0]==409
    status,body=call('/api/player-links');assert status==200
-   room=json.loads(body)['room'];assert '?r=' in room['join_url'] and '<svg' in room['qr_svg'],room
-   from urllib.parse import urlparse
-   link=urlparse(room['join_url']);assert link.port==7913
-   assert call('/?'+link.query)[0]==200
+   room=json.loads(body)['room'];assert room['room_code']=='' and 'join_url' not in room,room
+   for path in ['/', '/studio', '/host/lobby', '/docs', '/onboarding']:
+    assert call(path)[0]==404,path
    assert call('/api/host/lobby',{'id':'lobby'})[0]==204
    assert json.loads(config.read_text())['id']=='lobby'
-   print('PASS live host preferences, protected controls and public room QR')
+   print('PASS live host preferences, protected native controls and no local pages')
   finally:
    if proc.poll() is None:
     if os.name=='nt':subprocess.run(['taskkill','/PID',str(proc.pid),'/T','/F'],capture_output=True)

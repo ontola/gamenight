@@ -1047,9 +1047,7 @@ async fn run_inner(
                             s.pending_launches.remove(lobby);
                             s.lobby_recovery_opened = true;
                             s.dispatch(Command::OverlayOpened,None);
-                            if std::env::var_os("GAMENIGHT_WEB").is_some() {
-                                if let Err(error)=gamenight_local_web::host_lobby::open_recovery() { warn!(%error,"could not open lobby recovery"); }
-                            }
+                            warn!("Lobby restart limit reached; party retained. Use the native launcher to restart the lobby.");
                         }
                         continue;
                     }

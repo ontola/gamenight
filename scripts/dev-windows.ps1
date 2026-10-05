@@ -82,9 +82,8 @@ $games += @{
 [IO.File]::WriteAllText($library, (ConvertTo-Json -InputObject @($games) -Depth 20), [Text.UTF8Encoding]::new($false))
 $env:GAMENIGHT_LIBRARY=$library
 $env:GAMENIGHT_ADDR="127.0.0.1:$Port"
-$env:GAMENIGHT_WEB='1'
-$env:GAMENIGHT_DEV_WEB_DIR=Join-Path $repo 'web'
-if ($CatalogDir) { $env:GAMENIGHT_DEV_CATALOG_DIR=$CatalogDir }
+$env:GAMENIGHT_HOST_SERVICES='1'
+if ([string]::IsNullOrWhiteSpace($CloudUrl)) { $env:GAMENIGHT_OFFLINE='1' } else { Remove-Item Env:GAMENIGHT_OFFLINE -ErrorAction SilentlyContinue }
 if ($games.Count -le 1) { $env:GAMENIGHT_NO_PREWARM='1' }
 else { Remove-Item Env:GAMENIGHT_NO_PREWARM -ErrorAction SilentlyContinue }
 $env:GAMENIGHT_EXIT_WITH_LOBBY='1'

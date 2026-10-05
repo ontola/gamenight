@@ -219,6 +219,8 @@ arguments again. The world resolves an exact registered handler and reports
 observed data in its receipt. It preserves duplicate request receipts, and
 mutations reserve a persisted revision before applying their effects. Failed
 handlers may have partial effects; observe the new state before another request.
+Mutating calls clear settings Undo. Reversing a function effect requires a
+game-specific reverse function.
 
 Mineclonia currently exposes player listing, item search, inventory inspection,
 item grants, healing and teleporting. These calls work live without a restart.
@@ -231,8 +233,8 @@ follow-up; automatic sequences of dependent calls remain future work. New Lua
 mod registrations still use the separate validation and reconnect workflow.
 The registry does not automatically export all engine globals.
 
-Read the [function contract and extension example](https://github.com/ontola/gamenight-mineclonia/blob/664816072b2473701a88743a186e680b6c6c5715/GAME_FUNCTIONS.md), including its
-bounds, handler responsibilities and [two-client engine evidence](https://github.com/ontola/gamenight-mineclonia/tree/664816072b2473701a88743a186e680b6c6c5715/verification/functions-2026-10-05).
+Read the [function contract and extension example](https://github.com/ontola/gamenight-mineclonia/blob/b2275e4e80d953ee1a93b592dd962511abbaf0ef/GAME_FUNCTIONS.md), including its
+bounds, handler responsibilities and [two-client engine evidence](https://github.com/ontola/gamenight-mineclonia/tree/b2275e4e80d953ee1a93b592dd962511abbaf0ef/verification/functions-2026-10-05).
 The phone flow was checked with disposable host/provider fixtures. Physical
 controllers, speech recognition and a real model were not exercised by these
 function checks. Published store packages still require a separate release.

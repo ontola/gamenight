@@ -7,11 +7,89 @@
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-testing">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-testing" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing" aria-current="page">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-testing" aria-label="Documentation"><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/first-game">Your first game</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing" aria-current="page">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="game-contract-verification">Game contract verification</h1>
 <p>The wire contract is <code>docs/protocol.md</code>. Executable release requirements live in
 <code>contract/requirements.json</code>. Neither a catalog integration label nor a protocol
 handshake is proof of the complete implementation.</p>
+<h2 id="test-your-own-game">Test your own game</h2>
+<p>You do not need to add your game to our catalog to run the protocol harness.
+First follow <a href="/docs/first-game">Your first game</a> to test it in the real lobby.
+Then export a release package, extract it into a clean directory and build the
+harness from the GameNight checkout:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">cargo build --locked -p gamenight-certify
+</code></pre></div>
+<p>On Windows, test the executable from that extracted package:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-powershell">./target/debug/gamenight-certify.exe my-game --players 2 --cycles 3 --timeout 120 --report protocol-report.json -- C:/dev/my-game-release/MyGame.exe
+Get-FileHash C:/dev/my-game-windows.zip -Algorithm SHA256
+</code></pre></div>
+<p>On Linux or macOS:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">./target/debug/gamenight-certify my-game --players 2 --cycles 3 --timeout 120 --report protocol-report.json -- /absolute/path/to/my-game
+</code></pre></div>
+<p>For a Godot project, put the Godot executable after <code>--</code>, followed by <code>--path</code>
+and the project directory. For LÖVE, put the runtime after <code>--</code>, followed by the
+<code>.love</code> file. Use absolute asset paths or an export that resolves assets beside
+its executable: the harness does not change into the game's directory.</p>
+<p>The harness starts an isolated host and supplies launch credentials. It owns and
+stops the launched process. Increase the timeout for slow preparation. In CI,
+retain the JSON report, command output and exact package as artifacts, including
+on failure. Record the package's SHA-256, game version, OS/architecture and tested
+GameNight commit alongside the report; the protocol report alone is not full
+package-bound certification. Do not reuse results from an editor or another OS.</p>
+<p>The synthetic seats exercise the protocol, not physical controllers. This test
+does not prove rendering, audio, prewarming or real player ownership. Before
+release, use two controllers and different profiles in the actual lobby:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What to observe</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Prepare and Start</td>
+<td>No focus or sound while queued; a playable frame when started</td>
+</tr>
+<tr>
+<td>Seats</td>
+<td>Each controller moves only its player, including reversed connection order and reconnects</td>
+</tr>
+<tr>
+<td>Back and Resume</td>
+<td>One transition per press; simulation and audio pause; the same state resumes</td>
+</tr>
+<tr>
+<td>Profiles</td>
+<td>Names, skin/clothing colours and drawn faces update independently for the correct player</td>
+</tr>
+<tr>
+<td>Rounds and settings</td>
+<td>Results stay in game, rounds repeat, and settings apply at their declared time</td>
+</tr>
+<tr>
+<td>Switching and exit</td>
+<td>Another game starts cleanly; closing the host leaves no game processes behind</td>
+</tr>
+</tbody>
+</table>
+<p>Use the <a href="https://github.com/ontola/gamenight/blob/main/docs/desktop-integration-checklist.md">desktop checklist</a> for the detailed
+window and controller cases. Keep any unsupported or unobserved feature untested.</p>
+<h2 id="store-verification">Store verification</h2>
+<p>There are three different results: a protocol smoke test, distribution approval,
+and a verified store rating. None automatically implies the others.</p>
+<p>Send the exact package identity, reports, logs and manual test notes through your
+private developer conversation for review. The current trusted rating importer
+accepts GameNight's own Windows release evidence, matched to the catalog and
+package hash. It does not accept arbitrary developer reports, and publishing a
+preview does not schedule a hosted game test.</p>
+<p>For an independent game, staff must arrange a supported runner and trusted
+evidence path before its results can count in the store. That may require work
+on the suite. Until then, the game can have distribution approval while its
+integration checks remain unverified. There is no self-service certification
+upload endpoint today. New package bytes invalidate previous matching evidence.</p>
+<p>The following sections describe the existing first-party matrix and how to
+extend it. They are not a requirement to move your source into our repository.</p>
 <h2 id="one-matrix-including-missing-integrations">One matrix, including missing integrations</h2>
 <p><code>scripts/game-contract.py</code> discovers <strong>every</strong> <code>catalog/games/*.json</code> entry. Each
 feature gets <code>passed</code>, <code>failed</code>, <code>untested</code>, or (only for optional requirements)
@@ -59,9 +137,10 @@ the colour test checks the face layer's live data, not sampled display pixels.
 Cross-game switching remains untested. Back/Select is
 handled globally by the lobby, so the synthetic native host does not certify
 that input path. A passing game-specific CI run is not blanket certification.</p>
-<h2 id="running-it">Running it</h2>
+<h2 id="running-the-first-party-matrix">Running the first-party matrix</h2>
 <p>From the repository (Python 3.10+):</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python scripts/package-love-party.py --output dist/party
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python scripts/fetch-game-sources.py
+python scripts/package-love-party.py --output dist/party
 cargo build --locked -p gamenight-certify
 python scripts/game-contract.py --output dist/contract --pack dist/party \
   --love /path/to/lovec --certifier target/debug/gamenight-certify
@@ -151,7 +230,7 @@ catalog downloads. Update the release catalog and verify the corresponding
 packages before publication. Never substitute <code>--candidate-gate</code> in a release
 job.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="19431731105128807da31744c0ac121ae7ec3e17375dd64b1b2a99d3d79ee56c">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="4479766360f56568782e15b16c0587ed86b0cb4fadbf411e9692ed77c3635433">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/faces"><small>Previous</small>Faces &amp; colours</a><a href="/docs/publishing"><small>Next</small>Publish a game</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#test-your-own-game">Test your own game</a><a href="#store-verification">Store verification</a><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-the-first-party-matrix">Running the first-party matrix</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

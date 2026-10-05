@@ -2,6 +2,7 @@
 pub fn page(slug: &str) -> Option<&'static str> {
     match slug {
         "" => Some(include_str!("docs.html")),
+        "first-game" => Some(include_str!("docs-first-game.html")),
         "lifecycle" => Some(include_str!("docs-lifecycle.html")),
         "love" => Some(include_str!("docs-love.html")),
         "rust" => Some(include_str!("docs-rust.html")),

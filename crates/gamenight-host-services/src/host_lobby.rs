@@ -3,7 +3,6 @@ use crate::{daemon, SharedState};
 use axum::{
     extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
-    response::Html,
     Json,
 };
 use futures_util::{SinkExt, StreamExt};
@@ -144,20 +143,6 @@ pub async fn recover(
     })
     .await
     .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
-}
-pub async fn page(
-    ConnectInfo(peer): ConnectInfo<SocketAddr>,
-) -> Result<Html<&'static str>, StatusCode> {
-    if !peer.ip().is_loopback() {
-        return Err(StatusCode::FORBIDDEN);
-    }
-    Ok(Html(include_str!("../../../web/host-lobby.html")))
-}
-pub fn open_recovery() -> std::io::Result<()> {
-    crate::onboarding::open_browser(&format!(
-        "http://127.0.0.1:{}/host/lobby?recovery=1",
-        gamenight_protocol::DEFAULT_WEB_PORT
-    ))
 }
 #[cfg(test)]
 mod tests {

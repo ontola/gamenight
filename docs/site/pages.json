@@ -5,7 +5,20 @@
     "group": "Start here",
     "source": "docs/site/overview.md",
     "watch": [
-      "contract/requirements.json"
+      "contract/requirements.json",
+      "sdk/godot/addons/gamenight/gamenight.gd",
+      "sdk/godot/addons/gamenight/screen.gd",
+      "sdk/c/gamenight.h"
+    ]
+  },
+  {
+    "slug": "first-game",
+    "title": "Your first game",
+    "group": "Start here",
+    "source": "docs/site/first-game.md",
+    "watch": [
+      "scripts/run-local.py",
+      "crates/gamenight-protocol/src/lib.rs"
     ]
   },
   {
@@ -59,8 +72,10 @@
       "sdk/godot/lobby/main.gd",
       "crates/gamenight-daemon/src/lobby_input.rs",
       "sdk/godot/addons/gamenight/artwork.gd",
-      "crates/gamenight-local-web/src/host_lobby.rs",
-      "crates/gamenight-daemon/src/bin/gamenight-launcher.rs"
+      "crates/gamenight-host-services/src/host_lobby.rs",
+      "crates/gamenight-daemon/src/bin/gamenight-launcher.rs",
+      "crates/gamenight-host-services/src/lib.rs",
+      "crates/gamenight-host-services/src/cloud.rs"
     ]
   },
   {
@@ -108,7 +123,9 @@
     "source": "docs/game-contract-verification.md",
     "watch": [
       "contract/requirements.json",
-      "scripts/game-contract.py"
+      "scripts/game-contract.py",
+      "crates/gamenight-certify/src/main.rs",
+      "crates/gamenight-certify/src/lib.rs"
     ]
   },
   {
@@ -117,7 +134,9 @@
     "group": "Ship your game",
     "source": "docs/site/publishing.md",
     "watch": [
-      "scripts/package-love-party.py"
+      "scripts/package-love-party.py",
+      "action.yml",
+      "scripts/gamenight-publish.py"
     ]
   },
   {
