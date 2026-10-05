@@ -4,18 +4,53 @@ Use the [developer portal](/developers/publishing) to upload builds, manage vers
 
 ## Prepare a release
 
-For a new game, start with a [submission](/developers/releases), or [contact us](/developers) for integration help. Then choose **Set up** in the publishing portal. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.
+For a new game, sign in and save a free-game draft in the
+[release workspace](/developers/releases), or [contact us](/developers) for
+integration help. Then choose **Set up** for the draft in the publishing portal.
+You can upload private previews before submitting for distribution review.
+Existing catalog games need GameNight to register the correct owner once;
+matching a game name does not establish ownership.
 
 1. Choose your game, then **Versions**.
 2. Enter a version and platform. Upload a ZIP containing your exported executable and assets, or a standalone executable. Alternatively, import a direct HTTPS URL from S3 or another host. URL imports require the filename; signed URLs must remain valid throughout the import and must not redirect.
 3. Set the executable path relative to the ZIP root, such as `Game.exe` or `Game.app/Contents/MacOS/Game`. For a bare file, use its filename. Add release notes.
-4. After package verification, choose **Use as preview**, test the exact build, then **Publish to gamers**.
+4. After package verification, choose **Use as preview** and test the exact build.
+   For a first release, complete [distribution review](#first-release-review)
+   before choosing **Publish to gamers**.
 
 Packages may be at most 512 MiB, with at most 2 GiB extracted from a ZIP. Use a ZIP for executables with DLLs, PCK files or other assets. LÖVE packages need a platform runtime registered by GameNight. GameNight copies URL imports into its own storage; gamers never depend on an expiring source URL.
 
 A version identifies immutable bytes for one game and platform. Retrying the same version and checksum returns the same build. Changed bytes require a new version. Interrupted uploads can be retried. Choosing an older ready build for stable rolls back that platform without uploading again.
 
 Previews are private to the owner and their game-scoped keys. Public releases remain downloadable after rollback so cached catalogs still work. The portal shows upload failures and publishing activity.
+
+Builds are per platform: `windows`, `mac` or `linux`. Upload and test each platform
+separately; publishing Windows does not update the Mac build. There is no separate
+architecture selector, so choose and describe the architectures your package
+supports. ZIP files must contain the playable export, not just source code. Test
+without the editor installed. On macOS and Linux retain executable permissions;
+check macOS signing and Gatekeeper on a clean machine as part of your own release.
+The uploader does not sign or notarize builds for you.
+
+## First release review
+
+The release submission and package upload are separate records today. In the
+release workspace, provide the version, platform, SHA-256, player limits,
+controls and a playable HTTPS build link that the reviewer can access. Confirm
+your right to submit it and submit the draft. Approval requires the checksum,
+test report, controller/lobby checks and a recorded distribution agreement.
+
+Use the private conversation to arrange build access and send report or artwork
+links. Owner-only preview artifact links do not grant staff access; do not send
+an API key to work around that. There is no automatic attachment transfer from
+publishing to the submission. Staff can request changes before approving.
+
+Once approved, publish the same tested package. Distribution approval permits
+stable releases for the registered game; it does not turn tests green. Routine
+updates use **Versions** or CI. Editing the original submission creates a new
+review revision and revokes its publishing approval until staff approve again.
+Use that route for changes that need renewed distribution review, not every
+ordinary build upload.
 
 ## Connect GitHub Actions
 
@@ -61,6 +96,17 @@ python gamenight-publish.py preview --game my-game --output .local/preview
 
 Point `GAMENIGHT_LIBRARY` at the printed `shelf.json` when running a development host. On Windows the local launcher accepts this file through `-Shelf`. Downloading does not execute the game; start it through GameNight and test the [lifecycle](/docs/lifecycle). Runtime-based games use the registered LÖVE runtime alongside the `.love` file; the preview catalog includes the runtime checksum and entrypoint.
 
+With the [development host](/docs/first-game) installed, run from its checkout:
+
+```sh
+python scripts/run-local.py --lobby godot --godot godot --shelf .local/preview/shelf.json
+```
+
+Choose an output directory outside the extracted game. The preview command picks
+your current OS by default; use `--platform windows`, `mac` or `linux` to download
+another package, then test it on that platform. Keep the token in the environment,
+not in your shelf file. No store account is needed for the earlier local-build test.
+
 ## Publishing API
 
 Authenticate with `Authorization: Bearer YOUR_API_KEY`. Browser operations use the existing session and CSRF protection. Browser and CI requests use the same release service.
@@ -104,6 +150,15 @@ Private repository access, AI-assisted code processing and game distribution eac
 
 Use a portrait cover for the next-game display, a square icon for game spines and a gameplay screenshot for the TV. These are separate assets. If artwork is absent, the title remains readable; a random icon is not a substitute for a cover.
 
+The portal cannot upload or edit artwork yet. Send staff links to your PNG cover,
+icon and real gameplay screenshot in the private conversation, with the game ID
+and permission to use them. For the embedded catalog, each PNG must fit within
+1024 × 1024 and 256 KiB. Staff need to add the artwork to the registered publishing
+metadata as well as any source catalog entry; putting images in your game ZIP
+alone does not set the listing artwork. This is a manual handoff, not an upload
+API. Optional gameplay videos should follow the
+[preview guide](../gameplay-previews.md).
+
 ```json
 {
   "id": "my-game",
@@ -120,4 +175,10 @@ This is a local shelf artwork example. Downloadable catalog packages use the man
 
 Run the [integration checks](/docs/testing) against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.
 
-The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.
+The integration rating counts essential play and the separate name, colour and
+face checks. Optional extras are shown separately and do not increase the score.
+See [getting verified results into the store](/docs/testing#store-verification).
+There is no public evidence-upload API or automatic hosted certification job for
+arbitrary third-party packages today. Share your reports for staff review; do not
+expect an upload or a passing protocol test to change the rating automatically.
+Sending a message or submitting a build does not publish it.

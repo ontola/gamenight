@@ -26,6 +26,18 @@ class DocumentationTests(unittest.TestCase):
         with patch.object(docs, "source", side_effect=lambda p: original(p) + ("\n// API changed\n" if p == "crates/gamenight-sdk/src/lib.rs" else "")):
             self.assertNotEqual(before, docs.render(page)[0])
 
+    def test_publishing_tools_and_quickstart_are_watched(self):
+        for slug, paths in {
+            "publishing": ["action.yml", "scripts/gamenight-publish.py"],
+            "first-game": ["scripts/run-local.py"],
+        }.items():
+            page = next(p for p in docs.PAGES if p["slug"] == slug)
+            before = docs.render(page)[0]
+            original = docs.source
+            for path in paths:
+                with self.subTest(path=path), patch.object(docs, "source", side_effect=lambda p: original(p) + ("\n# changed\n" if p == path else "")):
+                    self.assertNotEqual(before, docs.render(page)[0])
+
     def test_missing_excerpt_markers_fail(self):
         with self.assertRaisesRegex(ValueError, "moved or disappeared"):
             docs.expand('::: source rust crates/gamenight-sdk/src/lib.rs "missing marker" "end"', set())

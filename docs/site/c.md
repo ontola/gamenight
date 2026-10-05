@@ -1,5 +1,8 @@
 # C / C++
 
+Use [Your first game](/docs/first-game) for local host setup, a launchable shelf
+and the path from testing to publication.
+
 `sdk/c/gamenight.h` is a single-header TCP client for C99 and C++. It uses newline-delimited JSON on the same port as the WebSocket transport. POSIX and Winsock are supported.
 
 ## Add the header
@@ -31,7 +34,7 @@ On Prepare, load your level while hidden, then call `gn_ready`. Start shows play
 
 The current `gn_seat` carries index, occupant, player ID and name. It does not expose controller tokens, controller frames, clothing colours, skin colours or face artwork. Implement those fields and message handling, or use a JSON client that preserves the full [protocol](/docs/protocol). Do not assign local joystick enumeration to seat indices as a workaround.
 
-The built-in name parser also replaces JSON `\\uXXXX` escapes with `?`. Extend it if your game needs complete escaped Unicode names. The fixed buffers limit message size; face payloads need appropriate storage and parsing.
+The built-in name parser also replaces JSON `\\uXXXX` escapes with `?`. Extend it if your game needs complete escaped Unicode names. Parsed fields have fixed limits even though the receive buffer grows; a custom face decoder needs its own storage and parsing.
 
 ## Compile the transport example
 

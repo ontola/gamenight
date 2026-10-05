@@ -20,14 +20,16 @@ or AI tools. For assisted work, agree repository access, code handling and any A
 first. Private repositories can stay private. GameNight prepares a pull request;
 you review and merge it, then supply the resulting build for testing.
 
-When ready for review, use the [release workspace](https://gamenight.ontola.io/developers/releases).
-Submit one platform build with a version, player limits and controls. Its SHA-256
-is required before approval. The workspace holds private feedback and revisions;
-each revised build needs a new review. Code access does not grant distribution
-permission. Staff review the package, rights and test evidence before approving
-catalog publication. Listing is free. The first flow supports free releases;
-commercial interest is accepted, but purchases, payouts and timed trials are not
-enabled by submitting a game.
+Start with [Your first game](site/first-game.md) for local setup and the release
+handoff. The [release workspace](https://gamenight.ontola.io/developers/releases)
+holds the initial submission, private feedback and distribution review. Editing
+that submission creates a new revision and invalidates its approval.
+
+After distribution approval, routine build updates use the
+[publishing portal](site/publishing.md) or CI without resubmitting the initial
+application. Every new package still needs testing; approval is not certification.
+Code access does not grant distribution permission. Listing is free; purchases,
+payouts and timed trials are not enabled by submitting a game.
 
 Run the [contract checks](game-contract-verification.md) before review and share
 their results. Also test physical controllers, joining/leaving, pause/resume and

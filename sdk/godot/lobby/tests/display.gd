@@ -32,6 +32,13 @@ func run() -> void:
 		view._focus_changed(true)
 		await settle()
 		check_fit("game return %d" % i)
+		if not root.always_on_top and root.has_focus():
+			failed = true
+			push_error("DISPLAY_TEST: focused lobby did not cover the taskbar")
+	view._window_focus_lost()
+	if root.always_on_top:
+		failed = true
+		push_error("DISPLAY_TEST: lobby stayed above another focused app")
 	# Windows restore can use the old windowed rectangle. Exercise that path
 	# independently from a host focus message.
 	root.size = Vector2i(1280,720)
@@ -44,7 +51,7 @@ func run() -> void:
 	view.client.active = false
 	view._focus_changed(false)
 	await settle()
-	if root.mode != Window.MODE_MINIMIZED:
+	if root.mode != Window.MODE_MINIMIZED or root.always_on_top:
 		failed = true
 		push_error("DISPLAY_TEST: stale resize raised the lobby")
 	print("LOBBY_DISPLAY_", "FAIL" if failed else "PASS")

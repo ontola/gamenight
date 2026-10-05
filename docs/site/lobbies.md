@@ -322,6 +322,15 @@ mutations also require `X-GameNight-Host: 1`. The recovery page uses
 `retry_lobby`, `close_overlay` and `quit_party` through a trusted local overlay.
 Retry is available only after the automatic restart budget is exhausted.
 
+## Desktop display checks
+
+Living Room uses a borderless window sized to the full monitor, including after
+returning from a game or restoring a minimized window. While it has focus, it
+covers the taskbar; losing focus releases that stacking position so Alt-Tab
+still works. Run `godot --path sdk/godot --script res://lobby/tests/display.gd`
+on a real desktop to exercise startup, restore and game-return sizing. Headless
+tests cannot verify monitor bounds or taskbar coverage.
+
 ## Automated coverage
 
 `python scripts/test-godot-sdk.py --godot /path/to/godot` checks the shared game

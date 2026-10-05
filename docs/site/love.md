@@ -1,10 +1,14 @@
 # LÖVE / Lua
 
+Use [Your first game](/docs/first-game) for local host setup, a launchable shelf
+and the path from testing to publication.
+
 Use the [shared runner](https://github.com/ontola/gamenight-games/tree/main/love-party) in the separate `ontola/gamenight-games` repository. It handles the GameNight connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.
 
 ## Run the reference game
 
-Install LÖVE 11.5, clone the repository and run from its root:
+Install LÖVE 11.5. Clone `ontola/gamenight`, then run from that host repository's
+root (these scripts are not in `ontola/gamenight-games`):
 
 ```sh
 python scripts/fetch-game-sources.py
@@ -24,6 +28,16 @@ Keep simulation in a game module and leave lifecycle handling in the runner. A m
 The input entries belong to the supplied player slots. Do not replace them with `love.joystick.getJoysticks()` in managed mode. The shared input adapter neutralises disconnected devices and frames older than 250 ms.
 
 Register a new module in `modes` in [main.lua](../../games/love-party/main.lua), add its renderer and add its ID to `GAMES` in [the packaging script](../../scripts/package-love-party.py). These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.
+
+That registration path is for contributing to GameNight's shared pack. An
+independent LÖVE game can stay in its own repository and ship its own `.love`
+package. Implement the [lifecycle](/docs/lifecycle) and
+[controller stream](/docs/controllers), using the shared adapters as a reference
+and retaining their licence notices if you copy them. There is no standalone
+drop-in LÖVE SDK or project generator yet. Test your package with a local LÖVE
+launch entry in [Your first game](/docs/first-game#add-your-local-build); you do
+not need a catalog PR to test locally. Store distribution of a bare `.love`
+package requires staff to register the platform runtime first.
 
 ## Draw a player face
 

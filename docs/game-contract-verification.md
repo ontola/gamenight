@@ -4,6 +4,78 @@ The wire contract is `docs/protocol.md`. Executable release requirements live in
 `contract/requirements.json`. Neither a catalog integration label nor a protocol
 handshake is proof of the complete implementation.
 
+## Test your own game
+
+You do not need to add your game to our catalog to run the protocol harness.
+First follow [Your first game](site/first-game.md) to test it in the real lobby.
+Then export a release package, extract it into a clean directory and build the
+harness from the GameNight checkout:
+
+```sh
+cargo build --locked -p gamenight-certify
+```
+
+On Windows, test the executable from that extracted package:
+
+```powershell
+./target/debug/gamenight-certify.exe my-game --players 2 --cycles 3 --timeout 120 --report protocol-report.json -- C:/dev/my-game-release/MyGame.exe
+Get-FileHash C:/dev/my-game-windows.zip -Algorithm SHA256
+```
+
+On Linux or macOS:
+
+```sh
+./target/debug/gamenight-certify my-game --players 2 --cycles 3 --timeout 120 --report protocol-report.json -- /absolute/path/to/my-game
+```
+
+For a Godot project, put the Godot executable after `--`, followed by `--path`
+and the project directory. For LÖVE, put the runtime after `--`, followed by the
+`.love` file. Use absolute asset paths or an export that resolves assets beside
+its executable: the harness does not change into the game's directory.
+
+The harness starts an isolated host and supplies launch credentials. It owns and
+stops the launched process. Increase the timeout for slow preparation. In CI,
+retain the JSON report, command output and exact package as artifacts, including
+on failure. Record the package's SHA-256, game version, OS/architecture and tested
+GameNight commit alongside the report; the protocol report alone is not full
+package-bound certification. Do not reuse results from an editor or another OS.
+
+The synthetic seats exercise the protocol, not physical controllers. This test
+does not prove rendering, audio, prewarming or real player ownership. Before
+release, use two controllers and different profiles in the actual lobby:
+
+| Check | What to observe |
+| --- | --- |
+| Prepare and Start | No focus or sound while queued; a playable frame when started |
+| Seats | Each controller moves only its player, including reversed connection order and reconnects |
+| Back and Resume | One transition per press; simulation and audio pause; the same state resumes |
+| Profiles | Names, skin/clothing colours and drawn faces update independently for the correct player |
+| Rounds and settings | Results stay in game, rounds repeat, and settings apply at their declared time |
+| Switching and exit | Another game starts cleanly; closing the host leaves no game processes behind |
+
+Use the [desktop checklist](desktop-integration-checklist.md) for the detailed
+window and controller cases. Keep any unsupported or unobserved feature untested.
+
+## Store verification
+
+There are three different results: a protocol smoke test, distribution approval,
+and a verified store rating. None automatically implies the others.
+
+Send the exact package identity, reports, logs and manual test notes through your
+private developer conversation for review. The current trusted rating importer
+accepts GameNight's own Windows release evidence, matched to the catalog and
+package hash. It does not accept arbitrary developer reports, and publishing a
+preview does not schedule a hosted game test.
+
+For an independent game, staff must arrange a supported runner and trusted
+evidence path before its results can count in the store. That may require work
+on the suite. Until then, the game can have distribution approval while its
+integration checks remain unverified. There is no self-service certification
+upload endpoint today. New package bytes invalidate previous matching evidence.
+
+The following sections describe the existing first-party matrix and how to
+extend it. They are not a requirement to move your source into our repository.
+
 ## One matrix, including missing integrations
 
 `scripts/game-contract.py` discovers **every** `catalog/games/*.json` entry. Each
@@ -55,11 +127,12 @@ Cross-game switching remains untested. Back/Select is
 handled globally by the lobby, so the synthetic native host does not certify
 that input path. A passing game-specific CI run is not blanket certification.
 
-## Running it
+## Running the first-party matrix
 
 From the repository (Python 3.10+):
 
 ```sh
+python scripts/fetch-game-sources.py
 python scripts/package-love-party.py --output dist/party
 cargo build --locked -p gamenight-certify
 python scripts/game-contract.py --output dist/contract --pack dist/party \

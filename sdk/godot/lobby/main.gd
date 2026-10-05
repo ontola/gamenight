@@ -100,6 +100,7 @@ func _ready() -> void:
 		get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
 		_fit_fullscreen()
 		get_window().focus_entered.connect(_window_restored)
+		get_window().focus_exited.connect(_window_focus_lost)
 	if not _fullscreen and get_window().size.x < 1050:
 		get_window().content_scale_size = Vector2i.ZERO
 	client.party_changed.connect(_party_changed)
@@ -177,12 +178,17 @@ func _focus_changed(active: bool) -> void:
 			get_window().grab_focus()
 		else:
 			_display_restore += 1
+			get_window().always_on_top = false
 			get_window().mode = Window.MODE_MINIMIZED
 	queue_redraw()
 
 func _window_restored() -> void:
 	await get_tree().process_frame
 	if _fullscreen and client.active: _fit_fullscreen()
+
+func _window_focus_lost() -> void:
+	# Cover the taskbar while the lobby owns focus, but let Alt-Tab reach apps.
+	get_window().always_on_top = false
 
 func _fit_fullscreen() -> void:
 	# Windows can restore a minimized fullscreen window to its old 1280px
@@ -202,6 +208,7 @@ func _fit_fullscreen() -> void:
 	# Reconcile after native restore/resize messages, including DPI changes.
 	DisplayServer.window_set_position(bounds.position,window.get_window_id())
 	DisplayServer.window_set_size(bounds.size,window.get_window_id())
+	window.always_on_top = client.active and window.has_focus()
 	queue_redraw()
 
 func _controllers_changed(controllers: Array) -> void:
