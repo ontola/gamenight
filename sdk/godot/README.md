@@ -22,6 +22,10 @@ Run `python scripts/test-godot-sdk.py --godot /path/to/godot` from the repositor
 root. For the complete lobby flow, run `scripts/test-godot-lobby.py` after building
 the daemon. These tests do not replace real controller and OS focus checks.
 
+On a desktop display, run `godot --path sdk/godot --script res://lobby/tests/display.gd`
+from the repository root to check fullscreen startup, game returns and native
+window restoration. This test uses an isolated window and does not join a party.
+
 Pause/resume is required. Games own round results and continue until players
 switch games. A handshake does not certify input, window behaviour or faces.
 The guide is built from canonical Markdown and excerpts from this addon; CI
