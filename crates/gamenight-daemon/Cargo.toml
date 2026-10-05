@@ -12,7 +12,7 @@ gamenight-protocol = { workspace = true }
 gamenight-core = { workspace = true }
 gamenight-catalog = { path = "../gamenight-catalog" }
 gamenight-installer = { path = "../gamenight-installer" }
-gamenight-local-web = { path = "../gamenight-local-web" }
+gamenight-host-services = { path = "../gamenight-host-services" }
 serde_json = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true, features = ["process"] }

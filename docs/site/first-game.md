@@ -70,16 +70,13 @@ the lobby, queue it and select **Start game**. The game should appear with
 the same players. Back/Select should return to the lobby; Resume should
 continue the same game state.
 
-The Godot lobby also enables the local phone interface on port 7913. Use the
-room QR to test a profile change, then check the name, skin colour and drawn
-face in your game. Phone access needs the same LAN and a firewall rule allowing
-the local web port. Camera scanning may require HTTPS; entering the room code
-or scanning with the phone's camera app is an alternative.
+Phone sign-in uses the hosted GameNight website. The lobby's QR appears after
+cloud registration; scan it to edit your face and pick up the profile with your
+controller. The native app does not host a phone website. Pass `--offline` when
+testing without the service; guest controllers and local games still work.
 
-Stop this development host with Ctrl+C before starting another copy. Re-export
-your game, then rerun the command with `--skip-build` to reuse the host binaries.
 Logs are in `.local/gamenight.log`. If a host already uses port 7912, stop it or
-choose another protocol port with `--port`; the phone web port remains separate.
+choose another protocol port with `--port`; the native control API remains on loopback port 7913.
 
 ## Verify the exported package
 

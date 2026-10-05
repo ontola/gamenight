@@ -5,10 +5,13 @@ use axum::{
     Json,
 };
 use gamenight_protocol::PlayerId;
+#[cfg(test)]
 use serde::Deserialize;
+#[cfg(test)]
+use std::time::Instant;
 use std::{
     collections::HashMap,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 fn now() -> u64 {
     SystemTime::now()
@@ -19,6 +22,7 @@ fn now() -> u64 {
 pub struct Room {
     code: String,
     pending: HashMap<String, (String, u64)>,
+    #[cfg(test)]
     attempts: (Instant, u32),
     pub main_profile: Option<String>,
 }
@@ -32,6 +36,7 @@ impl Room {
                 .map(|b| alphabet[*b as usize % alphabet.len()] as char)
                 .collect(),
             pending: HashMap::new(),
+            #[cfg(test)]
             attempts: (Instant::now(), 0),
             main_profile: None,
         }
@@ -42,6 +47,7 @@ impl Room {
             (uuid::Uuid::new_v4().to_string(), now() + 86400),
         );
     }
+    #[cfg(test)]
     pub fn waiting(&self, profile: &str) -> bool {
         self.pending
             .get(profile)
@@ -59,12 +65,14 @@ impl Room {
     }
 }
 #[derive(Deserialize)]
+#[cfg(test)]
 pub struct Join {
     code: String,
     profile: String,
     #[serde(default)]
     remember: Option<bool>,
 }
+#[cfg(test)]
 pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> StatusCode {
     let mut s = state.lock().unwrap();
     if s.cloud.is_some() {
@@ -103,6 +111,7 @@ pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> St
         .or_insert_with(|| (uuid::Uuid::new_v4().to_string(), now() + 300));
     StatusCode::NO_CONTENT
 }
+#[cfg(test)]
 pub async fn cancel(Path(id): Path<String>, State(state): State<SharedState>) -> StatusCode {
     state.lock().unwrap().local_room.pending.remove(&id);
     StatusCode::NO_CONTENT
@@ -233,9 +242,11 @@ mod tests {
 }
 
 #[derive(Deserialize)]
+#[cfg(test)]
 pub struct Remember {
     remember: bool,
 }
+#[cfg(test)]
 pub async fn remember(
     Path(id): Path<String>,
     State(state): State<SharedState>,
@@ -261,9 +272,11 @@ pub async fn remember(
 }
 
 #[derive(Deserialize)]
+#[cfg(test)]
 pub struct MainPlayer {
     enabled: bool,
 }
+#[cfg(test)]
 pub async fn main_player(
     Path(id): Path<String>,
     State(state): State<SharedState>,

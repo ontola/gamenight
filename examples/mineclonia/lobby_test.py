@@ -64,7 +64,7 @@ def main():
     library=folder/"shelf.json";library.write_text(json.dumps(shelf,indent=2))
     env={k:v for k,v in os.environ.items() if not k.startswith("GAMENIGHT")}
     env.update(GAMENIGHT_ADDR=f"127.0.0.1:{a.port}",GAMENIGHT_LIBRARY=str(library),GAMENIGHT_CATALOG=str(catalog),GAMENIGHT_LOBBY_GAME=lobby_id,RUST_LOG="info")
-    env.update(GAMENIGHT_WEB="1",GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(registrations))
+    env.update(GAMENIGHT_HOST_SERVICES="1",GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(registrations))
     if a.assistant_url: env["GAMENIGHT_ASSISTANT_URL"]=a.assistant_url
     if a.join_url: env["GAMENIGHT_JOIN_URL"]=a.join_url
     if a.links_url: env["GAMENIGHT_LINKS_URL"]=a.links_url

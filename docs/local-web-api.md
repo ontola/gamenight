@@ -1,38 +1,31 @@
-# Local character studio API
+# Native host services
 
-This opt-in API is intended for trusted LAN devices. See [security scope](../SECURITY.md).
-The host configures the daemon address; browser input cannot override it.
-Profiles and bindings are temporary and disappear when the server stops.
+The installed app does not host web pages. The public `gamenight-host-services`
+package connects to the hosted GameNight service and exposes a small native
+control API on `127.0.0.1:7913`. It rejects LAN binds and browser-origin requests.
 
-## Profiles and joining
+- `GET /api/player-links`: hosted room code, QR, waiting profiles and bindings.
+- `POST /api/room-pickup/{pending}/{player}`: controller-owned profile pickup;
+  requires `X-GameNight-Local-Pickup: 1`.
+- `POST /api/player-links/{player}/unlink`: detach a profile from its controller.
+- `GET /api/host/lobby`: installed lobby choices and saved preference.
+- `POST /api/host/lobby`: save `{ "id": "registered-lobby" }` for next launch;
+  requires `X-GameNight-Host: 1`.
+- `POST /api/host/recovery`: native `retry`, `resume` or `quit` command; requires
+  `X-GameNight-Host: 1`.
 
-`POST /api/profiles` stores a profile with `id`, `username`, `color` and `avatar`.
-`GET /api/profiles/:id` retrieves it, or returns 404.
-`POST /api/profiles/:id/join` accepts optional `seat` and `claim` fields.
-A seat takes precedence over a player ID. With neither, the host requests a new
-party member. Successful fresh joins include the player ID for later updates.
+There are no `/studio`, `/docs`, `/onboarding`, `/host/lobby` or static-asset
+routes. Phone profile mutations go through the authenticated hosted service;
+the host consumes them over its outbound relay. The relay also preserves
+profile-to-seat revision checks, full avatar data and acknowledged updates.
 
-| HTTP status | Meaning |
-|---|---|
-| 200 | Read the response's `status`: `joined`, `claimed`, `no_such_seat`, or `already_signed_in` |
-| 404 | Profile does not exist |
-| 502 | Daemon connection or reply stream failed |
-| 504 | Daemon did not answer within the deadline |
+Packaged launchers and `scripts/run-local.py` enable `GAMENIGHT_HOST_SERVICES=1`.
+The default service is `https://gamenight.ontola.io`. An explicit
+`GAMENIGHT_CLOUD_URL` must be an HTTPS origin. `GAMENIGHT_OFFLINE=1` disables
+cloud sync while native controls and guest play continue working. Contributors
+can run the API separately using `GAMENIGHT_HOST_SERVICES_ADDR`; non-loopback
+addresses are rejected.
 
-The server requires Welcome before sending player changes. A fresh join also
-requires a party snapshot containing the new player before reporting success.
-Connection and reply deadlines are two seconds each, with a six-second overall
-request deadline that also bounds socket writes and closing the connection.
-
-A timeout does not roll back commands already delivered to the daemon. A claim
-response confirms commands were sent; the protocol does not acknowledge each
-individual profile update. Clients should refresh party state before retrying
-an ambiguous operation. Concurrent fresh joins still rely on snapshot differences;
-request correlation is a future protocol improvement.
-
-### Player session status
-
-`GET /api/profiles/:id/session` reports `linked`, `player_name`, zero-based
-`seat`, party `players` count, `current` (title and phase), and `next` title.
-A stale binding whose player has left is reported as unlinked. The mobile
-Session tab uses this live state instead of showing another sign-in QR.
+Local remembered profiles from earlier versions are retained on disk. New
+account profile memory is managed by the centralized service. No migration
+uploads old local profiles or deletes them.

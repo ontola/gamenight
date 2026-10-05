@@ -61,15 +61,12 @@ The first run builds the host. Connect your controllers, choose your game in
 the lobby, queue it and select <strong>Start game</strong>. The game should appear with
 the same players. Back/Select should return to the lobby; Resume should
 continue the same game state.</p>
-<p>The Godot lobby also enables the local phone interface on port 7913. Use the
-room QR to test a profile change, then check the name, skin colour and drawn
-face in your game. Phone access needs the same LAN and a firewall rule allowing
-the local web port. Camera scanning may require HTTPS; entering the room code
-or scanning with the phone's camera app is an alternative.</p>
-<p>Stop this development host with Ctrl+C before starting another copy. Re-export
-your game, then rerun the command with <code>--skip-build</code> to reuse the host binaries.
-Logs are in <code>.local/gamenight.log</code>. If a host already uses port 7912, stop it or
-choose another protocol port with <code>--port</code>; the phone web port remains separate.</p>
+<p>Phone sign-in uses the hosted GameNight website. The lobby's QR appears after
+cloud registration; scan it to edit your face and pick up the profile with your
+controller. The native app does not host a phone website. Pass <code>--offline</code> when
+testing without the service; guest controllers and local games still work.</p>
+<p>Logs are in <code>.local/gamenight.log</code>. If a host already uses port 7912, stop it or
+choose another protocol port with <code>--port</code>; the native control API remains on loopback port 7913.</p>
 <h2 id="verify-the-exported-package">Verify the exported package</h2>
 <p>Follow <a href="/docs/testing#test-your-own-game">Test your own game</a> for a protocol
 smoke test and the manual controller/window checks. Test an extracted copy of
@@ -141,7 +138,7 @@ CI setup, update activation and access limits.</p>
 command and relevant logs. Remove launch tokens, API keys and private profile
 data before sharing logs.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/first-game.md">Edit this page</a><span data-source-fingerprint="160da93f1946d2ccabb5e1521faf09dd7ab69f8feeaf0741672161657efc1ebc">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/first-game.md">Edit this page</a><span data-source-fingerprint="4347625df4bfed4b08e2f5dfc99e25c08322bc64ec75dc28f73726a865fa9326">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/lifecycle"><small>Next</small>Game lifecycle</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install-the-development-host">Install the development host</a><a href="#add-your-local-build">Add your local build</a><a href="#play-through-the-lobby">Play through the lobby</a><a href="#verify-the-exported-package">Verify the exported package</a><a href="#publish-the-first-release">Publish the first release</a><a href="#ship-the-next-version">Ship the next version</a><a href="#if-something-fails">If something fails</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -9,7 +9,7 @@ members = [
     "crates/gamenight-catalog",
     "crates/gamenight-installer",
     "crates/gamenight-mcp",
-    "crates/gamenight-local-web",
+    "crates/gamenight-host-services",
     "examples/demo-game",
 ]
 exclude = ["crates/lobby", "vendor/bones"]

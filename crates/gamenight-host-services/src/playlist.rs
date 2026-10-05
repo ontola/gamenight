@@ -36,6 +36,7 @@ impl From<PartySnapshot> for View {
         }
     }
 }
+#[cfg(test)]
 pub(crate) async fn get(State(state): State<SharedState>) -> Result<Json<View>, StatusCode> {
     exchange(state, None).await
 }

@@ -1,5 +1,5 @@
 [package]
-name = "gamenight-local-web"
+name = "gamenight-host-services"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

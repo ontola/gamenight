@@ -25,7 +25,14 @@ pub struct PendingProfile {
     pub avatar: String,
 }
 #[derive(Default, Clone, serde::Deserialize)]
+pub struct LobbyChoice {
+    pub id: String,
+    pub title: String,
+}
+#[derive(Default, Clone, serde::Deserialize)]
 pub struct Snapshot {
+    #[serde(default)]
+    pub lobbies: Vec<LobbyChoice>,
     #[serde(default)]
     pub cloud: bool,
     #[serde(default)]
@@ -36,12 +43,8 @@ pub struct Snapshot {
     pub revisions: HashMap<PlayerId, u64>,
 }
 impl Snapshot {
-    pub fn join_url(&self, player: PlayerId, local_base: &str) -> Option<String> {
-        if self.cloud { return self.pairing_urls.get(&player).cloned(); }
-        let revision = self.revisions.get(&player).copied().unwrap_or(0);
-        let base = local_base.trim_end_matches('/');
-        let base = if base.strip_prefix("http://").or_else(|| base.strip_prefix("https://")).is_some_and(|s| !s.contains('/')) { format!("{base}/studio") } else { base.to_owned() };
-        Some(format!("{base}?claim={}&link_revision={revision}", player.0))
+    pub fn join_url(&self, player: PlayerId, _local_base: &str) -> Option<String> {
+        self.pairing_urls.get(&player).cloned()
     }
 }
 #[derive(bevy::prelude::Resource)]
@@ -49,6 +52,8 @@ pub struct PlayerLinks {
     pub state: Arc<Mutex<Option<Snapshot>>>,
     unlink: mpsc::Sender<PlayerId>,
     pickup: mpsc::Sender<(String, PlayerId)>,
+    choose: mpsc::Sender<String>,
+    notice: Arc<Mutex<String>>,
 }
 impl Default for PlayerLinks {
     fn default() -> Self {
@@ -56,15 +61,27 @@ impl Default for PlayerLinks {
         let shared = state.clone();
         let (unlink, rx) = mpsc::channel::<PlayerId>();
         let (pickup, pickups) = mpsc::channel::<(String, PlayerId)>();
+        let (choose, choices) = mpsc::channel::<String>();
+        let notice = Arc::new(Mutex::new(String::new()));
+        let result = notice.clone();
         std::thread::spawn(move || loop {
+            while let Ok(id) = choices.try_recv() {
+                let saved = request_body("POST", "/api/host/lobby", &serde_json::json!({"id":id}).to_string()).is_some();
+                *result.lock().unwrap() = if saved { "Saved for next launch." } else { "Could not save. Try again." }.into();
+            }
             while let Ok((id, player)) = pickups.try_recv() {
                 let _ = request("POST", &format!("/api/room-pickup/{id}/{}", player.0));
             }
             while let Ok(id) = rx.try_recv() {
                 let _ = request("POST", &format!("/api/player-links/{}/unlink", id.0));
             }
-            let snapshot = request("GET", "/api/player-links")
+            let mut snapshot: Option<Snapshot> = request("GET", "/api/player-links")
                 .and_then(|body| serde_json::from_str(&body).ok());
+            if let Some(snapshot) = snapshot.as_mut() {
+                snapshot.lobbies = request("GET", "/api/host/lobby")
+                    .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())
+                    .and_then(|value| serde_json::from_value(value["choices"].clone()).ok()).unwrap_or_default();
+            }
             *shared.lock().unwrap() = snapshot;
             std::thread::sleep(Duration::from_millis(500));
         });
@@ -72,10 +89,17 @@ impl Default for PlayerLinks {
             state,
             unlink,
             pickup,
+            choose,
+            notice,
         }
     }
 }
 impl PlayerLinks {
+    pub fn choose_lobby(&self, id: String) {
+        *self.notice.lock().unwrap() = "Saving…".into();
+        let _ = self.choose.send(id);
+    }
+    pub fn lobby_notice(&self) -> String { self.notice.lock().unwrap().clone() }
     pub fn snapshot(&self) -> Option<Snapshot> {
         self.state.lock().unwrap().clone()
     }
@@ -86,21 +110,17 @@ impl PlayerLinks {
         let _ = self.unlink.send(player);
     }
 }
-fn request(method: &str, path: &str) -> Option<String> {
+fn request(method: &str, path: &str) -> Option<String> { request_body(method,path,"") }
+fn request_body(method: &str, path: &str, body: &str) -> Option<String> {
     use std::io::{Read, Write};
     let base =
-        std::env::var("GAMENIGHT_LINKS_URL").or_else(|_| std::env::var("GAMENIGHT_JOIN_URL")).unwrap_or_else(|_| gamenight_protocol::web_base_url());
+        std::env::var("GAMENIGHT_LINKS_URL").unwrap_or_else(|_| format!("http://127.0.0.1:{}", gamenight_protocol::DEFAULT_WEB_PORT));
     let original = base.strip_prefix("http://")?.split('/').next()?;
-    let local_pickup = path.starts_with("/api/room-pickup/");
     let loopback = format!(
         "127.0.0.1:{}",
         original.rsplit_once(':').map(|(_, p)| p).unwrap_or("80")
     );
-    let host = if local_pickup {
-        loopback.as_str()
-    } else {
-        original
-    };
+    let host = loopback.as_str();
     use std::net::ToSocketAddrs;
     let addr = host.to_socket_addrs().ok()?.next()?;
     let mut stream = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(2)).ok()?;
@@ -108,7 +128,7 @@ fn request(method: &str, path: &str) -> Option<String> {
     stream
         .set_write_timeout(Some(Duration::from_secs(2)))
         .ok()?;
-    write!(stream, "{method} {path} HTTP/1.1\r\nHost: {host}\r\nX-GameNight-Local-Pickup: 1\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").ok()?;
+    write!(stream, "{method} {path} HTTP/1.1\r\nHost: {host}\r\nX-GameNight-Local-Pickup: 1\r\nX-GameNight-Host: 1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).ok()?;
     let mut raw = String::new();
     stream.read_to_string(&mut raw).ok()?;
     let (header, body) = raw.split_once("\r\n\r\n")?;
@@ -133,10 +153,9 @@ mod tests {
     }
 
     #[test]
-    fn offline_qr_has_scanner_recognized_studio_path() {
+    fn offline_guests_do_not_get_a_broken_phone_link() {
         let player = PlayerId::default();
         let snapshot = Snapshot::default();
-        assert!(snapshot.join_url(player, "http://192.168.0.85:7913/").unwrap()
-            .starts_with("http://192.168.0.85:7913/studio?claim="));
+        assert!(snapshot.join_url(player, "http://192.168.0.85:7913/").is_none());
     }
 }

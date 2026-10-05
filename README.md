@@ -74,7 +74,7 @@ Install stable Rust and Python 3. Windows builds need Visual Studio C++ Build
 Tools. See [development setup](docs/development.md) for Linux dependencies.
 
 ```sh
-python scripts/run-local.py --studio --shelf /path/to/games.json
+python scripts/run-local.py --shelf /path/to/games.json
 ```
 
 The shelf lists your games and their launch commands. GameNight adds the lobby.
@@ -111,8 +111,8 @@ On Windows, the current controller backend supports up to four Xbox/XInput
 controllers. Other controllers need an XInput-compatible mode or adapter.
 
 For quick changes to the lobby, use the [development loop](docs/development-loop.md).
-It separates restarting, building and packaging, and serves web files directly
-while you work.
+It separates restarting, building and packaging. Player pages are hosted by the
+GameNight service, independently of the native app.
 
 ## Contribute
 

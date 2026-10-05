@@ -72,8 +72,10 @@
       "sdk/godot/lobby/main.gd",
       "crates/gamenight-daemon/src/lobby_input.rs",
       "sdk/godot/addons/gamenight/artwork.gd",
-      "crates/gamenight-local-web/src/host_lobby.rs",
-      "crates/gamenight-daemon/src/bin/gamenight-launcher.rs"
+      "crates/gamenight-host-services/src/host_lobby.rs",
+      "crates/gamenight-daemon/src/bin/gamenight-launcher.rs",
+      "crates/gamenight-host-services/src/lib.rs",
+      "crates/gamenight-host-services/src/cloud.rs"
     ]
   },
   {

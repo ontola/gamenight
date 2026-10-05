@@ -202,11 +202,10 @@ not such a request. The Godot example uses window minimisation and restoration.
 
 Player and controller state survives a replacement lobby disconnect. A socket
 failure can reconnect to the same process. A dead process gets up to three
-restart attempts before opening the local recovery page. The game is paused
-and players remain registered. Recovery offers Retry lobby, Resume game and
-End game night. Retry resets the restart budget; it does not erase the party.
-The installed launcher keeps browser requests available throughout the session.
-Development hosts need `GAMENIGHT_WEB=1` to serve the recovery page. `quit_party`
+restart attempts, then pauses the game and retains players. Reopening the
+installed application requests `retry_lobby` and raises the lobby. Retry resets
+the restart budget; it does not erase the party. No recovery website is opened.
+`quit_party`
 is the deliberate exit path. The legacy platformer retains its old input and
 disconnect behaviour until it adopts this role.
 
@@ -257,19 +256,18 @@ OS media session; it does not provide a streaming service itself.
 
 ## Phone joining and profile pickup
 
-The public local-web server supplies `GET /api/player-links`. Its `room`
-contains the current `code`, `join_url` and `qr_svg`; the URL uses the actual
-LAN host and web port for a local room, or the registered cloud room's origin.
-Do not build a QR from the lobby's WebSocket address. Unregistered rooms do not
-get a QR. `scripts/run-local.py --lobby godot` starts local-web automatically.
+The public `gamenight-host-services` client supplies `GET /api/player-links` on
+loopback. Its `room` contains the registered `room_code`, hosted `join_url`
+and `qr_svg`. All phone pages, sign-in and profile editing belong to the hosted
+service. Never construct a QR from the host's local API or WebSocket address.
+Offline and unregistered rooms do not advertise a join code or QR.
 
-The Godot view defaults to `http://127.0.0.1:7913`. Set `GAMENIGHT_LINKS_URL`
-only when running a different local-web bridge. Phone profiles waiting for
-pickup are returned in the same response. A local controller selects its
-profile and the native lobby posts to
+The Godot view defaults to `http://127.0.0.1:7913`. `GAMENIGHT_LINKS_URL` can
+select a different loopback bridge. Waiting profiles arrive through the outbound
+cloud relay. A controller selects its profile and the native lobby posts to
 `/api/room-pickup/{pending_id}/{player_id}` with
-`X-GameNight-Local-Pickup: 1`. Pickup requires a loopback connection and this
-header; a phone cannot assign itself to another controller through this API.
+`X-GameNight-Local-Pickup: 1`. The API rejects browser-origin and LAN requests.
+`GAMENIGHT_OFFLINE=1` disables the cloud connection, not native guest play.
 
 ## Game settings and artwork
 
@@ -310,17 +308,13 @@ when other games are queued. If there is no current game, only Up next is shown.
 Resume keeps the current session and queue intact;
 **Start game** under Up next advances the queue.
 
-Launch `gamenight-launcher --choose-lobby`, or open
-`http://127.0.0.1:7913/host/lobby` on the host while the installed app runs.
-Choose the bundled platformer or a registered replacement. The choice is saved
-in `selected-lobby.json` and applies on the next launch. Missing executables
-fall back to the bundled lobby. Registration does not download or install a
-third-party lobby. Only install code you trust.
+Use **Select other lobby** inside either lobby's Start menu. The selection
+stays in the native UI. It saves `selected-lobby.json` for the next launch.
+Missing executables fall back to the bundled lobby. Registration does not
+download or install a third-party lobby. Only install code you trust.
 
-The preference and recovery controls are host-only. They reject LAN requests;
-mutations also require `X-GameNight-Host: 1`. The recovery page uses
-`retry_lobby`, `close_overlay` and `quit_party` through a trusted local overlay.
-Retry is available only after the automatic restart budget is exhausted.
+The preference and recovery APIs are loopback-only; mutations require
+`X-GameNight-Host: 1`. They serve JSON, never browser views.
 
 ## Desktop display checks
 

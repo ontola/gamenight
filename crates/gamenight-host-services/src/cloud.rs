@@ -1,4 +1,4 @@
-//! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
+//! Outbound hosted-profile relay. Native play never depends on cloud availability.
 pub(crate) mod discovery;
 mod settings;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
@@ -117,20 +117,55 @@ struct CloudProfile {
     skin_color: String,
     avatar: String,
 }
+fn service_origin(configured: Option<&str>, offline: bool) -> Option<String> {
+    if offline {
+        return None;
+    }
+    let origin = configured.unwrap_or(gamenight_protocol::DEFAULT_CLOUD_URL);
+    let url = reqwest::Url::parse(origin).ok()?;
+    if url.scheme() != "https"
+        || url.host_str().is_none()
+        || url.path() != "/"
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        tracing::warn!("Cloud profile sync requires an HTTPS origin");
+        return None;
+    }
+    Some(origin.trim_end_matches('/').into())
+}
+#[cfg(test)]
+mod configuration_tests {
+    use super::*;
+    #[test]
+    fn website_downloads_use_central_service_and_offline_is_explicit() {
+        assert_eq!(
+            service_origin(None, false).as_deref(),
+            Some("https://gamenight.ontola.io")
+        );
+        assert_eq!(service_origin(None, true), None);
+        assert_eq!(
+            service_origin(Some("https://preview.example/"), false).as_deref(),
+            Some("https://preview.example")
+        );
+        for bad in [
+            "http://192.168.0.85:7913",
+            "https://example/studio",
+            "https://user:secret@example",
+            "https://example/?r=test",
+        ] {
+            assert!(service_origin(Some(bad), false).is_none());
+        }
+    }
+}
 impl Bridge {
     pub fn configured() -> Option<Self> {
-        let origin = std::env::var("GAMENIGHT_CLOUD_URL").ok()?;
-        let u = reqwest::Url::parse(&origin).ok()?;
-        if u.scheme() != "https"
-            || u.path() != "/"
-            || u.query().is_some()
-            || u.fragment().is_some()
-            || !u.username().is_empty()
-            || u.password().is_some()
-        {
-            tracing::warn!("Cloud profile sync requires an HTTPS origin");
-            return None;
-        }
+        let origin = service_origin(
+            std::env::var("GAMENIGHT_CLOUD_URL").ok().as_deref(),
+            std::env::var("GAMENIGHT_OFFLINE").as_deref() == Ok("1"),
+        )?;
         Some(Self {
             origin: origin.trim_end_matches('/').into(),
             http: reqwest::Client::builder()

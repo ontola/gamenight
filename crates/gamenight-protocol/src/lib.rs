@@ -23,7 +23,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
 
-/// Port the web server (profile studio, join pages) listens on.
+/// Loopback-only native host control API. This port never serves player pages.
 pub const DEFAULT_WEB_PORT: u16 = 7913;
 
 /// This machine's address on the local network, for URLs that have to be
@@ -51,14 +51,12 @@ pub fn lan_ip() -> Option<std::net::IpAddr> {
     Some(ip)
 }
 
-/// The base URL of the web server as reachable from another device on the
-/// network, e.g. `http://192.168.1.42:7913`. Falls back to loopback when
-/// there's no LAN address to offer.
+/// Default hosted player interface for the distributed application.
+pub const DEFAULT_CLOUD_URL: &str = "https://gamenight.ontola.io";
+
+/// Hosted player interface. Local native APIs must never be used as QR targets.
 pub fn web_base_url() -> String {
-    match lan_ip() {
-        Some(ip) => format!("http://{ip}:{DEFAULT_WEB_PORT}"),
-        None => format!("http://127.0.0.1:{DEFAULT_WEB_PORT}"),
-    }
+    std::env::var("GAMENIGHT_CLOUD_URL").unwrap_or_else(|_| DEFAULT_CLOUD_URL.into())
 }
 
 // ---------------------------------------------------------------------------
@@ -1204,32 +1202,11 @@ mod addr_tests {
         // `None` is legitimate (no network at all) and callers fall back.
     }
 
-    /// The base URL must be well-formed and carry the web port, whether or
-    /// not a LAN address was found.
     #[test]
-    fn web_base_url_is_well_formed() {
-        let url = web_base_url();
-        assert!(url.starts_with("http://"), "got {url}");
-        assert!(
-            url.ends_with(&format!(":{DEFAULT_WEB_PORT}")),
-            "{url} must carry the web port"
-        );
-        assert!(!url.ends_with('/'), "{url} must not have a trailing slash");
-    }
-
-    /// When there is a LAN address, the URL has to actually use it rather
-    /// than quietly falling back to loopback.
-    #[test]
-    fn web_base_url_prefers_the_lan_address() {
-        if let Some(ip) = lan_ip() {
-            assert_eq!(url_host(&web_base_url()), ip.to_string());
+    fn hosted_url_has_no_local_server_dependency() {
+        assert_eq!(DEFAULT_CLOUD_URL, "https://gamenight.ontola.io");
+        if std::env::var_os("GAMENIGHT_CLOUD_URL").is_none() {
+            assert_eq!(web_base_url(), DEFAULT_CLOUD_URL);
         }
-    }
-
-    fn url_host(url: &str) -> String {
-        url.trim_start_matches("http://")
-            .rsplit_once(':')
-            .map(|(host, _)| host.to_string())
-            .unwrap_or_default()
     }
 }
