@@ -826,8 +826,8 @@ let initializing = true;
           localStorage.setItem('gamenight_bound_player',boundPlayerId);
         }
         document.getElementById('room-cancel').hidden=!session.waiting;
-        document.getElementById('qr-open').hidden=session.linked;
-        window.updateRoomNavigation?.(session.linked);
+        document.getElementById('qr-open').hidden=session.linked||session.waiting;
+        window.updateRoomNavigation?.(session.linked,!!session.waiting);
         document.getElementById('session-link-status').textContent = session.linked ? `Signed in as ${session.player_name}` : 'Not linked to a controller';
         document.getElementById('session-link-help').textContent = session.linked ? `${session.seat === null ? "Your profile is linked to this party." : "Player " + (session.seat + 1) + "."} Edit your name and character in the Character tab. To disconnect, choose Unlink in your controller’s Start menu.` : 'Press Start on your controller in the lobby, then scan the QR shown in your player menu.';
         document.getElementById('session-player-count').textContent = session.players;

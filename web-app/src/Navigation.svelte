@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { room, route, busy, signedIn, assistantUrl } from './state';
+  import { room, roomJoined, roomWaiting, route, busy, signedIn, assistantUrl } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
   let menuDialog: HTMLDialogElement;
@@ -14,12 +14,12 @@
     leaving=true; leaveError='';
     try {
       const local=document.body.dataset.local==='true';
-      let path='/v1/pairing/unlink';
+      let path=$roomWaiting?'/v1/rooms/cancel':'/v1/pairing/unlink';
       const headers: Record<string,string>={'Content-Type':'application/json'};
       if(local){
         const player=localStorage.getItem('gamenight_bound_player');
-        if(!player)throw Error('Open You to refresh your controller connection, then try again.');
-        path='/api/player-links/'+encodeURIComponent(player)+'/unlink';
+        if(!player && !$roomWaiting)throw Error('Open You to refresh your controller connection, then try again.');
+        path=$roomWaiting?'/api/local-room/cancel/'+encodeURIComponent(localStorage.getItem('gamenight_profile_id') || ''):'/api/player-links/'+encodeURIComponent(player!)+'/unlink';
       }else{
         const session=await fetch('/auth/session',{cache:'no-store'});
         if(!session.ok)throw Error('Please sign in again before leaving the room.');
@@ -56,8 +56,8 @@
   </div>
   <div class="site-room-actions">
     <a class="site-host site-desktop-action" href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined}>Host</a>
-    <button class="btn-primary" data-room-join hidden={$room===true} onclick={join}>Join</button>
-    <button class="btn-primary site-desktop-action" data-room-leave hidden={$room!==true} onclick={openLeave}>Leave room</button>
+    <button class="btn-primary" data-room-join hidden={$roomJoined!==false} onclick={join}>Join</button>
+    <button class="btn-primary site-desktop-action" data-room-leave hidden={$roomJoined!==true} onclick={openLeave}>Leave room</button>
     <button class="site-menu-toggle" aria-label="Open menu" aria-haspopup="dialog" onclick={()=>menuDialog.showModal()}>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
@@ -68,7 +68,7 @@
   <nav aria-label="More navigation">
     <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined} onclick={()=>menuDialog.close()}>Docs <span aria-hidden="true">↗</span></a>
     <a href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined} onclick={()=>menuDialog.close()}>Host a room <span aria-hidden="true">→</span></a>
-    {#if $room===true}<button class="site-menu-leave" onclick={openLeave}>Leave room <span aria-hidden="true">→</span></button>{/if}
+    {#if $roomJoined===true}<button class="site-menu-leave" onclick={openLeave}>Leave room <span aria-hidden="true">→</span></button>{/if}
   </nav>
 </dialog>
 <dialog class="leave-room-dialog" bind:this={leaveDialog} oncancel={(event)=>{if(leaving)event.preventDefault();}} onclick={(event)=>{if(event.target===leaveDialog && !leaving)leaveDialog.close();}}>
