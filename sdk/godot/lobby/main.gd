@@ -40,6 +40,7 @@ var _assistant_url := ""
 var assistant = preload("res://lobby/assistant.gd").new()
 var _talk_owner := ""
 var _fullscreen := false
+var _display_restore := 0
 var _cursors: Dictionary = {}
 var _links := HTTPRequest.new()
 var _pickup := HTTPRequest.new()
@@ -97,7 +98,8 @@ func _ready() -> void:
 		get_window().content_scale_size = Vector2i(1280, 800)
 		get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 		get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
-		get_window().mode = Window.MODE_FULLSCREEN
+		_fit_fullscreen()
+		get_window().focus_entered.connect(_window_restored)
 	if not _fullscreen and get_window().size.x < 1050:
 		get_window().content_scale_size = Vector2i.ZERO
 	client.party_changed.connect(_party_changed)
@@ -170,10 +172,36 @@ func _focus_changed(active: bool) -> void:
 	AudioServer.set_bus_mute(0, not active)
 	if DisplayServer.get_name() != "headless" and _capture_path.is_empty():
 		if active:
-			get_window().mode = Window.MODE_FULLSCREEN if _fullscreen else Window.MODE_WINDOWED
+			if _fullscreen: _fit_fullscreen()
+			else: get_window().mode = Window.MODE_WINDOWED
 			get_window().grab_focus()
 		else:
+			_display_restore += 1
 			get_window().mode = Window.MODE_MINIMIZED
+	queue_redraw()
+
+func _window_restored() -> void:
+	await get_tree().process_frame
+	if _fullscreen and client.active: _fit_fullscreen()
+
+func _fit_fullscreen() -> void:
+	# Windows can restore a minimized fullscreen window to its old 1280px
+	# rectangle while retaining the larger render surface. Use an explicitly
+	# sized borderless desktop window, including after taskbar/Alt-Tab restore.
+	var window := get_window()
+	var screen := window.current_screen
+	var bounds := Rect2i(DisplayServer.screen_get_position(screen),DisplayServer.screen_get_size(screen))
+	window.mode = Window.MODE_WINDOWED
+	window.borderless = true
+	window.position = bounds.position
+	window.size = bounds.size
+	_display_restore += 1
+	var revision := _display_restore
+	await get_tree().process_frame
+	if revision != _display_restore or window.mode == Window.MODE_MINIMIZED: return
+	# Reconcile after native restore/resize messages, including DPI changes.
+	DisplayServer.window_set_position(bounds.position,window.get_window_id())
+	DisplayServer.window_set_size(bounds.size,window.get_window_id())
 	queue_redraw()
 
 func _controllers_changed(controllers: Array) -> void:
