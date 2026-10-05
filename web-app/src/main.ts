@@ -24,7 +24,7 @@ if(shell){
       if(!response.ok)return;
       const state=await response.json();
       if(!local)signedIn.set(true);
-      window.updateRoomNavigation?.(local?!!state.linked:state.status==='connected');
+      window.updateRoomNavigation?.(local?!!state.linked:state.status==='connected', local?!!state.waiting:state.status==='waiting');
       // A host advertises its assistant; standalone local servers need not have one.
       assistantUrl.set(state.assistant_url === '/agent' ? '/agent' : '');
     }catch{ /* Keep known state during a transient network failure. */ }

@@ -26,6 +26,13 @@ var _message_until := 0
 var _quit_confirm := false
 var _menu_open := false
 var _menu_index := 0
+var _chooser_open := false
+var _chooser := HTTPRequest.new()
+var _chooser_base := ""
+var _lobby_choices: Array = []
+var _lobby_selected := ""
+var _lobby_saving := ""
+var _chooser_message := ""
 var _capture_path := ""
 var _captured := false
 var _started_at := 0
@@ -46,6 +53,10 @@ var _delta := 0.016
 var _card_rects: Dictionary = {}
 var _cards_moving := false
 var _queue_offset := 0
+var _pickup_page := 0
+var _pickup_pending := ""
+var _pickup_player := ""
+var _pickup_deadline := 0
 
 func _ready() -> void:
 	add_child(artwork)
@@ -55,7 +66,14 @@ func _ready() -> void:
 	if not _links_base.begins_with("http://127.0.0.1:"): _links_base = ""
 	_links.timeout = 3
 	add_child(_links); add_child(_pickup)
+	add_child(_chooser)
+	_chooser.timeout = 5
+	_chooser.request_completed.connect(_chooser_received)
+	var chooser_url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
+	_chooser_base = chooser_url.trim_suffix("/host/lobby") if chooser_url.begins_with("http://127.0.0.1:") else "http://127.0.0.1:7913"
 	_links.request_completed.connect(_links_received)
+	_pickup.timeout = 8
+	_pickup.request_completed.connect(_pickup_received)
 	if not _links_base.is_empty():
 		var timer := Timer.new()
 		timer.wait_time = 2
@@ -74,7 +92,12 @@ func _ready() -> void:
 	bold.font_names = font.font_names
 	bold.font_weight = 700
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	get_window().min_size = Vector2i(400, 800)
+	get_window().min_size = Vector2i.ZERO if _fullscreen else Vector2i(400, 300)
+	if _fullscreen and DisplayServer.get_name() != "headless":
+		get_window().content_scale_size = Vector2i(1280, 800)
+		get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+		get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+		get_window().mode = Window.MODE_FULLSCREEN
 	if not _fullscreen and get_window().size.x < 1050:
 		get_window().content_scale_size = Vector2i.ZERO
 	client.party_changed.connect(_party_changed)
@@ -103,6 +126,11 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	self._delta = minf(_delta, 0.05)
+	if not _pickup_pending.is_empty() and Time.get_ticks_msec() > _pickup_deadline:
+		_pickup_pending = ""; _pickup_player = ""
+		_message = "Profile pickup was not confirmed. Please try again."
+		_message_until = Time.get_ticks_msec() + 6000
+		queue_redraw()
 	if not _cursors.is_empty() or _cards_moving or assistant.state == "listening": queue_redraw()
 	if _message_until > 0 and Time.get_ticks_msec() > _message_until:
 		_message = ""
@@ -226,6 +254,7 @@ func _controllers_changed(controllers: Array) -> void:
 	queue_redraw()
 
 func _controller_player(controller: String) -> Dictionary:
+	if controller.is_empty(): return {}
 	for seat in party.get("seats", []):
 		if seat.get("controller", "") == controller:
 			for player in party.get("players", []):
@@ -240,7 +269,7 @@ func _cursor_hits(id: String) -> Array:
 func _section(action: String) -> String:
 	if action.begins_with("select:") or action in ["play-next", "queue", "previous", "next"]: return "games"
 	if action.begins_with("media:"): return "music"
-	if action.begins_with("pickup:") or action == "room": return "room"
+	if action.begins_with("pickup:") or action.begins_with("pickup-page:") or action == "room": return "room"
 	if action.begins_with("leave:"): return "players"
 	if action == "assistant": return "assistant"
 	return "up-next"
@@ -378,16 +407,36 @@ func _select(direction: int) -> void:
 	queue_redraw()
 
 func _activate(action: String, controller: String = "") -> void:
+	if action == "menu-close" and _chooser_open:
+		_chooser_open = false
+		_menu_index = 0
+		for id in _cursors: _cursors[id].action = "choose-lobby"
+		queue_redraw()
+		return
 	if action == "menu" or action == "menu-close":
+		_chooser_open = false
 		_menu_open = not _menu_open if action == "menu" else false
 		_menu_index = 0
 		for id in _cursors: _cursors[id].action = "choose-lobby" if _menu_open else "select:%d" % selected
 		queue_redraw()
 		return
 	if action == "choose-lobby":
-		var url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
-		if not url.begins_with("http://127.0.0.1:"): url = "http://127.0.0.1:7913/host/lobby"
-		OS.shell_open(url)
+		_chooser_open = true
+		_chooser_message = "Loading lobbies…"
+		_menu_index = 0
+		if _chooser.request(_chooser_base+"/api/host/lobby") != OK: _chooser_message = "Could not load lobbies. Try again."
+		queue_redraw()
+		return
+	if _chooser_open and action.begins_with("lobby:"):
+		if not _lobby_saving.is_empty(): return
+		var choice := action.trim_prefix("lobby:")
+		if not _lobby_choices.any(func(item): return str(item.id) == choice): return
+		_lobby_saving = choice
+		_chooser_message = "Saving…"
+		if _chooser.request(_chooser_base+"/api/host/lobby",PackedStringArray(["Content-Type: application/json","X-GameNight-Host: 1"]),HTTPClient.METHOD_POST,JSON.stringify({"id":choice})) != OK:
+			_lobby_saving = ""
+			_chooser_message = "Could not save this lobby. Try again."
+		queue_redraw()
 		return
 	if _menu_open:
 		if action in ["quit", "room"]: _menu_open = false
@@ -430,13 +479,19 @@ func _activate(action: String, controller: String = "") -> void:
 	elif action.begins_with("earlier:"):
 		var index := int(action.trim_prefix("earlier:"))
 		client.move_in_queue(index, index - 1)
+	elif action.begins_with("pickup-page:"):
+		_pickup_page = maxi(0,_pickup_page+int(action.get_slice(":",1)))
 	elif action.begins_with("pickup:"):
 		var player := _controller_player(controller)
 		if player.is_empty():
 			_message = "Select your profile with your controller, then press A."
 			_message_until = Time.get_ticks_msec() + 5000
-		elif not _links_base.is_empty():
-			_pickup.request(_links_base + "/api/room-pickup/" + action.trim_prefix("pickup:") + "/" + str(player.id), ["X-GameNight-Local-Pickup: 1"], HTTPClient.METHOD_POST)
+		elif not _links_base.is_empty() and _pickup_pending.is_empty():
+			_pickup_pending = action.trim_prefix("pickup:")
+			_pickup_player = str(player.id)
+			_pickup_deadline = Time.get_ticks_msec() + 12000
+			var error := _pickup.request(_links_base + "/api/room-pickup/" + _pickup_pending + "/" + _pickup_player, ["X-GameNight-Local-Pickup: 1"], HTTPClient.METHOD_POST)
+			if error != OK: _pickup_received(HTTPRequest.RESULT_CANT_CONNECT,0,PackedStringArray(),PackedByteArray())
 	elif action.begins_with("leave:"):
 		client.leave(action.trim_prefix("leave:"))
 	elif action.begins_with("select:"):
@@ -709,14 +764,41 @@ func _draw_current(rect: Rect2, compact: bool) -> void:
 
 	_mask_card_corners(rect)
 
+func _chooser_received(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if not _lobby_saving.is_empty():
+		if result == HTTPRequest.RESULT_SUCCESS and code == 204:
+			_lobby_selected = _lobby_saving
+			_chooser_message = "Saved. This lobby opens next time you start GameNight."
+		else: _chooser_message = "Could not save this lobby. Try again."
+		_lobby_saving = ""
+	else:
+		var data: Variant = JSON.parse_string(body.get_string_from_utf8())
+		if result == HTTPRequest.RESULT_SUCCESS and code == 200 and data is Dictionary and data.get("choices") is Array:
+			_lobby_choices = data.choices
+			_lobby_selected = str(data.get("selected",""))
+			_chooser_message = "Choose the lobby for your next game night."
+			for id in _cursors: _cursors[id].action = "lobby:"+_lobby_selected
+		else: _chooser_message = "Could not load lobbies. Try again."
+	queue_redraw()
+
 func _draw_menu() -> void:
 	hits.clear()
 	draw_rect(Rect2(Vector2.ZERO,size),Color(0.08,0.15,0.12,0.72))
 	var box := Rect2(size.x/2-minf(230,size.x/2-20),size.y/2-210,minf(460,size.x-40),420)
 	_round(box,PAPER,22)
+	if _chooser_open:
+		_center("Choose a lobby",Rect2(box.position+Vector2(20,20),Vector2(box.size.x-40,40)),26,INK,true)
+		var y := box.position.y+80
+		for choice in _lobby_choices:
+			_button(str(choice.title)+( " · Selected" if str(choice.id) == _lobby_selected else ""),Rect2(box.position.x+24,y,box.size.x-48,48),"lobby:"+str(choice.id),str(choice.id)==_lobby_selected,not _lobby_saving.is_empty())
+			y += 60
+		_text(_chooser_message,Vector2(box.position.x+24,box.end.y-96),13,MUTED,false,box.size.x-48)
+		_button("Back",Rect2(box.position+Vector2(24,354),Vector2(box.size.x-48,42)),"menu-close")
+		if _cursors.is_empty() and not hits.is_empty(): _round(hits[clampi(_menu_index,0,hits.size()-1)].rect.grow(3),Color.TRANSPARENT,14,GREEN,2)
+		return
 	_center("Living Room",Rect2(box.position+Vector2(20,20),Vector2(box.size.x-40,40)),26,INK,true)
 	_button("Select other lobby",Rect2(box.position+Vector2(24,82),Vector2(box.size.x-48,46)),"choose-lobby",true)
-	_center("Opens on this computer. Applies next launch.",Rect2(box.position+Vector2(20,132),Vector2(box.size.x-40,32)),13,MUTED)
+	_center("Change your lobby here.",Rect2(box.position+Vector2(20,132),Vector2(box.size.x-40,32)),13,MUTED)
 	if size.x < 1050: _button("Room",Rect2(box.position+Vector2(24,178),Vector2(box.size.x-48,42)),"room")
 	if not _assistant_url.is_empty(): _button("Hold A · Talk to assistant",Rect2(box.position+Vector2(24,232),Vector2(box.size.x-48,42)),"assistant")
 	_button("End game night",Rect2(box.position+Vector2(24,300),Vector2(box.size.x-48,42)),"quit")
@@ -776,12 +858,27 @@ func _draw_up_next(rect: Rect2) -> void:
 
 	_mask_card_corners(rect)
 
+func _pickup_received(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS or code not in [200,202,204]:
+		_pickup_pending = ""; _pickup_player = ""
+		_message = "Could not pick up this profile. Please try again."
+		_message_until = Time.get_ticks_msec()+6000
+	queue_redraw()
+
 func _links_received(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
 		_room = {}; _qr = null; _qr_source = ""; queue_redraw(); return
 	var data: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if not data is Dictionary: return
 	_room = data.get("room", {})
+	if not _pickup_pending.is_empty() and _pickup_player in data.get("linked", []):
+		var still_waiting := false
+		for ticket in _room.get("pending", []):
+			if str(ticket.get("id", "")) == _pickup_pending: still_waiting = true
+		if not still_waiting:
+			_pickup_pending = ""; _pickup_player = ""
+			_message = "Profile connected."
+			_message_until = Time.get_ticks_msec()+3000
 	var source: String = _room.get("qr_svg", "")
 	if source != _qr_source:
 		_qr_source = source; _qr = null
@@ -799,11 +896,30 @@ func _draw_room_tools(rect: Rect2) -> void:
 	if _qr != null: draw_texture_rect(_qr,Rect2(x+16,y+44,132,132),false)
 	_text(str(_room.get("room_code","Connecting…")),Vector2(x+16,y+204),25,INK,true,w-32)
 	_text("Scan to join",Vector2(x+160,y+83),14,MUTED)
+	y += 240
 	var pending: Array = _room.get("pending",[])
-	for i in mini(2,pending.size()):
-		var profile: Dictionary = pending[i].get("profile",{})
-		_button(str(profile.get("display_name","Player")).left(12),Rect2(x+156,y+102+i*40,w-168,34),"pickup:"+str(pending[i].id))
-	y += 246
+	if not pending.is_empty():
+		_pickup_page = clampi(_pickup_page,0,int((pending.size()-1)/2))
+		var start := _pickup_page*2
+		var count := mini(2,pending.size()-start)
+		var height := 42+count*64+(36 if pending.size()>2 else 0)
+		_round(Rect2(x,y,w,height),LIME,18)
+		_text("PICK UP YOUR PROFILE",Vector2(x+16,y+27),14,GREEN,true)
+		for i in count:
+			var ticket: Dictionary = pending[start+i]
+			var profile: Dictionary = ticket.get("profile",{})
+			var card := Rect2(x+10,y+38+i*64,w-20,58)
+			_round(card,PAPER,12)
+			faces.draw_face(self,profile,card.position+Vector2(28,29),18)
+			_text(str(profile.get("display_name","Player")),card.position+Vector2(56,24),16,INK,true,w-92)
+			_text("Connecting…" if _pickup_pending == str(ticket.id) else "A · Pick up",card.position+Vector2(56,44),12,GREEN)
+			if _pickup_pending.is_empty(): hits.append({"rect":card,"action":"pickup:"+str(ticket.id)})
+		if pending.size()>2:
+			_button("‹",Rect2(x+w-90,y+height-34,32,28),"pickup-page:-1",false,_pickup_page==0)
+			_button("›",Rect2(x+w-48,y+height-34,32,28),"pickup-page:1",false,start+count>=pending.size())
+		y += height+12
+	else:
+		y += 6
 	_round(Rect2(x,y,w,180),Color("e5ead8"),18)
 	_text("MUSIC",Vector2(x+16,y+28),14,GREEN,true)
 	var track: Dictionary = party.get("now_playing",{})
