@@ -1,6 +1,6 @@
 //! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
 pub(crate) mod discovery;
-mod settings;
+pub(crate) mod settings;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
 use axum::{
     extract::{Path, State},

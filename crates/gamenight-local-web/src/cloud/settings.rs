@@ -1,5 +1,5 @@
 //! Typed settings adapter. No model output becomes code or process arguments.
-use super::discovery::Selection;
+use super::{discovery::Selection, Seat};
 use crate::{daemon, SharedState};
 use futures_util::{SinkExt, StreamExt};
 use gamenight_protocol::{
@@ -71,11 +71,22 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> Result<
     if selection.expires <= now {
         return Err("Request expired".into());
     }
-    let player =
-        PlayerId(uuid::Uuid::parse_str(&selection.seat.player).map_err(|_| "Invalid player")?);
+    control(state, &selection.seat, Some(&selection.game), command).await
+}
+
+/// Sends `command` to the daemon as the player seated at `seat` and waits
+/// for its receipt. `game` defaults to the game whose active or warm session
+/// is `command.instance`, for callers that only know the session.
+pub(crate) async fn control(
+    state: &SharedState,
+    seat: &Seat,
+    game: Option<&str>,
+    command: &Command,
+) -> Result<(), String> {
+    let player = PlayerId(uuid::Uuid::parse_str(&seat.player).map_err(|_| "Invalid player")?);
     let addr = {
         let local = state.lock().unwrap();
-        if *local.link_revisions.get(&player).unwrap_or(&0) != selection.seat.revision {
+        if *local.link_revisions.get(&player).unwrap_or(&0) != seat.revision {
             return Err("Player link changed".into());
         }
         local.daemon_addr.clone()
@@ -100,13 +111,23 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> Result<
         if !party
             .seats
             .iter()
-            .any(|s| s.index == selection.seat.index && s.occupant.player_id() == Some(player))
+            .any(|s| s.index == seat.index && s.occupant.player_id() == Some(player))
         {
             return Err("Player left or changed seat".to_string());
         }
+        let game = match game {
+            Some(game) => GameId(game.to_string()),
+            None => party
+                .active_session
+                .iter()
+                .chain(party.warm_session.iter())
+                .find(|s| s.id == command.instance)
+                .map(|s| s.game.clone())
+                .ok_or("That game is no longer running")?,
+        };
         ws.send(Message::Text(
             ClientMessage::ControlSettings {
-                game: GameId(selection.game.clone()),
+                game: game.clone(),
                 session: command.instance,
                 expected_revision: command.expected_revision,
                 player_id: player,
@@ -121,10 +142,10 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> Result<
             match serde_json::from_str::<ServerMessage>(&text) {
                 Ok(ServerMessage::Error { message }) => return Err(message),
                 Ok(ServerMessage::SettingsAccepted {
-                    game,
+                    game: accepted,
                     session,
                     revision,
-                }) if game.0 == selection.game
+                }) if accepted == game
                     && session == command.instance
                     && revision == command.expected_revision + 1 =>
                 {
@@ -142,7 +163,6 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> Result<
 
 #[cfg(test)]
 mod tests {
-    use super::super::Seat;
     use super::*;
     use crate::ServerState;
     use std::sync::{Arc, Mutex};

@@ -210,6 +210,11 @@ class GameNightApi {
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
 
+  /// A JSON request to this host, for features that keep their calls in their
+  /// own file (see room_controls.dart).
+  Future<dynamic> request(String method, String path, {Object? body, String? failure}) =>
+      _send(method, path, body: body, failure: failure);
+
   /// Cheap reachability check used by the connect screen.
   Future<void> ping() => _send('GET', '/api/player-links',
       failure: 'This address answered, but it is not a GameNight.');
