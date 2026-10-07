@@ -553,8 +553,11 @@ don't fit in a web page. Declare a native app instead of (or next to) a page:
 
 `download` is an `https://` URL or a file inside `root`; a file is served by
 the GameNight PC over the LAN, so the PC is the phone's installer. The
-GameNight app offers **Install** (download, then Android's own installer
-asks to confirm) and **Open** (launches `android`). The app connects to the
+GameNight app acts as the store: **Install** downloads the APK and hands
+it to Android's installer (Android asks once to allow installs from
+GameNight and confirms each first install; updates of apps GameNight
+installed need no confirmation on Android 12+), and **Open** launches
+`android`. In Godot: `GameNight.declare_companion(root, "", app)`. The app connects to the
 game by its own means, for example LAN discovery; `companion_message` is for
 pages only. iPhones can't install apps from outside the App Store, so there
 the app must come from the App Store or TestFlight.

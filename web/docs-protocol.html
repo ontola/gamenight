@@ -662,8 +662,11 @@ don't fit in a web page. Declare a native app instead of (or next to) a page:</p
 </code></pre></div>
 <p><code>download</code> is an <code>https://</code> URL or a file inside <code>root</code>; a file is served by
 the GameNight PC over the LAN, so the PC is the phone's installer. The
-GameNight app offers <strong>Install</strong> (download, then Android's own installer
-asks to confirm) and <strong>Open</strong> (launches <code>android</code>). The app connects to the
+GameNight app acts as the store: <strong>Install</strong> downloads the APK and hands
+it to Android's installer (Android asks once to allow installs from
+GameNight and confirms each first install; updates of apps GameNight
+installed need no confirmation on Android 12+), and <strong>Open</strong> launches
+<code>android</code>. In Godot: <code>GameNight.declare_companion(root, &quot;&quot;, app)</code>. The app connects to the
 game by its own means, for example LAN discovery; <code>companion_message</code> is for
 pages only. iPhones can't install apps from outside the App Store, so there
 the app must come from the App Store or TestFlight.</p>
@@ -825,7 +828,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="3d88ed4da239ad26e4f199b89bf6d7846ea728934a6645a1ce5fa8d581d2d20b">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="dcf56a61b09f0c5f4851a823f122e3a73dbbd6af41fb52a11c972d0edd9357af">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

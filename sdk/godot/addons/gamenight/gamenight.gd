@@ -192,6 +192,34 @@ func declare_settings(settings: Array) -> void:
 
 var _declared_settings: Array = []
 
+## Optional: give each player a screen of their own on their phone (see
+## "Phone screens" in docs/protocol.md). `root` is an absolute directory the
+## host's web server may serve, `entry` a page inside it, and `app` a native
+## phone app: { "name": ..., "android": "com.example.app", "download":
+## "file-in-root.apk" or "https://..." }. Pass a page, an app or both.
+## Re-declared automatically after every reconnect.
+func declare_companion(root: String = "", entry: String = "", app: Dictionary = {}) -> void:
+	var msg := {"type": "declare_companion"}
+	if not root.is_empty(): msg["root"] = root
+	if not entry.is_empty(): msg["entry"] = entry
+	if not app.is_empty(): msg["app"] = app
+	_declared_companion = msg
+	_send(msg)
+
+var _declared_companion: Dictionary = {}
+
+## Send JSON to one player's phone page, or to every phone when `player_id`
+## is empty. Answers arrive via [signal companion_message].
+func send_companion_message(data: Variant, player_id: String = "") -> void:
+	var msg := {"type": "companion_message", "data": data}
+	if not player_id.is_empty(): msg["player_id"] = player_id
+	_send(msg)
+
+## A player's phone page sent [param data]. Treat it as untrusted input.
+signal companion_message(player_id: String, data: Variant)
+## A player's phone page opened or closed; send them their view on connect.
+signal companion_presence(player_id: String, connected: bool)
+
 ## Optional: how far along warming is (0-100), so the lobby's screen can show
 ## the party something truthful while they wait instead of an unchanging
 ## "loading". Send as often as is useful; the daemon keeps the latest. A game
@@ -334,6 +362,8 @@ func _handle(msg: Variant) -> void:
 			# party changed while we were away.
 			if not _declared_settings.is_empty():
 				_send({"type": "declare_settings", "settings": _declared_settings})
+			if not _declared_companion.is_empty():
+				_send(_declared_companion)
 		"party_state":
 			party = msg.get("party", {})
 			party_updated.emit(party)
@@ -386,5 +416,9 @@ func _handle(msg: Variant) -> void:
 				# JSON numbers parse as float; number settings are integers.
 				value = int(value)
 			setting_changed.emit(msg.get("key", ""), value)
+		"companion_message":
+			companion_message.emit(str(msg.get("player_id", "")), msg.get("data"))
+		"companion_presence":
+			companion_presence.emit(str(msg.get("player_id", "")), bool(msg.get("connected", false)))
 		"error":
 			push_warning("GameNight daemon: %s" % msg.get("message", "unknown error"))
