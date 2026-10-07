@@ -24,6 +24,10 @@ Scan the lobby QR code to open the character editor on your phone. Draw a face
 and change the playlist. Games can use your profile too; the catalog lists
 which parts of the integration have been checked.
 
+Prefer an app? The [GameNight app](mobile) is a Flutter version of the same
+phone studio for Android and iOS: join the room, draw your face and manage the
+playlist.
+
 This is an early preview. Game support varies, and controller, audio and window
 behaviour still need testing across machines. See the
 [Windows preview guide](docs/windows-preview.md) or

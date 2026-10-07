@@ -1,0 +1,50 @@
+# GameNight app
+
+A Flutter app for players on the couch. It does what the phone studio in the
+browser does, as an installable app for Android and iOS:
+
+- **Room.** Scan the lobby QR (or type the address) to connect to a GameNight
+  on your Wi-Fi. Enter the room code and walk your character to your door to
+  be picked up, or scan the QR above a character to sign in as that one.
+  Shows who you are signed in as, the current game and what is up next, and
+  lets you become the main player or be remembered.
+- **You.** Your name, skin colour and the 48×48 face you draw, with the same
+  presets, tools and wire format as the web studio. Every change saves by
+  itself and follows your character into every integrated game.
+- **Playlist.** Tonight's queue: drag to reorder, remove a game, or play an
+  earlier game again.
+
+The app only talks to the local web server on the GameNight PC (port 7913),
+over the same HTTP endpoints as `web/studio.js`. It needs no changes to the
+host and never touches the daemon's control port. Hosted rooms on
+gamenight.ontola.io still open in the browser.
+
+## Run
+
+GameNight must have its phone studio on: start it with
+`python scripts/run-local.py --studio`, or set `GAMENIGHT_WEB=1`.
+
+```sh
+cd mobile
+flutter pub get
+flutter run            # on a phone on the same Wi-Fi
+flutter test
+flutter build apk      # Android
+flutter build ipa      # iOS, needs a Mac and signing
+```
+
+Android allows plain HTTP for this app (`usesCleartextTraffic`), and iOS
+allows local networking (`NSAllowsLocalNetworking`), because the GameNight PC
+serves plain HTTP on the LAN.
+
+`flutter build web` also works for quick UI checks. Serve the build from the
+same origin as the GameNight web server (or through a proxy): the local web
+server sends no CORS headers.
+
+## Not yet
+
+- Phones as gamepads or game-specific phone screens. That needs a live
+  channel from the host to each phone, which the local web server does not
+  have yet (see the companion screens proposal).
+- Several saved faces, and backups. The web studio has these.
+- Signing in to a GameNight account and hosted rooms.
