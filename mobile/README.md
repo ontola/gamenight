@@ -7,16 +7,23 @@ browser does, as an installable app for Android and iOS:
   on your Wi-Fi. Enter the room code and walk your character to your door to
   be picked up, or scan the QR above a character to sign in as that one.
   Shows who you are signed in as, the current game and what is up next, and
-  lets you become the main player or be remembered.
+  lets you become the main player or be remembered, or hand your character
+  back.
+- **Game.** The current game's own phone screen, for games that declare one
+  (see [Phone screens](../docs/protocol.md#phone-screens)): a hand of cards,
+  a private map. It opens by itself when such a game starts, so there is
+  nothing to install per game. Hexstead in `ontola/gamenight-games` is the
+  example.
 - **You.** Your name, skin colour and the 48×48 face you draw, with the same
   presets, tools and wire format as the web studio. Every change saves by
-  itself and follows your character into every integrated game.
+  itself and follows your character into every integrated game. Keep several
+  faces, and copy or restore a backup as text (the web studio's format).
 - **Playlist.** Tonight's queue: drag to reorder, remove a game, or play an
   earlier game again.
 
 The app only talks to the local web server on the GameNight PC (port 7913),
-over the same HTTP endpoints as `web/studio.js`. It needs no changes to the
-host and never touches the daemon's control port. Hosted rooms on
+over the same HTTP endpoints as `web/studio.js`, plus `/api/companion` for
+phone screens. It never touches the daemon's control port. Hosted rooms on
 gamenight.ontola.io still open in the browser.
 
 ## Run
@@ -43,8 +50,5 @@ server sends no CORS headers.
 
 ## Not yet
 
-- Phones as gamepads or game-specific phone screens. That needs a live
-  channel from the host to each phone, which the local web server does not
-  have yet (see the companion screens proposal).
-- Several saved faces, and backups. The web studio has these.
+- Phones as plain gamepads for games without a phone screen.
 - Signing in to a GameNight account and hosted rooms.
