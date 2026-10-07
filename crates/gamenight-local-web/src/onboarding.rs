@@ -96,15 +96,12 @@ fn listen_for_catalog_requests(state: SharedState, file: PathBuf) {
                 continue;
             };
             let addr = state.lock().unwrap().daemon_addr.clone();
-            if std::fs::write(&file, json!({"complete":false,"game":game}).to_string()).is_err() {
+            if save(&file, json!({"complete":false,"game":game})).is_err() {
                 continue;
             }
             match queue(&addr, game).await {
                 Ok(installed) => {
-                    let _ = std::fs::write(
-                        &file,
-                        json!({"complete":installed,"game":game}).to_string(),
-                    );
+                    let _ = save(&file, json!({"complete":installed,"game":game}));
                 }
                 Err(error) => {
                     tracing::warn!(%game, %error, "Catalog selection could not reach the lobby; saved for next launch")
@@ -263,14 +260,14 @@ async fn complete(state: &SharedState, ticket: &str, game: Option<&str>) -> Resu
     // Persist the requested ID before contacting the daemon. A crash or an
     // interrupted download keeps the choice for the next desktop launch.
     let result = async {
-        std::fs::write(&file, json!({"complete":false,"game":game}).to_string())
+        save(&file, json!({"complete":false,"game":game}))
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         let installed = match game {
             Some(game) => queue(&addr, game).await?,
             None => true,
         };
         // Until installed, resume this choice on the next launch as well.
-        std::fs::write(&file, json!({"complete":installed,"game":game}).to_string())
+        save(&file, json!({"complete":installed,"game":game}))
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok(())
     }
@@ -473,4 +470,12 @@ mod tests {
         assert!(!queue(&addr.to_string(), "blast-party").await.unwrap());
         task.await.unwrap();
     }
+}
+
+/// Replaces the saved choice in one step, so the launcher never reads a
+/// half-written file.
+fn save(file: &std::path::Path, value: serde_json::Value) -> std::io::Result<()> {
+    let temporary = file.with_extension(format!("{}.tmp", std::process::id()));
+    std::fs::write(&temporary, value.to_string())?;
+    std::fs::rename(temporary, file)
 }
