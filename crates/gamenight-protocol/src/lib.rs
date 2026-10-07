@@ -711,18 +711,38 @@ pub struct PartySnapshot {
 }
 
 /// A game's own phone screen: a small web page that GameNight serves to the
-/// phones of seated players while that game is active. Games that support
-/// asymmetric play (a hidden hand of cards, a god's-eye map) declare one with
-/// `declare_companion` and talk to each phone with `companion_message`.
+/// phones of seated players while that game is active, a native phone app,
+/// or both. Games that support asymmetric play (a hidden hand of cards, a
+/// god's-eye map) declare one with `declare_companion`; pages talk to the
+/// game with `companion_message`, native apps use their own connection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CompanionScreen {
     pub game: GameId,
     /// Page to open, relative to `root`, e.g. `phone/index.html`.
-    pub entry: String,
-    /// Absolute directory the local web server serves the page from. Only
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entry: Option<String>,
+    /// Absolute directory the local web server serves files from. Only
     /// trusted local UIs see it; it is stripped from lobby snapshots.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<CompanionApp>,
+}
+
+/// A native phone app for a game, for phone sides a web page can't carry
+/// (a full 3D view, say). The GameNight app offers to install and open it;
+/// connecting to the game is the app's own business.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompanionApp {
+    /// Shown on the phone, e.g. "The Voice and the Will".
+    pub name: String,
+    /// Android package to launch, e.g. `io.ontola.godgame`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub android: Option<String>,
+    /// Where to get the app: an `https://` URL, or a file inside `root`
+    /// (such as `god.apk`), which the host then serves on the LAN.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,10 +1020,15 @@ pub enum ClientMessage {
     },
     /// Offer a phone screen for this game (see [`CompanionScreen`]). Send
     /// after `welcome`, and again after every reconnect. `root` must be an
-    /// absolute directory; `entry` is the page inside it.
+    /// absolute directory; `entry` is the page inside it. Declare a page,
+    /// an `app`, or both.
     DeclareCompanion {
-        root: String,
-        entry: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        root: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        entry: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        app: Option<CompanionApp>,
     },
     /// Opaque JSON between a game and phone screens. From a game, `player_id`
     /// addresses one phone and its absence addresses every phone. From a

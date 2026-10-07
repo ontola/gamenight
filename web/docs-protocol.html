@@ -653,6 +653,20 @@ another player's hand. Keep messages small (under 16 KB) and treat every one
 as untrusted input. Overlays see declared screens in <code>party_state.companions</code>
 and relay traffic with <code>companion_message</code> (<code>game</code> and <code>player_id</code> set) and
 <code>companion_presence</code>; the lobby sees screens without their <code>root</code>.</p>
+<h3 id="native-phone-apps">Native phone apps</h3>
+<p>Some phone sides are a whole game of their own, such as a 3D god view, and
+don't fit in a web page. Declare a native app instead of (or next to) a page:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;declare_companion&quot;, &quot;root&quot;: &quot;/abs/path/to/game/phone&quot;,
+  &quot;app&quot;: { &quot;name&quot;: &quot;The Voice and the Will&quot;, &quot;android&quot;: &quot;io.ontola.godgame&quot;,
+           &quot;download&quot;: &quot;voice-and-will.apk&quot; } }
+</code></pre></div>
+<p><code>download</code> is an <code>https://</code> URL or a file inside <code>root</code>; a file is served by
+the GameNight PC over the LAN, so the PC is the phone's installer. The
+GameNight app offers <strong>Install</strong> (download, then Android's own installer
+asks to confirm) and <strong>Open</strong> (launches <code>android</code>). The app connects to the
+game by its own means, for example LAN discovery; <code>companion_message</code> is for
+pages only. iPhones can't install apps from outside the App Store, so there
+the app must come from the App Store or TestFlight.</p>
 <h2 id="the-night-end-to-end">The night, end to end</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>overlay: set_playlist [neon-trails, neon-siege]
 daemon → neon-trails: prepare      (warm the first game)
@@ -811,7 +825,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="705dcc38bfb78b89f40235f7222fe435bb58101f00f412a9681beedeeecf34d3">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="3d88ed4da239ad26e4f199b89bf6d7846ea728934a6645a1ce5fa8d581d2d20b">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

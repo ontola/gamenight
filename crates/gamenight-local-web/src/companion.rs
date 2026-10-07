@@ -240,17 +240,47 @@ pub async fn current(
 ) -> Json<serde_json::Value> {
     let (hub, player) = hub_and_player(&state, &query.profile);
     match (player, hub.active()) {
-        (Some(player), Some((screen, title))) => Json(serde_json::json!({
-            "game": screen.game,
-            "title": title,
-            "player_id": player,
-            "url": format!(
-                "/play/{}/{}?profile={}&game={}",
-                screen.game, screen.entry, query.profile, screen.game
-            ),
-        })),
+        (Some(player), Some((screen, title))) => {
+            let profile = encode(&query.profile);
+            let url = screen.entry.as_ref().map(|entry| {
+                format!(
+                    "/play/{}/{entry}?profile={profile}&game={}",
+                    screen.game, screen.game
+                )
+            });
+            // A download inside the game's folder is served from here, so
+            // the GameNight PC installs the app over the LAN.
+            let app = screen.app.map(|app| {
+                let download = app.download.map(|d| {
+                    if d.starts_with("https://") {
+                        d
+                    } else {
+                        format!("/play/{}/{d}", screen.game)
+                    }
+                });
+                serde_json::json!({"name": app.name, "android": app.android, "download": download})
+            });
+            Json(serde_json::json!({
+                "game": screen.game,
+                "title": title,
+                "player_id": player,
+                "url": url,
+                "app": app,
+            }))
+        }
         _ => Json(serde_json::json!({"game": null, "linked": player.is_some()})),
     }
+}
+
+fn encode(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }
 
 /// `GET /play/<game>/<path>`: a file of a declared phone screen.
@@ -301,6 +331,7 @@ fn content_type(path: &std::path::Path) -> &'static str {
         "jpg" | "jpeg" => "image/jpeg",
         "webp" => "image/webp",
         "woff2" => "font/woff2",
+        "apk" => "application/vnd.android.package-archive",
         "wav" => "audio/wav",
         "ogg" => "audio/ogg",
         "mp3" => "audio/mpeg",
@@ -321,7 +352,7 @@ pub async fn socket(
     let Some(game) = query.game.map(GameId::new) else {
         return StatusCode::BAD_REQUEST.into_response();
     };
-    if hub.screen(&game).is_none() {
+    if hub.screen(&game).is_none_or(|s| s.entry.is_none()) {
         return (StatusCode::NOT_FOUND, "this game has no phone screen").into_response();
     }
     upgrade

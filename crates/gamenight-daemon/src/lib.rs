@@ -391,23 +391,18 @@ impl Shared {
             )
         };
         match (msg, registration) {
-            (ClientMessage::DeclareCompanion { root, entry }, Registration::Game(game)) => {
-                if !std::path::Path::new(&root).is_absolute()
-                    || entry.is_empty()
-                    || entry.starts_with('/')
-                    || entry.split(['/', '\\']).any(|part| part == "..")
-                {
-                    return reject("declare_companion needs an absolute root and a relative entry");
+            (ClientMessage::DeclareCompanion { root, entry, app }, Registration::Game(game)) => {
+                let screen = gamenight_protocol::CompanionScreen {
+                    game: game.clone(),
+                    entry,
+                    root,
+                    app,
+                };
+                if let Err(reason) = valid_companion(&screen) {
+                    return reject(reason);
                 }
-                info!(%game, %root, %entry, "game declared a phone screen");
-                self.companions.insert(
-                    game.clone(),
-                    gamenight_protocol::CompanionScreen {
-                        game: game.clone(),
-                        entry,
-                        root: Some(root),
-                    },
-                );
+                info!(%game, ?screen, "game declared a phone screen");
+                self.companions.insert(game.clone(), screen);
                 self.broadcast_party();
             }
             (
@@ -646,6 +641,46 @@ fn lobby_snapshot(
         companion.root = None;
     }
     party
+}
+
+/// A file path a phone may ask for inside a declared root.
+fn relative_path(path: &str) -> bool {
+    !path.is_empty()
+        && !path.starts_with(['/', '\\'])
+        && !path.contains(':')
+        && !path.split(['/', '\\']).any(|part| part == "..")
+}
+
+fn valid_companion(screen: &gamenight_protocol::CompanionScreen) -> Result<(), &'static str> {
+    if let Some(root) = &screen.root {
+        if !std::path::Path::new(root).is_absolute() {
+            return Err("declare_companion: root must be an absolute directory");
+        }
+    }
+    if let Some(entry) = &screen.entry {
+        if screen.root.is_none() || !relative_path(entry) {
+            return Err("declare_companion: entry must be a relative page inside root");
+        }
+    }
+    if let Some(app) = &screen.app {
+        let name_ok = !app.name.trim().is_empty() && app.name.len() <= 80;
+        let package_ok = app.android.as_deref().is_none_or(|p| {
+            !p.is_empty()
+                && p.len() <= 200
+                && p.chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '_')
+        });
+        let download_ok = app.download.as_deref().is_none_or(|d| {
+            d.starts_with("https://") || (screen.root.is_some() && relative_path(d))
+        });
+        if !name_ok || !package_ok || !download_ok {
+            return Err("declare_companion: app needs a name, a package id and an https or in-root download");
+        }
+    }
+    if screen.entry.is_none() && screen.app.is_none() {
+        return Err("declare_companion needs an entry page, an app, or both");
+    }
+    Ok(())
 }
 
 fn send(tx: &Tx, msg: &ServerMessage) {
@@ -2050,6 +2085,45 @@ mod replacement_lobby_tests {
     }
 
     #[test]
+    fn phone_screens_may_be_a_page_a_native_app_or_both() {
+        use gamenight_protocol::{CompanionApp, CompanionScreen};
+        let root = std::env::temp_dir().display().to_string();
+        let app = |download: &str| CompanionApp {
+            name: "The Voice and the Will".into(),
+            android: Some("io.ontola.godgame".into()),
+            download: Some(download.into()),
+        };
+        let screen =
+            |root: Option<&str>, entry: Option<&str>, app: Option<CompanionApp>| CompanionScreen {
+                game: GameId::new("god"),
+                root: root.map(Into::into),
+                entry: entry.map(Into::into),
+                app,
+            };
+        assert!(valid_companion(&screen(
+            None,
+            None,
+            Some(app("https://example.org/god.apk"))
+        ))
+        .is_ok());
+        assert!(valid_companion(&screen(Some(&root), None, Some(app("god.apk")))).is_ok());
+        assert!(valid_companion(&screen(Some(&root), Some("index.html"), None)).is_ok());
+        assert!(
+            valid_companion(&screen(None, None, Some(app("god.apk")))).is_err(),
+            "a file needs a root"
+        );
+        assert!(valid_companion(&screen(Some(&root), None, Some(app("../god.apk")))).is_err());
+        assert!(
+            valid_companion(&screen(None, None, Some(app("http://example.org/god.apk")))).is_err()
+        );
+        assert!(
+            valid_companion(&screen(Some(&root), None, None)).is_err(),
+            "nothing to show"
+        );
+        assert!(valid_companion(&screen(None, Some("index.html"), None)).is_err());
+    }
+
+    #[test]
     fn phone_screens_route_between_games_and_the_local_web_server() {
         let mut shared = Shared::new(Vec::new(), "127.0.0.1:1".into(), None);
         let game = GameId::new("hexstead");
@@ -2067,8 +2141,9 @@ mod replacement_lobby_tests {
 
         shared.companion(
             ClientMessage::DeclareCompanion {
-                root: "relative/dir".into(),
-                entry: "phone.html".into(),
+                root: Some("relative/dir".into()),
+                entry: Some("phone.html".into()),
+                app: None,
             },
             &as_game,
             &game_tx,
@@ -2076,8 +2151,9 @@ mod replacement_lobby_tests {
         assert!(matches!(next(&mut game_rx), ServerMessage::Error { .. }));
         shared.companion(
             ClientMessage::DeclareCompanion {
-                root: root.clone(),
-                entry: "phone/index.html".into(),
+                root: Some(root.clone()),
+                entry: Some("phone/index.html".into()),
+                app: None,
             },
             &as_game,
             &game_tx,

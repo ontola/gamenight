@@ -387,8 +387,26 @@ impl GameNight {
         entry: impl Into<String>,
     ) -> Result<(), SdkError> {
         self.send(&ClientMessage::DeclareCompanion {
-            root: root.into(),
-            entry: entry.into(),
+            root: Some(root.into()),
+            entry: Some(entry.into()),
+            app: None,
+        })
+        .await
+    }
+
+    /// Offer a native phone app instead of (or next to) a page, for phone
+    /// sides a web page can't carry. The GameNight app installs and opens
+    /// it; the app connects to your game by its own means.
+    pub async fn declare_companion_app(
+        &mut self,
+        app: gamenight_protocol::CompanionApp,
+        root: Option<String>,
+        entry: Option<String>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::DeclareCompanion {
+            root,
+            entry,
+            app: Some(app),
         })
         .await
     }

@@ -540,6 +540,25 @@ as untrusted input. Overlays see declared screens in `party_state.companions`
 and relay traffic with `companion_message` (`game` and `player_id` set) and
 `companion_presence`; the lobby sees screens without their `root`.
 
+### Native phone apps
+
+Some phone sides are a whole game of their own, such as a 3D god view, and
+don't fit in a web page. Declare a native app instead of (or next to) a page:
+
+```json
+{ "type": "declare_companion", "root": "/abs/path/to/game/phone",
+  "app": { "name": "The Voice and the Will", "android": "io.ontola.godgame",
+           "download": "voice-and-will.apk" } }
+```
+
+`download` is an `https://` URL or a file inside `root`; a file is served by
+the GameNight PC over the LAN, so the PC is the phone's installer. The
+GameNight app offers **Install** (download, then Android's own installer
+asks to confirm) and **Open** (launches `android`). The app connects to the
+game by its own means, for example LAN discovery; `companion_message` is for
+pages only. iPhones can't install apps from outside the App Store, so there
+the app must come from the App Store or TestFlight.
+
 ## The night, end to end
 
 ```
