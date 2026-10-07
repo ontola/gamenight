@@ -2,6 +2,7 @@
 // preview: the body atlas comes from the host, skin and clothing are tinted,
 // the old head is replaced by the shared circular head.
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -32,6 +33,24 @@ class CharacterSprite {
       return null;
     }
   }
+
+  /// The living-room idle cell bundled with the app, so the body guide and the
+  /// preview work before the phone has joined a GameNight. It is the first
+  /// cell of `crates/lobby/assets/player/skins/fishy/fishy-body.png`, which is
+  /// what hosts serve at `/assets/characters/living-room`.
+  static Future<ui.Image?> bundled() => _atlas.putIfAbsent('bundled', () async {
+        try {
+          final codec = await ui.instantiateImageCodec(base64Decode(_bundledIdleCell));
+          return (await codec.getNextFrame()).image;
+        } catch (_) {
+          _atlas.remove('bundled');
+          return null;
+        }
+      });
+
+  /// The host's body when it can be loaded, otherwise the bundled one.
+  static Future<ui.Image?> atlasOrBundled(Uri? host) async =>
+      (host == null ? null : await atlas(host)) ?? await bundled();
 
   /// Recolours the idle cell. Skin pixels are the cream shades of the atlas.
   static Future<ui.Image> tint(ui.Image atlas, String clothing, String skin) async {
@@ -69,6 +88,46 @@ class CharacterSprite {
   }
 }
 
+/// The tinted body for the current host and colours. Screens listen to it and
+/// repaint once a new tint is ready.
+class TintedBody extends ChangeNotifier {
+  ui.Image? image;
+  String? _key;
+  bool _disposed = false;
+
+  Future<void> update(Uri? host, String clothing, String skin) async {
+    final key = '$host|$clothing|$skin';
+    if (key == _key) return;
+    _key = key;
+    final atlas = await CharacterSprite.atlasOrBundled(host);
+    if (atlas == null || key != _key) return;
+    final tinted = await CharacterSprite.tint(atlas, clothing, skin);
+    if (key != _key || _disposed) return;
+    image = tinted;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}
+
+const String _bundledIdleCell =
+    'iVBORw0KGgoAAAANSUhEUgAAAGAAAABQCAYAAADm4nCVAAACvklEQVR42u2aoY8TQRjF3zUYQB+YJptgNsGMGrFJ'
+    'DdhWryNZi9lkjz+kyRocaSCYprYWtcmICWIMyRjoJjXkNEEWw056204pbQ9m2/dT7dxV9L39vjfzTQFCCCGEEEII'
+    'IYQQQgghhBBCCCHnylXXv8CP759W29YfP315RQP+seg+Qjajd+7iH/oZGnBiIUM1oXcJ4odsQu9SxA/VhN4liR+i'
+    'CZ0L4XODBtCA/9MqQmlDrAAaQAMIDaABhAZscp9TzFAmpKwAGkADguY+WkVIFzSdqIBTChba7VhnWtAphAvxarJT'
+    'GXCMgKHeC3cuhA8RMuRLef4shVw2wTwli8XizpNcliUAIM9zaK3dulIK1loYY5CmKZIkAQBIKRFFEQCgrmtoraGU'
+    'QpIkKIoCaZpiOp0CAJbLJbehPrTWGAwGTvw2eZ4jy7Ktn6vremO9KAoAcEYxhPekEUxrjaIoMJlM3Pt9TORJ+ECU'
+    'UhtrQggYYyClhJRy6/80ws9mMyilIKVEnucQQtCAY8my7I6Q1tq92koURYjjOOjv9qBLO4ayLF0A/00FcRe0B/1+'
+    '3+2C7Of3G3+//fnMhTMAVFW1tddLKXH98CsePXkBABiNRjDGQAiB6bs3uP2iMHj1NpjdUCfH0ePx2Bu0WmsnPgDX'
+    'gnZVDQ34/TTuDMxvH10g+5BSbqxZa1F9eO2q6vp5QgN8zOfzP7YEX6g24m8zgRlwRB60W49P/CYfqqpCFEXuULae'
+    'G+vVxl3QiU/P7dfNKCJ0gjSg/YQOh8OVL0SbUYMQwo0oGhNCnP10sgIa8bvW38+uBWmtvSYYYzp3CAs2hHeFshAC'
+    'cRy79tImTVP3mi3oxKRp6kbUvpFEc38gpfSaxAo4kJubm1Vb/OZg1rxfrwBr7V5nCxpwxPmgaS++s0PI7YcQQggh'
+    'hBBCCCGEEEIIIZfBL3vTLYtEm2RNAAAAAElFTkSuQmCC';
+
 /// Paints body, head and face at native pixel size, scaled to fit.
 class CharacterPainter extends CustomPainter {
   final ui.Image? body;
@@ -76,16 +135,15 @@ class CharacterPainter extends CustomPainter {
   final Color skin;
   final int revision;
 
-  CharacterPainter(
-      {required this.body, required this.face, required this.skin, this.revision = 0});
+  CharacterPainter({required this.body, required this.face, required this.skin, this.revision = 0});
 
   @override
   void paint(Canvas canvas, Size size) {
     final scale = (size.width / cellSize.width) < (size.height / cellSize.height)
         ? size.width / cellSize.width
         : size.height / cellSize.height;
-    canvas.translate((size.width - cellSize.width * scale) / 2,
-        (size.height - cellSize.height * scale) / 2);
+    canvas.translate(
+        (size.width - cellSize.width * scale) / 2, (size.height - cellSize.height * scale) / 2);
     canvas.scale(scale);
     final pixel = Paint()..isAntiAlias = false;
     if (body != null) {
@@ -98,8 +156,7 @@ class CharacterPainter extends CustomPainter {
       if (c == null) continue;
       pixel.color = Color(int.parse(c.substring(1, 7), radix: 16) | 0xFF000000);
       canvas.drawRect(
-          Rect.fromLTWH(faceOrigin.dx + i % gridSize, faceOrigin.dy + i ~/ gridSize, 1, 1),
-          pixel);
+          Rect.fromLTWH(faceOrigin.dx + i % gridSize, faceOrigin.dy + i ~/ gridSize, 1, 1), pixel);
     }
   }
 

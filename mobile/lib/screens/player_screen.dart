@@ -1,6 +1,3 @@
-import 'dart:ui' as ui;
-
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -9,8 +6,7 @@ import '../avatar.dart';
 import '../character.dart';
 import '../faces.dart';
 import '../theme.dart';
-
-enum Tool { pencil, eraser, fill }
+import 'face_editor_screen.dart';
 
 const List<String> clothingColors = [
   '#ff5555', '#ff8f3f', '#ffc94a', '#7ddf64', '#3fd0c9', '#55a0ff',
@@ -28,153 +24,38 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   late final _name = TextEditingController(text: widget.state.name);
-  late Pixels _grid = List.of(widget.state.face);
-  final List<Pixels> _undo = [];
-  Tool _tool = Tool.pencil;
-  String _color = drawPalette.first;
-  int _brush = 1;
-  bool _guide = true;
-  (int, int)? _last;
-  bool _strokeDirty = false;
-  bool _stroking = false;
-  final _canvasKey = GlobalKey();
-
-  ui.Image? _body;
-  String? _bodyKey;
+  final _body = TintedBody();
 
   AppState get state => widget.state;
 
   @override
   void initState() {
     super.initState();
-    state.addListener(_refreshBody);
-    state.addListener(_followArtwork);
-    _refreshBody();
+    state.addListener(_onState);
+    _body.addListener(_onBody);
+    _onState();
   }
 
   @override
   void dispose() {
-    state.removeListener(_refreshBody);
-    state.removeListener(_followArtwork);
+    state.removeListener(_onState);
+    _body.dispose();
     _name.dispose();
     super.dispose();
   }
 
-  Future<void> _refreshBody() async {
-    final api = state.api;
-    final key = '${api?.base}|${state.clothingColor}|${state.skinColor}';
-    if (key == _bodyKey) return;
-    _bodyKey = key;
-    if (api == null) {
-      if (mounted) setState(() => _body = null);
-      return;
-    }
-    final atlas = await CharacterSprite.atlas(api.characterSprite);
-    if (atlas == null || key != _bodyKey) return;
-    final tinted = await CharacterSprite.tint(atlas, state.clothingColor, state.skinColor);
-    if (mounted && key == _bodyKey) setState(() => _body = tinted);
+  void _onBody() {
+    if (mounted) setState(() {});
   }
 
-  late String _shownArtwork = state.currentArtworkId;
-
-  /// Picking another saved face (or importing a backup) replaces the canvas.
-  void _followArtwork() {
-    if (_shownArtwork != state.currentArtworkId) {
-      _shownArtwork = state.currentArtworkId;
-      setState(() {
-        _grid = List.of(state.face);
-        _undo.clear();
-      });
-    }
+  void _onState() {
+    _body.update(state.api?.characterSprite, state.clothingColor, state.skinColor);
     if (_name.text != state.name) _name.text = state.name;
   }
 
-  void _pushUndo() {
-    _undo.add(List.of(_grid));
-    if (_undo.length > 40) _undo.removeAt(0);
-  }
-
-  void _commit() => state.setFace(List.of(_grid));
-
-  void _replace(Pixels next) {
-    _pushUndo();
-    setState(() => _grid = next);
-    _commit();
-  }
-
-  void _put(int x, int y, String? color) {
-    if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) return;
-    final i = y * gridSize + x;
-    if (_grid[i] == color) return;
-    _grid[i] = color;
-    _strokeDirty = true;
-  }
-
-  void _stamp(int x, int y) {
-    final offset = (_brush - 1) ~/ 2;
-    final color = _tool == Tool.eraser ? null : _color;
-    for (var dy = 0; dy < _brush; dy++) {
-      for (var dx = 0; dx < _brush; dx++) {
-        _put(x + dx - offset, y + dy - offset, color);
-      }
-    }
-  }
-
-  void _line((int, int) from, (int, int) to) {
-    var (x, y) = from;
-    final (ex, ey) = to;
-    final dx = (ex - x).abs(), dy = -(ey - y).abs();
-    final sx = x < ex ? 1 : -1, sy = y < ey ? 1 : -1;
-    var err = dx + dy;
-    while (true) {
-      _stamp(x, y);
-      if (x == ex && y == ey) break;
-      final e2 = err * 2;
-      if (e2 >= dy) {
-        err += dy;
-        x += sx;
-      }
-      if (e2 <= dx) {
-        err += dx;
-        y += sy;
-      }
-    }
-  }
-
-  void _paintAt(Offset local, double side) {
-    final x = (local.dx * gridSize / side).floor();
-    final y = (local.dy * gridSize / side).floor();
-    if (x < 0 || y < 0 || x >= gridSize || y >= gridSize) {
-      _last = null;
-      return;
-    }
-    if (_tool == Tool.fill) {
-      if (_last != null) return;
-      final before = List.of(_grid);
-      floodFill(_grid, y * gridSize + x, _color);
-      _strokeDirty = _strokeDirty || before.join() != _grid.join();
-    } else {
-      _line(_last ?? (x, y), (x, y));
-    }
-    _last = (x, y);
-    setState(() {});
-  }
-
-  void _startStroke(Offset p, double side) {
-    _pushUndo();
-    _strokeDirty = false;
-    _last = null;
-    _paintAt(p, side);
-  }
-
-  void _endStroke() {
-    _last = null;
-    if (!_strokeDirty) {
-      _undo.removeLast();
-    } else {
-      _commit();
-    }
-    setState(() {});
+  Future<void> _openEditor() async {
+    await FaceEditorScreen.open(context, state);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -200,10 +81,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
         height: 170,
         child: CustomPaint(
           painter: CharacterPainter(
-              body: _body,
-              face: _grid,
+              body: _body.image,
+              face: state.face,
               skin: hexColor(state.skinColor),
-              revision: Object.hashAll(_grid)),
+              revision: Object.hashAll(state.face)),
         ),
       ),
       const SizedBox(height: 12),
@@ -250,98 +131,52 @@ class _PlayerScreenState extends State<PlayerScreen> {
       const SizedBox(height: 14),
       const Hint('Skin colour'),
       const SizedBox(height: 6),
-      _Swatches(colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
+      ColorSwatches(colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
       const SizedBox(height: 12),
       const Hint('Clothing colour (preview only, games pick their own)'),
       const SizedBox(height: 6),
-      _Swatches(colors: clothingColors, selected: state.clothingColor, onTap: state.setClothing),
+      ColorSwatches(
+          colors: clothingColors, selected: state.clothingColor, onTap: state.setClothing),
     ]);
   }
 
+  /// A preview of the current face. Drawing happens full screen.
   Widget _editor() {
     return Section(title: 'Draw your face', children: [
-      const Hint('Draw anywhere on the head, hats included. The circle marks your head.'),
+      const Hint('Draw anywhere on the head, hats included. Tap the canvas to start.'),
       const SizedBox(height: 12),
-      LayoutBuilder(builder: (context, box) {
-        final side = box.maxWidth;
-        Offset local(Offset global) =>
-            (_canvasKey.currentContext!.findRenderObject() as RenderBox).globalToLocal(global);
-        // Claims the pointer at once, so drawing never turns into scrolling.
-        return RawGestureDetector(
-          gestures: {
-            ImmediateMultiDragGestureRecognizer:
-                GestureRecognizerFactoryWithHandlers<ImmediateMultiDragGestureRecognizer>(
-              ImmediateMultiDragGestureRecognizer.new,
-              (r) => r.onStart = (position) {
-                if (_stroking) return null;
-                _stroking = true;
-                _startStroke(local(position), side);
-                return _Stroke(
-                  onUpdate: (d) => _paintAt(local(d.globalPosition), side),
-                  onDone: () {
-                    _stroking = false;
-                    _endStroke();
-                  },
-                );
-              },
-            ),
-          },
-          child: SizedBox(
-            key: _canvasKey,
-            width: side,
-            height: side,
-            child: CustomPaint(
-              painter: _GridPainter(
-                grid: _grid,
-                skin: hexColor(state.skinColor),
-                body: _guide ? _body : null,
-                revision: Object.hashAll(_grid),
+      Center(
+        child: Semantics(
+          button: true,
+          label: 'Edit face',
+          child: GestureDetector(
+            onTap: _openEditor,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: SizedBox.square(
+                dimension: 200,
+                child: CustomPaint(
+                  painter: FaceCanvasPainter(
+                    grid: state.face,
+                    skin: hexColor(state.skinColor),
+                    body: _body.image,
+                    guide: true,
+                    revision: Object.hashAll(state.face),
+                  ),
+                ),
               ),
             ),
           ),
-        );
-      }),
-      const SizedBox(height: 12),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        for (final size in [1, 2, 4, 8])
-          ChoiceChip(
-            label: Text('$size px'),
-            selected: _brush == size,
-            onSelected: (_) => setState(() => _brush = size),
-          ),
-        FilterChip(
-          label: const Text('Body guide'),
-          selected: _guide,
-          onSelected: (v) => setState(() => _guide = v),
         ),
-      ]),
-      const SizedBox(height: 12),
-      _Swatches(
-        wrap: true,
-        colors: drawPalette,
-        selected: _tool == Tool.eraser ? null : _color,
-        onTap: (c) => setState(() {
-          _color = c;
-          if (_tool == Tool.eraser) _tool = Tool.pencil;
-        }),
       ),
       const SizedBox(height: 12),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        _toolButton(Tool.pencil, '✏️ Draw'),
-        _toolButton(Tool.eraser, '🧹 Erase'),
-        _toolButton(Tool.fill, '🪣 Fill'),
-        OutlinedButton(
-          onPressed: _undo.isEmpty
-              ? null
-              : () {
-                  setState(() => _grid = _undo.removeLast());
-                  _commit();
-                },
-          child: const Text('↩️ Undo'),
+      Center(
+        child: FilledButton.icon(
+          onPressed: _openEditor,
+          icon: const Icon(Icons.brush, size: 18),
+          label: const Text('Edit face'),
         ),
-        OutlinedButton(onPressed: () => _replace(emptyFace()), child: const Text('🗑️ Clear')),
-        OutlinedButton(onPressed: () => _replace(randomFace()), child: const Text('🎲 Random')),
-      ]),
+      ),
     ]);
   }
 
@@ -358,7 +193,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           itemBuilder: (_, i) {
             final art = state.artworks[i];
             final active = art.id == state.currentArtworkId;
-            final data = active ? _grid : art.data;
+            final data = active ? state.face : art.data;
             return Semantics(
               button: true,
               selected: active,
@@ -477,121 +312,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       toast(context, e.message);
     }
   }
-
-  Widget _toolButton(Tool tool, String label) {
-    final active = _tool == tool;
-    return active
-        ? FilledButton(onPressed: () {}, child: Text(label))
-        : OutlinedButton(onPressed: () => setState(() => _tool = tool), child: Text(label));
-  }
-}
-
-class _Swatches extends StatelessWidget {
-  final List<String> colors;
-  final String? selected;
-  final ValueChanged<String> onTap;
-  final bool wrap;
-  const _Swatches(
-      {required this.colors, required this.selected, required this.onTap, this.wrap = false});
-
-  @override
-  Widget build(BuildContext context) {
-    final swatches = [
-      for (final c in colors)
-        Semantics(
-          button: true,
-          selected: c == selected,
-          label: c,
-          child: GestureDetector(
-            onTap: () => onTap(c),
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: hexColor(c),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: c == selected ? Colors.white : GnColors.border,
-                  width: c == selected ? 3 : 1,
-                ),
-              ),
-            ),
-          ),
-        ),
-    ];
-    if (wrap) return Wrap(spacing: 8, runSpacing: 8, children: swatches);
-    // One swipeable row keeps the drawing grid close to the top.
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: swatches.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) => swatches[i],
-      ),
-    );
-  }
-}
-
-class _GridPainter extends CustomPainter {
-  final Pixels grid;
-  final Color skin;
-  final ui.Image? body;
-  final int revision;
-  _GridPainter({required this.grid, required this.skin, required this.body, required this.revision});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cell = size.width / gridSize;
-    canvas.drawRect(Offset.zero & size, Paint()..color = GnColors.canvas);
-    canvas.save();
-    canvas.scale(cell);
-    if (body != null) {
-      // The same 48x48 crop of the body the face is drawn onto, dimmed.
-      canvas.drawImageRect(
-        body!,
-        Rect.fromLTWH(faceOrigin.dx, faceOrigin.dy, gridSize.toDouble(), gridSize.toDouble()),
-        Rect.fromLTWH(0, 0, gridSize.toDouble(), gridSize.toDouble()),
-        Paint()
-          ..filterQuality = FilterQuality.none
-          ..color = const Color(0x99FFFFFF),
-      );
-    }
-    canvas.drawCircle(const Offset(headX + .0, headY + .0), headRadius + .0,
-        Paint()..color = skin);
-    final p = Paint()..isAntiAlias = false;
-    for (var i = 0; i < grid.length; i++) {
-      final c = grid[i];
-      if (c == null) continue;
-      p.color = hexColor(c);
-      canvas.drawRect(Rect.fromLTWH((i % gridSize) - .02, (i ~/ gridSize) - .02, 1.04, 1.04), p);
-    }
-    canvas.restore();
-    final line = Paint()
-      ..color = const Color(0x22FFFFFF)
-      ..strokeWidth = 1;
-    for (var i = 0; i <= gridSize; i += 4) {
-      final o = i * cell;
-      canvas.drawLine(Offset(o, 0), Offset(o, size.height), line);
-      canvas.drawLine(Offset(0, o), Offset(size.width, o), line);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_GridPainter old) =>
-      old.revision != revision || old.skin != skin || old.body != body || old.grid != grid;
-}
-
-class _Stroke extends Drag {
-  final GestureDragUpdateCallback onUpdate;
-  final VoidCallback onDone;
-  _Stroke({required this.onUpdate, required this.onDone});
-  @override
-  void update(DragUpdateDetails details) => onUpdate(details);
-  @override
-  void end(DragEndDetails details) => onDone();
-  @override
-  void cancel() => onDone();
 }
 
 /// A saved face on its skin-coloured head, for the gallery.
