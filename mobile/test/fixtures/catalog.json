@@ -19,12 +19,13 @@
       "godot"
     ],
     "color": "#ff7547",
-    "cover": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAAECAIAAADETxJQAAAAEElEQVR4nGP4X+oOQQx4WQCoJxTF1vSrWAAAAABJRU5ErkJggg=="
+    "cover": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAAECAIAAADETxJQAAAAEElEQVR4nGP4X+oOQQx4WQCoJxTF1vSrWAAAAABJRU5ErkJggg==",
+    "screenshot": "/game-images/ballkickers.png"
   },
   {
     "id": "growing-guns",
     "title": "Growing Guns",
-    "tagline": "Fast arena FPS — the loser of each round picks the upgrade.",
+    "tagline": "Fast arena FPS \u2014 the loser of each round picks the upgrade.",
     "developer": "Joep Meindertsma",
     "players": {
       "min": 2,
@@ -59,7 +60,40 @@
     ],
     "cover": "https://gamenight.ontola.io/media/pinpals/cover.png",
     "media": {
-      "video": "https://gamenight.ontola.io/media/pinpals/preview.m3u8"
+      "source": "https://example.org/pinpals",
+      "items": [
+        {
+          "kind": "image",
+          "url": "https://gamenight.ontola.io/media/pinpals/shot.png",
+          "label": "Gameplay"
+        },
+        {
+          "kind": "video",
+          "url": "https://gamenight.ontola.io/media/pinpals/preview.mp4",
+          "label": "Preview",
+          "poster": "https://gamenight.ontola.io/media/pinpals/preview.jpg",
+          "preview": true,
+          "duration": 5
+        },
+        {
+          "kind": "trailer",
+          "url": "https://www.youtube.com/watch?v=x",
+          "label": "Trailer"
+        },
+        {
+          "kind": "video",
+          "url": "http://insecure.example/x.mp4",
+          "label": "Skipped"
+        }
+      ]
+    },
+    "platforms": [
+      "windows",
+      "linux"
+    ],
+    "links": {
+      "homepage": "https://example.org/pinpals",
+      "bad": "javascript:alert(1)"
     }
   },
   {

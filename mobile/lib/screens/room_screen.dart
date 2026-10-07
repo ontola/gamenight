@@ -108,7 +108,6 @@ class _RoomScreenState extends State<RoomScreen> {
                   ..._connectCards()
                 else
                   ..._roomCards(),
-                _accountCard(),
               ],
             ));
   }
@@ -137,46 +136,6 @@ class _RoomScreenState extends State<RoomScreen> {
         title: const Text('Remember me on this GameNight'),
         controlAffinity: ListTileControlAffinity.leading,
       );
-
-  Widget _accountCard() {
-    final account = state.account;
-    return Section(title: 'Account', children: [
-      if (state.signedIn) ...[
-        Row(children: [
-          const Icon(Icons.account_circle, color: GnColors.ok),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text('Signed in${state.accountEmail == null ? '' : ' as ${state.accountEmail}'}',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Hint('${account?.displayName ?? state.name} and your faces are saved to your account.'),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: _busy
-                ? null
-                : () => _run(() async {
-                      await state.signOut();
-                      return 'Signed out. Your player stays on this phone.';
-                    }),
-            child: const Text('Sign out'),
-          ),
-        ),
-      ] else ...[
-        const Hint('Sign in to keep your name and faces on every phone and to join '
-            'rooms with their code from anywhere.'),
-        const SizedBox(height: 12),
-        OutlinedButton.icon(
-          onPressed: _busy ? null : () => _signIn(),
-          icon: const Icon(Icons.login, size: 18),
-          label: const Text('Sign in'),
-        ),
-      ],
-    ]);
-  }
 
   List<Widget> _hostedCards() {
     final room = state.hostedRoom;
@@ -274,40 +233,42 @@ class _RoomScreenState extends State<RoomScreen> {
 
   List<Widget> _connectCards() => [
         Section(title: 'Join a room', children: [
-          const Hint('Enter the code on the TV.'),
-          const SizedBox(height: 12),
-          _codeField(),
-          _rememberBox(),
-          if (!state.signedIn)
-            const Hint('Joining by code needs a GameNight account. You sign in once.'),
-        ]),
-        Section(title: 'Or scan the lobby QR', children: [
-          const Hint('Scan the QR code in the GameNight lobby. On the same Wi-Fi as the '
-              'GameNight PC this works without an account.'),
-          const SizedBox(height: 16),
           FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
             onPressed: _busy ? null : _scan,
             icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Scan lobby QR'),
+            label: const Text('Scan the QR on the TV'),
           ),
-        ]),
-        Section(title: 'Or type the address', children: [
-          TextField(
-            controller: _address,
-            keyboardType: TextInputType.url,
-            autocorrect: false,
-            decoration: const InputDecoration(hintText: '192.168.1.20:7913'),
-            onSubmitted: _busy ? null : _open,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: _busy ? null : () => _open(_address.text),
-            child: Text(_busy ? 'Connecting…' : 'Connect'),
-          ),
+          const SizedBox(height: 20),
+          const Center(child: Hint('or enter the room code')),
           const SizedBox(height: 8),
-          const Hint('The address is printed under the QR in the lobby. '
-              'Turn on the phone studio in GameNight if nothing answers.'),
+          _codeField(),
         ]),
+        Theme(
+          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+          child: ExpansionTile(
+            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+            childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+            title: const Text('Advanced', style: TextStyle(color: GnColors.muted, fontSize: 14)),
+            children: [
+              TextField(
+                controller: _address,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                    labelText: 'GameNight address', hintText: '192.168.1.20:7913'),
+                onSubmitted: _busy ? null : _open,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton(
+                onPressed: _busy ? null : () => _open(_address.text),
+                child: Text(_busy ? 'Connecting…' : 'Connect'),
+              ),
+              const SizedBox(height: 8),
+              const Hint('The address is printed under the QR in the lobby.'),
+            ],
+          ),
+        ),
       ];
 
   List<Widget> _roomCards() {

@@ -38,6 +38,26 @@ void main() {
     expect(pinpals.color, isNull);
   });
 
+  test('reads the same videos, screenshots and facts as the website', () {
+    final games = parseCatalog(fixture());
+    final pinpals = games[2];
+    expect(pinpals.media.map((m) => m.kind),
+        [MediaKind.video, MediaKind.trailer, MediaKind.image],
+        reason: 'looping preview first, images last, insecure videos dropped');
+    expect(pinpals.media[0].preview, isTrue);
+    expect(pinpals.media[0].poster!.url.toString(), 'https://gamenight.ontola.io/media/pinpals/preview.jpg');
+    expect(pinpals.platformLabel, 'Windows · Linux');
+    expect(pinpals.links.keys, ['homepage'], reason: 'only web links');
+    expect(pinpals.mediaSource, Uri.parse('https://example.org/pinpals'));
+
+    final ball = games[0];
+    expect(ball.media.single.image!.url, Uri.parse('https://gamenight.ontola.io/game-images/ballkickers.png'),
+        reason: 'the screenshot is a slide');
+    expect(ball.matchMinutes, 2);
+    expect(games[1].media, isEmpty, reason: 'nothing to show: the colour tile stands in');
+    expect(ball.similar(games).map((g) => g.id), ['growing-guns'], reason: 'they share tags');
+  });
+
   test('tolerates odd entries', () {
     final games = parseCatalog([
       {

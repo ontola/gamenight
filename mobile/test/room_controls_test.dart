@@ -199,8 +199,12 @@ void main() {
       expect(room.calls.where((c) => c.contains('/api/games')), isEmpty);
 
       await tester.tap(find.text('Ballkickers'));
-      await tester.pump();
-      expect(launcher.opened, ['https://gamenight.ontola.io/games/ballkickers']);
+      await tester.pumpAndSettle();
+      expect(launcher.opened, isEmpty, reason: 'the game page opens in the app');
+      expect(find.text('Chaotic party football: charge shots, dash tackles and diving saves.'),
+          findsOneWidget);
+      expect(find.text('2 min'), findsOneWidget);
+      expect(find.text('Join a room to put this game in the queue.'), findsOneWidget);
       await close(tester);
     });
 

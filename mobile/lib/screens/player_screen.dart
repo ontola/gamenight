@@ -6,6 +6,7 @@ import '../avatar.dart';
 import '../character.dart';
 import '../faces.dart';
 import '../theme.dart';
+import 'account_card.dart';
 import 'face_editor_screen.dart';
 
 const List<String> clothingColors = [
@@ -68,6 +69,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           _identity(),
           _editor(),
           _gallery(),
+          AccountCard(state: state),
           _backup(),
         ],
       ),

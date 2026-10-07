@@ -1,15 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../api.dart';
 import '../catalog.dart';
 import '../room_controls.dart';
 import '../theme.dart';
+import 'game_detail_screen.dart';
 
-/// The store catalog as a grid of covers. A tap opens the game's page in the
-/// browser. In a room, games its host can play get an "Add to queue" button.
+/// The store catalog as a grid of covers. A tap opens the game's page with
+/// its videos and screenshots. In a room, games its host can play get an "Add to queue" button.
 class CatalogSection extends StatefulWidget {
   final RoomControls? controls;
   const CatalogSection({super.key, this.controls});
@@ -87,13 +87,13 @@ class _CatalogSectionState extends State<CatalogSection> {
     }
   }
 
-  Future<void> _open(CatalogGame game) async {
-    var opened = false;
-    try {
-      opened = await launchUrl(game.page, mode: LaunchMode.externalApplication);
-    } catch (_) {}
-    if (!opened && mounted) toast(context, 'Could not open ${game.page}');
-  }
+  void _open(CatalogGame game) => Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => GameDetailScreen(
+            game: game,
+            games: _games ?? const [],
+            host: _inRoom && _host.isNotEmpty ? _host : null,
+            onAdd: _inRoom ? _add : null,
+          )));
 
   @override
   Widget build(BuildContext context) {
@@ -106,8 +106,8 @@ class _CatalogSectionState extends State<CatalogSection> {
       Padding(
         padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
         child: Hint(_inRoom
-            ? 'Tap a game to read more. Games this GameNight has can go straight into the queue.'
-            : 'Everything in the GameNight store. Tap a game to read more.'),
+            ? 'Tap a game for videos and screenshots. Games this GameNight has can go into the queue.'
+            : 'Everything in the GameNight store. Tap a game for videos and screenshots.'),
       ),
       if (games == null && _error == null)
         const Padding(
