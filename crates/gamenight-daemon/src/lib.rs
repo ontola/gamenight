@@ -2059,6 +2059,8 @@ mod replacement_lobby_tests {
         shared.overlays.insert(0, web_tx.clone());
         let as_game = Registration::Game(game.clone());
         let as_web = Registration::Overlay(0);
+        // Absolute on every platform ("/games" is relative on Windows).
+        let root = std::env::temp_dir().join("hexstead").display().to_string();
         let next = |rx: &mut mpsc::UnboundedReceiver<String>| -> ServerMessage {
             serde_json::from_str(&rx.try_recv().unwrap()).unwrap()
         };
@@ -2074,7 +2076,7 @@ mod replacement_lobby_tests {
         assert!(matches!(next(&mut game_rx), ServerMessage::Error { .. }));
         shared.companion(
             ClientMessage::DeclareCompanion {
-                root: "/games/hexstead".into(),
+                root: root.clone(),
                 entry: "phone/index.html".into(),
             },
             &as_game,
@@ -2083,7 +2085,7 @@ mod replacement_lobby_tests {
         let ServerMessage::PartyState { party } = next(&mut web_rx) else {
             panic!("expected a party update");
         };
-        assert_eq!(party.companions[0].root.as_deref(), Some("/games/hexstead"));
+        assert_eq!(party.companions[0].root.as_deref(), Some(root.as_str()));
         assert!(lobby_snapshot(party.clone()).companions[0].root.is_none());
         assert!(game_welcome_snapshot(party).companions.is_empty());
 

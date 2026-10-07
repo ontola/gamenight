@@ -21,7 +21,7 @@
     pub buttons: u32,
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs#L761">Source: crates/gamenight-protocol/src/lib.rs</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs#L779">Source: crates/gamenight-protocol/src/lib.rs</a></p>
 <p>Axes are left X/Y, right X/Y and left/right trigger. Divide signed axis values by 32767. The button bits are A, B, X, Y, LB, RB, Back, Start, LS, RS, Up, Down, Left and Right, beginning at bit zero.</p>
 <h2 id="release-stale-input">Release stale input</h2>
 <p>An empty frame releases every controller. A missing token releases that device. More than 250 ms since the last frame means neutral input. Never borrow another device to fill a gap.</p>
@@ -66,7 +66,7 @@ end
 <h2 id="check-real-devices">Check real devices</h2>
 <p>Test two different profiles, reversed connection order, unplugging one pad and reconnecting it. Then switch between games. Synthetic frames can check token matching, but they do not prove that a physical controller belongs to the right player on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="08ea51913a8d1c4f7dc9fa2b73188d17dddb1f061a145992cc94ea5c15314d81">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="c725f227faf7f2f29787682eafd76aeafa04baab4063b8d253ab1a0d7aa82548">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/other-engines"><small>Previous</small>Unity, Unreal &amp; others</a><a href="/docs/faces"><small>Next</small>Faces &amp; colours</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

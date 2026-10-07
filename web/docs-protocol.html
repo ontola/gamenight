@@ -84,8 +84,8 @@ untouched.</li>
 <tr>
 <td><code>game</code></td>
 <td>a game process (via an SDK)</td>
-<td><code>ready</code> (mandatory), <code>finished</code> + <code>declare_settings</code> (optional)</td>
-<td>session lifecycle commands, <code>controller_frame</code>, <code>setting_changed</code></td>
+<td><code>ready</code> (mandatory), <code>finished</code> + <code>declare_settings</code> + <code>declare_companion</code> + <code>companion_message</code> (optional)</td>
+<td>session lifecycle commands, <code>controller_frame</code>, <code>setting_changed</code>, <code>companion_message</code>, <code>companion_presence</code></td>
 </tr>
 <tr>
 <td><code>overlay</code></td>
@@ -234,6 +234,14 @@ playing, in the lobby, and a second route in makes the two disagree.</p>
 <tr>
 <td><code>declare_settings</code> <em>(optional)</em></td>
 <td>the match settings this game exposes (see <a href="#match-settings">Match settings</a>)</td>
+</tr>
+<tr>
+<td><code>declare_companion</code> <em>(optional)</em></td>
+<td>a phone screen for this game (see <a href="#phone-screens">Phone screens</a>)</td>
+</tr>
+<tr>
+<td><code>companion_message</code> <em>(optional)</em></td>
+<td>JSON for one player's phone screen, or every phone</td>
 </tr>
 </tbody>
 </table>
@@ -612,6 +620,39 @@ the moment a <code>play_next</code> names a game with no launch spec, it calls
 bump that game to the front of whatever's left in the queue. An in-flight
 download always finishes first (no HTTP range support to resume a cancelled
 one); reprioritizing only reorders what hasn't started yet.</p>
+<h2 id="phone-screens">Phone screens</h2>
+<p>A game can give every seated player a screen of their own on their phone: a
+hand of cards nobody else may see, a god's-eye map, a private vote. This is
+how GameNight does asymmetric play. The phone screen is a small web page that
+ships with the game; the host's local web server (<code>GAMENIGHT_WEB=1</code>, port
+7913) serves it while that game is the active session, and the GameNight app
+and the phone studio open it automatically.</p>
+<p>Declare it once after <code>welcome</code>, and again after every reconnect:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;declare_companion&quot;, &quot;root&quot;: &quot;/abs/path/to/game/phone&quot;, &quot;entry&quot;: &quot;index.html&quot; }
+</code></pre></div>
+<p><code>root</code> must be an absolute directory and <code>entry</code> a path inside it. Phones load
+<code>/play/&lt;game&gt;/&lt;entry&gt;?profile=…&amp;game=&lt;game&gt;</code>, so relative links in the page
+resolve inside <code>root</code>, and nothing outside it is served.</p>
+<p>The page loads <code>/assets/companion.js</code> and exchanges plain JSON with the game:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-js">const game = GameNight.connect((data) =&gt; render(data), (status) =&gt; showStatus(status));
+game.send({ action: &quot;roll&quot; });
+</code></pre></div>
+<p>The game receives what a phone sends tagged with the sender, and is told when
+a phone opens or closes its screen. Send that player their current view on
+<code>connected: true</code>; phones reconnect after a refresh or a host restart.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;companion_presence&quot;, &quot;player_id&quot;: &quot;7d0c…&quot;, &quot;connected&quot;: true }
+{ &quot;type&quot;: &quot;companion_message&quot;,  &quot;player_id&quot;: &quot;7d0c…&quot;, &quot;data&quot;: { &quot;action&quot;: &quot;roll&quot; } }
+</code></pre></div>
+<p>To answer, address one player, or leave <code>player_id</code> out to reach every phone:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;companion_message&quot;, &quot;player_id&quot;: &quot;7d0c…&quot;, &quot;data&quot;: { &quot;hand&quot;: [&quot;wood&quot;, &quot;wool&quot;] } }
+{ &quot;type&quot;: &quot;companion_message&quot;, &quot;data&quot;: { &quot;turn&quot;: &quot;7d0c…&quot; } }
+</code></pre></div>
+<p>Phones never name their own player: the web server knows which party member
+each signed-in phone is and fills it in, so a player cannot read or play
+another player's hand. Keep messages small (under 16 KB) and treat every one
+as untrusted input. Overlays see declared screens in <code>party_state.companions</code>
+and relay traffic with <code>companion_message</code> (<code>game</code> and <code>player_id</code> set) and
+<code>companion_presence</code>; the lobby sees screens without their <code>root</code>.</p>
 <h2 id="the-night-end-to-end">The night, end to end</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>overlay: set_playlist [neon-trails, neon-siege]
 daemon → neon-trails: prepare      (warm the first game)
@@ -770,7 +811,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="2b6e5b53bb37cd7fd213ff44f2d718dc737e84b1824b477ac19928d4b65dc097">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="705dcc38bfb78b89f40235f7222fe435bb58101f00f412a9681beedeeecf34d3">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

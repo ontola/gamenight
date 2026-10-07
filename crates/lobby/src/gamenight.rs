@@ -841,7 +841,9 @@ fn gamenight_bridge_system(
             // were never declared, so this never actually fires.
             GameEvent::PartyUpdated { .. } => {}
             GameEvent::ControllerFrame { .. } => {}
-            GameEvent::SettingChanged { .. } => {}
+            GameEvent::SettingChanged { .. }
+            | GameEvent::CompanionMessage { .. }
+            | GameEvent::CompanionPresence { .. } => {}
             GameEvent::LobbyFocus { active } => {
                 info!(active, "gamenight: lobby focus changed");
                 if bridge.current_session.is_none() {
