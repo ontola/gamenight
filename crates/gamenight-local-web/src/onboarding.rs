@@ -341,6 +341,14 @@ async fn queue(addr: &str, game: &str) -> Result<bool, StatusCode> {
     // already renders this selection and its genuine installer progress.
 }
 
+/// Replaces the saved choice in one step, so the launcher never reads a
+/// half-written file.
+fn save(file: &std::path::Path, value: serde_json::Value) -> std::io::Result<()> {
+    let temporary = file.with_extension(format!("{}.tmp", std::process::id()));
+    std::fs::write(&temporary, value.to_string())?;
+    std::fs::rename(temporary, file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -470,12 +478,4 @@ mod tests {
         assert!(!queue(&addr.to_string(), "blast-party").await.unwrap());
         task.await.unwrap();
     }
-}
-
-/// Replaces the saved choice in one step, so the launcher never reads a
-/// half-written file.
-fn save(file: &std::path::Path, value: serde_json::Value) -> std::io::Result<()> {
-    let temporary = file.with_extension(format!("{}.tmp", std::process::id()));
-    std::fs::write(&temporary, value.to_string())?;
-    std::fs::rename(temporary, file)
 }
