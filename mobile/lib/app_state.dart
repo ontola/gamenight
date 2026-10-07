@@ -11,6 +11,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'account.dart';
 import 'api.dart';
 import 'avatar.dart';
 import 'faces.dart';
@@ -22,8 +23,12 @@ class AppState extends ChangeNotifier {
   final SharedPreferences prefs;
   final GameNightApi Function(Uri base) apiFactory;
 
-  AppState(this.prefs, {GameNightApi Function(Uri base)? apiFactory})
-      : apiFactory = apiFactory ?? ((base) => GameNightApi(base)) {
+  /// GameNight online: the account and hosted rooms.
+  final CloudApi cloud;
+
+  AppState(this.prefs, {GameNightApi Function(Uri base)? apiFactory, CloudApi? cloud})
+      : apiFactory = apiFactory ?? ((base) => GameNightApi(base)),
+        cloud = cloud ?? CloudApi() {
     profileId = prefs.getString('profile_id') ?? _newProfileId();
     prefs.setString('profile_id', profileId);
     name = prefs.getString('player_name') ?? randomName();
@@ -37,6 +42,10 @@ class AppState extends ChangeNotifier {
     boundPlayer = prefs.getString('bound_player');
     final host = prefs.getString('host');
     if (host != null) _api = this.apiFactory(Uri.parse(host));
+    this.cloud.token = prefs.getString('cloud_token');
+    accountEmail = prefs.getString('account_email');
+    _studioRevision = prefs.getInt('studio_revision') ?? 0;
+    inHostedRoom = prefs.getBool('hosted_room') ?? false;
   }
 
   static String _newProfileId() {
@@ -90,7 +99,8 @@ class AppState extends ChangeNotifier {
       face = List.of(match.first.data);
     } else {
       // The face from before saved faces existed becomes the first one.
-      final art = Artwork(id: newArtworkId(), name: 'Sketch ${artworks.length + 1}', data: List.of(face));
+      final art =
+          Artwork(id: newArtworkId(), name: 'Sketch ${artworks.length + 1}', data: List.of(face));
       artworks.add(art);
       currentArtworkId = art.id;
       _saveArtworks();
@@ -117,7 +127,9 @@ class AppState extends ChangeNotifier {
 
   void newArtwork({Pixels? data, String? name}) {
     final art = Artwork(
-        id: newArtworkId(), name: name ?? 'Sketch ${artworks.length + 1}', data: data ?? randomFace());
+        id: newArtworkId(),
+        name: name ?? 'Sketch ${artworks.length + 1}',
+        data: data ?? randomFace());
     artworks.add(art);
     _saveArtworks();
     selectArtwork(art.id);
@@ -149,9 +161,8 @@ class AppState extends ChangeNotifier {
     String? active;
     for (final incoming in backup.artworks) {
       final key = encodeAvatar(incoming.data);
-      var same = artworks
-          .where((a) => a.name == incoming.name && encodeAvatar(a.data) == key)
-          .firstOrNull;
+      var same =
+          artworks.where((a) => a.name == incoming.name && encodeAvatar(a.data) == key).firstOrNull;
       if (same == null) {
         same = Artwork(id: newArtworkId(), name: incoming.name, data: incoming.data);
         artworks.add(same);
@@ -179,8 +190,8 @@ class AppState extends ChangeNotifier {
     await refreshSession();
   }
 
-  Profile get profile => Profile(
-      id: profileId, username: name, skinColor: skinColor, avatar: encodeAvatar(face));
+  Profile get profile =>
+      Profile(id: profileId, username: name, skinColor: skinColor, avatar: encodeAvatar(face));
 
   // ---- Editing ---------------------------------------------------------
 
@@ -229,9 +240,11 @@ class AppState extends ChangeNotifier {
       _savePending = true;
       return;
     }
+    unawaited(_pushAccount());
     final api = _api;
     if (api == null) {
-      _status(SyncState.savedLocally, 'Saved on your phone');
+      _status(SyncState.savedLocally,
+          signedIn ? 'Saved on your phone and your account' : 'Saved on your phone');
       return;
     }
     _saving = true;
@@ -242,13 +255,13 @@ class AppState extends ChangeNotifier {
         _status(SyncState.savedLocally, 'Saved on your phone');
         return;
       }
-      final result = await api.join(profileId,
-          claim: target, seat: claimSeat, linkRevision: linkRevision);
+      final result =
+          await api.join(profileId, claim: target, seat: claimSeat, linkRevision: linkRevision);
       switch (result.status) {
         case 'unlinked':
           _clearClaim();
-          _status(SyncState.savedLocally,
-              'Controller unlinked. Your character is kept on this phone.');
+          _status(
+              SyncState.savedLocally, 'Controller unlinked. Your character is kept on this phone.');
           return;
         case 'no_such_seat':
           _status(SyncState.warning, result.message ?? 'Nobody is on that seat any more.');
@@ -258,8 +271,8 @@ class AppState extends ChangeNotifier {
           claimSeat = null;
           _bind(result.playerId);
           linkRevision = 0;
-          _status(SyncState.warning,
-              'Already connected. Your edits update your existing character.');
+          _status(
+              SyncState.warning, 'Already connected. Your edits update your existing character.');
           _savePending = true;
           return;
       }
@@ -297,8 +310,9 @@ class AppState extends ChangeNotifier {
   /// Opens a scanned or typed lobby link. Returns a message for the user.
   Future<String> connect(HostLink link) async {
     if (link.hosted) {
-      throw const LinkError(
-          'This QR is for an online GameNight room. Open it in your browser instead.');
+      if (link.pair != null) return claimHostedSeat(link.pair!);
+      if (link.roomCode != null) return joinHostedRoom(link.roomCode!);
+      throw const LinkError('Enter the room code shown on the TV.');
     }
     final api = apiFactory(link.base);
     await api.ping();
@@ -358,8 +372,13 @@ class AppState extends ChangeNotifier {
 
   void startPolling() {
     _poll?.cancel();
-    unawaited(refreshSession());
-    _poll = Timer.periodic(const Duration(seconds: 4), (_) => refreshSession());
+    unawaited(_refreshAll());
+    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _refreshAll());
+  }
+
+  Future<void> _refreshAll() async {
+    await refreshSession();
+    if (inHostedRoom) await refreshHostedRoom();
   }
 
   Future<void> refreshSession() async {
@@ -387,6 +406,218 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ---- GameNight account ----------------------------------------------
+
+  String? accountEmail;
+  Account? account;
+  int _studioRevision = 0;
+  bool _pushingAccount = false, _accountPending = false;
+
+  bool get signedIn => cloud.signedIn;
+
+  /// Step 1 of signing in: GameNight emails a code to [email].
+  Future<void> requestSignInCode(String email) async {
+    await cloud.requestCode(email);
+    accountEmail = email.trim().toLowerCase();
+    await prefs.setString('account_email', accountEmail!);
+  }
+
+  /// Step 2: the emailed code signs this phone in. The player saved on the
+  /// account comes to the phone (faces are merged, nothing is lost), and the
+  /// result is saved back.
+  Future<String> verifySignInCode(String code) async {
+    await cloud.verifyCode(code);
+    await prefs.setString('cloud_token', cloud.token!);
+    try {
+      account = await cloud.me();
+      final doc = await cloud.studio();
+      final adopted = _adoptStudio(doc);
+      await _pushAccount();
+      notifyListeners();
+      return adopted
+          ? 'Signed in. Your saved player is on this phone now.'
+          : 'Signed in. Your player is saved to your account.';
+    } on SignedOut {
+      await _forgetAccount();
+      rethrow;
+    }
+  }
+
+  /// Takes the account's name, skin and faces. False for a new account.
+  bool _adoptStudio(StudioDocument doc) {
+    _setStudioRevision(doc.revision);
+    final workspace = doc.workspace;
+    // A new account only has a placeholder name; this phone's player wins.
+    if (workspace == null) return false;
+    try {
+      importBackup(jsonEncode({
+        'username': doc.displayName ?? name,
+        'skinColor': doc.skinColor ?? skinColor,
+        ...workspace,
+      }));
+      if (doc.displayName != null && doc.displayName!.trim().isNotEmpty) {
+        name = doc.displayName!;
+        prefs.setString('player_name', name);
+      }
+      if (doc.skinColor != null) {
+        skinColor = doc.skinColor!;
+        prefs.setString('skin_color', skinColor);
+      }
+      return true;
+    } on Exception {
+      return false;
+    }
+  }
+
+  void _setStudioRevision(int revision) {
+    _studioRevision = revision;
+    prefs.setInt('studio_revision', revision);
+  }
+
+  /// Saves the player and every face to the account.
+  Future<void> _pushAccount() async {
+    if (!cloud.signedIn) return;
+    if (_pushingAccount) {
+      _accountPending = true;
+      return;
+    }
+    _pushingAccount = true;
+    try {
+      Future<StudioDocument?> save() => cloud.saveStudio(
+          revision: _studioRevision,
+          displayName: name.trim().isEmpty ? 'Player' : name.trim(),
+          skinColor: skinColor,
+          avatar: encodeAvatar(face),
+          workspace: jsonDecode(exportBackup()) as Map<String, dynamic>);
+      var saved = await save();
+      if (saved == null) {
+        // Another device saved first. This phone is the one being edited
+        // right now, so its player wins; the other device reloads it.
+        _setStudioRevision((await cloud.studio()).revision);
+        saved = await save();
+      }
+      if (saved != null) _setStudioRevision(saved.revision);
+    } on SignedOut {
+      await _forgetAccount();
+      _status(SyncState.warning, 'Your sign-in expired. Sign in again to keep your player online.');
+    } on ApiError catch (e) {
+      _status(SyncState.warning, e.message);
+    } finally {
+      _pushingAccount = false;
+      if (_accountPending) {
+        _accountPending = false;
+        unawaited(_pushAccount());
+      }
+    }
+  }
+
+  Future<void> signOut() async {
+    await cloud.signOut();
+    await _forgetAccount();
+    notifyListeners();
+  }
+
+  Future<void> _forgetAccount() async {
+    cloud.token = null;
+    account = null;
+    hostedRoom = null;
+    inHostedRoom = false;
+    await prefs.remove('cloud_token');
+    await prefs.remove('hosted_room');
+    await prefs.remove('studio_revision');
+    _studioRevision = 0;
+  }
+
+  /// Loads the account on startup, so the name shows and the token is known
+  /// to still work.
+  Future<void> loadAccount() async {
+    if (!cloud.signedIn) return;
+    try {
+      account = await cloud.me();
+      if (inHostedRoom) startPolling();
+    } on SignedOut {
+      await _forgetAccount();
+    } on ApiError {
+      // Offline: keep the token and try again later.
+    }
+    notifyListeners();
+  }
+
+  // ---- Hosted rooms (joined by room code over the internet) ------------
+
+  bool inHostedRoom = false;
+  HostedRoom? hostedRoom;
+
+  /// The phone needs an account for hosted rooms.
+  static const signInFirst = ApiError('Sign in to join a room with its code.');
+
+  Future<String> joinHostedRoom(String code, {bool remember = false}) async {
+    if (!cloud.signedIn) throw signInFirst;
+    await _pushAccount();
+    await cloud.joinRoom(code.toUpperCase(), remember: remember);
+    await _enterHostedRoom();
+    return hostedRoom?.connected ?? false
+        ? 'Connected to the room.'
+        : 'Walk your character to your door in the lobby to connect.';
+  }
+
+  /// A hosted lobby's QR: connect straight to that seat.
+  Future<String> claimHostedSeat(String ticket, {bool remember = false}) async {
+    if (!cloud.signedIn) throw signInFirst;
+    await _pushAccount();
+    await cloud.claim(ticket, remember: remember);
+    await _enterHostedRoom();
+    return 'Connected to the room.';
+  }
+
+  Future<void> _enterHostedRoom() async {
+    inHostedRoom = true;
+    await prefs.setBool('hosted_room', true);
+    startPolling();
+    await refreshHostedRoom();
+  }
+
+  Future<void> refreshHostedRoom() async {
+    if (!cloud.signedIn) return;
+    try {
+      hostedRoom = await cloud.roomStatus();
+      sessionError = null;
+    } on SignedOut {
+      await _forgetAccount();
+    } on ApiError catch (e) {
+      sessionError = e.message;
+    }
+    notifyListeners();
+  }
+
+  Future<void> leaveHostedRoom() async {
+    final room = hostedRoom;
+    if (room != null && room.waiting) {
+      await cloud.cancelPickup();
+    } else {
+      await cloud.leaveRoom();
+    }
+    hostedRoom = null;
+    inHostedRoom = false;
+    await prefs.remove('hosted_room');
+    if (_api == null) _poll?.cancel();
+    notifyListeners();
+  }
+
+  Future<void> setHostedRemember(bool value) async {
+    final code = hostedRoom?.code;
+    if (code == null) return;
+    await cloud.remember(code, value);
+    await refreshHostedRoom();
+  }
+
+  Future<void> setHostedMainPlayer(bool value) async {
+    final code = hostedRoom?.code;
+    if (code == null) return;
+    await cloud.mainPlayer(code, value);
+    await refreshHostedRoom();
+  }
+
   // ---- Playlist ---------------------------------------------------------
 
   String newRequestId() {
@@ -407,6 +638,7 @@ class AppState extends ChangeNotifier {
     _poll?.cancel();
     _saveTimer?.cancel();
     _api?.close();
+    cloud.close();
     super.dispose();
   }
 }

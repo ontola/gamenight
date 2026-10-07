@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../api.dart';
 import '../app_state.dart';
 import '../link.dart';
 import '../theme.dart';
 import 'scanner_screen.dart';
+import 'sign_in_screen.dart';
 
 /// Connect to a GameNight on this network and see where you stand in it.
 class RoomScreen extends StatefulWidget {
@@ -47,8 +49,24 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  Future<void> _open(String text) =>
-      _run(() async => state.connect(parseHostLink(text)));
+  Future<void> _open(String text) => _withAccount(() => state.connect(parseHostLink(text)));
+
+  /// Runs [action]; when it needs an account, signs in first and retries.
+  Future<void> _withAccount(Future<String> Function() action) => _run(() async {
+        try {
+          return await action();
+        } on ApiError catch (e) {
+          if (e != AppState.signInFirst || !mounted) rethrow;
+          final ok = await _signIn(
+              reason: 'Sign in to join this room. Your name and faces are saved '
+                  'to your account and follow you to every GameNight.');
+          if (ok != true) return null;
+          return action();
+        }
+      });
+
+  Future<bool?> _signIn({String? reason}) => Navigator.of(context)
+      .push<bool>(MaterialPageRoute(builder: (_) => SignInScreen(state: state, reason: reason)));
 
   Future<void> _scan() async {
     final text = await Navigator.of(context).push<String>(
@@ -60,31 +78,212 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _joinCode() async {
     final code = _code.text.trim().toUpperCase();
     if (!isRoomCode(code)) return;
-    await _run(() => state.joinRoom(code, remember: _rememberJoin));
+    // On a GameNight's Wi-Fi the code picks up a character there; otherwise
+    // it is an online room, like the website's join page.
+    if (state.host != null) {
+      await _run(() => state.joinRoom(code, remember: _rememberJoin));
+    } else {
+      await _withAccount(() => state.joinHostedRoom(code, remember: _rememberJoin));
+    }
     _code.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final connected = state.host != null;
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      children: [
-        const _Header(),
-        if (_error != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(_error!, style: const TextStyle(color: GnColors.warn)),
+    return ListenableBuilder(
+        listenable: state,
+        builder: (context, _) => ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                const _Header(),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(_error!, style: const TextStyle(color: GnColors.warn)),
+                  ),
+                if (state.inHostedRoom)
+                  ..._hostedCards()
+                else if (!connected)
+                  ..._connectCards()
+                else
+                  ..._roomCards(),
+                _accountCard(),
+              ],
+            ));
+  }
+
+  Widget _codeField() => TextField(
+        controller: _code,
+        textCapitalization: TextCapitalization.characters,
+        autocorrect: false,
+        maxLength: 6,
+        textAlign: TextAlign.center,
+        style: const TextStyle(fontSize: 28, letterSpacing: 10, fontFamily: 'monospace'),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp('[A-Za-z2-9]')),
+          TextInputFormatter.withFunction((_, v) => v.copyWith(text: v.text.toUpperCase())),
+        ],
+        decoration: const InputDecoration(hintText: '······', counterText: ''),
+        onChanged: (v) {
+          if (v.length == 6) _joinCode();
+        },
+      );
+
+  Widget _rememberBox() => CheckboxListTile(
+        contentPadding: EdgeInsets.zero,
+        value: _rememberJoin,
+        onChanged: (v) => setState(() => _rememberJoin = v ?? false),
+        title: const Text('Remember me on this GameNight'),
+        controlAffinity: ListTileControlAffinity.leading,
+      );
+
+  Widget _accountCard() {
+    final account = state.account;
+    return Section(title: 'Account', children: [
+      if (state.signedIn) ...[
+        Row(children: [
+          const Icon(Icons.account_circle, color: GnColors.ok),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text('Signed in${state.accountEmail == null ? '' : ' as ${state.accountEmail}'}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
-        if (!connected) ..._connectCards() else ..._roomCards(),
+        ]),
+        const SizedBox(height: 8),
+        Hint('${account?.displayName ?? state.name} and your faces are saved to your account.'),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      await state.signOut();
+                      return 'Signed out. Your player stays on this phone.';
+                    }),
+            child: const Text('Sign out'),
+          ),
+        ),
+      ] else ...[
+        const Hint('Sign in to keep your name and faces on every phone and to join '
+            'rooms with their code from anywhere.'),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _busy ? null : () => _signIn(),
+          icon: const Icon(Icons.login, size: 18),
+          label: const Text('Sign in'),
+        ),
       ],
-    );
+    ]);
+  }
+
+  List<Widget> _hostedCards() {
+    final room = state.hostedRoom;
+    final connected = room?.connected ?? false;
+    final waiting = room?.waiting ?? false;
+    return [
+      Section(title: room?.code == null ? 'Your room' : 'Room ${room!.code}', children: [
+        Row(children: [
+          Icon(connected ? Icons.check_circle : Icons.hourglass_top,
+              color: connected ? GnColors.ok : GnColors.muted),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              state.sessionError ??
+                  (room == null
+                      ? 'Checking your room…'
+                      : connected
+                          ? 'Connected as ${state.name}'
+                          : waiting
+                              ? 'Waiting for pickup in the lobby'
+                              : 'Not in a room any more'),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 8),
+        Hint(connected
+            ? 'Your name and face follow you into every game.'
+            : waiting
+                ? 'Walk your character to your door in the lobby and stand there to connect.'
+                : 'The pickup expired or you left. Enter the room code again.'),
+        if (connected) ...[
+          const SizedBox(height: 12),
+          _Facts(rows: [
+            ('Players in the room', '${room!.players}'),
+            ('Current game', room.current ?? 'In the lobby'),
+            ('Up next', room.next ?? 'No game queued'),
+          ]),
+          if (!room.fresh)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Hint('The GameNight PC has not checked in for a moment.'),
+            ),
+        ],
+      ]),
+      if (room != null && (connected || waiting))
+        Section(children: [
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: room.mainPlayer,
+            onChanged: _busy
+                ? null
+                : (v) => _run(() async {
+                      await state.setHostedMainPlayer(v);
+                      return v
+                          ? 'You are the main player on this GameNight.'
+                          : 'Your player will no longer appear automatically.';
+                    }),
+            title: const Text('Main player on this GameNight'),
+            subtitle: const Text('Appear at the door on startup, ready for your controller.'),
+          ),
+          if (!room.mainPlayer)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: room.remembered,
+              onChanged: _busy
+                  ? null
+                  : (v) => _run(() async {
+                        await state.setHostedRemember(v);
+                        return v
+                            ? 'Your player will be waiting here next time.'
+                            : 'Your player will no longer be remembered here.';
+                      }),
+              title: const Text('Remember me on this GameNight'),
+            ),
+        ]),
+      if (room != null && room.none)
+        Section(title: 'Room code', children: [_codeField(), _rememberBox()]),
+      Section(children: [
+        OutlinedButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _run(() async {
+                    await state.leaveHostedRoom();
+                    return waiting
+                        ? 'Pickup cancelled.'
+                        : 'You left the room. Your player is kept.';
+                  }),
+          icon: const Icon(Icons.logout, size: 18),
+          label: Text(waiting ? 'Cancel pickup' : 'Leave room'),
+        ),
+      ]),
+    ];
   }
 
   List<Widget> _connectCards() => [
-        Section(title: 'Join a GameNight', children: [
-          const Hint('Scan the QR code in the GameNight lobby. Your phone needs to be on '
-              'the same Wi-Fi as the GameNight PC.'),
+        Section(title: 'Join a room', children: [
+          const Hint('Enter the code on the TV.'),
+          const SizedBox(height: 12),
+          _codeField(),
+          _rememberBox(),
+          if (!state.signedIn)
+            const Hint('Joining by code needs a GameNight account. You sign in once.'),
+        ]),
+        Section(title: 'Or scan the lobby QR', children: [
+          const Hint('Scan the QR code in the GameNight lobby. On the same Wi-Fi as the '
+              'GameNight PC this works without an account.'),
           const SizedBox(height: 16),
           FilledButton.icon(
             onPressed: _busy ? null : _scan,
@@ -156,40 +355,20 @@ class _RoomScreenState extends State<RoomScreen> {
         if (waiting) ...[
           const SizedBox(height: 12),
           OutlinedButton(
-            onPressed: _busy ? null : () => _run(() async {
-              await state.cancelPickup();
-              return 'Pickup cancelled.';
-            }),
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      await state.cancelPickup();
+                      return 'Pickup cancelled.';
+                    }),
             child: const Text('Cancel pickup'),
           ),
         ],
       ]),
       if (!linked && !waiting)
         Section(title: 'Room code', children: [
-          TextField(
-            controller: _code,
-            textCapitalization: TextCapitalization.characters,
-            autocorrect: false,
-            maxLength: 6,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 28, letterSpacing: 10, fontFamily: 'monospace'),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp('[A-Za-z2-9]')),
-              TextInputFormatter.withFunction(
-                  (_, v) => v.copyWith(text: v.text.toUpperCase())),
-            ],
-            decoration: const InputDecoration(hintText: '······', counterText: ''),
-            onChanged: (v) {
-              if (v.length == 6) _joinCode();
-            },
-          ),
-          CheckboxListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _rememberJoin,
-            onChanged: (v) => setState(() => _rememberJoin = v ?? false),
-            title: const Text('Remember me on this GameNight'),
-            controlAffinity: ListTileControlAffinity.leading,
-          ),
+          _codeField(),
+          _rememberBox(),
           const Hint('The first player to join becomes this GameNight’s main player '
               'and returns next time.'),
         ]),
@@ -198,12 +377,14 @@ class _RoomScreenState extends State<RoomScreen> {
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: s!.mainPlayer,
-            onChanged: _busy ? null : (v) => _run(() async {
-              await state.setMainPlayer(v);
-              return v
-                  ? 'You are the main player on this GameNight.'
-                  : 'Your player will no longer appear automatically.';
-            }),
+            onChanged: _busy
+                ? null
+                : (v) => _run(() async {
+                      await state.setMainPlayer(v);
+                      return v
+                          ? 'You are the main player on this GameNight.'
+                          : 'Your player will no longer appear automatically.';
+                    }),
             title: const Text('Main player on this GameNight'),
             subtitle: const Text('Appear at the door on startup, ready for your controller.'),
           ),
@@ -211,22 +392,26 @@ class _RoomScreenState extends State<RoomScreen> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               value: s.remembered,
-              onChanged: _busy ? null : (v) => _run(() async {
-                await state.setRemember(v);
-                return v
-                    ? 'Your player will be waiting here next time.'
-                    : 'Your player will no longer be remembered here.';
-              }),
+              onChanged: _busy
+                  ? null
+                  : (v) => _run(() async {
+                        await state.setRemember(v);
+                        return v
+                            ? 'Your player will be waiting here next time.'
+                            : 'Your player will no longer be remembered here.';
+                      }),
               title: const Text('Remember me on this GameNight'),
               subtitle: const Text('Return as a guest without becoming the main player.'),
             ),
           if (linked) ...[
             const SizedBox(height: 4),
             OutlinedButton.icon(
-              onPressed: _busy ? null : () => _run(() async {
-                await state.leaveCharacter();
-                return 'You left your character. Your faces stay on this phone.';
-              }),
+              onPressed: _busy
+                  ? null
+                  : () => _run(() async {
+                        await state.leaveCharacter();
+                        return 'You left your character. Your faces stay on this phone.';
+                      }),
               icon: const Icon(Icons.logout, size: 18),
               label: const Text('Leave this character'),
             ),
@@ -242,10 +427,12 @@ class _RoomScreenState extends State<RoomScreen> {
             child: const Text('Scan again'),
           ),
           TextButton(
-            onPressed: _busy ? null : () => _run(() async {
-              await state.disconnect();
-              return 'Disconnected. Your player is kept on this phone.';
-            }),
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      await state.disconnect();
+                      return 'Disconnected. Your player is kept on this phone.';
+                    }),
             child: const Text('Leave'),
           ),
         ]),

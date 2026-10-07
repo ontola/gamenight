@@ -5,6 +5,9 @@
 //   http://192.168.1.20:7913/?r=ABC234                     room code
 //   http://192.168.1.20:7913/studio?claim=<id>&link_revision=2   a character
 //   http://192.168.1.20:7913/mobile                         just the host
+// When the lobby is online, its QR points at the website instead:
+//   https://gamenight.ontola.io/studio#pair=<ticket>        a seat, needs sign-in
+//   https://gamenight.ontola.io/studio#room=ABC234          a hosted room code
 const int defaultWebPort = 7913;
 const String hostedOrigin = 'https://gamenight.ontola.io';
 
@@ -20,8 +23,11 @@ class HostLink {
   final int? seat;
   final int linkRevision;
 
+  /// A hosted lobby's one-time seat ticket.
+  final String? pair;
+
   const HostLink(this.base,
-      {this.roomCode, this.claim, this.seat, this.linkRevision = 0});
+      {this.roomCode, this.claim, this.seat, this.linkRevision = 0, this.pair});
 
   bool get hosted => base.origin == hostedOrigin;
 }
@@ -44,9 +50,7 @@ HostLink parseHostLink(String input) {
   } on FormatException {
     throw const LinkError('That is not a GameNight address.');
   }
-  if (!['http', 'https'].contains(url.scheme) ||
-      url.host.isEmpty ||
-      url.userInfo.isNotEmpty) {
+  if (!['http', 'https'].contains(url.scheme) || url.host.isEmpty || url.userInfo.isNotEmpty) {
     throw const LinkError('That is not a GameNight address.');
   }
   final port = url.hasPort
@@ -56,15 +60,24 @@ HostLink parseHostLink(String input) {
           : (input.contains('://') ? 80 : defaultWebPort);
   final base = Uri(scheme: url.scheme, host: url.host, port: port);
   final path = url.path.isEmpty ? '/' : url.path;
-  final known = path == '/' ||
-      RegExp(r'^/(session(/[^/]+)?|studio|mobile)/?$').hasMatch(path);
-  if (!known) throw const LinkError('This is not a GameNight sign-in QR. Try the code in the lobby.');
+  final known = path == '/' || RegExp(r'^/(session(/[^/]+)?|studio|mobile|join)/?$').hasMatch(path);
+  if (!known) {
+    throw const LinkError('This is not a GameNight sign-in QR. Try the code in the lobby.');
+  }
   final q = url.queryParameters;
-  final room = q['r']?.toUpperCase();
+  final Map<String, String> fragment;
+  try {
+    fragment = Uri.splitQueryString(url.fragment);
+  } on FormatException {
+    throw const LinkError('That is not a GameNight address.');
+  }
+  final room = (q['r'] ?? fragment['room'])?.toUpperCase();
+  final pair = fragment['pair'];
   final seat = int.tryParse(q['seat'] ?? '');
   return HostLink(base,
       roomCode: room != null && isRoomCode(room) ? room : null,
       claim: q['claim'],
       seat: seat,
-      linkRevision: int.tryParse(q['link_revision'] ?? '') ?? 0);
+      linkRevision: int.tryParse(q['link_revision'] ?? '') ?? 0,
+      pair: pair != null && pair.isNotEmpty && pair.length <= 200 ? pair : null);
 }

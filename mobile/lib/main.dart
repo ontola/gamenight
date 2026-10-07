@@ -12,7 +12,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   final state = AppState(prefs);
-  if (state.host != null) state.startPolling();
+  if (state.host != null || state.inHostedRoom) state.startPolling();
+  state.loadAccount();
   runApp(GameNightApp(state: state));
 }
 

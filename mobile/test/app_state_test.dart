@@ -101,9 +101,9 @@ void main() {
     again.dispose();
   });
 
-  test('hosted room links are refused with a clear message', () async {
-    expect(() => state.connect(parseHostLink('https://gamenight.ontola.io/?r=ABC234')),
-        throwsA(isA<LinkError>()));
+  test('hosted room links ask to sign in first', () async {
+    expect(() => state.connect(parseHostLink('https://gamenight.ontola.io/studio#room=ABC234')),
+        throwsA(AppState.signInFirst));
   });
 
   test('a game with a phone screen is offered while it is played', () async {
