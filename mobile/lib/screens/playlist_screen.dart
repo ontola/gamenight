@@ -122,9 +122,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
-          onReorder: (from, to) {
+          onReorderItem: (from, to) {
             final a = upcoming[from];
-            if (to > from) to -= 1;
             final b = upcoming[to];
             if (a == b || a == view.current || b == view.current) return;
             _edit((api, v) => api.movePlaylistEntry(v, a, b));
