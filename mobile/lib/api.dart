@@ -87,17 +87,41 @@ class SessionInfo {
 }
 
 /// A game's own phone screen, offered while that game is being played.
+/// A game's own phone app, offered next to or instead of its phone page.
+class CompanionApp {
+  final String name;
+
+  /// Android package name, to see whether it is installed and open it.
+  final String? android;
+
+  /// Where to get the app: an APK on the GameNight computer or a store page.
+  final String? download;
+  const CompanionApp({required this.name, this.android, this.download});
+
+  static CompanionApp? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final name = j['name'];
+    if (name is! String) return null;
+    return CompanionApp(
+        name: name, android: j['android'] as String?, download: j['download'] as String?);
+  }
+}
+
 class Companion {
   final String game;
   final String title;
-  final String url;
-  const Companion({required this.game, required this.title, required this.url});
+
+  /// The phone page, when the game has one.
+  final String? url;
+  final CompanionApp? app;
+  const Companion({required this.game, required this.title, this.url, this.app});
 
   static Companion? fromJson(Map<String, dynamic> j) {
     final game = j['game'] as String?;
     final url = j['url'] as String?;
-    if (game == null || url == null) return null;
-    return Companion(game: game, title: j['title'] as String? ?? game, url: url);
+    final app = CompanionApp.fromJson(j['app']);
+    if (game == null || (url == null && app == null)) return null;
+    return Companion(game: game, title: j['title'] as String? ?? game, url: url, app: app);
   }
 }
 
@@ -156,7 +180,11 @@ class GameNightApi {
   }
 
   /// Absolute address of a page the host serves, such as a phone screen.
-  Uri resolve(String path) => _u(path);
+  /// Addresses elsewhere (a store page) are kept as they are.
+  Uri resolve(String path) {
+    final uri = Uri.parse(path);
+    return uri.hasScheme ? uri : _u(path);
+  }
 
   Future<dynamic> _send(String method, String path,
       {Object? body, String? failure}) async {

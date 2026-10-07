@@ -13,7 +13,12 @@ browser does, as an installable app for Android and iOS:
   (see [Phone screens](../docs/protocol.md#phone-screens)): a hand of cards,
   a private map. It opens by itself when such a game starts, so there is
   nothing to install per game. Hexstead in `ontola/gamenight-games` is the
-  example.
+  example. A game that needs a native phone app instead (like the God game)
+  gets an Install / Open card: on Android GameNight downloads the APK from
+  the GameNight computer and installs it, like a store. Android asks once to
+  allow installs from GameNight and confirms each first install; updates of
+  apps GameNight installed go through without asking on Android 12+. On iOS
+  the player gets the app from the App Store.
 - **You.** Your name, skin colour and the 48×48 face you draw, with the same
   presets, tools and wire format as the web studio. Every change saves by
   itself and follows your character into every integrated game. Keep several

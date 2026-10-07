@@ -114,7 +114,7 @@ void main() {
     host.companion = true;
     await state.refreshSession();
     expect(state.companion!.title, 'Hexstead');
-    expect(state.api!.resolve(state.companion!.url).toString(),
+    expect(state.api!.resolve(state.companion!.url!).toString(),
         'http://10.0.0.2:7913/play/hexstead/index.html?profile=${state.profileId}&game=hexstead');
     host.linked = false;
     await state.refreshSession();
