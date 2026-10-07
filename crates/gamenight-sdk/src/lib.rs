@@ -114,6 +114,18 @@ pub enum GameEvent {
     LobbyFocus {
         active: bool,
     },
+    /// A player's phone screen (see [`GameNight::declare_companion`]) sent
+    /// `data`. Answer with [`GameNight::companion_message`].
+    CompanionMessage {
+        player_id: gamenight_protocol::PlayerId,
+        data: serde_json::Value,
+    },
+    /// A player's phone screen opened or closed. Send that player their
+    /// current view when `connected` is true.
+    CompanionPresence {
+        player_id: gamenight_protocol::PlayerId,
+        connected: bool,
+    },
 }
 
 /// A live connection from a game process to the GameNight daemon.
@@ -243,6 +255,19 @@ impl GameNight {
                             GameEvent::ControllerFrame { controllers }
                         }
                         ServerMessage::SettingsAccepted { .. } => continue,
+                        ServerMessage::CompanionMessage {
+                            player_id: Some(player_id),
+                            data,
+                            ..
+                        } => GameEvent::CompanionMessage { player_id, data },
+                        ServerMessage::CompanionMessage { .. } => continue,
+                        ServerMessage::CompanionPresence {
+                            player_id,
+                            connected,
+                        } => GameEvent::CompanionPresence {
+                            player_id,
+                            connected,
+                        },
                         ServerMessage::Error { message } => {
                             return Err(SdkError::Rejected(message))
                         }
@@ -351,6 +376,35 @@ impl GameNight {
     pub async fn declare_settings(&mut self, settings: Vec<SettingSpec>) -> Result<(), SdkError> {
         self.send(&ClientMessage::DeclareSettings { settings })
             .await
+    }
+
+    /// Offer a phone screen: GameNight serves `entry` (relative to the
+    /// absolute directory `root`) to seated players' phones while this game
+    /// is active. Call after connecting.
+    pub async fn declare_companion(
+        &mut self,
+        root: impl Into<String>,
+        entry: impl Into<String>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::DeclareCompanion {
+            root: root.into(),
+            entry: entry.into(),
+        })
+        .await
+    }
+
+    /// Send JSON to one player's phone screen, or to every phone with `None`.
+    pub async fn companion_message(
+        &mut self,
+        player_id: Option<gamenight_protocol::PlayerId>,
+        data: serde_json::Value,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::CompanionMessage {
+            game: None,
+            player_id,
+            data,
+        })
+        .await
     }
 
     async fn send(&mut self, msg: &ClientMessage) -> Result<(), SdkError> {

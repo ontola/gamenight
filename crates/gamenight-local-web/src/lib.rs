@@ -6,6 +6,7 @@ use axum::{
     Json, Router,
 };
 mod cloud;
+mod companion;
 mod dev_catalog;
 mod dev_web;
 pub mod host_lobby;
@@ -84,6 +85,8 @@ pub struct ServerState {
     #[doc(hidden)]
     pub bindings: HashMap<String, PlayerId>,
     pub link_revisions: HashMap<PlayerId, u64>,
+    /// Phone screens of games, relayed between the daemon and phones.
+    companions: companion::Hub,
 }
 
 impl ServerState {
@@ -98,6 +101,7 @@ impl ServerState {
             daemon_addr,
             bindings: HashMap::new(),
             link_revisions: HashMap::new(),
+            companions: companion::Hub::default(),
         }
     }
 }
@@ -177,6 +181,10 @@ pub fn create_router(state: SharedState) -> Router {
             get(playlist::get).post(playlist::move_entry),
         )
         .route("/api/player-links", get(player_links))
+        .route("/api/companion", get(companion::current))
+        .route("/api/companion/ws", get(companion::socket))
+        .route("/assets/companion.js", get(companion::script))
+        .route("/play/:game/*path", get(companion::file))
         .route("/api/local-room/join", post(local_room::join))
         .route("/api/profiles/:id/remember", post(local_room::remember))
         .route(
@@ -210,6 +218,10 @@ pub async fn run_server(
         }
         local.local_room.main_profile = memory.main_profile.clone();
         local.memory = memory;
+    }
+    {
+        let local = state.lock().unwrap();
+        tokio::spawn(local.companions.clone().run(local.daemon_addr.clone()));
     }
     if let Some(bridge) = cloud::Bridge::configured() {
         state.lock().unwrap().cloud = Some(bridge.clone());

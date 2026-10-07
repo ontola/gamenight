@@ -47,7 +47,7 @@ A connection announces itself with its first message, a `hello`:
 
 | role | who | sends | receives |
 |---|---|---|---|
-| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` (optional) | session lifecycle commands, `controller_frame`, `setting_changed` |
+| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` + `declare_companion` + `companion_message` (optional) | session lifecycle commands, `controller_frame`, `setting_changed`, `companion_message`, `companion_presence` |
 | `overlay` | party UI / controller surface / LLM (via `gamenight-mcp`) | party commands | `party_state` snapshots |
 | `lobby` | selected replacement lobby executable | party commands, `lobby_ready`, `quit_party` | full snapshots, `lobby_focus`, runtime controller frames |
 
@@ -152,6 +152,8 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `request_overlay` *(optional)* | "get me back to the party" — a player asked to leave your game |
 | `request_start` *(optional)* | explicit player request to start or resume; never a focus callback |
 | `declare_settings` *(optional)* | the match settings this game exposes (see [Match settings](#match-settings)) |
+| `declare_companion` *(optional)* | a phone screen for this game (see [Phone screens](#phone-screens)) |
+| `companion_message` *(optional)* | JSON for one player's phone screen, or every phone |
 
 ```json
 { "type": "ready",    "session": "9be2…" }
@@ -488,6 +490,55 @@ the moment a `play_next` names a game with no launch spec, it calls
 bump that game to the front of whatever's left in the queue. An in-flight
 download always finishes first (no HTTP range support to resume a cancelled
 one); reprioritizing only reorders what hasn't started yet.
+
+## Phone screens
+
+A game can give every seated player a screen of their own on their phone: a
+hand of cards nobody else may see, a god's-eye map, a private vote. This is
+how GameNight does asymmetric play. The phone screen is a small web page that
+ships with the game; the host's local web server (`GAMENIGHT_WEB=1`, port
+7913) serves it while that game is the active session, and the GameNight app
+and the phone studio open it automatically.
+
+Declare it once after `welcome`, and again after every reconnect:
+
+```json
+{ "type": "declare_companion", "root": "/abs/path/to/game/phone", "entry": "index.html" }
+```
+
+`root` must be an absolute directory and `entry` a path inside it. Phones load
+`/play/<game>/<entry>?profile=…&game=<game>`, so relative links in the page
+resolve inside `root`, and nothing outside it is served.
+
+The page loads `/assets/companion.js` and exchanges plain JSON with the game:
+
+```js
+const game = GameNight.connect((data) => render(data), (status) => showStatus(status));
+game.send({ action: "roll" });
+```
+
+The game receives what a phone sends tagged with the sender, and is told when
+a phone opens or closes its screen. Send that player their current view on
+`connected: true`; phones reconnect after a refresh or a host restart.
+
+```json
+{ "type": "companion_presence", "player_id": "7d0c…", "connected": true }
+{ "type": "companion_message",  "player_id": "7d0c…", "data": { "action": "roll" } }
+```
+
+To answer, address one player, or leave `player_id` out to reach every phone:
+
+```json
+{ "type": "companion_message", "player_id": "7d0c…", "data": { "hand": ["wood", "wool"] } }
+{ "type": "companion_message", "data": { "turn": "7d0c…" } }
+```
+
+Phones never name their own player: the web server knows which party member
+each signed-in phone is and fills it in, so a player cannot read or play
+another player's hand. Keep messages small (under 16 KB) and treat every one
+as untrusted input. Overlays see declared screens in `party_state.companions`
+and relay traffic with `companion_message` (`game` and `player_id` set) and
+`companion_presence`; the lobby sees screens without their `root`.
 
 ## The night, end to end
 

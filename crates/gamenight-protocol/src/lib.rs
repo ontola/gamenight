@@ -705,6 +705,24 @@ pub struct PartySnapshot {
     /// one that shows none at all. Screens render this only when it's `Some`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub now_playing: Option<NowPlaying>,
+    /// Phone screens declared by connected games (see [`CompanionScreen`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub companions: Vec<CompanionScreen>,
+}
+
+/// A game's own phone screen: a small web page that GameNight serves to the
+/// phones of seated players while that game is active. Games that support
+/// asymmetric play (a hidden hand of cards, a god's-eye map) declare one with
+/// `declare_companion` and talk to each phone with `companion_message`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompanionScreen {
+    pub game: GameId,
+    /// Page to open, relative to `root`, e.g. `phone/index.html`.
+    pub entry: String,
+    /// Absolute directory the local web server serves the page from. Only
+    /// trusted local UIs see it; it is stripped from lobby snapshots.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -980,6 +998,30 @@ pub enum ClientMessage {
     DeclareSettings {
         settings: Vec<SettingSpec>,
     },
+    /// Offer a phone screen for this game (see [`CompanionScreen`]). Send
+    /// after `welcome`, and again after every reconnect. `root` must be an
+    /// absolute directory; `entry` is the page inside it.
+    DeclareCompanion {
+        root: String,
+        entry: String,
+    },
+    /// Opaque JSON between a game and phone screens. From a game, `player_id`
+    /// addresses one phone and its absence addresses every phone. From a
+    /// trusted overlay (the local web server), `game` names the recipient and
+    /// `player_id` the phone that sent it.
+    CompanionMessage {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        game: Option<GameId>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        player_id: Option<PlayerId>,
+        data: serde_json::Value,
+    },
+    /// Overlay only: a player's phone screen for `game` connected or left.
+    CompanionPresence {
+        game: GameId,
+        player_id: PlayerId,
+        connected: bool,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -1061,6 +1103,22 @@ pub enum ServerMessage {
         active: bool,
     },
 
+    /// Phone screen traffic. To a game: `player_id` is the phone that sent
+    /// `data`. To overlays: `game` sent it, and `player_id` is the phone it is
+    /// for (absent means every phone showing that game).
+    CompanionMessage {
+        game: GameId,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        player_id: Option<PlayerId>,
+        data: serde_json::Value,
+    },
+    /// To a game: a player's phone screen connected or went away. A game
+    /// sends that player its current view when `connected` is true.
+    CompanionPresence {
+        player_id: PlayerId,
+        connected: bool,
+    },
+
     /// Something was rejected. Informational; connections stay open.
     Error {
         message: String,
@@ -1093,6 +1151,26 @@ mod tests {
         let json = msg.to_json();
         assert!(json.contains("\"type\":\"hello\""));
         let back: ClientMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, msg);
+    }
+
+    #[test]
+    fn companion_messages_carry_opaque_json() {
+        let msg: ClientMessage = serde_json::from_str(
+            r#"{"type":"companion_message","player_id":"7d0c1d59-8c51-4d2e-8f4d-1f7b8b4b5a10","data":{"hand":[1,2]}}"#,
+        )
+        .unwrap();
+        let ClientMessage::CompanionMessage {
+            game,
+            player_id,
+            data,
+        } = &msg
+        else {
+            panic!("wrong variant");
+        };
+        assert!(game.is_none() && player_id.is_some());
+        assert_eq!(data["hand"][1], 2);
+        let back: ClientMessage = serde_json::from_str(&msg.to_json()).unwrap();
         assert_eq!(back, msg);
     }
 

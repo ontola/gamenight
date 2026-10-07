@@ -98,6 +98,8 @@ struct Shared {
     shutdown_requested: bool,
     lobby_restarts: u8,
     lobby_recovery_opened: bool,
+    /// Phone screens declared by connected games, by game.
+    companions: HashMap<GameId, gamenight_protocol::CompanionScreen>,
 }
 
 impl Shared {
@@ -136,6 +138,7 @@ impl Shared {
             shutdown_requested: false,
             lobby_restarts: 0,
             lobby_recovery_opened: false,
+            companions: HashMap::new(),
         }
     }
 
@@ -150,6 +153,8 @@ impl Shared {
             })
             .collect();
         party.game_issues.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+        party.companions = self.companions.values().cloned().collect();
+        party.companions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party
     }
 
@@ -353,20 +358,117 @@ impl Shared {
             }
         }
         if broadcast {
-            let msg = ServerMessage::PartyState {
-                party: self.snapshot(),
-            };
-            for tx in self.overlays.values() {
-                send(tx, &msg);
+            self.broadcast_party();
+        }
+    }
+
+    fn broadcast_party(&self) {
+        let msg = ServerMessage::PartyState {
+            party: self.snapshot(),
+        };
+        for tx in self.overlays.values() {
+            send(tx, &msg);
+        }
+        let lobby_msg = ServerMessage::PartyState {
+            party: lobby_snapshot(self.snapshot()),
+        };
+        for id in &self.lobby_connections {
+            if let Some(tx) = self.games.get(id) {
+                send(tx, &lobby_msg);
             }
-            let lobby_msg = ServerMessage::PartyState {
-                party: lobby_snapshot(self.snapshot()),
-            };
-            for id in &self.lobby_connections {
-                if let Some(tx) = self.games.get(id) {
-                    send(tx, &lobby_msg);
+        }
+    }
+
+    /// Route phone screen traffic. Games publish their screen and talk to
+    /// phones; the local web server (an overlay) relays what phones send.
+    fn companion(&mut self, msg: ClientMessage, registration: &Registration, tx: &Tx) {
+        let reject = |message: &str| {
+            send(
+                tx,
+                &ServerMessage::Error {
+                    message: message.into(),
+                },
+            )
+        };
+        match (msg, registration) {
+            (ClientMessage::DeclareCompanion { root, entry }, Registration::Game(game)) => {
+                if !std::path::Path::new(&root).is_absolute()
+                    || entry.is_empty()
+                    || entry.starts_with('/')
+                    || entry.split(['/', '\\']).any(|part| part == "..")
+                {
+                    return reject("declare_companion needs an absolute root and a relative entry");
+                }
+                info!(%game, %root, %entry, "game declared a phone screen");
+                self.companions.insert(
+                    game.clone(),
+                    gamenight_protocol::CompanionScreen {
+                        game: game.clone(),
+                        entry,
+                        root: Some(root),
+                    },
+                );
+                self.broadcast_party();
+            }
+            (
+                ClientMessage::CompanionMessage {
+                    player_id, data, ..
+                },
+                Registration::Game(game),
+            ) => {
+                let msg = ServerMessage::CompanionMessage {
+                    game: game.clone(),
+                    player_id,
+                    data,
+                };
+                for overlay in self.overlays.values() {
+                    send(overlay, &msg);
                 }
             }
+            (
+                ClientMessage::CompanionMessage {
+                    game: Some(game),
+                    player_id: Some(player_id),
+                    data,
+                },
+                Registration::Overlay(_),
+            ) => {
+                if let Some(game_tx) = self.games.get(&game) {
+                    send(
+                        game_tx,
+                        &ServerMessage::CompanionMessage {
+                            game,
+                            player_id: Some(player_id),
+                            data,
+                        },
+                    );
+                }
+            }
+            (
+                ClientMessage::CompanionPresence {
+                    game,
+                    player_id,
+                    connected,
+                },
+                Registration::Overlay(_),
+            ) => {
+                if let Some(game_tx) = self.games.get(&game) {
+                    send(
+                        game_tx,
+                        &ServerMessage::CompanionPresence {
+                            player_id,
+                            connected,
+                        },
+                    );
+                }
+            }
+            (ClientMessage::DeclareCompanion { .. }, _) => {
+                reject("only games declare a phone screen")
+            }
+            (ClientMessage::CompanionPresence { .. }, _) => {
+                reject("only the local web server reports phone screens")
+            }
+            _ => reject("companion_message from a phone needs game and player_id"),
         }
     }
 
@@ -527,6 +629,8 @@ fn game_welcome_snapshot(
         game.icon = None;
         game.screenshot = None;
     }
+    // A game only needs its own screen, not where other games live on disk.
+    party.companions.clear();
     party
 }
 
@@ -537,6 +641,9 @@ fn lobby_snapshot(
 ) -> gamenight_protocol::PartySnapshot {
     for game in &mut party.library {
         game.launch = None;
+    }
+    for companion in &mut party.companions {
+        companion.root = None;
     }
     party
 }
@@ -1423,6 +1530,15 @@ async fn serve(
                 }
                 continue;
             }
+            if matches!(
+                parsed,
+                ClientMessage::DeclareCompanion { .. }
+                    | ClientMessage::CompanionMessage { .. }
+                    | ClientMessage::CompanionPresence { .. }
+            ) {
+                shared.lock().await.companion(parsed, &registration, &tx);
+                continue;
+            }
             let command = match message_to_command(parsed, &registration) {
                 Ok(Some(c)) => c,
                 Ok(None) => continue,
@@ -1444,6 +1560,7 @@ async fn serve(
             Registration::Game(game_id) => {
                 info!(game = %game_id, "game disconnected");
                 s.games.remove(game_id);
+                s.companions.remove(game_id);
                 let mut kind = gamenight_protocol::GameIssueKind::Disconnected;
                 if let Some(mut child) = s.running_children.remove(game_id) {
                     if let Ok(Some(status)) = child.try_wait() {
@@ -1547,6 +1664,11 @@ fn message_to_command(
             return Err("controller frames require lobby routing".into())
         }
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
+        ClientMessage::DeclareCompanion { .. }
+        | ClientMessage::CompanionMessage { .. }
+        | ClientMessage::CompanionPresence { .. } => {
+            return Err("phone screens require dedicated routing".into())
+        }
         ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby => {
             return Err("lobby lifecycle requires dedicated routing".into())
         }
@@ -1925,6 +2047,107 @@ mod replacement_lobby_tests {
         .await
         .unwrap();
         ws
+    }
+
+    #[test]
+    fn phone_screens_route_between_games_and_the_local_web_server() {
+        let mut shared = Shared::new(Vec::new(), "127.0.0.1:1".into(), None);
+        let game = GameId::new("hexstead");
+        let (game_tx, mut game_rx) = mpsc::unbounded_channel();
+        let (web_tx, mut web_rx) = mpsc::unbounded_channel();
+        shared.games.insert(game.clone(), game_tx.clone());
+        shared.overlays.insert(0, web_tx.clone());
+        let as_game = Registration::Game(game.clone());
+        let as_web = Registration::Overlay(0);
+        let next = |rx: &mut mpsc::UnboundedReceiver<String>| -> ServerMessage {
+            serde_json::from_str(&rx.try_recv().unwrap()).unwrap()
+        };
+
+        shared.companion(
+            ClientMessage::DeclareCompanion {
+                root: "relative/dir".into(),
+                entry: "phone.html".into(),
+            },
+            &as_game,
+            &game_tx,
+        );
+        assert!(matches!(next(&mut game_rx), ServerMessage::Error { .. }));
+        shared.companion(
+            ClientMessage::DeclareCompanion {
+                root: "/games/hexstead".into(),
+                entry: "phone/index.html".into(),
+            },
+            &as_game,
+            &game_tx,
+        );
+        let ServerMessage::PartyState { party } = next(&mut web_rx) else {
+            panic!("expected a party update");
+        };
+        assert_eq!(party.companions[0].root.as_deref(), Some("/games/hexstead"));
+        assert!(lobby_snapshot(party.clone()).companions[0].root.is_none());
+        assert!(game_welcome_snapshot(party).companions.is_empty());
+
+        let player = gamenight_protocol::PlayerId::new();
+        shared.companion(
+            ClientMessage::CompanionPresence {
+                game: game.clone(),
+                player_id: player,
+                connected: true,
+            },
+            &as_web,
+            &web_tx,
+        );
+        assert!(matches!(
+            next(&mut game_rx),
+            ServerMessage::CompanionPresence { player_id, connected: true } if player_id == player
+        ));
+        shared.companion(
+            ClientMessage::CompanionMessage {
+                game: Some(game.clone()),
+                player_id: Some(player),
+                data: serde_json::json!({"roll": true}),
+            },
+            &as_web,
+            &web_tx,
+        );
+        assert!(matches!(
+            next(&mut game_rx),
+            ServerMessage::CompanionMessage { player_id: Some(p), data, .. } if p == player && data["roll"] == true
+        ));
+        shared.companion(
+            ClientMessage::CompanionMessage {
+                game: None,
+                player_id: Some(player),
+                data: serde_json::json!({"hand": ["wool"]}),
+            },
+            &as_game,
+            &game_tx,
+        );
+        assert!(matches!(
+            next(&mut web_rx),
+            ServerMessage::CompanionMessage { game: g, player_id: Some(p), .. } if g == game && p == player
+        ));
+        // Games cannot impersonate a phone, and phones need an address.
+        shared.companion(
+            ClientMessage::CompanionPresence {
+                game: game.clone(),
+                player_id: player,
+                connected: false,
+            },
+            &as_game,
+            &game_tx,
+        );
+        assert!(matches!(next(&mut game_rx), ServerMessage::Error { .. }));
+        shared.companion(
+            ClientMessage::CompanionMessage {
+                game: None,
+                player_id: None,
+                data: serde_json::Value::Null,
+            },
+            &as_web,
+            &web_tx,
+        );
+        assert!(matches!(next(&mut web_rx), ServerMessage::Error { .. }));
     }
 
     #[test]

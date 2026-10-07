@@ -930,6 +930,7 @@ impl GameNight {
     pub fn snapshot(&self) -> PartySnapshot {
         PartySnapshot {
             game_issues: Vec::new(),
+            companions: Vec::new(),
             presence: self.presence_snapshot(),
             players: self.players.clone(),
             seats: self.seats.clone(),
