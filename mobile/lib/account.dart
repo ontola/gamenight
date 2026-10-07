@@ -265,6 +265,11 @@ class CloudApi {
   Future<void> mainPlayer(String code, bool enabled) =>
       _send('POST', '/v1/rooms/main-player', body: {'code': code, 'enabled': enabled});
 
+  /// Other room calls, for the Game tab's controls.
+  Future<dynamic> request(String method, String path,
+          {Object? body, Map<int, String> errors = const {}}) =>
+      _send(method, path, body: body, errors: errors);
+
   Future<PairingPreview> pairing(String ticket) async =>
       PairingPreview(await _send('GET', '/v1/pairing/${Uri.encodeComponent(ticket)}',
           errors: {404: 'This QR expired. Scan the lobby QR again.'}));

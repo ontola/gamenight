@@ -4,6 +4,9 @@
 // [RoomControls] is the seam between the screen and where the room lives.
 // [LocalRoomControls] talks to a GameNight computer on the same Wi-Fi; a
 // hosted (online) room can implement the same interface.
+import 'dart:math';
+
+import 'account.dart';
 import 'api.dart';
 import 'app_state.dart';
 
@@ -199,8 +202,85 @@ class LocalRoomControls implements RoomControls {
   }
 }
 
+/// An online room joined by code. The website relays to the GameNight
+/// computer, which reports its games and settings every few seconds.
+class CloudRoomControls implements RoomControls {
+  final CloudApi cloud;
+  CloudRoomControls(this.cloud);
+
+  static String _requestId() {
+    final r = Random.secure();
+    final b = List.generate(16, (_) => r.nextInt(256));
+    b[6] = (b[6] & 0x0f) | 0x40;
+    b[8] = (b[8] & 0x3f) | 0x80;
+    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-'
+        '${h.substring(16, 20)}-${h.substring(20)}';
+  }
+
+  Future<Map?> _discovery() async {
+    final room = await cloud.roomStatus();
+    if (!room.connected) return null;
+    final d = room.raw['discovery'];
+    return d is Map ? d : null;
+  }
+
+  @override
+  Future<List<HostGame>> games() async {
+    final list = (await _discovery())?['games'];
+    return [
+      if (list is List)
+        for (final g in list)
+          if (HostGame.fromJson(g) case final game?) game
+    ];
+  }
+
+  /// Online rooms queue by asking the host to play the game next.
+  @override
+  Future<void> addToQueue(String game) => cloud.request('POST', '/v1/rooms/next', body: {
+        'game': game,
+        'request_id': _requestId()
+      }, errors: {
+        503: 'The GameNight computer is not answering. Try again in a moment.',
+        403: 'Join the room first.',
+      });
+
+  @override
+  Future<GameSettings?> settings() async =>
+      GameSettings.fromJson((await _discovery())?['controls']);
+
+  @override
+  Future<GameSettings?> applySettings(GameSettings current,
+      {Map<String, Object> values = const {}, SettingsAction action = SettingsAction.set}) async {
+    await cloud.request('POST', '/v1/rooms/agent/control', body: {
+      'request_id': _requestId(),
+      'game': current.game,
+      'command': {
+        'action': action.name,
+        'instance': current.instance,
+        'expected_revision': current.revision,
+        'values': values,
+      },
+    }, errors: {
+      403: 'In an online room, only the main player can change settings.',
+      409: 'The game changed meanwhile. Look again and retry.',
+      400: 'The game does not take that change.',
+    });
+    // The host picks the change up on its next check-in.
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final next = await settings();
+      if (next == null || next.revision != current.revision) return next;
+    }
+    return settings();
+  }
+}
+
 /// The controls for the room this phone is playing in, if it is in one.
 RoomControls? roomControlsFor(AppState state) {
+  if (state.inHostedRoom && (state.hostedRoom?.connected ?? false)) {
+    return CloudRoomControls(state.cloud);
+  }
   final api = state.api;
   if (api == null || !(state.session?.linked ?? false)) return null;
   return LocalRoomControls(api, state.profileId);
