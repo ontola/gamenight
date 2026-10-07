@@ -5,7 +5,7 @@ use std::{collections::HashSet, time::Duration};
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 pub(crate) const REPLY_TIMEOUT: Duration = Duration::from_secs(2);
-type DaemonWs = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
+pub(crate) type DaemonWs = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
 #[derive(Debug)]
 pub(crate) enum DaemonError {
@@ -91,4 +91,42 @@ pub(crate) async fn wait_for_profile(
         _ => None,
     })
     .await
+}
+
+/// Opens an overlay connection to the daemon and reads its welcome snapshot.
+pub(crate) async fn connect(
+    state: &crate::SharedState,
+) -> Result<(DaemonWs, PartySnapshot), axum::http::StatusCode> {
+    use axum::http::StatusCode;
+    use futures_util::SinkExt;
+    use gamenight_protocol::{ClientMessage, Role};
+    let addr = state.lock().unwrap().daemon_addr.clone();
+    tokio::time::timeout(REPLY_TIMEOUT * 2, async {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        ws.send(Message::Text(
+            ClientMessage::Hello {
+                role: Role::Overlay,
+                game: None,
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .map_err(|_| StatusCode::BAD_GATEWAY)?;
+        let party = read_welcome(&mut ws).await.map_err(StatusCode::from)?;
+        Ok((ws, party))
+    })
+    .await
+    .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
+}
+
+/// The party as it is now.
+pub(crate) async fn party(
+    state: &crate::SharedState,
+) -> Result<PartySnapshot, axum::http::StatusCode> {
+    let (mut ws, party) = connect(state).await?;
+    let _ = ws.close(None).await;
+    Ok(party)
 }

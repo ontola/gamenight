@@ -14,6 +14,7 @@ mod local_room;
 mod memory;
 mod onboarding;
 mod playlist;
+mod room_controls;
 mod docs_pages {
     include!("../../../web/docs-routes.rs");
 }
@@ -179,6 +180,12 @@ pub fn create_router(state: SharedState) -> Router {
         .route(
             "/api/playlist",
             get(playlist::get).post(playlist::move_entry),
+        )
+        .route("/api/playlist/queue", post(room_controls::queue))
+        .route("/api/games", get(room_controls::games))
+        .route(
+            "/api/settings",
+            get(room_controls::get_settings).post(room_controls::set_settings),
         )
         .route("/api/player-links", get(player_links))
         .route("/api/companion", get(companion::current))

@@ -36,3 +36,31 @@ request correlation is a future protocol improvement.
 `seat`, party `players` count, `current` (title and phase), and `next` title.
 A stale binding whose player has left is reported as unlinked. The mobile
 Session tab uses this live state instead of showing another sign-in QR.
+
+## Room controls for linked phones
+
+These endpoints act as the party member a profile is bound to, so a phone can
+only act as the character it drives. The phone sends its profile ID, never a
+player ID. A profile that is not bound to a seated player gets 403.
+
+`GET /api/games?profile=<id>` lists the host's games as `{"games": [...]}`,
+each with `id`, `title`, `selectable` and `state` (`available`, `playing`,
+`downloading`…). Only selectable games can be queued. Launch details are never
+included.
+
+`POST /api/playlist/queue` with `{"profile", "game"}` adds a selectable game to
+the end of the queue without starting or interrupting play. It answers with the
+same playlist view as `GET /api/playlist`, or 409 when the host cannot play the
+game.
+
+`GET /api/settings?profile=<id>` returns the match settings of the active or
+warm game: `game`, `instance` (the session), `revision`, `can_undo` and a
+`settings` map of `toggle`, `number` and `choice` controls with their current
+`value`. It returns `null` when that game declared none.
+
+`POST /api/settings` with
+`{"profile", "command": {"action", "instance", "expected_revision", "values"}}`
+sends a [`control_settings`](protocol.md#atomic-settings-batches) batch as the
+profile's player. `action` is `set`, `undo` or `keep`. Success returns the
+settings afterwards. A stale revision, an invalid value or a session that ended
+returns 409 with `{"error": "..."}` naming the daemon's reason.

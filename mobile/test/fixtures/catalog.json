@@ -1,0 +1,85 @@
+[
+  {
+    "id": "ballkickers",
+    "title": "Ballkickers",
+    "tagline": "Chaotic party football: charge shots, dash tackles and diving saves.",
+    "developer": "Joep Meindertsma",
+    "players": {
+      "min": 1,
+      "max": 6,
+      "best": 4
+    },
+    "match_minutes": 2,
+    "price": "free",
+    "tags": [
+      "football",
+      "sports",
+      "party",
+      "versus",
+      "godot"
+    ],
+    "color": "#ff7547",
+    "cover": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAMAAAAECAIAAADETxJQAAAAEElEQVR4nGP4X+oOQQx4WQCoJxTF1vSrWAAAAABJRU5ErkJggg=="
+  },
+  {
+    "id": "growing-guns",
+    "title": "Growing Guns",
+    "tagline": "Fast arena FPS — the loser of each round picks the upgrade.",
+    "developer": "Joep Meindertsma",
+    "players": {
+      "min": 2,
+      "max": 4,
+      "best": 2
+    },
+    "price": "free",
+    "tags": [
+      "versus",
+      "fps",
+      "arena",
+      "splitscreen",
+      "godot"
+    ],
+    "color": "#ffb454"
+  },
+  {
+    "id": "pinpals",
+    "title": "Pinpals",
+    "tagline": "Head-to-head pinball.",
+    "developer": "Polle Pas",
+    "players": {
+      "min": 2,
+      "max": 2,
+      "best": 2
+    },
+    "price": "free",
+    "tags": [
+      "pinball",
+      "local-multiplayer",
+      "love2d"
+    ],
+    "cover": "https://gamenight.ontola.io/media/pinpals/cover.png",
+    "media": {
+      "video": "https://gamenight.ontola.io/media/pinpals/preview.m3u8"
+    }
+  },
+  {
+    "id": "lobby",
+    "title": "GameNight Lobby",
+    "tagline": "The couch you gather on before the game starts.",
+    "developer": "GameNight contributors",
+    "players": {
+      "min": 1,
+      "max": 4,
+      "best": 4
+    },
+    "price": "free",
+    "tags": [
+      "lobby",
+      "bundled"
+    ],
+    "color": "#6366f1"
+  },
+  {
+    "title": "No id, skipped"
+  }
+]

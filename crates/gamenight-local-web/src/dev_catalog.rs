@@ -1,15 +1,11 @@
 //! Opt-in adapter for previewing a separately supplied catalog UI locally.
-use crate::{
-    cloud::{discovery, Seat},
-    daemon, SharedState,
-};
+use crate::{cloud::discovery, daemon, room_controls::seat, SharedState};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
     Json,
 };
-use futures_util::SinkExt;
-use gamenight_protocol::{ClientMessage, PartySnapshot, Role};
+use gamenight_protocol::PartySnapshot;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -26,42 +22,7 @@ async fn party(state: &SharedState) -> Result<PartySnapshot, StatusCode> {
     if std::env::var_os("GAMENIGHT_DEV_CATALOG_DIR").is_none() {
         return Err(StatusCode::NOT_FOUND);
     }
-    let addr = state.lock().unwrap().daemon_addr.clone();
-    tokio::time::timeout(daemon::REPLY_TIMEOUT, async {
-        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
-            .await
-            .map_err(|_| StatusCode::BAD_GATEWAY)?;
-        ws.send(tokio_tungstenite::tungstenite::Message::Text(
-            ClientMessage::Hello {
-                role: Role::Overlay,
-                game: None,
-                token: None,
-            }
-            .to_json(),
-        ))
-        .await
-        .map_err(|_| StatusCode::BAD_GATEWAY)?;
-        let result = daemon::read_welcome(&mut ws)
-            .await
-            .map_err(StatusCode::from);
-        let _ = ws.close(None).await;
-        result
-    })
-    .await
-    .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
-}
-fn seat(state: &SharedState, party: &PartySnapshot, profile: &str) -> Option<Seat> {
-    let local = state.lock().ok()?;
-    let id = *local.bindings.get(profile)?;
-    let seat = party
-        .seats
-        .iter()
-        .find(|s| s.occupant.player_id() == Some(id))?;
-    Some(Seat {
-        index: seat.index,
-        player: id.0.to_string(),
-        revision: *local.link_revisions.get(&id).unwrap_or(&0),
-    })
+    daemon::party(state).await
 }
 pub async fn status(
     State(state): State<SharedState>,

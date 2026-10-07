@@ -8,11 +8,14 @@ import '../api.dart';
 import '../app_state.dart';
 import '../apps.dart';
 import '../companion/view.dart';
+import '../room_controls.dart';
 import '../theme.dart';
+import 'catalog_view.dart';
+import 'settings_panel.dart';
 
-/// The current game's own phone screen, for games that have one: a hand of
-/// cards, a private map, a vote. GameNight opens it here by itself when such
-/// a game starts, so there is nothing to install per game.
+/// The Game tab. While the current game has its own phone screen or app,
+/// that comes first. Below it (or on its own) are the game's settings, when
+/// it has any, and the store catalog to browse and queue games from.
 class GameScreen extends StatelessWidget {
   final AppState state;
   final VoidCallback onJoin;
@@ -25,6 +28,11 @@ class GameScreen extends StatelessWidget {
       builder: (context, _) {
         final companion = state.companion;
         final api = state.api;
+        final controls = roomControlsFor(state);
+        final session = state.session;
+        final settings = SettingsSection(
+            key: const ValueKey('settings'), controls: controls, title: session?.currentTitle);
+        final catalog = CatalogSection(key: const ValueKey('catalog'), controls: controls);
         if (companion != null && api != null) {
           return Column(children: [
             Padding(
@@ -37,6 +45,12 @@ class GameScreen extends StatelessWidget {
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
                 Text('on your phone', style: const TextStyle(color: GnColors.muted, fontSize: 13)),
+                if (companion.url != null && controls != null)
+                  IconButton(
+                    tooltip: 'Game settings',
+                    icon: const Icon(Icons.tune),
+                    onPressed: () => _showSettings(context, controls, companion.title),
+                  ),
               ]),
             ),
             if (companion.app != null)
@@ -57,12 +71,15 @@ class GameScreen extends StatelessWidget {
                 ),
               )
             else
-              const Spacer(),
+              Expanded(
+                child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    children: [settings, catalog]),
+              ),
           ]);
         }
-        final session = state.session;
         final linked = session?.linked ?? false;
-        return ListView(padding: const EdgeInsets.all(16), children: [
+        return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
           Section(title: 'Game screen', children: [
             if (!linked) ...[
               const Hint('Some games put part of the game on your phone, like your own '
@@ -76,8 +93,24 @@ class GameScreen extends StatelessWidget {
               const Hint('Nothing is being played right now. Games with a phone screen '
                   'open here by themselves when they start.'),
           ]),
+          settings,
+          catalog,
         ]);
       },
+    );
+  }
+
+  void _showSettings(BuildContext context, RoomControls controls, String title) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: SettingsSection(controls: controls, title: title, showEmpty: true),
+        ),
+      ),
     );
   }
 }

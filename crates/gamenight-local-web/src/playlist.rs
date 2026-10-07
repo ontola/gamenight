@@ -18,7 +18,7 @@ pub(crate) struct MoveRequest {
     #[serde(default)]
     remove: bool,
 }
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub(crate) struct View {
     playlist: PlaylistSnapshot,
     playing: Option<gamenight_protocol::GameId>,
