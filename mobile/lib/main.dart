@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_state.dart';
+import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/playlist_screen.dart';
 import 'screens/room_screen.dart';
@@ -39,7 +40,28 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late int _tab = widget.state.host == null ? 0 : 1;
+  late int _tab = widget.state.host == null ? 0 : 2;
+  String? _openedFor;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.state.addListener(_followGame);
+  }
+
+  @override
+  void dispose() {
+    widget.state.removeListener(_followGame);
+    super.dispose();
+  }
+
+  /// Bring up a game's phone screen the moment that game starts, once per
+  /// game, so players never have to go looking for it.
+  void _followGame() {
+    final game = widget.state.companion?.game;
+    if (game != null && game != _openedFor) setState(() => _tab = 1);
+    _openedFor = game;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final linked = widget.state.session?.linked ?? false;
         final pages = [
           RoomScreen(state: widget.state),
+          GameScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
           PlayerScreen(state: widget.state),
           PlaylistScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
         ];
@@ -66,6 +89,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Icon(Icons.qr_code_scanner),
                 ),
                 label: 'Room',
+              ),
+              NavigationDestination(
+                icon: Badge(
+                  isLabelVisible: widget.state.companion != null,
+                  backgroundColor: GnColors.ok,
+                  smallSize: 8,
+                  child: const Icon(Icons.sports_esports),
+                ),
+                label: 'Game',
               ),
               const NavigationDestination(icon: Icon(Icons.face_retouching_natural), label: 'You'),
               const NavigationDestination(icon: Icon(Icons.queue_music), label: 'Playlist'),

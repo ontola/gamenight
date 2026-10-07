@@ -86,6 +86,21 @@ class SessionInfo {
   }
 }
 
+/// A game's own phone screen, offered while that game is being played.
+class Companion {
+  final String game;
+  final String title;
+  final String url;
+  const Companion({required this.game, required this.title, required this.url});
+
+  static Companion? fromJson(Map<String, dynamic> j) {
+    final game = j['game'] as String?;
+    final url = j['url'] as String?;
+    if (game == null || url == null) return null;
+    return Companion(game: game, title: j['title'] as String? ?? game, url: url);
+  }
+}
+
 class PlaylistEntry {
   final String game;
   final String title;
@@ -135,7 +150,13 @@ class GameNightApi {
   GameNightApi(this.base, {http.Client? client})
       : _client = client ?? http.Client();
 
-  Uri _u(String path) => base.replace(path: path);
+  Uri _u(String path) {
+    final relative = Uri.parse(path);
+    return base.replace(path: relative.path, query: relative.hasQuery ? relative.query : null);
+  }
+
+  /// Absolute address of a page the host serves, such as a phone screen.
+  Uri resolve(String path) => _u(path);
 
   Future<dynamic> _send(String method, String path,
       {Object? body, String? failure}) async {
@@ -184,6 +205,18 @@ class GameNightApi {
 
   /// Applies the profile to a character: the one [claim] or [seat] names, or a
   /// new party member when both are null.
+  /// The phone screen of the game being played, if it has one. Hosts from
+  /// before phone screens answer 404, which reads as "none".
+  Future<Companion?> companion(String profile) async {
+    try {
+      final j = await _send('GET', '/api/companion?profile=${Uri.encodeQueryComponent(profile)}');
+      return j is Map<String, dynamic> ? Companion.fromJson(j) : null;
+    } on ApiError catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
   Future<JoinResult> join(String id,
           {String? claim, int? seat, int linkRevision = 0}) async =>
       JoinResult(await _send('POST', '/api/profiles/${Uri.encodeComponent(id)}/join',
@@ -196,6 +229,12 @@ class GameNightApi {
           body: {'code': code, 'profile': profile, if (remember) 'remember': true},
           failure:
               'Could not join this room. Check the code and that you are not already connected.');
+
+  /// Hand a character back: the controller stays in the game as a fresh,
+  /// unnamed player, and this phone is no longer bound to it.
+  Future<void> unlink(String player) => _send(
+      'POST', '/api/player-links/${Uri.encodeComponent(player)}/unlink',
+      failure: 'Could not leave this character. Try again.');
 
   Future<void> cancelPickup(String profile) => _send(
       'POST', '/api/local-room/cancel/${Uri.encodeComponent(profile)}',

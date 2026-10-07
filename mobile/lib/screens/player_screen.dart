@@ -2,10 +2,12 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../avatar.dart';
 import '../character.dart';
+import '../faces.dart';
 import '../theme.dart';
 
 enum Tool { pencil, eraser, fill }
@@ -46,12 +48,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
   void initState() {
     super.initState();
     state.addListener(_refreshBody);
+    state.addListener(_followArtwork);
     _refreshBody();
   }
 
   @override
   void dispose() {
     state.removeListener(_refreshBody);
+    state.removeListener(_followArtwork);
     _name.dispose();
     super.dispose();
   }
@@ -69,6 +73,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (atlas == null || key != _bodyKey) return;
     final tinted = await CharacterSprite.tint(atlas, state.clothingColor, state.skinColor);
     if (mounted && key == _bodyKey) setState(() => _body = tinted);
+  }
+
+  late String _shownArtwork = state.currentArtworkId;
+
+  /// Picking another saved face (or importing a backup) replaces the canvas.
+  void _followArtwork() {
+    if (_shownArtwork != state.currentArtworkId) {
+      _shownArtwork = state.currentArtworkId;
+      setState(() {
+        _grid = List.of(state.face);
+        _undo.clear();
+      });
+    }
+    if (_name.text != state.name) _name.text = state.name;
   }
 
   void _pushUndo() {
@@ -168,6 +186,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
         children: [
           _identity(),
           _editor(),
+          _gallery(),
+          _backup(),
         ],
       ),
     );
@@ -325,6 +345,139 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ]);
   }
 
+  Widget _gallery() {
+    return Section(title: 'Your faces', children: [
+      const Hint('Keep as many faces as you like. Tap one to wear it.'),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 96,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: state.artworks.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 10),
+          itemBuilder: (_, i) {
+            final art = state.artworks[i];
+            final active = art.id == state.currentArtworkId;
+            final data = active ? _grid : art.data;
+            return Semantics(
+              button: true,
+              selected: active,
+              label: art.name,
+              child: GestureDetector(
+                onTap: () => state.selectArtwork(art.id),
+                child: Column(children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: GnColors.bg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: active ? GnColors.accent : GnColors.border, width: active ? 3 : 1),
+                    ),
+                    child: CustomPaint(painter: _FaceThumb(data, state.skinColor)),
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: 72,
+                    child: Text(art.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 12, color: active ? Colors.white : GnColors.muted)),
+                  ),
+                ]),
+              ),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        OutlinedButton.icon(
+            onPressed: () => state.newArtwork(),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('New face')),
+        OutlinedButton.icon(
+            onPressed: () => state.cloneArtwork(state.currentArtworkId),
+            icon: const Icon(Icons.copy, size: 18),
+            label: const Text('Copy')),
+        OutlinedButton.icon(
+            onPressed: _confirmDelete,
+            icon: const Icon(Icons.delete_outline, size: 18),
+            label: const Text('Delete')),
+      ]),
+    ]);
+  }
+
+  Future<void> _confirmDelete() async {
+    final art = state.currentArtwork;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${art.name}?'),
+        content: const Text('This face is removed from this phone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok == true) state.deleteArtwork(art.id);
+  }
+
+  Widget _backup() {
+    return Section(title: 'Backup', children: [
+      const Hint('Copy your faces, name and skin as text and keep it in a note. '
+          'Paste it back here or in the browser studio to restore.'),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        FilledButton.tonalIcon(
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: state.exportBackup()));
+            if (mounted) toast(context, 'Backup copied. Paste it into a note to keep it.');
+          },
+          icon: const Icon(Icons.content_copy, size: 18),
+          label: const Text('Copy backup'),
+        ),
+        OutlinedButton.icon(
+          onPressed: _restore,
+          icon: const Icon(Icons.restore, size: 18),
+          label: const Text('Restore'),
+        ),
+      ]),
+    ]);
+  }
+
+  Future<void> _restore() async {
+    final field = TextEditingController();
+    final text = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore a backup'),
+        content: TextField(
+          controller: field,
+          maxLines: 6,
+          decoration: const InputDecoration(hintText: 'Paste your backup here'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, field.text), child: const Text('Restore')),
+        ],
+      ),
+    );
+    field.dispose();
+    if (text == null || text.trim().isEmpty || !mounted) return;
+    try {
+      final added = state.importBackup(text);
+      toast(context, 'Imported $added face${added == 1 ? '' : 's'}. Existing faces were kept.');
+    } on BackupError catch (e) {
+      toast(context, e.message);
+    }
+  }
+
   Widget _toolButton(Tool tool, String label) {
     final active = _tool == tool;
     return active
@@ -439,4 +592,29 @@ class _Stroke extends Drag {
   void end(DragEndDetails details) => onDone();
   @override
   void cancel() => onDone();
+}
+
+/// A saved face on its skin-coloured head, for the gallery.
+class _FaceThumb extends CustomPainter {
+  final Pixels face;
+  final String skin;
+  _FaceThumb(this.face, this.skin);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cell = size.width / gridSize;
+    canvas.drawCircle(Offset((headX + .5) * cell, (headY + .5) * cell), headRadius * cell,
+        Paint()..color = hexColor(skin));
+    final paint = Paint();
+    for (var i = 0; i < face.length; i++) {
+      final c = face[i];
+      if (c == null) continue;
+      paint.color = hexColor(c);
+      canvas.drawRect(
+          Rect.fromLTWH((i % gridSize) * cell, (i ~/ gridSize) * cell, cell + .3, cell + .3), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FaceThumb old) => old.face != face || old.skin != skin;
 }

@@ -5,6 +5,7 @@
 // phone is bound to. Binding happens through a character QR (`claim`), a seat
 // QR (`seat`) or a room-code pickup in the lobby.
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -12,6 +13,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart';
 import 'avatar.dart';
+import 'faces.dart';
 import 'link.dart';
 
 enum SyncState { idle, saving, savedLocally, synced, joined, warning }
@@ -31,6 +33,7 @@ class AppState extends ChangeNotifier {
     // Keep the first random name and face, so a restart is still you.
     prefs.setString('player_name', name);
     prefs.setString('face', encodeAvatar(face));
+    _loadArtworks();
     boundPlayer = prefs.getString('bound_player');
     final host = prefs.getString('host');
     if (host != null) _api = this.apiFactory(Uri.parse(host));
@@ -60,12 +63,121 @@ class AppState extends ChangeNotifier {
   SessionInfo? session;
   String? sessionError;
 
+  /// The current game's phone screen, while there is one.
+  Companion? companion;
+
   SyncState sync = SyncState.idle;
   String syncMessage = '';
 
   Timer? _saveTimer;
   Timer? _poll;
   bool _saving = false, _savePending = false;
+
+  // ---- Saved faces ------------------------------------------------------
+
+  final List<Artwork> artworks = [];
+  late String currentArtworkId;
+
+  void _loadArtworks() {
+    try {
+      final list = jsonDecode(prefs.getString('artworks') ?? '[]') as List;
+      artworks.addAll(list.map(Artwork.fromJson).whereType<Artwork>());
+    } catch (_) {}
+    final current = prefs.getString('current_artwork');
+    final match = artworks.where((a) => a.id == current);
+    if (match.isNotEmpty) {
+      currentArtworkId = match.first.id;
+      face = List.of(match.first.data);
+    } else {
+      // The face from before saved faces existed becomes the first one.
+      final art = Artwork(id: newArtworkId(), name: 'Sketch ${artworks.length + 1}', data: List.of(face));
+      artworks.add(art);
+      currentArtworkId = art.id;
+      _saveArtworks();
+    }
+  }
+
+  void _saveArtworks() {
+    prefs.setString('artworks', jsonEncode([for (final a in artworks) a.toJson()]));
+    prefs.setString('current_artwork', currentArtworkId);
+  }
+
+  Artwork get currentArtwork => artworks.firstWhere((a) => a.id == currentArtworkId);
+
+  /// Load a saved face into the editor; it becomes your character's face.
+  void selectArtwork(String id) {
+    final art = artworks.where((a) => a.id == id).firstOrNull;
+    if (art == null) return;
+    currentArtworkId = id;
+    face = List.of(art.data);
+    prefs.setString('face', encodeAvatar(face));
+    _saveArtworks();
+    scheduleSave();
+  }
+
+  void newArtwork({Pixels? data, String? name}) {
+    final art = Artwork(
+        id: newArtworkId(), name: name ?? 'Sketch ${artworks.length + 1}', data: data ?? randomFace());
+    artworks.add(art);
+    _saveArtworks();
+    selectArtwork(art.id);
+  }
+
+  void cloneArtwork(String id) {
+    final source = artworks.where((a) => a.id == id).firstOrNull;
+    if (source != null) newArtwork(data: List.of(source.data), name: '${source.name} copy');
+  }
+
+  void deleteArtwork(String id) {
+    artworks.removeWhere((a) => a.id == id);
+    if (artworks.isEmpty) return newArtwork();
+    if (currentArtworkId == id) return selectArtwork(artworks.first.id);
+    _saveArtworks();
+    notifyListeners();
+  }
+
+  /// A backup of every face, the name and the skin colour, as text the
+  /// player can keep in a note. Same format as the browser studio's.
+  String exportBackup() => encodeBackup(Backup(
+      username: name, skinColor: skinColor, activeArtworkId: currentArtworkId, artworks: artworks));
+
+  /// Adds the faces from a backup (skipping ones already here) and takes its
+  /// name and skin. Returns how many faces were new.
+  int importBackup(String text) {
+    final backup = decodeBackup(text);
+    var added = 0;
+    String? active;
+    for (final incoming in backup.artworks) {
+      final key = encodeAvatar(incoming.data);
+      var same = artworks
+          .where((a) => a.name == incoming.name && encodeAvatar(a.data) == key)
+          .firstOrNull;
+      if (same == null) {
+        same = Artwork(id: newArtworkId(), name: incoming.name, data: incoming.data);
+        artworks.add(same);
+        added++;
+      }
+      if (incoming.id == backup.activeArtworkId) active = same.id;
+    }
+    name = backup.username;
+    prefs.setString('player_name', name);
+    skinColor = backup.skinColor;
+    prefs.setString('skin_color', skinColor);
+    _saveArtworks();
+    selectArtwork(active ?? currentArtworkId);
+    return added;
+  }
+
+  /// Give your character back to the room. The phone keeps your faces and
+  /// can sign in again with a room code or a character QR.
+  Future<void> leaveCharacter() async {
+    final api = _api, player = session?.playerId ?? boundPlayer;
+    if (api == null || player == null) return;
+    await api.unlink(player);
+    _clearClaim();
+    companion = null;
+    await refreshSession();
+  }
 
   Profile get profile => Profile(
       id: profileId, username: name, skinColor: skinColor, avatar: encodeAvatar(face));
@@ -94,6 +206,8 @@ class AppState extends ChangeNotifier {
   void setFace(Pixels pixels) {
     face = pixels;
     prefs.setString('face', encodeAvatar(pixels));
+    currentArtwork.data = List.of(pixels);
+    _saveArtworks();
     scheduleSave();
   }
 
@@ -211,6 +325,7 @@ class AppState extends ChangeNotifier {
     _api?.close();
     _api = null;
     session = null;
+    companion = null;
     sessionError = null;
     _clearClaim();
     await prefs.remove('host');
@@ -264,9 +379,11 @@ class AppState extends ChangeNotifier {
         // latest drawing so the character matches what is on screen.
         if (!wasLinked) unawaited(pushProfile());
       }
+      companion = next.linked ? await api.companion(profileId) : null;
     } on ApiError catch (e) {
       sessionError = e.message;
     }
+    if (_disposed) return;
     notifyListeners();
   }
 

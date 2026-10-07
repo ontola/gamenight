@@ -220,6 +220,17 @@ class _RoomScreenState extends State<RoomScreen> {
               title: const Text('Remember me on this GameNight'),
               subtitle: const Text('Return as a guest without becoming the main player.'),
             ),
+          if (linked) ...[
+            const SizedBox(height: 4),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : () => _run(() async {
+                await state.leaveCharacter();
+                return 'You left your character. Your faces stay on this phone.';
+              }),
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Leave this character'),
+            ),
+          ],
         ]),
       Section(children: [
         Row(children: [

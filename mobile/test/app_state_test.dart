@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/api.dart';
 import 'package:gamenight/app_state.dart';
+import 'package:gamenight/faces.dart';
 import 'package:gamenight/link.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -13,6 +14,7 @@ class FakeHost {
   final calls = <String>[];
   final bodies = <String, dynamic>{};
   bool linked = false;
+  bool companion = false;
 
   late final client = MockClient((request) async {
     final key = '${request.method} ${request.url.path}';
@@ -37,6 +39,16 @@ class FakeHost {
           200);
     }
     if (request.url.path == '/api/local-room/join') return http.Response('', 204);
+    if (request.url.path == '/api/companion' && companion) {
+      final profile = request.url.queryParameters['profile'];
+      return http.Response(
+          jsonEncode({
+            'game': 'hexstead',
+            'title': 'Hexstead',
+            'url': '/play/hexstead/index.html?profile=$profile&game=hexstead',
+          }),
+          200);
+    }
     return http.Response('', 404);
   });
 }
@@ -92,5 +104,45 @@ void main() {
   test('hosted room links are refused with a clear message', () async {
     expect(() => state.connect(parseHostLink('https://gamenight.ontola.io/?r=ABC234')),
         throwsA(isA<LinkError>()));
+  });
+
+  test('a game with a phone screen is offered while it is played', () async {
+    await state.connect(parseHostLink('http://10.0.0.2:7913/?r=ABC234'));
+    host.linked = true;
+    await state.refreshSession();
+    expect(state.companion, isNull, reason: 'a host without phone screens answers 404');
+    host.companion = true;
+    await state.refreshSession();
+    expect(state.companion!.title, 'Hexstead');
+    expect(state.api!.resolve(state.companion!.url).toString(),
+        'http://10.0.0.2:7913/play/hexstead/index.html?profile=${state.profileId}&game=hexstead');
+    host.linked = false;
+    await state.refreshSession();
+    expect(state.companion, isNull);
+  });
+
+  test('saved faces survive a restart and round-trip through a backup', () async {
+    final first = state.currentArtworkId;
+    state.newArtwork(name: 'Second');
+    expect(state.artworks.length, 2);
+    state.cloneArtwork(first);
+    expect(state.artworks.last.name, endsWith('copy'));
+    final backup = state.exportBackup();
+
+    final restarted = AppState(state.prefs,
+        apiFactory: (base) => GameNightApi(base, client: host.client));
+    expect(restarted.artworks.length, 3);
+    expect(restarted.currentArtworkId, state.currentArtworkId);
+    restarted.dispose();
+
+    SharedPreferences.setMockInitialValues({});
+    final fresh = AppState(await SharedPreferences.getInstance(),
+        apiFactory: (base) => GameNightApi(base, client: host.client));
+    expect(fresh.importBackup(backup), 3);
+    expect(fresh.name, state.name);
+    expect(fresh.face, state.face);
+    expect(fresh.importBackup(backup), 0, reason: 'faces already here are skipped');
+    expect(() => fresh.importBackup('{"format":"nope"}'), throwsA(isA<BackupError>()));
+    fresh.dispose();
   });
 }
