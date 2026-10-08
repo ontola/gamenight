@@ -144,8 +144,17 @@ class _RoomScreenState extends State<RoomScreen> {
     return [
       Section(title: room?.code == null ? 'Your room' : 'Room ${room!.code}', children: [
         Row(children: [
-          Icon(connected ? Icons.check_circle : Icons.hourglass_top,
-              color: connected ? GnColors.ok : GnColors.muted),
+          Icon(
+              state.sessionError != null
+                  ? Icons.wifi_off
+                  : connected
+                      ? Icons.check_circle
+                      : Icons.hourglass_top,
+              color: state.sessionError != null
+                  ? GnColors.warn
+                  : connected
+                      ? GnColors.ok
+                      : GnColors.muted),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -278,14 +287,23 @@ class _RoomScreenState extends State<RoomScreen> {
     return [
       Section(title: 'Your session', children: [
         Row(children: [
-          Icon(linked ? Icons.check_circle : Icons.link_off,
-              color: linked ? GnColors.ok : GnColors.muted),
+          Icon(
+              state.sessionError != null
+                  ? Icons.wifi_off
+                  : linked
+                      ? Icons.check_circle
+                      : Icons.link_off,
+              color: state.sessionError != null
+                  ? GnColors.warn
+                  : linked
+                      ? GnColors.ok
+                      : GnColors.muted),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               state.sessionError ??
                   (linked
-                      ? 'Signed in as ${s!.playerName ?? state.name}'
+                      ? 'Connected as ${s!.playerName ?? state.name}'
                       : waiting
                           ? 'Waiting for pickup in the lobby'
                           : 'Not linked to a character yet'),
@@ -294,7 +312,9 @@ class _RoomScreenState extends State<RoomScreen> {
           ),
         ]),
         const SizedBox(height: 8),
-        Hint(linked
+        Hint(state.sessionError != null
+            ? 'Showing what this phone last knew. It updates when GameNight is reachable again.'
+            : linked
             ? '${s!.seat == null ? 'Your profile is linked to this party.' : 'Player ${s.seat! + 1}.'} '
                 'Your name and face follow you into every game.'
             : waiting
