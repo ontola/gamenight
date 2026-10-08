@@ -39,6 +39,25 @@
 <p>Pin the action to a reviewed commit SHA for reproducible CI. It calculates the checksum, streams the upload, promotes the preview and adds a portal link to the Actions summary. Outputs are <code>build-id</code>, <code>sha256</code> and <code>portal-url</code>.</p>
 <p>Use <code>channel: stable</code> for automated public releases. That requires a publish-scoped key and GameNight distribution approval. Never provide secrets to pull-request code from untrusted forks. Build/test PRs without publishing; publish from trusted main or version-tag workflows.</p>
 <p>Keys are restricted to one game. The portal lists expiry and last use. Create a replacement, update your CI secret, then revoke the old key. Revocation is immediate, including before an upload completes. Keys expire after 90 days by default; choose 30 days or up to one year. CI keys cannot create more keys or edit account details.</p>
+<p>Games that build in one workflow and publish from a second <code>workflow_run</code> workflow can call the reusable workflow instead of copying these steps. It only uploads successful <code>main</code> or <code>v*</code> builds from your own repository:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-yaml">on:
+  workflow_run:
+    workflows: [Build and release]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  upload:
+    if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
+    uses: ontola/gamenight/.github/workflows/publish-game.yml@main
+    secrets: inherit
+    with:
+      artifact: my-game-windows   # artifact uploaded by the build
+      game: my-game
+      file: my-game-windows.zip   # path inside that artifact
+      entrypoint: Game.exe
+</code></pre></div>
 <p>The shared first-party pack uses a <code>gamenight-&lt;game-id&gt;</code> GitHub environment per game, each holding its <code>GAMENIGHT_API_TOKEN</code>. Native repositories use a <code>gamenight</code> environment. Set the repository variable <code>GAMENIGHT_PUBLISH_ENABLED=true</code> after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.</p>
 <h2 id="other-ci-systems-and-local-previews">Other CI systems and local previews</h2>
 <p><a href="/developers/gamenight-publish.py">Download the Python uploader</a>. It requires Python 3.11 or later and no third-party packages. Set <code>GAMENIGHT_API_TOKEN</code> in your shell or CI secret environment, then:</p>
@@ -119,7 +138,7 @@
 <p>Run the <a href="/docs/testing">integration checks</a> against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.</p>
 <p>The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="5584a49692ab8eee370ad279a197e999c1d36155bdacaa4648ce2fb7ff123d0f">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="62361608f6165954bd8f113b158479a4434993c4167b653c51be0958577c4fb3">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/settings"><small>Next</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#prepare-a-release">Prepare a release</a><a href="#connect-github-actions">Connect GitHub Actions</a><a href="#other-ci-systems-and-local-previews">Other CI systems and local previews</a><a href="#publishing-api">Publishing API</a><a href="#catalog-updates">Catalog updates</a><a href="#supply-the-artwork">Supply the artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

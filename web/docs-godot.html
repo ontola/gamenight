@@ -14,6 +14,13 @@ player profiles over WebSocket. Your game connects these to its simulation and
 rendering.</p>
 <h2 id="install">Install</h2>
 <p>Copy <code>sdk/godot/addons/gamenight</code> into your project’s <code>addons</code> directory and enable GameNight in Project Settings → Plugins. The plugin registers <code>GameNight</code> and <code>GameNightScreen</code> autoloads.</p>
+<p>Godot has no package manager, so every game keeps its own copy of the addon, and copies fall behind. Run <code>python sdk/godot/sync.py path/to/your/game</code> from a GameNight checkout to update it, and add the drift check to your game's CI. It fails as soon as your copy differs from the SDK on <code>main</code>:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-yaml">jobs:
+  gamenight-sdk:
+    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+    with:
+      path: .  # the folder that holds project.godot
+</code></pre></div>
 <p>The connection reads the launch environment automatically. Keep standalone menus separate from the managed path using <code>GameNight.launched_by_daemon</code>.</p>
 <h2 id="lifecycle-signals">Lifecycle signals</h2>
 <p>These declarations come directly from the addon:</p>
@@ -103,7 +110,7 @@ Minimizing in <code>_ready()</code> is too late to prevent the initial window ap
 Use <code>GameNightScreen</code> for Start/Resume and explicitly claim the screen in your
 standalone launch path. OS focus must never request gameplay.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="6e8d52e084daa6f87bf86df59e848871d356f170b37fef9e5a17d7843fa4dd8e">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="d208f2f7f6b39bdd08fe513147c1cea3069f2fabbe3a8b179ced1f35be4035c4">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
