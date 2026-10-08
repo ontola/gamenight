@@ -8,11 +8,11 @@ GameNight puts local multiplayer games in one lobby. Players pick a game, keep t
 | --- | --- | --- |
 | [LÖVE / Lua](/docs/love) | Shared party runner | Lifecycle, controller mapping, window handling and faces |
 | [Rust / Bevy](/docs/rust) | Rust SDK | Typed protocol events; your engine handles input consumption and rendering |
-| [Godot 4](/docs/godot) | Godot addon | Lifecycle signals; controller streaming and window behaviour need work |
+| [Godot 4](/docs/godot) | Godot addon | Lifecycle, controllers per seat, window handling, settings, faces and phone screens |
 | [C / C++](/docs/c) | Single-header adapter | TCP transport and lifecycle; no controller stream or face decoder yet |
 | [Unity, Unreal and others](/docs/other-engines) | Wire protocol | Implement the connection and engine adapter yourself |
 
-These are implementation starting points, not certifications. The engine guides call out missing support before you copy anything.
+These are implementation starting points, not certifications. [Engine support](/docs/engines) compares every engine feature by feature and lists the open work.
 
 ## What a good integration does
 
