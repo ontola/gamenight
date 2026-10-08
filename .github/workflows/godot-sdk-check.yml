@@ -1,0 +1,36 @@
+# Reusable check for games that vendor the Godot addon. It fails when a game's
+# copy of addons/gamenight differs from the SDK on GameNight's main branch.
+#
+#   jobs:
+#     gamenight-sdk:
+#       uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+#       with:
+#         path: .   # the folder holding project.godot
+name: GameNight Godot SDK check
+on:
+  workflow_call:
+    inputs:
+      path:
+        description: Godot project directories in the calling repository, separated by spaces
+        type: string
+        default: .
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: game
+      - uses: actions/checkout@v4
+        with:
+          repository: ontola/gamenight
+          ref: main
+          path: gamenight
+          sparse-checkout: sdk/godot
+      - name: Compare addons/gamenight with the SDK
+        working-directory: game
+        env:
+          GAME_PATHS: ${{ inputs.path }}
+        run: python3 ../gamenight/sdk/godot/sync.py --check $GAME_PATHS

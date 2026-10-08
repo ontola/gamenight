@@ -1,0 +1,79 @@
+# Reusable upload of a tested build to the GameNight catalog. Call it from a
+# workflow_run workflow that fires after the game's own build:
+#
+#   on:
+#     workflow_run:
+#       workflows: [Build and release]
+#       types: [completed]
+#   jobs:
+#     upload:
+#       if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
+#       uses: ontola/gamenight/.github/workflows/publish-game.yml@main
+#       secrets: inherit
+#       with:
+#         artifact: mygame-windows
+#         game: mygame
+#         file: mygame-windows.zip
+#         entrypoint: MyGame.exe
+#
+# Only successful main or v* builds from the repository itself are uploaded.
+# GAMENIGHT_API_TOKEN comes from the caller's `gamenight` environment, or from
+# its repository secrets through `secrets: inherit`.
+name: Publish to GameNight
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: Name of the build artifact uploaded by the triggering run
+        type: string
+        required: true
+      game:
+        description: Registered game ID
+        type: string
+        required: true
+      file:
+        description: Package path inside the artifact
+        type: string
+        required: true
+      entrypoint:
+        description: Executable path inside the ZIP, or bare package filename
+        type: string
+        required: true
+      platform:
+        type: string
+        default: windows
+      channel:
+        type: string
+        default: preview
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: gamenight-publish-${{ inputs.game }}
+  cancel-in-progress: false
+jobs:
+  upload:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event != 'pull_request' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.head_branch == 'main' || startsWith(github.event.workflow_run.head_branch, 'v'))
+    runs-on: ubuntu-latest
+    environment: gamenight
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact }}
+          path: package
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Upload the tested build
+        uses: ontola/gamenight@main
+        with:
+          token: ${{ secrets.GAMENIGHT_API_TOKEN }}
+          game: ${{ inputs.game }}
+          file: package/${{ inputs.file }}
+          platform: ${{ inputs.platform }}
+          entrypoint: ${{ inputs.entrypoint }}
+          version: ci-${{ github.event.workflow_run.head_sha }}-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          channel: ${{ inputs.channel }}

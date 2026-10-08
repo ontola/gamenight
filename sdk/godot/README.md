@@ -10,9 +10,22 @@ and follow [Build a lobby](../../docs/site/lobbies.md), published at
 It uses the separate `lobby.gd` client and reusable `face.gd` renderer.
 Run it through `python scripts/run-local.py --lobby godot --godot /path/to/godot`.
 
-Copy `addons/gamenight` into your project and enable the plugin. It registers
-`GameNight` and `GameNightScreen` autoloads. The connection reads the host launch
-environment automatically.
+Copy `addons/gamenight` into your project with `sdk/godot/install.sh` and enable
+the plugin. It registers `GameNight` and `GameNightScreen` autoloads. The
+connection reads the host launch environment automatically.
+
+Vendored copies drift. Update one with `python sdk/godot/sync.py path/to/game`
+and let the game's CI fail when it falls behind:
+
+```yaml
+jobs:
+  gamenight-sdk:
+    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+```
+
+Games that publish to the catalog can call
+`ontola/gamenight/.github/workflows/publish-game.yml@main` from a `workflow_run`
+workflow instead of copying the upload steps; the file shows an example.
 
 Managed games read `GameNight.frame_for_seat(index)` rather than native joystick
 indices. Subscribe to `roster_changed` for live profiles. Stale input is cleared,

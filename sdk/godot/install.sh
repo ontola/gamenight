@@ -10,14 +10,14 @@
 # looked integrated.
 #
 #   sdk/godot/install.sh /path/to/project
+#
+# To keep the copy current afterwards, use sync.py (and sync.py --check in CI).
 set -euo pipefail
 src="$(cd "$(dirname "$0")" && pwd)/addons/gamenight"
 dest="${1:?usage: install.sh /path/to/godot/project}"
 [ -f "$dest/project.godot" ] || { echo "not a Godot project: $dest" >&2; exit 1; }
 
-mkdir -p "$dest/addons/gamenight"
-cp "$src"/gamenight.gd "$src"/screen.gd "$src"/lobby.gd "$src"/face.gd "$src"/artwork.gd "$src"/plugin.gd "$src"/plugin.cfg "$dest/addons/gamenight/"
-echo "copied the addon into $dest/addons/gamenight"
+python3 "$(dirname "$src")/../sync.py" --all "$dest"
 
 grep -q "GameNightScreen" "$dest/project.godot" || cat <<'MSG'
 
