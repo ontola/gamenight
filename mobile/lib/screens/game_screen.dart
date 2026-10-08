@@ -78,16 +78,29 @@ class GameScreen extends StatelessWidget {
               ),
           ]);
         }
-        final linked = session?.linked ?? false;
+        // In a room on this Wi-Fi, or an online one: the Room tab has nothing
+        // left to offer, so no "Join a room" here.
+        final hosted = state.inHostedRoom ? state.hostedRoom : null;
+        final linked = (session?.linked ?? false) || (hosted?.connected ?? false);
+        final waiting = (session?.waiting ?? false) || (hosted?.waiting ?? false);
+        final playing = session?.currentTitle ?? hosted?.current;
         return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
           Section(title: 'Game screen', children: [
-            if (!linked) ...[
+            if (waiting)
+              const Hint('Walk your character to your door in the lobby and stand there to '
+                  'connect. Games with a phone screen open here by themselves.')
+            else if (!linked && state.host != null) ...[
+              const Hint('You are connected to a GameNight, but your character has not been '
+                  'picked up yet. Enter the room code or scan the QR in the lobby.'),
+              const SizedBox(height: 12),
+              FilledButton(onPressed: onJoin, child: const Text('Pick up my character')),
+            ] else if (!linked) ...[
               const Hint('Some games put part of the game on your phone, like your own '
                   'hand of cards. Join a room and it opens here when such a game starts.'),
               const SizedBox(height: 12),
               FilledButton(onPressed: onJoin, child: const Text('Join a room')),
-            ] else if (session?.currentTitle != null)
-              Hint('${session!.currentTitle} is played on the TV with your controller. '
+            ] else if (playing != null)
+              Hint('$playing is played on the TV with your controller. '
                   'Games with a phone screen open here by themselves.')
             else
               const Hint('Nothing is being played right now. Games with a phone screen '

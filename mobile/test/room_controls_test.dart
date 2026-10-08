@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/api.dart';
+import 'package:gamenight/account.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/catalog.dart';
 import 'package:gamenight/room_controls.dart';
@@ -195,7 +196,7 @@ void main() {
       expect(find.text('1–6 players'), findsOneWidget);
       expect(find.text('GameNight Lobby'), findsNothing);
       expect(find.text('Add to queue'), findsNothing);
-      expect(find.text('Join a room'), findsOneWidget);
+      expect(find.text('Pick up my character'), findsOneWidget);
       expect(room.calls.where((c) => c.contains('/api/games')), isEmpty);
 
       await tester.tap(find.text('Ballkickers'));
@@ -205,6 +206,28 @@ void main() {
           findsOneWidget);
       expect(find.text('2 min'), findsOneWidget);
       expect(find.text('Join a room to put this game in the queue.'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('connected to a GameNight but not picked up yet, it says so', (tester) async {
+      await show(tester);
+      expect(find.text('Join a room'), findsNothing);
+      expect(find.text('Pick up my character'), findsOneWidget);
+      await close(tester);
+    });
+
+    testWidgets('in an online room there is no Join a room button', (tester) async {
+      state.inHostedRoom = true;
+      state.hostedRoom = HostedRoom({'status': 'connected', 'players': 2, 'discovery': {}});
+      await show(tester);
+      expect(find.text('Join a room'), findsNothing);
+      expect(find.textContaining('Nothing is being played'), findsOneWidget);
+
+      state.hostedRoom = HostedRoom({'status': 'waiting'});
+      state.notifyListeners();
+      await tester.pump();
+      expect(find.text('Join a room'), findsNothing);
+      expect(find.textContaining('Walk your character to your door'), findsOneWidget);
       await close(tester);
     });
 
