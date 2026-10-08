@@ -66,10 +66,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
       builder: (context, _) => ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         children: [
+          AccountCard(state: state),
           _identity(),
           _editor(),
           _gallery(),
-          AccountCard(state: state),
           _backup(),
         ],
       ),

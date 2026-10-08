@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/main.dart';
-import 'package:gamenight/screens/player_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -11,16 +12,27 @@ void main() {
     final state = AppState(await SharedPreferences.getInstance());
     await tester.pumpWidget(GameNightApp(state: state));
     expect(find.text('Scan the QR on the TV'), findsOneWidget);
-    expect(find.text('Sign in'), findsNothing, reason: 'signing in lives on the You tab');
+    expect(find.text('Sign in with email'), findsNothing, reason: 'signing in lives on the You tab');
     await tester.tap(find.text('You'));
     await tester.pumpAndSettle();
-    expect(find.text('Draw your face'), findsOneWidget);
     expect(find.byType(TextField), findsWidgets);
-    await tester.scrollUntilVisible(find.text('Sign in'), 200,
-        scrollable: find
-            .descendant(of: find.byType(PlayerScreen), matching: find.byType(Scrollable))
-            .first);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Sign in with email').hitTestable(), findsOneWidget,
+        reason: 'sign in is the first thing on the You tab');
+    state.dispose();
+  });
+
+  testWidgets('a sign-in link from the email opens the app and says what happened', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final state = AppState(await SharedPreferences.getInstance());
+    final links = StreamController<Uri>();
+    addTearDown(links.close);
+    await tester.pumpWidget(GameNightApp(state: state, links: links.stream));
+    links.add(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('belongs to another phone or browser'), findsOneWidget,
+        reason: 'no code was asked for on this phone');
+    links.add(Uri.parse('https://example.org/other'));
+    await tester.pumpAndSettle();
     state.dispose();
   });
 }

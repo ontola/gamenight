@@ -15,7 +15,7 @@ if(process.argv.includes('--check')){
   let offset=header.length;frames.forEach((frame,i)=>{const at=6+i*16;header[at]=sizes[i]%256;header[at+1]=sizes[i]%256;header.writeUInt16LE(1,at+4);header.writeUInt16LE(32,at+6);header.writeUInt32LE(frame.length,at+8);header.writeUInt32LE(offset,at+12);offset+=frame.length;});
   const ico=Buffer.concat([header,...frames]);
   write('web/favicon.ico',ico);write('web/apple-touch-icon.png',await sharp(svg).resize(180,180).png().toBuffer());
-  write('site/icon.svg',svg);write('site/icon.png',png);write('site/favicon.ico',ico);
+  write('site/icon.svg',svg);write('mobile/assets/icon.svg',svg);write('site/icon.png',png);write('site/favicon.ico',ico);
   write('crates/lobby/branding/gamenight.ico',ico);
   write('crates/lobby/branding/icon-64.rgba',await sharp(svg).resize(64,64).ensureAlpha().raw().toBuffer());
   fs.writeFileSync(path.join(root,manifest),JSON.stringify({source,sha256:hashes},null,2)+'\n');

@@ -43,6 +43,7 @@ class AppState extends ChangeNotifier {
     final host = prefs.getString('host');
     if (host != null) _api = this.apiFactory(Uri.parse(host));
     this.cloud.token = prefs.getString('cloud_token');
+    _restoreEmailBinding();
     accountEmail = prefs.getString('account_email');
     _studioRevision = prefs.getInt('studio_revision') ?? 0;
     inHostedRoom = prefs.getBool('hosted_room') ?? false;
@@ -420,6 +421,32 @@ class AppState extends ChangeNotifier {
     await cloud.requestCode(email);
     accountEmail = email.trim().toLowerCase();
     await prefs.setString('account_email', accountEmail!);
+    // The emailed link may open the app after it was closed: keep what ties
+    // the code to this phone for as long as the code lives.
+    await prefs.setString('email_binding', cloud.emailBinding!);
+    await prefs.setInt('email_binding_at', DateTime.now().millisecondsSinceEpoch);
+  }
+
+  void _restoreEmailBinding() {
+    final binding = prefs.getString('email_binding');
+    final at = prefs.getInt('email_binding_at') ?? 0;
+    final age = DateTime.now().millisecondsSinceEpoch - at;
+    if (binding != null && age >= 0 && age < emailCodeLife.inMilliseconds) {
+      cloud.emailBinding = binding;
+    }
+  }
+
+  /// How long an emailed code works.
+  static const emailCodeLife = Duration(minutes: 10);
+
+  /// Finishes a sign-in from the link in the email.
+  Future<String> signInWithLink(SignInLink link) async {
+    if (signedIn) return 'You are already signed in.';
+    if (cloud.emailBinding == null) {
+      throw const ApiError('This sign-in link belongs to another phone or browser. '
+          'Ask for a new code in this app.');
+    }
+    return verifySignInCode(link.code);
   }
 
   /// Step 2: the emailed code signs this phone in. The player saved on the
@@ -427,6 +454,8 @@ class AppState extends ChangeNotifier {
   /// result is saved back.
   Future<String> verifySignInCode(String code) async {
     await cloud.verifyCode(code);
+    await prefs.remove('email_binding');
+    await prefs.remove('email_binding_at');
     await prefs.setString('cloud_token', cloud.token!);
     try {
       account = await cloud.me();

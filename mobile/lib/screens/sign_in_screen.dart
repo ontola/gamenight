@@ -26,7 +26,19 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    widget.state.addListener(_signedInElsewhere);
+  }
+
+  /// The link in the email can finish the sign-in while this screen is open.
+  void _signedInElsewhere() {
+    if (widget.state.signedIn && !_busy && mounted) Navigator.of(context).pop(true);
+  }
+
+  @override
   void dispose() {
+    widget.state.removeListener(_signedInElsewhere);
     _email.dispose();
     _code.dispose();
     super.dispose();

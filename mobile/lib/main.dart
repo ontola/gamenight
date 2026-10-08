@@ -1,7 +1,12 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api.dart' show ApiError;
 import 'app_state.dart';
+import 'link.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/playlist_screen.dart';
@@ -14,12 +19,21 @@ Future<void> main() async {
   final state = AppState(prefs);
   if (state.host != null || state.inHostedRoom) state.startPolling();
   state.loadAccount();
-  runApp(GameNightApp(state: state));
+  final links = AppLinks();
+  Uri? first;
+  try {
+    first = await links.getInitialLink();
+  } catch (_) {}
+  runApp(GameNightApp(state: state, links: links.uriLinkStream, initialLink: first));
 }
 
 class GameNightApp extends StatelessWidget {
   final AppState state;
-  const GameNightApp({super.key, required this.state});
+
+  /// Links that open the app, e.g. from the sign-in email.
+  final Stream<Uri>? links;
+  final Uri? initialLink;
+  const GameNightApp({super.key, required this.state, this.links, this.initialLink});
 
   @override
   Widget build(BuildContext context) {
@@ -27,14 +41,16 @@ class GameNightApp extends StatelessWidget {
       title: 'GameNight',
       debugShowCheckedModeBanner: false,
       theme: gameNightTheme(),
-      home: HomeScreen(state: state),
+      home: HomeScreen(state: state, links: links, initialLink: initialLink),
     );
   }
 }
 
 class HomeScreen extends StatefulWidget {
   final AppState state;
-  const HomeScreen({super.key, required this.state});
+  final Stream<Uri>? links;
+  final Uri? initialLink;
+  const HomeScreen({super.key, required this.state, this.links, this.initialLink});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -43,17 +59,36 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late int _tab = widget.state.host == null ? 0 : 2;
   String? _openedFor;
+  StreamSubscription<Uri>? _links;
 
   @override
   void initState() {
     super.initState();
     widget.state.addListener(_followGame);
+    _links = widget.links?.listen(_onLink);
+    final first = widget.initialLink;
+    if (first != null) WidgetsBinding.instance.addPostFrameCallback((_) => _onLink(first));
   }
 
   @override
   void dispose() {
+    _links?.cancel();
     widget.state.removeListener(_followGame);
     super.dispose();
+  }
+
+  /// The link in the sign-in email opens the app and signs in here.
+  Future<void> _onLink(Uri uri) async {
+    final link = SignInLink.parse(uri);
+    if (link == null) return;
+    String message;
+    try {
+      message = await widget.state.signInWithLink(link);
+      if (mounted) setState(() => _tab = 2);
+    } on ApiError catch (e) {
+      message = e.message;
+    }
+    if (mounted) toast(context, message);
   }
 
   /// Bring up a game's phone screen the moment that game starts, once per
@@ -98,7 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   smallSize: 8,
                   child: const Icon(Icons.sports_esports),
                 ),
-                label: 'Game',
+                label: 'Games',
               ),
               const NavigationDestination(icon: Icon(Icons.face_retouching_natural), label: 'You'),
               const NavigationDestination(icon: Icon(Icons.queue_music), label: 'Playlist'),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 /// Colours from web/site.css, so the app and the phone studio match.
 class GnColors {
@@ -122,4 +123,15 @@ void toast(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+/// The GameNight logo: the website's own icon (`web/icon.svg`, copied by
+/// `scripts/generate-branding.cjs`), never a stand-in.
+class GameNightLogo extends StatelessWidget {
+  final double size;
+  const GameNightLogo({super.key, this.size = 32});
+
+  @override
+  Widget build(BuildContext context) => SvgPicture.asset('assets/icon.svg',
+      width: size, height: size, semanticsLabel: 'GameNight');
 }

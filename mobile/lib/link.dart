@@ -81,3 +81,25 @@ HostLink parseHostLink(String input) {
       linkRevision: int.tryParse(q['link_revision'] ?? '') ?? 0,
       pair: pair != null && pair.isNotEmpty && pair.length <= 200 ? pair : null);
 }
+
+/// The link in the sign-in email: `https://gamenight.ontola.io/auth/login#code=12345678`.
+/// On Android it opens the app, which finishes the sign-in it started.
+class SignInLink {
+  final String code;
+  const SignInLink(this.code);
+
+  /// Null for any other URL.
+  static SignInLink? parse(Uri uri) {
+    if (uri.scheme != 'https' || uri.origin != hostedOrigin) return null;
+    if (uri.path != '/auth/login') return null;
+    final Map<String, String> fragment;
+    try {
+      fragment = Uri.splitQueryString(uri.fragment);
+    } on FormatException {
+      return null;
+    }
+    final code = fragment['code'];
+    if (code == null || !RegExp(r'^\d{8}$').hasMatch(code)) return null;
+    return SignInLink(code);
+  }
+}

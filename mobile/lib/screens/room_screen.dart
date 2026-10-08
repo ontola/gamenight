@@ -408,7 +408,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) => const Padding(
         padding: EdgeInsets.only(bottom: 8),
         child: Row(children: [
-          Icon(Icons.sports_esports, color: GnColors.accent, size: 30),
+          GameNightLogo(size: 36),
           SizedBox(width: 10),
           Text('GameNight', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
         ]),

@@ -33,38 +33,50 @@ class _AccountCardState extends State<AccountCard> {
   @override
   Widget build(BuildContext context) {
     final account = state.account;
-    return Section(title: 'Account', children: [
-      if (state.signedIn) ...[
-        Row(children: [
-          const Icon(Icons.account_circle, color: GnColors.ok),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text('Signed in${state.accountEmail == null ? '' : ' as ${state.accountEmail}'}',
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+    if (state.signedIn) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+          child: Row(children: [
+            const Icon(Icons.account_circle, color: GnColors.ok, size: 32),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(state.accountEmail ?? account?.displayName ?? 'Signed in',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                const Hint('Your name and faces are saved to your account.'),
+              ]),
+            ),
+            TextButton(onPressed: _busy ? null : _signOut, child: const Text('Sign out')),
+          ]),
+        ),
+      );
+    }
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: GnColors.accent, width: 1.5),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Sign in to GameNight',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 6),
+          const Hint('Keep your name and faces on every phone, and join rooms with their '
+              'code from anywhere.'),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => SignInScreen(state: state))),
+            icon: const Icon(Icons.login, size: 18),
+            label: const Text('Sign in with email'),
           ),
         ]),
-        const SizedBox(height: 8),
-        Hint('${account?.displayName ?? state.name} and your faces are saved to your account.'),
-        const SizedBox(height: 8),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _busy ? null : _signOut,
-            icon: const Icon(Icons.logout, size: 18),
-            label: const Text('Sign out'),
-          ),
-        ),
-      ] else ...[
-        const Hint('Sign in to keep your name and faces on every phone and to join '
-            'rooms with their code from anywhere.'),
-        const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: () => Navigator.of(context)
-              .push(MaterialPageRoute(builder: (_) => SignInScreen(state: state))),
-          icon: const Icon(Icons.login, size: 18),
-          label: const Text('Sign in'),
-        ),
-      ],
-    ]);
+      ),
+    );
   }
 }

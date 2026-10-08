@@ -179,6 +179,33 @@ void main() {
     expect(parseHostLink('https://gamenight.ontola.io/join#room=abc234').roomCode, 'ABC234');
   });
 
+  test('the link in the email finishes the sign-in, even after a restart', () async {
+    final link = SignInLink.parse(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'))!;
+    expect(link.code, '12345678');
+    for (final other in [
+      'https://gamenight.ontola.io/auth/login',
+      'https://gamenight.ontola.io/auth/login#code=1234',
+      'https://gamenight.ontola.io/studio#code=12345678',
+      'https://evil.example/auth/login#code=12345678',
+      'http://gamenight.ontola.io/auth/login#code=12345678',
+    ]) {
+      expect(SignInLink.parse(Uri.parse(other)), isNull, reason: other);
+    }
+
+    await expectLater(state.signInWithLink(link), throwsA(isA<Exception>()),
+        reason: 'no code was asked for on this phone');
+
+    await state.requestSignInCode('joep@example.com');
+    state.dispose();
+    state = AppState(state.prefs, cloud: CloudApi(client: cloud.client));
+    expect(state.cloud.emailBinding, isNotNull, reason: 'the app was closed while checking email');
+    final message = await state.signInWithLink(link);
+    expect(message, startsWith('Signed in'));
+    expect(state.signedIn, isTrue);
+    expect(state.prefs.getString('email_binding'), isNull);
+    expect(await state.signInWithLink(link), 'You are already signed in.');
+  });
+
   test('an expired session signs the phone out', () async {
     await state.requestSignInCode('joep@example.com');
     await state.verifySignInCode('12345678');

@@ -52,7 +52,8 @@ void main() {
     await tester.tap(find.text('You'));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Edit face'));
+    await tester.scrollUntilVisible(find.text('Edit face'), 200,
+        scrollable: find.byType(Scrollable).first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Edit face'));
     await tester.pumpAndSettle();
