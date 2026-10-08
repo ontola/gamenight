@@ -41,7 +41,7 @@ cd mobile
 flutter pub get
 flutter run            # on a phone on the same Wi-Fi
 flutter test
-flutter build apk      # Android
+flutter build apk      # Android (CI publishes the signed one, see below)
 flutter build ipa      # iOS, needs a Mac and signing
 ```
 
@@ -57,3 +57,10 @@ server sends no CORS headers.
 
 - Phones as plain gamepads for games without a phone screen.
 - Signing in to a GameNight account and hosted rooms.
+
+## Download
+
+CI signs every build from `main` with the GameNight key and publishes it as
+the `app-latest` release, so this link always has the newest app:
+
+<https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk>

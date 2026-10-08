@@ -13,6 +13,9 @@ permissions:
   contents: read
 jobs:
   flutter:
+    # Publishing the release needs write access; pull requests never get it.
+    permissions:
+      contents: write
     timeout-minutes: 30
     runs-on: ubuntu-latest
     defaults:
@@ -58,3 +61,20 @@ jobs:
         with:
           name: gamenight-android
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
+      # One stable download link for the signed APK:
+      # https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk
+      # Only a build signed with the fixed key is published, never a debug one.
+      - name: Publish the APK as the app-latest release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.GAMENIGHT_KEYSTORE_FILE != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          cp mobile/build/app/outputs/flutter-apk/app-release.apk gamenight.apk
+          git tag -f app-latest "$GITHUB_SHA"
+          git push -f origin refs/tags/app-latest
+          notes="Signed Android build of the GameNight app from commit ${GITHUB_SHA::7}. Install it over the previous one; the signing key stays the same."
+          gh release view app-latest >/dev/null 2>&1 \
+            || gh release create app-latest --title "GameNight for Android" --notes "$notes" --latest
+          gh release edit app-latest --notes "$notes"
+          gh release upload app-latest gamenight.apk --clobber
