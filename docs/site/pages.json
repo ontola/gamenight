@@ -9,6 +9,18 @@
     ]
   },
   {
+    "slug": "engines",
+    "title": "Engine support",
+    "group": "Start here",
+    "source": "docs/site/engines.md",
+    "watch": [
+      "sdk/godot/addons/gamenight/gamenight.gd",
+      "sdk/c/gamenight.h",
+      "crates/gamenight-sdk/src/lib.rs",
+      "games/love-party/shared/lifecycle.lua"
+    ]
+  },
+  {
     "slug": "lifecycle",
     "title": "Game lifecycle",
     "group": "Start here",
