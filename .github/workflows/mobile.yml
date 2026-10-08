@@ -49,7 +49,9 @@ jobs:
         run: |
           {
             echo "### APK signing key"
-            keytool -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk | grep -E "Owner|SHA256"
+            # v2/v3-signed APKs have no jar signature, so keytool cannot read them.
+            "$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner" verify --print-certs \
+              build/app/outputs/flutter-apk/app-release.apk | grep -E "certificate (DN|SHA-256)"
             [ -n "$GAMENIGHT_KEYSTORE_FILE" ] || echo "Debug key: set the GAMENIGHT_KEYSTORE_* secrets for a fixed one."
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
