@@ -40,8 +40,19 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	sprite.shaded = true
 	sprite.double_sided = true
 	sprite.offset = Vector2(0, Character.H / 2.0 - 2)
-	sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# A flat sprite seen edge-on by the lights casts a hairline shadow, so an
+	# invisible body casts it instead.
+	sprite.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	node.add_child(sprite)
+	var body := MeshInstance3D.new()
+	var capsule := CapsuleMesh.new()
+	capsule.radius = 0.36
+	capsule.height = 1.7
+	body.mesh = capsule
+	# Just behind the sprite, so it never shades the player's own face.
+	body.position = Vector3(0, 0.85, -0.42)
+	body.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+	node.add_child(body)
 	# A soft personal glow so every player pops out of the haze.
 	var light := OmniLight3D.new()
 	light.light_energy = 0.9
@@ -58,7 +69,7 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	zzz.position = Vector3(0.6, 1.8, 0.1)
 	zzz.visible = false
 	node.add_child(zzz)
-	return {"node": node, "sprite": sprite, "light": light, "zzz": zzz, "key": ""}
+	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "key": ""}
 
 func update(world, delta: float) -> void:
 	_time += delta
@@ -76,6 +87,10 @@ func update(world, delta: float) -> void:
 		elif not p.grounded and p.vy > 4: squash = 1.08
 		sprite.scale = Vector3(1.0 / sqrt(squash), squash, 1)
 		if p.spawn > 0: sprite.scale *= 1.0 - p.spawn * 0.8
+		# The shadow body follows the pose: lower when sleeping or squashed.
+		var body: MeshInstance3D = actor.body
+		body.scale = Vector3(sprite.scale.x, sprite.scale.y * (0.6 if p.sleeping else 1.0), 1)
+		body.position.y = 0.85 * body.scale.y
 		if p.stun > 0: sprite.rotation.z = sin(_time * 30) * 0.15
 		else: sprite.rotation.z = 0
 		actor.zzz.visible = p.sleeping

@@ -731,10 +731,12 @@ func _plaque() -> void:
 		neon_line(c + Vector3(p[0].x, p[0].y, 0.08), c + Vector3(p[1].x, p[1].y, 0.08), AMBER, 3.0, 0.05)
 
 func _ceiling_lights() -> void:
-	# Fixed spots that paint coloured cones through the haze.
-	var spots := [[-5.4, VIOLET, Vector3(-4.6, 0, 0.5)], [0.0, PINK, Vector3(0, 0, 0.8)], [6.0, AMBER, Vector3(6.5, 0, 0.5)]]
+	# Fixed spots that paint coloured cones through the haze. They hang in
+	# front of the play line and off to the side, so the light hits players at
+	# an angle and throws a real shadow back onto the floor and wall.
+	var spots := [[-6.8, VIOLET, Vector3(-4.4, 0, -0.6)], [-1.6, PINK, Vector3(0.6, 0, -0.6)], [7.6, AMBER, Vector3(5.6, 0, -0.6)]]
 	for s in spots:
-		var housing := cylinder(0.22, 0.4, Vector3(s[0], 10.4, 0.6), mat(Color("221d30"), 0.4, 0.6))
+		var housing := cylinder(0.22, 0.4, Vector3(s[0], 10.4, 6.0), mat(Color("221d30"), 0.4, 0.6))
 		housing.name = "spot"
 		var light := SpotLight3D.new()
 		light.light_color = s[1]
@@ -745,7 +747,8 @@ func _ceiling_lights() -> void:
 		light.spot_angle_attenuation = 0.4
 		light.spot_attenuation = 0.5
 		light.shadow_enabled = true
-		light.position = Vector3(s[0], 9.95, 0.6)
+		light.shadow_blur = 1.5
+		light.position = Vector3(s[0], 9.95, 6.0)
 		add_child(light)
 		light.look_at(s[2])
 	# Two moving heads that sweep slowly across the room.
