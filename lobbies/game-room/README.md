@@ -19,8 +19,9 @@ Without a runtime, a demo party with bots shows the room:
 godot --path lobbies/game-room -- --demo [--scene=action|stations|sleep|empty]
 ```
 
-The project runs from source without an editor import step: the pixel font
-and logo are read from their files at runtime.
+The project runs from source without an editor import step: the fonts (Outfit
+for all text, the pixel font only for the neon wordmark) and the logo are read
+from their files at runtime.
 
 ## Controls
 
@@ -79,5 +80,5 @@ audio or phone camera scanning; those need a playtest on the TV.
 - No sound effects yet.
 - Game settings and the session assistant from the Living Room are not in
   this lobby yet.
-- No export preset yet; an export must include `assets/fonts/*.ttf` and
+- No export preset yet; an export must include `assets/fonts/*` and
   `assets/icon.svg` as non-resource files.
