@@ -29,11 +29,25 @@ android {
         versionName = flutter.versionName
     }
 
+    // CI signs with one fixed key (a GitHub secret), so a new APK can update
+    // the installed app and Android can verify the app's links on
+    // gamenight.ontola.io (the site's assetlinks.json holds the key's
+    // fingerprint). Without the key, e.g. a local build, the debug key is used.
+    val keystoreFile = System.getenv("GAMENIGHT_KEYSTORE_FILE")
+    if (keystoreFile != null) {
+        signingConfigs {
+            create("gamenight") {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("GAMENIGHT_KEYSTORE_PASSWORD")
+                keyAlias = "gamenight"
+                keyPassword = System.getenv("GAMENIGHT_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystoreFile != null) "gamenight" else "debug")
         }
     }
 }
