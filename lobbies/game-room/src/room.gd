@@ -14,6 +14,10 @@ const BG := Color("0b0b12")
 const TEXT := Color("f2f1f8")
 
 var font: FontFile
+var bold: FontFile
+var pixel: FontFile                 # wordmark only
+var _label_font: FontFile
+var _label_bold: FontFile
 var camera: Camera3D
 var environment: Environment
 var screens: Dictionary = {}       # name -> {viewport, canvas}
@@ -39,6 +43,10 @@ var mood := VIOLET                 # tinted by the next game's colour
 
 func _ready() -> void:
 	font = load_font()
+	bold = load_font(800)
+	pixel = load_pixel_font()
+	_label_font = load_font(600, true)
+	_label_bold = load_font(800, true)
 	_environment()
 	_camera()
 	_shell()
@@ -58,9 +66,19 @@ func _ready() -> void:
 
 # ---------------------------------------------------------------- helpers
 
-## Loads the GameNight pixel font straight from the TTF, so the project runs
-## from source without an editor import step.
-static func load_font() -> FontFile:
+## Fonts load straight from the files, so the project runs without an editor
+## import step (.godot/ and *.import are ignored). Outfit is the GameNight UI
+## face; the pixel font is kept only for the wordmark on the neon sign.
+static func load_font(weight := 600, msdf := false) -> FontFile:
+	var f := FontFile.new()
+	f.load_dynamic_font("res://assets/fonts/outfit-%d.woff2" % weight)
+	# MSDF keeps 3D labels sharp at any distance; 2D text draws at its real
+	# pixel size, where plain hinted glyphs look cleaner.
+	f.multichannel_signed_distance_field = msdf
+	f.generate_mipmaps = msdf
+	return f
+
+static func load_pixel_font() -> FontFile:
 	var f := FontFile.new()
 	f.load_dynamic_font("res://assets/fonts/ark-pixel-16px-latin.ttf")
 	f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
@@ -136,13 +154,13 @@ func neon_line(a: Vector3, b: Vector3, color: Color, energy := 5.0, thickness :=
 func label(text: String, pos: Vector3, size: int, color: Color, parent: Node = self, outline := 0) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font = font
+	l.font = _label_bold if size >= 32 else _label_font
 	l.font_size = size
 	l.pixel_size = 0.01
 	l.modulate = color
 	l.outline_size = outline
 	l.outline_modulate = Color(0, 0, 0, 0.8)
-	l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	l.position = pos
 	l.shaded = false
 	parent.add_child(l)
@@ -153,7 +171,7 @@ func screen(name: String, size: Vector2i, painter: Callable) -> ViewportTexture:
 	viewport.size = size
 	viewport.transparent_bg = false
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_NEAREST
+	viewport.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR
 	var canvas := Canvas.new()
 	canvas.painter = painter
 	canvas.size = size
@@ -358,14 +376,15 @@ func _logo() -> void:
 	var y := 8.0
 	var z := Layout.BACK + 0.12
 	var sign_texture := screen("logo", Vector2i(1024, 256), func(canvas: Control):
-		var f: Font = font
+		var f: Font = pixel
+		var sub := "COUCH MULTIPLAYER CLUB"
 		# Soft halo first, then the tube itself.
 		for k in [30, 18, 10]:
 			canvas.draw_string_outline(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, k, Color(AMBER, 0.12))
-			canvas.draw_string_outline(f, Vector2(0, 225), "COUCH  MULTIPLAYER  CLUB", HORIZONTAL_ALIGNMENT_CENTER, 1024, 48, k / 2, Color(VIOLET, 0.15))
+			canvas.draw_string_outline(font, Vector2(0, 222), sub, HORIZONTAL_ALIGNMENT_CENTER, 1024, 44, k / 2, Color(VIOLET, 0.15))
 		canvas.draw_string_outline(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, 4, AMBER.lightened(0.2))
 		canvas.draw_string(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, Color("ffd59a"))
-		canvas.draw_string(f, Vector2(0, 225), "COUCH  MULTIPLAYER  CLUB", HORIZONTAL_ALIGNMENT_CENTER, 1024, 48, Color("d9d0ff")))
+		canvas.draw_string(font, Vector2(0, 222), sub, HORIZONTAL_ALIGNMENT_CENTER, 1024, 44, Color("d9d0ff")))
 	screens.logo.viewport.transparent_bg = true
 	screens.logo.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var m := StandardMaterial3D.new()
@@ -603,7 +622,7 @@ func _couch_corner() -> void:
 	var strip := mat(GREEN, 0.3, 0, GREEN, 3.0)
 	box(Vector3(3.2, 0.025, 0.025), Vector3(q.x, ledge - 0.11, q.z + 0.36), strip, self, false)
 	_strip_materials.append(strip)
-	label("UP NEXT", Vector3(q.x - 0.95, ledge - 0.32, q.z + 0.3), 40, Color(0.8, 3.0, 1.8), self, 8)
+	label("UP NEXT", Vector3(q.x - 0.95, ledge - 0.3, q.z + 0.3), 32, Color(0.8, 3.0, 1.8), self, 8)
 	var sizes := [Vector2(1.2, 1.68), Vector2(0.82, 1.15), Vector2(0.82, 1.15)]
 	var xs := [-0.95, 0.24, 1.14]
 	for i in 3:
@@ -702,6 +721,7 @@ func _plaque() -> void:
 	var c := Layout.PLAQUE_CENTER
 	box(Vector3(2.3, 2.75, 0.1), c + Vector3(0, 0, -0.02), mat(Color("0e0c18"), 0.4))
 	var texture := screen("plaque", Vector2i(320, 380), func(_canvas): pass)
+	screens.plaque.canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp QR modules
 	# Bright enough to read as white after tone mapping: QR codes need contrast.
 	var m := screen_material(texture, 1.7)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST

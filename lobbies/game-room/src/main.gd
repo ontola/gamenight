@@ -35,6 +35,7 @@ var room
 var view
 var hud: Control
 var font: FontFile
+var bold: FontFile
 var party: Dictionary = {}
 var profiles: Dictionary = {}       # player id -> player
 var controllers: Dictionary = {}    # controller token -> player id
@@ -67,6 +68,7 @@ var _last_input: Dictionary = {}
 func _ready() -> void:
 	room = Room.new()
 	font = Room.load_font()
+	bold = Room.load_font(800)
 	add_child(room)
 	view = View.new()
 	view.room = room
@@ -546,8 +548,14 @@ func _cover(canvas: Control, texture: Texture2D, rect: Rect2) -> void:
 	var src := Rect2((size - src_size) / 2, src_size)
 	canvas.draw_texture_rect_region(texture, rect, src)
 
+## Headings (40 px and up) use the heavy weight.
 func _text(canvas: Control, value: String, pos: Vector2, size: int, color: Color, width := -1.0, align := HORIZONTAL_ALIGNMENT_LEFT) -> void:
-	canvas.draw_string(font, pos, value, align, width, size, color)
+	canvas.draw_string(bold if size >= 40 else font, pos, value, align, width, size, color)
+
+## Shrinks the size until value fits in width, down to a minimum.
+func _fit(value: String, size: int, width: float, minimum := 14) -> int:
+	while size > minimum and (bold if size >= 40 else font).get_string_size(value, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width: size -= 2
+	return size
 
 func _title_card(canvas: Control, game: Dictionary, rect: Rect2, size: int) -> void:
 	var color := Color.from_string(str(game.get("color", "")), VIOLET)
@@ -601,7 +609,7 @@ func _draw_tv(canvas: Control) -> void:
 	# Bottom bar with the title, top-left kicker capsule.
 	canvas.draw_rect(Rect2(0, size.y - 120, size.x, 120), Color(0.02, 0.02, 0.05, 0.78))
 	_text(canvas, str(game.get("title", "Game")), Vector2(36, size.y - 58), 48, TEXT)
-	_text(canvas, detail, Vector2(36, size.y - 22), 16, DIM)
+	_text(canvas, detail, Vector2(36, size.y - 22), 22, DIM)
 	var kw := font.get_string_size(kicker, HORIZONTAL_ALIGNMENT_LEFT, -1, 32).x + 40
 	canvas.draw_rect(Rect2(28, 26, kw, 52), Color(0.02, 0.02, 0.05, 0.85))
 	canvas.draw_rect(Rect2(28, 26, 6, 52), kicker_color)
@@ -677,19 +685,26 @@ func _draw_queue_box(canvas: Control, index: int) -> void:
 	_draw_box(canvas, game, str(index + 1))
 
 func _draw_jukebox(canvas: Control) -> void:
-	# Seen from the couch the screen is small, so only big type.
+	# Lit like the jukebox dome: warm glass with dark lettering, the way a
+	# real title strip sits behind the glass. Long titles shrink to fit.
 	var size := canvas.size
-	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("120a14"))
+	for y in int(size.y):
+		var t := float(y) / size.y
+		canvas.draw_line(Vector2(0, y), Vector2(size.x, y), Color("ffe2b0").lerp(Color("f4a96a"), t))
+	var ink := Color("4a1428")
+	canvas.draw_rect(Rect2(10, 10, size.x - 20, size.y - 20), Color(ink, 0.35), false, 2)
 	var track: Variant = party.get("now_playing")
 	if not track is Dictionary or track.is_empty():
-		_text(canvas, "JUKEBOX", Vector2(0, 70), 48, PINK, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(canvas, "no music", Vector2(0, 126), 32, DIM, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(canvas, "JUKEBOX", Vector2(0, 92), 48, ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		return
 	var playing: bool = track.get("playing", false)
+	var title := str(track.get("title", ""))
 	var artist := str(track.get("artist", ""))
 	if artist.is_empty(): artist = str(track.get("source", ""))
-	_text(canvas, ("> " if playing else "|| ") + _short(str(track.get("title", "")), 16), Vector2(12, 62), 32, TEXT)
-	_text(canvas, _short(artist, 18), Vector2(12, 110), 32, AMBER if playing else DIM)
+	var width := size.x - 40
+	_text(canvas, "NOW PLAYING" if playing else "PAUSED", Vector2(0, 40), 18, Color(ink, 0.7), size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, _short(title, 28), Vector2(0, 92), _fit(_short(title, 28), 44, width, 22), ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, _short(artist, 32), Vector2(0, 128), _fit(_short(artist, 32), 24, width, 16), Color("8a2e3c"), size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _draw_plaque(canvas: Control) -> void:
 	var size := canvas.size
@@ -723,34 +738,33 @@ func _draw_hud(canvas: Control) -> void:
 		var at := camera.unproject_position(head) / canvas.get_global_transform().get_scale()
 		var color := Color.from_string(str(profiles.get(id, {}).get("color", "")), VIOLET)
 		var name := _short(_name(id), 14)
-		var size := 16 if scale < 0.75 else 32
+		var size := int(20 * scale)
 		var width := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		for o in [Vector2(-2, 0), Vector2(2, 0), Vector2(0, -2), Vector2(0, 2)]:
-			_text(canvas, name, at + Vector2(-width / 2, 0) + o, size, BG)
+		canvas.draw_string_outline(font, at + Vector2(-width / 2, 0), name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, maxi(4, int(5 * scale)), Color(BG, 0.85))
 		_text(canvas, name, at + Vector2(-width / 2, 0), size, color.lightened(0.35))
 		var station := station_for(id)
 		if not station.is_empty() and not menus.has(id):
-			_hint(canvas, at + Vector2(0, -size - 18), station, size)
-		if menus.has(id): _draw_menu(canvas, id, at + Vector2(0, -size - 14), size)
+			_hint(canvas, at + Vector2(0, -size - 10 * scale), station, int(19 * scale))
+		if menus.has(id): _draw_menu(canvas, id, at + Vector2(0, -size - 10 * scale), int(22 * scale))
 	# Toasts, bottom centre.
 	var y := canvas.size.y - 40 * scale
 	for i in range(toasts.size() - 1, -1, -1):
 		var t: Dictionary = toasts[i]
-		var size := 16 if scale < 0.75 else 32
-		var w := font.get_string_size(t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
-		var rect := Rect2(canvas.size.x / 2 - w / 2, y - size - 22, w, size + 28)
+		var size := int(22 * scale)
+		var w := font.get_string_size(t.text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 44
+		var rect := Rect2(canvas.size.x / 2 - w / 2, y - size - 20, w, size + 24)
 		canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.88))
-		canvas.draw_rect(Rect2(rect.position, Vector2(6, rect.size.y)), t.color)
-		_text(canvas, t.text, rect.position + Vector2(28, size + 6), size, TEXT)
+		canvas.draw_rect(Rect2(rect.position, Vector2(4, rect.size.y)), t.color)
+		_text(canvas, t.text, rect.position + Vector2(24, size + 4), size, TEXT)
 		y -= rect.size.y + 10
 	if demo == null and not client.connected:
-		var size := 16 if scale < 0.75 else 32
+		var size := int(24 * scale)
 		var msg := "Connecting to GameNight…"
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, 24, w, size + 28), Color(0.03, 0.03, 0.06, 0.9))
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, 24 + size + 6), size, AMBER)
 	if profiles.is_empty() and (demo != null or client.connected):
-		var size := 16 if scale < 0.75 else 32
+		var size := int(28 * scale)
 		var msg := "Press any button on a controller to jump in"
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, canvas.size.y * 0.42, w, size + 28), Color(0.03, 0.03, 0.06, 0.85))
@@ -761,10 +775,11 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	var text := str(station.label)
 	var extra := str(station.get("extra", ""))
 	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-	var ew := font.get_string_size(extra, HORIZONTAL_ALIGNMENT_LEFT, -1, size / 2).x if not extra.is_empty() else 0.0
-	var h := size + 20.0
-	var badge := h - 10
-	var w := tw + badge + 34 + (ew + 20 if extra else 0.0)
+	var small := int(size * 0.72)
+	var ew := font.get_string_size(extra, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x if not extra.is_empty() else 0.0
+	var h := size + 14.0
+	var badge := h - 8
+	var w := tw + badge + 22 + (ew + 16 if extra else 0.0)
 	var rect := Rect2(at.x - w / 2, at.y - h, w, h)
 	# Keep the capsule and its round ends on screen near the walls.
 	rect.position.x = clampf(rect.position.x, h / 2 + 12, canvas.size.x - w - h / 2 - 12)
@@ -773,11 +788,11 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	canvas.draw_circle(rect.position + Vector2(0, h / 2), h / 2, bg)
 	canvas.draw_circle(rect.position + Vector2(w, h / 2), h / 2, bg)
 	var badge_color := Color("f8cd34") if station.enabled else Color("55516a")
-	canvas.draw_circle(rect.position + Vector2(badge / 2 + 2, h / 2), badge / 2, badge_color)
-	_text(canvas, "Y", rect.position + Vector2(2, h / 2 + size * 0.36), size, BG, badge, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(canvas, text, rect.position + Vector2(badge + 16, h / 2 + size * 0.36), size, TEXT if station.enabled else DIM)
+	canvas.draw_circle(rect.position + Vector2(badge / 2 - 2, h / 2), badge / 2, badge_color)
+	canvas.draw_string(bold, rect.position + Vector2(-2, h / 2 + size * 0.36), "Y", HORIZONTAL_ALIGNMENT_CENTER, badge, size, BG)
+	_text(canvas, text, rect.position + Vector2(badge + 10, h / 2 + size * 0.36), size, TEXT if station.enabled else DIM)
 	if extra:
-		_text(canvas, extra, rect.position + Vector2(badge + 30 + tw, h / 2 + size * 0.18), size / 2, AMBER)
+		_text(canvas, extra, rect.position + Vector2(badge + 26 + tw, h / 2 + small * 0.36), small, AMBER)
 
 func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	var items := menu_items(id)
@@ -792,7 +807,7 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	rect.position.y = maxf(rect.position.y, 16)
 	canvas.draw_rect(rect, Color(0.04, 0.035, 0.08, 0.95))
 	canvas.draw_rect(rect, Color(VIOLET, 0.9), false, 3)
-	_text(canvas, _name(id).to_upper(), rect.position + Vector2(24, size + 14), size / 2 * 1 if size > 16 else 16, AMBER)
+	_text(canvas, _name(id).to_upper(), rect.position + Vector2(24, size + 14), int(size * 0.7), AMBER)
 	for i in items.size():
 		var y := rect.position.y + 50 + i * line
 		var selected: bool = i == menu.index
