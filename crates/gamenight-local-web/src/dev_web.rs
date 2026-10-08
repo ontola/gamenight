@@ -82,7 +82,6 @@ pub async fn assets(request: Request, next: Next) -> Response {
         let page = match request.uri().path() {
             "/" | "/index.html" => Some("index.html"),
             "/dev.html" => Some("dev.html"),
-            "/catalog-guide.html" => Some("catalog.html"),
             _ => None,
         };
         if let Some(page) = page {
