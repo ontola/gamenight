@@ -8,6 +8,16 @@ rendering.
 
 Copy `sdk/godot/addons/gamenight` into your project’s `addons` directory and enable GameNight in Project Settings → Plugins. The plugin registers `GameNight` and `GameNightScreen` autoloads.
 
+Godot has no package manager, so every game keeps its own copy of the addon, and copies fall behind. Run `python sdk/godot/sync.py path/to/your/game` from a GameNight checkout to update it, and add the drift check to your game's CI. It fails as soon as your copy differs from the SDK on `main`:
+
+```yaml
+jobs:
+  gamenight-sdk:
+    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+    with:
+      path: .  # the folder that holds project.godot
+```
+
 The connection reads the launch environment automatically. Keep standalone menus separate from the managed path using `GameNight.launched_by_daemon`.
 
 ## Lifecycle signals

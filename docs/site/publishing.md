@@ -43,6 +43,28 @@ Use `channel: stable` for automated public releases. That requires a publish-sco
 
 Keys are restricted to one game. The portal lists expiry and last use. Create a replacement, update your CI secret, then revoke the old key. Revocation is immediate, including before an upload completes. Keys expire after 90 days by default; choose 30 days or up to one year. CI keys cannot create more keys or edit account details.
 
+Games that build in one workflow and publish from a second `workflow_run` workflow can call the reusable workflow instead of copying these steps. It only uploads successful `main` or `v*` builds from your own repository:
+
+```yaml
+on:
+  workflow_run:
+    workflows: [Build and release]
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  upload:
+    if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
+    uses: ontola/gamenight/.github/workflows/publish-game.yml@main
+    secrets: inherit
+    with:
+      artifact: my-game-windows   # artifact uploaded by the build
+      game: my-game
+      file: my-game-windows.zip   # path inside that artifact
+      entrypoint: Game.exe
+```
+
 The shared first-party pack uses a `gamenight-<game-id>` GitHub environment per game, each holding its `GAMENIGHT_API_TOKEN`. Native repositories use a `gamenight` environment. Set the repository variable `GAMENIGHT_PUBLISH_ENABLED=true` after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.
 
 ## Other CI systems and local previews
