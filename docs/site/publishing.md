@@ -118,7 +118,7 @@ New desktop builds refresh the trusted HTTPS publishing catalog in the backgroun
 
 Store metadata and artifact hashes use the promoted release. Uploads do not inherit old certification. Package verification checks hashes, ZIP safety and the entrypoint; it does not execute uploaded code or certify gameplay. Test controllers, player joining/leaving, return to lobby and continuous rounds against the actual release.
 
-The first public release requires distribution approval. Subsequent updates can use the same approved game and publish-scoped key. **Store page** edits update title, description, player counts and website without rebuilding the app. Choose **Free** or **Paid**. Selling opens to the first developers soon: you set the price, players buy once, and one owner unlocks the game for the whole couch. Ask about it from the portal's **Earnings** page.
+The first public release requires distribution approval. Subsequent updates can use the same approved game and publish-scoped key. **Store page** edits update title, description, player counts and website without rebuilding the app. Choose **Free** or **Paid**. Selling opens to the first developers soon. You set a price from €0.99 to €100 including VAT and keep 85% after VAT. GameNight is the seller and handles checkout, VAT, receipts and refunds; your share goes to your Stripe account with every sale. Players buy once, and one owner unlocks the game for the whole couch. Refunds are automatic within 14 days for buyers who played less than 2 hours. Ask about it from the portal's **Earnings** page.
 
 Private repository access, AI-assisted code processing and game distribution each need agreement. Sharing a repository does not grant permission to distribute the game. Listing is free.
 
