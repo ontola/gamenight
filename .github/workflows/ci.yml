@@ -120,13 +120,17 @@ jobs:
       - run: cargo build --locked -p gamenight-daemon --bin gamenight-daemon
       - run: python3 scripts/test-godot-sdk.py --godot /tmp/godot/Godot_v4.5.2-stable_linux.x86_64
       - run: python3 scripts/test-godot-lobby.py --godot /tmp/godot/Godot_v4.5.2-stable_linux.x86_64
+      - run: python3 sdk/godot/sync.py --check lobbies/game-room
+      - run: python3 scripts/test-game-room.py --godot /tmp/godot/Godot_v4.5.2-stable_linux.x86_64
       - run: python3 scripts/test-lobby-recovery.py
       - run: python3 scripts/test-host-lobby.py
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: godot-integration-log
-          path: .local/lobby-flow.log
+          path: |
+            .local/lobby-flow.log
+            .local/game-room-flow.log
 
   shared-web:
     runs-on: ubuntu-latest
