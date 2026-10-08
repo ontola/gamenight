@@ -57,7 +57,7 @@ func _stage() -> void:
 	var w = main.world
 	match scene:
 		"action":
-			var places := [[-6.0, 0.0], [-1.2, 0.0], [1.5, 6.55], [5.8, 0.85], [-9.6, 2.7], [8.8, 0.0]]
+			var places := [[-6.0, 0.0], [-1.2, 0.0], [1.5, 6.55], [5.8, 0.85], [-9.6, 2.65], [8.8, 0.0]]
 			for i in places.size():
 				var p: Dictionary = w.players.get("p%d" % i, {})
 				if p.is_empty(): continue
@@ -73,7 +73,7 @@ func _stage() -> void:
 			blaster.holder = "p0"; w.players.p0.item = blaster.id
 			w.spawn_item("bomb", -5.4, 5.9)
 		"stations":
-			var places := [[-8.325, 0.0], [0.0, 0.0], [9.35, 0.0], [6.0, 0.85]]
+			var places := [[-9.4, 0.0], [0.0, 0.0], [9.35, 0.0], [6.0, 0.85]]
 			for i in places.size():
 				var p: Dictionary = w.players["p%d" % i]
 				p.x = places[i][0]; p.y = places[i][1]; p.spawn = 0

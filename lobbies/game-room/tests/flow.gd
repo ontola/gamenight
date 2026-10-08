@@ -20,31 +20,37 @@ func _run() -> void:
 	var a: String = ids[0]
 	var b: String = ids[1]
 	var shelf: Array = main.shelf_games()
-	# Arcade: Y appends the cabinet's game.
+	# Game shelf: Y queues the box on the stand, RB browses to the next one.
 	var first := str(shelf[main.shelf_offset % shelf.size()].id)
-	_place(a, Layout.CABINETS[0])
+	_place(a, (Layout.GAME_SHELF.x + Layout.GAME_SHELF.y) / 2)
 	_press(a, World.BTN_Y)
-	if not await _until("Y on a cabinet queues its game", func(): return main.upcoming().any(func(e): return e.game == first)): return
-	# LT/RT browse, LB puts the game first.
-	_press(a, main.BTN_RT)
-	if not await _until("RT browses the arcade", func(): return main.shelf_offset == 1): return
-	var second := str(shelf[(main.shelf_offset + 1) % shelf.size()].id)
-	_place(a, Layout.CABINETS[1])
+	if not await _until("Y at the shelf queues its game", func(): return main.upcoming().any(func(e): return e.game == first)): return
+	var start: int = main.shelf_offset
+	_press(a, main.BTN_RB)
+	if not await _until("RB browses the shelf", func(): return main.shelf_offset == (start + 1) % shelf.size()): return
 	_press(a, main.BTN_LB)
-	if not await _until("LB plays a cabinet game next", func(): return not main.upcoming().is_empty() and main.upcoming()[0].game == second): return
+	if not await _until("LB browses back", func(): return main.shelf_offset == start): return
+	_press(a, main.BTN_RB)
+	var second := str(shelf[(start + 1) % shelf.size()].id)
+	await get_tree().create_timer(0.5).timeout  # station cooldown
+	_press(a, World.BTN_Y)
+	if not await _until("Y queues the browsed game", func(): return main.upcoming().back().game == second): return
+	_place(a, Layout.TV_PADS[1])
+	_press(a, main.BTN_RB)
+	if main.shelf_offset != (start + 1) % shelf.size(): return _fail("RB away from the shelf does not browse")
+	var head := str(main.upcoming()[0].game)
 	await _capture("queue")
 	# TV pad: start the head of the queue.
-	_place(a, Layout.TV_PADS[1])
 	_press(a, World.BTN_Y)
-	if not await _until("Y on Start launches the queue head", func(): return _phase(second) == "running"): return
+	if not await _until("Y on Start launches the queue head", func(): return _phase(head) == "running"): return
 	main.client.open_lobby()
-	if not await _until("opening the lobby pauses the game", func(): return _phase(second) == "paused"): return
+	if not await _until("opening the lobby pauses the game", func(): return _phase(head) == "paused"): return
 	_place(a, Layout.TV_PADS[0])
 	if main.station_for(a).get("action") != "resume": return _fail("left pad offers Resume while a game is paused")
 	_press(a, World.BTN_Y)
-	if not await _until("Y on Resume resumes the game", func(): return _phase(second) == "running"): return
+	if not await _until("Y on Resume resumes the game", func(): return _phase(head) == "running"): return
 	main.client.open_lobby()
-	if not await _until("lobby open again", func(): return _phase(second) == "paused"): return
+	if not await _until("lobby open again", func(): return _phase(head) == "paused"): return
 	# Phone profile waiting at a door: an unlinked player picks it up.
 	if not await _until("a phone profile waits at a door", func(): return main.pending_profiles().size() > 0): return
 	await _capture("door")

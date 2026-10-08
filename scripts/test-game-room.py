@@ -136,7 +136,7 @@ def run(godot, capture_dir=None):
                 process.wait(timeout=10)
         contents = log_path.read_text()
         assert "GAME_ROOM_FLOW_PASS" in contents and "SCRIPT ERROR" not in contents, contents[-6000:]
-        print("PASS Game Room: queue, play next, start, pause, resume, phone pickup, leave")
+        print("PASS Game Room: shelf browse, queue, start, pause, resume, phone pickup, leave")
 
 
 def main():

@@ -28,7 +28,11 @@ var _camera_base := Vector3(0, 4.7, 20.4)
 var _camera_target := Vector3(0, 4.55, 0)
 var _time := 0.0
 var doors: Array = []              # profile door nodes, see set_doors
-var cabinet_lights: Array = []
+var featured_box: Node3D
+var queue_boxes: Array = []
+var queue_more: Label3D
+var queue_empty: Label3D
+var _spine_root: Node3D
 var _eq_bars: Array = []
 var music_playing := false
 var mood := VIOLET                 # tinted by the next game's colour
@@ -41,7 +45,7 @@ func _ready() -> void:
 	_window()
 	_logo()
 	_tv()
-	_cabinets()
+	_game_shelf()
 	_shelves()
 	_couch_corner()
 	_jukebox()
@@ -430,40 +434,113 @@ func _tv() -> void:
 		cylinder(0.12, 0.04, Vector3(x, 3.22, Layout.BACK + 0.61), mat(Color("1a1622"), 0.3, 0.6)).rotation.x = PI / 2
 		body.name = "speaker"
 
-func _cabinets() -> void:
-	var colors := [PINK, CYAN, AMBER]
-	for i in Layout.CABINETS.size():
-		var x: float = Layout.CABINETS[i]
-		var color: Color = colors[i]
-		var z := Layout.BACK + 0.55
-		var body_mat := mat(Color("16121f"), 0.45)
-		box(Vector3(1.2, 2.7, 0.95), Vector3(x, 1.35, z), body_mat)
-		# Side art: two neon stripes in the cabinet colour.
-		for side in [-1, 1]:
-			box(Vector3(0.03, 2.3, 0.08), Vector3(x + side * 0.61, 1.35, z + 0.4), mat(color, 0.4, 0, color, 3.5), self, false)
-		# Marquee.
-		var marquee_mat := mat(color, 0.3, 0, color, 2.2)
-		box(Vector3(1.1, 0.34, 0.1), Vector3(x, 2.46, z + 0.46), marquee_mat, self, false)
-		var title := label("PLAY", Vector3(x, 2.46, z + 0.53), 40, Color(0.05, 0.03, 0.08), self)
-		title.name = "marquee%d" % i
-		# Screen, tilted back a little.
-		var texture := screen("cabinet%d" % i, Vector2i(256, 224), func(_canvas): pass)
-		var scr := quad(Vector2(0.95, 0.82), Vector3(x, 1.85, z + 0.49), screen_material(texture, 1.5))
-		scr.rotation.x = -0.12
-		# Control panel with buttons.
-		box(Vector3(1.2, 0.16, 0.5), Vector3(x, 1.25, z + 0.62), mat(Color("221b2e"), 0.4))
-		for b in 3:
-			var bc: Color = [PINK, AMBER, GREEN][b]
-			cylinder(0.05, 0.05, Vector3(x - 0.05 + b * 0.18, 1.35, z + 0.66), mat(bc, 0.3, 0, bc, 2.0))
-		cylinder(0.025, 0.18, Vector3(x - 0.35, 1.42, z + 0.66), mat(Color("cccccc"), 0.2, 0.8))
-		sphere(0.06, Vector3(x - 0.35, 1.53, z + 0.66), mat(Color("ff3355"), 0.3))
-		var light := OmniLight3D.new()
-		light.light_color = color
-		light.light_energy = 1.6
-		light.omni_range = 3.2
-		light.position = Vector3(x, 1.9, z + 1.2)
-		add_child(light)
-		cabinet_lights.append(light)
+func _game_shelf() -> void:
+	# Old-fashioned game boxes: a bookcase of spines and a display stand
+	# showing the selected box face forward.
+	var wood := mat(Color("5b3b2a"), 0.55)
+	var dark := mat(Color("3a261c"), 0.6)
+	var z := Layout.BACK + 0.4
+	var bx := (Layout.BOOKCASE.x + Layout.BOOKCASE.y) / 2
+	var bw := Layout.BOOKCASE.y - Layout.BOOKCASE.x
+	box(Vector3(bw, 2.65, 0.06), Vector3(bx, 1.325, z - 0.3), dark)
+	for side in [-1, 1]:
+		box(Vector3(0.08, 2.65, 0.66), Vector3(bx + side * (bw / 2 - 0.04), 1.325, z), wood)
+	for y in Layout.SPINE_ROWS + [1.79, 2.65]:
+		box(Vector3(bw, 0.07, 0.66), Vector3(bx, y - 0.035, z), wood)
+	var led := mat(VIOLET, 0.3, 0, VIOLET, 3.0)
+	for y in Layout.SPINE_ROWS:
+		box(Vector3(bw - 0.2, 0.025, 0.025), Vector3(bx, y + 0.76, z + 0.3), led, self, false)
+	_strip_materials.append(led)
+	# Top compartment: a retro console and a plant, so the case never looks empty.
+	box(Vector3(0.6, 0.14, 0.4), Vector3(bx - 0.25, 1.86, z), mat(Color("c9c4d8"), 0.4, 0.2))
+	box(Vector3(0.12, 0.02, 0.02), Vector3(bx - 0.4, 1.9, z + 0.21), mat(PINK, 0.3, 0, PINK, 3.0), self, false)
+	box(Vector3(0.22, 0.06, 0.14), Vector3(bx - 0.25, 1.96, z + 0.1), mat(Color("2a2838"), 0.5))
+	cylinder(0.13, 0.22, Vector3(bx + 0.4, 1.9, z), mat(Color("c46c4a"), 0.8))
+	sphere(0.22, Vector3(bx + 0.4, 2.15, z), mat(Color("2f8f5a"), 0.9))
+	_spine_root = Node3D.new()
+	add_child(_spine_root)
+	# Display stand: low cabinet, the featured box on an easel, a spot on it.
+	var dx := (Layout.DISPLAY.x + Layout.DISPLAY.y) / 2
+	var dw := Layout.DISPLAY.y - Layout.DISPLAY.x
+	box(Vector3(dw, 0.78, 0.8), Vector3(dx, 0.39, z + 0.05), wood)
+	box(Vector3(dw - 0.14, 0.5, 0.02), Vector3(dx, 0.39, z + 0.46), mat(Color("24170f"), 0.5))
+	box(Vector3(dw + 0.05, 0.05, 0.85), Vector3(dx, 0.8, z + 0.05), dark)
+	var front_texture := screen("box_front", Vector2i(300, 420), func(_canvas): pass)
+	featured_box = game_box(Vector2(1.5, 2.1), Vector3(dx, 1.9, z + 0.1), front_texture, 1.45)
+	featured_box.rotation.x = -0.06
+	for side in [-1, 1]:
+		var arrow := label("< LB" if side < 0 else "RB >", Vector3(dx + side * 0.98, 1.9, z + 0.3), 32, Color(1.6, 1.3, 2.4), self, 6)
+		arrow.name = "shelf_lb" if side < 0 else "shelf_rb"
+	var spot := SpotLight3D.new()
+	spot.light_color = Color("ffd7a0")
+	spot.light_energy = 9.0
+	spot.spot_range = 5.0
+	spot.spot_angle = 22
+	spot.light_volumetric_fog_energy = 0.6
+	spot.position = Vector3(dx, 4.2, z + 1.6)
+	add_child(spot)
+	spot.look_at(Vector3(dx, 1.9, z), Vector3.UP)
+	var glow := OmniLight3D.new()
+	glow.light_color = Color("b9a6ff")
+	glow.light_energy = 3.0
+	glow.omni_range = 3.2
+	glow.position = Vector3(bx, 1.4, z + 1.0)
+	add_child(glow)
+
+## A game box like a DVD case: dark plastic shell with the cover in front.
+func game_box(size: Vector2, pos: Vector3, cover: Texture2D, energy := 1.2, parent: Node = self) -> Node3D:
+	var root := Node3D.new()
+	root.position = pos
+	parent.add_child(root)
+	box(Vector3(size.x + 0.05, size.y + 0.05, 0.1), Vector3.ZERO, mat(Color("12141f"), 0.35, 0.2), root)
+	box(Vector3(0.05, size.y + 0.05, 0.11), Vector3(-size.x / 2 - 0.0, 0, 0), mat(Color("23263a"), 0.3, 0.3), root, false)
+	var face := screen_material(cover, energy)
+	face.disable_fog = true  # covers stay crisp through the haze
+	quad(size, Vector3(0, 0, 0.051), face, root)
+	return root
+
+## Rebuilds the spines: games is [{title, color}], selected sits on the stand.
+func set_shelf(games: Array, selected: int) -> void:
+	for child in _spine_root.get_children(): child.queue_free()
+	var bw := Layout.BOOKCASE.y - Layout.BOOKCASE.x - 0.24
+	var per_row := int(bw / 0.22)
+	var slots := per_row * Layout.SPINE_ROWS.size()
+	# With more games than slots, show the window around the selection.
+	var first := 0
+	if games.size() > slots: first = clampi(selected - slots / 2, 0, games.size() - slots)
+	for n in mini(games.size(), slots):
+		var i := first + n
+		var row: float = Layout.SPINE_ROWS[n / per_row]
+		var x := Layout.BOOKCASE.x + 0.23 + (n % per_row) * 0.22
+		var color := Color.from_string(str(games[i].get("color", "")), VIOLET)
+		if i == selected:
+			# The box is out on the stand: leave a gap with a glowing marker.
+			box(Vector3(0.16, 0.03, 0.4), Vector3(x, row + 0.02, Layout.BACK + 0.45), mat(AMBER, 0.3, 0, AMBER, 3.0), _spine_root, false)
+			continue
+		var height := 0.7
+		box(Vector3(0.2, height, 0.5), Vector3(x, row + height / 2, Layout.BACK + 0.4), mat(color.darkened(0.25), 0.45, 0.1), _spine_root)
+		box(Vector3(0.205, 0.08, 0.505), Vector3(x, row + height - 0.06, Layout.BACK + 0.4), mat(Color("12141f"), 0.35), _spine_root, false)
+		var title := label(str(games[i].get("title", "")).to_upper(), Vector3(x, row + height / 2 - 0.04, Layout.BACK + 0.66), 16, Color(1.4, 1.4, 1.5), _spine_root, 4)
+		title.rotation.z = PI / 2
+		title.pixel_size = 0.01
+		var width := font.get_string_size(title.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x * 0.01
+		if width > 0.58: title.pixel_size *= 0.58 / width
+
+## Little hop of the featured box when browsing.
+func pop_box(step: int) -> void:
+	if featured_box == null: return
+	var tween := create_tween()
+	featured_box.rotation.y = -0.6 * step
+	featured_box.scale = Vector3.ONE * 0.9
+	tween.set_parallel().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(featured_box, "rotation:y", 0.0, 0.35)
+	tween.tween_property(featured_box, "scale", Vector3.ONE, 0.35)
+
+## Up next: boxes on a ledge over the couch. count of up to 3 visible.
+func set_queue(count: int, more: int) -> void:
+	for i in queue_boxes.size(): queue_boxes[i].visible = i < count
+	queue_more.text = "+%d" % more if more > 0 else ""
+	queue_empty.visible = count == 0
 
 func _shelves() -> void:
 	var wood := mat(Color("5b3b2a"), 0.55)
@@ -518,15 +595,31 @@ func _couch_corner() -> void:
 		box(Vector3(1.02, 0.18, 1.0), Vector3(5.4 + i * 1.05, 0.8, z + 0.15), fabric)
 	box(Vector3(0.5, 0.42, 0.18), Vector3(5.2, 1.08, z - 0.12), mat(AMBER, 0.9)).rotation.z = 0.25
 	box(Vector3(0.5, 0.42, 0.18), Vector3(7.7, 1.08, z - 0.12), mat(GREEN.darkened(0.2), 0.9)).rotation.z = -0.2
-	# Queue board on the wall above the couch.
+	# Up next: game boxes on a ledge above the couch, next in line on the left,
+	# high enough that people on the couch do not hide them.
 	var q := Layout.QUEUE_BOARD
-	box(Vector3(2.7, 2.0, 0.08), q + Vector3(0, 0, -0.02), mat(Color("0e0c18"), 0.4))
-	var texture := screen("queue", Vector2i(540, 400), func(_canvas): pass)
-	quad(Vector2(2.56, 1.9), q + Vector3(0, 0, 0.03), screen_material(texture, 1.25))
-	var frame_color := GREEN
-	for p in [[Vector3(-1.35, -1.0, 0.06), Vector3(1.35, -1.0, 0.06)], [Vector3(-1.35, 1.0, 0.06), Vector3(1.35, 1.0, 0.06)],
-			[Vector3(-1.35, -1.0, 0.06), Vector3(-1.35, 1.0, 0.06)], [Vector3(1.35, -1.0, 0.06), Vector3(1.35, 1.0, 0.06)]]:
-		neon_line(q + p[0], q + p[1], frame_color, 3.0, 0.05)
+	var ledge := q.y
+	box(Vector3(3.3, 0.1, 0.4), Vector3(q.x, ledge - 0.05, q.z + 0.16), mat(Color("5b3b2a"), 0.55))
+	var strip := mat(GREEN, 0.3, 0, GREEN, 3.0)
+	box(Vector3(3.2, 0.025, 0.025), Vector3(q.x, ledge - 0.11, q.z + 0.36), strip, self, false)
+	_strip_materials.append(strip)
+	label("UP NEXT", Vector3(q.x - 0.95, ledge - 0.32, q.z + 0.3), 40, Color(0.8, 3.0, 1.8), self, 8)
+	var sizes := [Vector2(1.2, 1.68), Vector2(0.82, 1.15), Vector2(0.82, 1.15)]
+	var xs := [-0.95, 0.24, 1.14]
+	for i in 3:
+		var texture := screen("queue%d" % i, Vector2i(200, 280), func(_canvas): pass)
+		var size: Vector2 = sizes[i]
+		var node := game_box(size, Vector3(q.x + xs[i], ledge + size.y / 2 + 0.03, q.z + 0.14), texture, 1.3 if i == 0 else 1.05)
+		node.rotation.z = [0.0, -0.03, 0.04][i]
+		queue_boxes.append(node)
+	queue_more = label("", Vector3(q.x + 1.14, ledge - 0.32, q.z + 0.3), 32, Color(0.8, 2.2, 1.4), self, 6)
+	queue_empty = label("Press Y at the game shelf", Vector3(q.x + 0.3, ledge + 0.5, q.z + 0.2), 24, Color(0.9, 0.9, 1.1), self, 6)
+	var light := OmniLight3D.new()
+	light.light_color = Color("bff5dc")
+	light.light_energy = 2.0
+	light.omni_range = 3.0
+	light.position = Vector3(q.x, ledge + 1.0, q.z + 1.4)
+	add_child(light)
 	# Floor lamp: warm light, a nice contrast to the neon.
 	var lamp_x := 8.55
 	cylinder(0.025, 2.6, Vector3(lamp_x, 1.3, Layout.BACK + 0.5), mat(Color("c8a46a"), 0.3, 0.8))
@@ -619,7 +712,7 @@ func _plaque() -> void:
 
 func _ceiling_lights() -> void:
 	# Fixed spots that paint coloured cones through the haze.
-	var spots := [[-6.0, VIOLET, Vector3(-6.5, 0, 0.5)], [0.0, PINK, Vector3(0, 0, 0.8)], [6.0, AMBER, Vector3(6.5, 0, 0.5)]]
+	var spots := [[-5.4, VIOLET, Vector3(-4.6, 0, 0.5)], [0.0, PINK, Vector3(0, 0, 0.8)], [6.0, AMBER, Vector3(6.5, 0, 0.5)]]
 	for s in spots:
 		var housing := cylinder(0.22, 0.4, Vector3(s[0], 10.4, 0.6), mat(Color("221d30"), 0.4, 0.6))
 		housing.name = "spot"

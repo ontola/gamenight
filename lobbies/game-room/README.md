@@ -31,20 +31,21 @@ and logo are read from their files at runtime.
 | B | Grab an item, throw it; open a hat box |
 | X | Punch, fire the confetti blaster, throw a lit bomb |
 | Y | Use the station you stand at (hint above your name) |
-| LT / RT | Browse the arcade cabinets |
-| LB | At a cabinet: play that game next |
+| LB / RB | At the game shelf: browse the boxes |
 | Start | Your menu: leave, unlink, choose another lobby, quit |
 
 The runtime joins controllers and handles Back, as for every lobby.
 
 ## Stations
 
-- **Arcade cabinets** show three games from the shelf. Y adds the game to the
-  queue (`queue_game`), LB puts it first. LT/RT shift the whole row.
+- **Game shelf**: a bookcase of game box spines and a stand with the selected
+  box face forward. LB/RB pick the previous or next box, Y adds it to the queue
+  (`queue_game`).
 - **TV pads**: left resumes the paused game (or starts the queue head when
   nothing runs), middle starts the queue head (`next`), right skips to the
   following game (`queue_next`).
-- **Up next board** above the couch lists the queue; the TV shows the current
+- **Up next ledge** above the couch shows the next three boxes, the first one
+  biggest; the TV shows the current
   or next game with loading progress and stopped-game issues.
 - **Profile doors** appear for phone profiles waiting in the room. An unlinked
   player presses Y at the door to pick it up (`/api/room-pickup`).

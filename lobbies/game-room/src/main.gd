@@ -4,8 +4,8 @@ extends Node3D
 ## everyone runs, jumps and fights over bombs while choosing the next game.
 ##
 ## Controls: stick/D-pad move, A jump (down + A drops through), B grab/throw,
-## X punch/use, Y use the station you stand at, LT/RT browse the arcade,
-## LB play the arcade game next, Start opens your menu.
+## X punch/use, Y use the station you stand at, LB/RB browse the game shelf,
+## Start opens your menu.
 
 const LobbyClient = preload("res://addons/gamenight/lobby.gd")
 const Artwork = preload("res://addons/gamenight/artwork.gd")
@@ -26,8 +26,7 @@ const TEXT := Color("f2f1f8")
 const DIM := Color("9a98ad")
 const BTN_LB := 16
 const BTN_START := 128
-const BTN_LT := 1 << 14
-const BTN_RT := 1 << 15
+const BTN_RB := 32
 
 var client = LobbyClient.new()
 var artwork = Artwork.new()
@@ -56,6 +55,7 @@ var _pressed_flash: Dictionary = {}  # station id -> time of last press
 var _door_nodes: Array = []
 var _door_key := ""
 var _screen_key := ""
+var _shelf_key := ""
 var _time := 0.0
 var demo                            # demo.gd when running with --demo
 var _capture_path := ""
@@ -214,9 +214,6 @@ func _controllers_changed(frames: Array) -> void:
 		if id.is_empty(): continue
 		var buttons := int(frame.get("buttons", 0))
 		var axes: Array = frame.get("axes", [0, 0, 0, 0, 0, 0])
-		if axes.size() >= 6:
-			if int(axes[4]) > 16000: buttons |= BTN_LT
-			if int(axes[5]) > 16000: buttons |= BTN_RT
 		var stick := Vector2(float(axes[0]) / 32767.0, float(axes[1]) / 32767.0) if axes.size() >= 2 else Vector2.ZERO
 		input(id, buttons, stick)
 
@@ -239,19 +236,14 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 		return
 	world.set_input(id, buttons, stick)
 	if pressed & World.BTN_Y: _use_station(id)
-	if pressed & BTN_LT: _browse(-1)
-	if pressed & BTN_RT: _browse(1)
-	if pressed & BTN_LB:
-		var station := station_for(id)
-		if station.get("kind") == "cabinet" and station.enabled:
-			client.queue_game(str(station.game), true)
-			toast("%s plays next." % station.title, GREEN)
-			_celebrate(id, str(station.id))
+	if pressed & (BTN_LB | BTN_RB) and station_for(id).get("kind") == "shelf":
+		_browse(-1 if pressed & BTN_LB else 1)
 
 func _browse(step: int) -> void:
 	var shelf := shelf_games()
 	if shelf.is_empty(): return
 	shelf_offset = posmod(shelf_offset + step, shelf.size())
+	room.pop_box(step)
 	_redraw_screens()
 
 # ---------------------------------------------------------------- stations
@@ -261,13 +253,12 @@ func station_for(id: String) -> Dictionary:
 	var p: Dictionary = world.players.get(id, {})
 	if p.is_empty() or not p.grounded or p.y > 0.1 or p.sleeping: return {}
 	var shelf := shelf_games()
-	for i in Layout.CABINETS.size():
-		if absf(p.x - Layout.CABINETS[i]) <= 0.62 and not shelf.is_empty() and i < shelf.size():
-			var game: Dictionary = shelf[(shelf_offset + i) % shelf.size()]
-			var reason := _unavailable(game)
-			return {"id": "cabinet%d" % i, "kind": "cabinet", "game": game.id, "title": str(game.get("title", "Game")),
-				"label": reason if not reason.is_empty() else "Add %s" % str(game.get("title", "game")),
-				"enabled": reason.is_empty(), "extra": "LB Play next" if reason.is_empty() else ""}
+	if p.x >= Layout.GAME_SHELF.x and p.x <= Layout.GAME_SHELF.y and not shelf.is_empty():
+		var game: Dictionary = shelf[shelf_offset % shelf.size()]
+		var reason := _unavailable(game)
+		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
+			"label": reason if not reason.is_empty() else "Queue %s" % str(game.get("title", "game")),
+			"enabled": reason.is_empty(), "extra": "LB / RB browse" if shelf.size() > 1 else ""}
 	for i in Layout.TV_PADS.size():
 		if absf(p.x - Layout.TV_PADS[i]) <= Layout.PAD_HALF:
 			var pad := tv_pad(i)
@@ -317,7 +308,7 @@ func _use_station(id: String) -> void:
 	if now < float(_station_cooldown.get(station.id, 0.0)): return
 	_station_cooldown[station.id] = now + 0.4
 	match station.kind:
-		"cabinet":
+		"shelf":
 			client.queue_game(str(station.game), false)
 			toast("%s added to the queue." % station.title, GREEN)
 		"pad":
@@ -518,25 +509,23 @@ func _name(id: String) -> String:
 
 func _hook_screens() -> void:
 	room.screens.tv.canvas.painter = _draw_tv
-	room.screens.queue.canvas.painter = _draw_queue
 	room.screens.plaque.canvas.painter = _draw_plaque
 	room.screens.jukebox.canvas.painter = _draw_jukebox
-	for i in Layout.CABINETS.size():
-		room.screens["cabinet%d" % i].canvas.painter = _draw_cabinet.bind(i)
+	room.screens.box_front.canvas.painter = _draw_front_box
+	for i in 3: room.screens["queue%d" % i].canvas.painter = _draw_queue_box.bind(i)
 
 func _redraw_screens() -> void:
-	for name in ["tv", "queue", "plaque", "jukebox", "cabinet0", "cabinet1", "cabinet2"]: room.redraw(name)
+	for name in ["tv", "plaque", "jukebox", "box_front", "queue0", "queue1", "queue2"]: room.redraw(name)
 	var track: Variant = party.get("now_playing")
 	room.music_playing = track is Dictionary and bool(track.get("playing", false))
 	var shelf := shelf_games()
-	for i in Layout.CABINETS.size():
-		var marquee: Label3D = room.get_node_or_null("marquee%d" % i)
-		if marquee == null: continue
-		if shelf.is_empty() or i >= shelf.size(): marquee.text = "SOON"
-		else: marquee.text = _short(str(shelf[(shelf_offset + i) % shelf.size()].get("title", "Game")), 14).to_upper()
-		# Fit the marquee: 1 m of glass at 0.01 m per pixel.
-		var width := font.get_string_size(marquee.text, HORIZONTAL_ALIGNMENT_LEFT, -1, 32).x
-		marquee.font_size = clampi(int(32 * 96.0 / maxf(width, 1)), 12, 40)
+	var shelf_key := JSON.stringify([shelf.map(func(g): return [g.get("id"), g.get("title"), g.get("color")]), shelf_offset])
+	if shelf_key != _shelf_key:
+		_shelf_key = shelf_key
+		room.set_shelf(shelf, shelf_offset)
+	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = shelf.size() > 1
+	var queue := upcoming()
+	room.set_queue(mini(queue.size(), 3), maxi(queue.size() - 3, 0))
 
 func _short(value: String, length: int) -> String:
 	return value if value.length() <= length else value.left(length - 1) + "…"
@@ -631,7 +620,7 @@ func _draw_idle_tv(canvas: Control) -> void:
 		var c := Color.from_hsv(fmod(t * 0.05 + i * 0.05, 1.0), 0.7, 0.35)
 		canvas.draw_rect(Rect2(0, i * size.y / 14, size.x, size.y / 14 + 1), c)
 	_text(canvas, "NOTHING QUEUED", Vector2(0, size.y / 2 - 10), 64, TEXT, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(canvas, "Walk to an arcade cabinet and press Y to add a game", Vector2(0, size.y / 2 + 48), 24, TEXT.darkened(0.15), size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, "Walk to the game shelf and press Y to add a game", Vector2(0, size.y / 2 + 48), 24, TEXT.darkened(0.15), size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	_scanlines(canvas, size)
 
 func _scanlines(canvas: Control, size: Vector2) -> void:
@@ -645,43 +634,47 @@ func _issue(game_id: String) -> String:
 				"failed_to_start": "Could not start game", "startup_timeout": "Game did not connect"}.get(str(issue.get("kind")), "Game stopped")
 	return ""
 
-func _draw_cabinet(canvas: Control, index: int) -> void:
+## A box cover: art (or a title card), a GameNight band on top and the
+## player count at the bottom, like an old DVD case.
+func _draw_box(canvas: Control, game: Dictionary, badge := "") -> void:
 	var size := canvas.size
-	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("07060d"))
-	var shelf := shelf_games()
-	if shelf.is_empty() or index >= shelf.size():
-		_text(canvas, "INSERT", Vector2(0, size.y / 2 - 6), 32, DIM, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(canvas, "GAME", Vector2(0, size.y / 2 + 30), 32, DIM, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		return
-	var game: Dictionary = shelf[(shelf_offset + index) % shelf.size()]
+	var color := Color.from_string(str(game.get("color", "")), VIOLET)
+	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("0c0a16"))
+	var band := roundf(size.y * 0.09)
+	var rect := Rect2(0, band, size.x, size.y - band * 2)
 	var art := _art(game, ["cover", "screenshot", "icon"])
-	var rect := Rect2(Vector2.ZERO, size - Vector2(0, 40))
 	if art != null: _cover(canvas, art, rect)
-	else: _title_card(canvas, game, rect, 32)
-	canvas.draw_rect(Rect2(0, size.y - 40, size.x, 40), Color("120f1e"))
+	else: _title_card(canvas, game, rect, 32 if size.x > 220 else 16)
+	canvas.draw_rect(Rect2(0, 0, size.x, band), color)
+	_text(canvas, "GAMENIGHT", Vector2(0, band * 0.72), 16, BG, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	canvas.draw_rect(Rect2(0, size.y - band, size.x, band), Color("12141f"))
 	var players := str(game.get("players", "")) if game.get("players") != null else ""
 	if players.is_empty() and game.get("max_players") != null: players = "1-%d" % int(game.max_players)
-	_text(canvas, "%s PLAYERS" % players if not players.is_empty() else "PRESS Y", Vector2(0, size.y - 12), 16, AMBER, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_scanlines(canvas, size)
+	if not players.is_empty():
+		_text(canvas, "%s PLAYERS" % players, Vector2(0, size.y - band * 0.28), 16, color.lightened(0.3), size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if art != null and size.x > 220:
+		# Title over the art so the stand reads from the couch.
+		canvas.draw_rect(Rect2(0, size.y - band - 64, size.x, 64), Color(0.02, 0.02, 0.05, 0.72))
+		_text(canvas, _short(str(game.get("title", "Game")), 14), Vector2(0, size.y - band - 20), 32, TEXT, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if not badge.is_empty():
+		var r := Rect2(8, band + 8, 44, 44)
+		canvas.draw_rect(r, AMBER if badge == "1" else TEXT)
+		_text(canvas, badge, Vector2(8, band + 44), 32, BG, 44, HORIZONTAL_ALIGNMENT_CENTER)
 
-func _draw_queue(canvas: Control) -> void:
-	var size := canvas.size
-	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("0c0a16"))
-	_text(canvas, "UP NEXT", Vector2(28, 56), 48, GREEN)
-	var queue := upcoming()
-	if queue.is_empty():
-		_text(canvas, "The queue is empty.", Vector2(28, 130), 32, TEXT)
-		_text(canvas, "Press Y at an arcade cabinet", Vector2(28, 180), 16, DIM)
-		_text(canvas, "to add a game. LT / RT browse.", Vector2(28, 204), 16, DIM)
+func _draw_front_box(canvas: Control) -> void:
+	var shelf := shelf_games()
+	if shelf.is_empty():
+		canvas.draw_rect(Rect2(Vector2.ZERO, canvas.size), Color("0c0a16"))
+		_text(canvas, "NO GAMES", Vector2(0, canvas.size.y / 2), 32, DIM, canvas.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		return
-	for i in mini(queue.size(), 6):
-		var y := 112 + i * 50
-		var game := game_meta(queue[i].game)
-		var color := Color.from_string(str(game.get("color", "")), VIOLET)
-		canvas.draw_rect(Rect2(28, y - 30, 38, 38), color)
-		_text(canvas, str(i + 1), Vector2(28, y), 32, BG, 38, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(canvas, _short(str(queue[i].title), 22), Vector2(82, y), 32, TEXT if i > 0 else AMBER)
-	if queue.size() > 6: _text(canvas, "+%d more" % (queue.size() - 6), Vector2(28, size.y - 12), 16, DIM)
+	_draw_box(canvas, shelf[shelf_offset % shelf.size()])
+
+func _draw_queue_box(canvas: Control, index: int) -> void:
+	var queue := upcoming()
+	if index >= queue.size(): return
+	var game := game_meta(queue[index].game)
+	if game.is_empty(): game = {"id": queue[index].game, "title": queue[index].title}
+	_draw_box(canvas, game, str(index + 1))
 
 func _draw_jukebox(canvas: Control) -> void:
 	# Seen from the couch the screen is small, so only big type.
@@ -773,6 +766,8 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	var badge := h - 10
 	var w := tw + badge + 34 + (ew + 20 if extra else 0.0)
 	var rect := Rect2(at.x - w / 2, at.y - h, w, h)
+	# Keep the capsule and its round ends on screen near the walls.
+	rect.position.x = clampf(rect.position.x, h / 2 + 12, canvas.size.x - w - h / 2 - 12)
 	var bg := Color(0.03, 0.03, 0.06, 0.9)
 	canvas.draw_rect(rect, bg)
 	canvas.draw_circle(rect.position + Vector2(0, h / 2), h / 2, bg)
