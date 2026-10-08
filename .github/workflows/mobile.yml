@@ -53,7 +53,7 @@ jobs:
             "$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner" verify --print-certs \
               build/app/outputs/flutter-apk/app-release.apk | grep -E "certificate (DN|SHA-256)"
             [ -n "$GAMENIGHT_KEYSTORE_FILE" ] || echo "Debug key: set the GAMENIGHT_KEYSTORE_* secrets for a fixed one."
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: gamenight-android
