@@ -482,7 +482,7 @@ func _process(delta: float) -> void:
 		var queue := upcoming()
 		if not queue.is_empty(): next = game_meta(queue[0].game)
 	room.set_mood(Color.from_string(str(next.get("color", "")), VIOLET) if not next.is_empty() else VIOLET)
-	var key := JSON.stringify([party.get("warm_session"), party.get("warming"), party.get("game_issues"), shelf_offset])
+	var key := JSON.stringify([party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset])
 	if key != _screen_key:
 		_screen_key = key
 		_redraw_screens()
@@ -520,11 +520,14 @@ func _hook_screens() -> void:
 	room.screens.tv.canvas.painter = _draw_tv
 	room.screens.queue.canvas.painter = _draw_queue
 	room.screens.plaque.canvas.painter = _draw_plaque
+	room.screens.jukebox.canvas.painter = _draw_jukebox
 	for i in Layout.CABINETS.size():
 		room.screens["cabinet%d" % i].canvas.painter = _draw_cabinet.bind(i)
 
 func _redraw_screens() -> void:
-	for name in ["tv", "queue", "plaque", "cabinet0", "cabinet1", "cabinet2"]: room.redraw(name)
+	for name in ["tv", "queue", "plaque", "jukebox", "cabinet0", "cabinet1", "cabinet2"]: room.redraw(name)
+	var track: Variant = party.get("now_playing")
+	room.music_playing = track is Dictionary and bool(track.get("playing", false))
 	var shelf := shelf_games()
 	for i in Layout.CABINETS.size():
 		var marquee: Label3D = room.get_node_or_null("marquee%d" % i)
@@ -679,6 +682,21 @@ func _draw_queue(canvas: Control) -> void:
 		_text(canvas, str(i + 1), Vector2(28, y), 32, BG, 38, HORIZONTAL_ALIGNMENT_CENTER)
 		_text(canvas, _short(str(queue[i].title), 22), Vector2(82, y), 32, TEXT if i > 0 else AMBER)
 	if queue.size() > 6: _text(canvas, "+%d more" % (queue.size() - 6), Vector2(28, size.y - 12), 16, DIM)
+
+func _draw_jukebox(canvas: Control) -> void:
+	# Seen from the couch the screen is small, so only big type.
+	var size := canvas.size
+	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("120a14"))
+	var track: Variant = party.get("now_playing")
+	if not track is Dictionary or track.is_empty():
+		_text(canvas, "JUKEBOX", Vector2(0, 70), 48, PINK, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(canvas, "no music", Vector2(0, 126), 32, DIM, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		return
+	var playing: bool = track.get("playing", false)
+	var artist := str(track.get("artist", ""))
+	if artist.is_empty(): artist = str(track.get("source", ""))
+	_text(canvas, ("> " if playing else "|| ") + _short(str(track.get("title", "")), 16), Vector2(12, 62), 32, TEXT)
+	_text(canvas, _short(artist, 18), Vector2(12, 110), 32, AMBER if playing else DIM)
 
 func _draw_plaque(canvas: Control) -> void:
 	var size := canvas.size

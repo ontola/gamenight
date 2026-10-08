@@ -28,8 +28,6 @@ func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
 			actor.sprite.texture = Character.build(profile, Character.decode_face(faces, profile), hat)
 			var color := Color.from_string(str(profile.get("color", "")), Color("7c5cff"))
 			actor.light.light_color = color
-			actor.ring.material_override.emission = color
-			actor.ring.material_override.albedo_color = color
 
 func _make_actor(_profile: Dictionary) -> Dictionary:
 	var node := Node3D.new()
@@ -50,20 +48,6 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	light.omni_range = 2.2
 	light.position = Vector3(0, 0.8, 0.8)
 	node.add_child(light)
-	var ring_mesh := TorusMesh.new()
-	ring_mesh.inner_radius = 0.46
-	ring_mesh.outer_radius = 0.55
-	var ring := MeshInstance3D.new()
-	ring.mesh = ring_mesh
-	var ring_mat := StandardMaterial3D.new()
-	ring_mat.emission_enabled = true
-	ring_mat.emission_energy_multiplier = 2.5
-	ring_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	ring.material_override = ring_mat
-	ring.scale = Vector3(1, 0.2, 0.45)
-	ring.position = Vector3(0, 0.02, 0)
-	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	node.add_child(ring)
 	var zzz := Label3D.new()
 	zzz.text = "z"
 	zzz.font = room.font
@@ -74,7 +58,7 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	zzz.position = Vector3(0.6, 1.8, 0.1)
 	zzz.visible = false
 	node.add_child(zzz)
-	return {"node": node, "sprite": sprite, "light": light, "ring": ring, "zzz": zzz, "key": ""}
+	return {"node": node, "sprite": sprite, "light": light, "zzz": zzz, "key": ""}
 
 func update(world, delta: float) -> void:
 	_time += delta
@@ -94,7 +78,6 @@ func update(world, delta: float) -> void:
 		if p.spawn > 0: sprite.scale *= 1.0 - p.spawn * 0.8
 		if p.stun > 0: sprite.rotation.z = sin(_time * 30) * 0.15
 		else: sprite.rotation.z = 0
-		actor.ring.visible = p.grounded
 		actor.zzz.visible = p.sleeping
 		if p.sleeping:
 			var t := fmod(_time * 0.45, 1.0)

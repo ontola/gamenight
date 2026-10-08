@@ -29,6 +29,8 @@ var _camera_target := Vector3(0, 4.55, 0)
 var _time := 0.0
 var doors: Array = []              # profile door nodes, see set_doors
 var cabinet_lights: Array = []
+var _eq_bars: Array = []
+var music_playing := false
 var mood := VIOLET                 # tinted by the next game's colour
 
 func _ready() -> void:
@@ -423,12 +425,9 @@ func _tv() -> void:
 	for s2 in [-1, 1]:
 		var x: float = s2 * 4.2
 		box(Vector3(1.0, 0.1, 0.6), Vector3(x, 3.55, Layout.BACK + 0.3), mat(Color("3b2c4a"), 0.4))
-		var body := box(Vector3(0.8, 1.3, 0.55), Vector3(x, 2.85, Layout.BACK + 0.32), mat(Color("2c2540"), 0.45))
-		cylinder(0.26, 0.04, Vector3(x, 2.65, Layout.BACK + 0.61), mat(Color("2c2838"), 0.3, 0.6)).rotation.x = PI / 2
-		cylinder(0.11, 0.04, Vector3(x, 3.22, Layout.BACK + 0.61), mat(Color("2c2838"), 0.3, 0.6)).rotation.x = PI / 2
-		var ring := cylinder(0.3, 0.02, Vector3(x, 2.65, Layout.BACK + 0.6), mat(PINK, 0.4, 0, PINK, 3.0))
-		ring.rotation.x = PI / 2
-		_neon.append({"material": ring.material_override, "base": 3.0, "phase": s2, "speed": 2.2})
+		var body := box(Vector3(0.8, 1.3, 0.55), Vector3(x, 2.85, Layout.BACK + 0.32), mat(Color("4a3a5e"), 0.45))
+		cylinder(0.3, 0.04, Vector3(x, 2.65, Layout.BACK + 0.61), mat(Color("1a1622"), 0.3, 0.6)).rotation.x = PI / 2
+		cylinder(0.12, 0.04, Vector3(x, 3.22, Layout.BACK + 0.61), mat(Color("1a1622"), 0.3, 0.6)).rotation.x = PI / 2
 		body.name = "speaker"
 
 func _cabinets() -> void:
@@ -550,20 +549,42 @@ func _couch_corner() -> void:
 	add_child(warm)
 
 func _jukebox() -> void:
+	# A proper jukebox: arched cabinet, now-playing screen, bubbling tubes
+	# that dance while music plays, and three buttons above the floor pads.
 	var x := Layout.JUKEBOX
-	var z := Layout.BACK + 0.5
-	box(Vector3(1.3, 1.9, 0.8), Vector3(x, 0.95, z), mat(Color("3a1d2e"), 0.4))
-	var arch := cylinder(0.65, 0.8, Vector3(x, 1.9, z), mat(Color("3a1d2e"), 0.4))
+	var z := Layout.BACK + 0.55
+	var wood := mat(Color("5a2438"), 0.35, 0.1)
+	box(Vector3(1.7, 2.1, 0.9), Vector3(x, 1.05, z), wood)
+	var arch := cylinder(0.85, 0.9, Vector3(x, 2.1, z), wood)
 	arch.rotation.x = PI / 2
-	var glass := cylinder(0.5, 0.05, Vector3(x, 1.85, z + 0.4), mat(Color("ffcf8a"), 0.2, 0, AMBER, 2.5))
-	glass.rotation.x = PI / 2
-	_neon.append({"material": glass.material_override, "base": 2.5, "phase": 0.0, "speed": 1.3})
-	for i in 5:
-		var c := Color.from_hsv(i / 5.0, 0.8, 1.0)
-		var tube := box(Vector3(0.08, 1.15, 0.05), Vector3(x - 0.4 + i * 0.2, 0.85, z + 0.42), mat(c, 0.3, 0, c, 3.0), self, false)
+	var chrome := mat(Color("d8d4e8"), 0.15, 0.9)
+	var rim := cylinder(0.88, 0.06, Vector3(x, 2.1, z + 0.44), chrome)
+	rim.rotation.x = PI / 2
+	var dome := cylinder(0.74, 0.04, Vector3(x, 2.1, z + 0.47), mat(Color("ffcf8a"), 0.2, 0, AMBER, 2.2))
+	dome.rotation.x = PI / 2
+	_neon.append({"material": dome.material_override, "base": 2.2, "phase": 0.0, "speed": 1.3})
+	var texture := screen("jukebox", Vector2i(320, 160), func(_canvas): pass)
+	quad(Vector2(1.3, 0.65), Vector3(x, 2.2, z + 0.5), screen_material(texture, 1.4))
+	for i in 7:
+		var c := Color.from_hsv(i / 7.0, 0.75, 1.0)
+		var tube := box(Vector3(0.1, 1.0, 0.05), Vector3(x - 0.6 + i * 0.2, 1.05, z + 0.47), mat(c, 0.3, 0, c, 3.0), self, false)
 		_neon.append({"material": tube.material_override, "base": 3.0, "phase": i * 1.2, "speed": 3.0})
+		_eq_bars.append(tube)
+	box(Vector3(1.75, 0.08, 0.95), Vector3(x, 0.45, z), chrome)
+	box(Vector3(1.75, 0.08, 0.95), Vector3(x, 1.62, z), chrome)
+	var icons := ["<<", "> ||", ">>"]
 	for i in 3:
-		box(Vector3(0.36, 0.03, 0.6), Vector3(Layout.MUSIC_PADS[i], 0.015, 0.0), mat(Color("1c1530"), 0.3, 0.2, PINK, 0.6), self, false)
+		var px: float = Layout.MUSIC_PADS[i]
+		var button := cylinder(0.13, 0.06, Vector3(px, 0.28, z + 0.48), mat(PINK, 0.3, 0, PINK, 2.0))
+		button.rotation.x = PI / 2
+		label(icons[i], Vector3(px, 0.28, z + 0.53), 22, Color(0.05, 0.02, 0.08), self)
+		box(Vector3(0.5, 0.03, 0.7), Vector3(px, 0.015, 0.0), mat(Color("1c1530"), 0.3, 0.2, PINK, 0.8), self, false)
+	var light := OmniLight3D.new()
+	light.light_color = Color("ff8fb8")
+	light.light_energy = 1.8
+	light.omni_range = 3.5
+	light.position = Vector3(x, 0.9, z + 1.3)
+	add_child(light)
 
 func _exit_door() -> void:
 	var x := Layout.EXIT_DOOR
@@ -782,6 +803,11 @@ func _process(delta: float) -> void:
 		var t: float = _time * 0.35 + (0.0 if m.side < 0 else PI)
 		m.node.look_at(Vector3(sin(t) * 7.0 - m.side * 1.5, 0, 1.0 + cos(t * 0.7) * 1.5))
 	if _disco: _disco.rotation.y = _time * 0.6
+	for i in _eq_bars.size():
+		var level := 0.35
+		if music_playing: level = 0.45 + 0.55 * absf(sin(_time * (3.1 + i * 0.7) + i * 1.9) * sin(_time * 1.7 + i))
+		_eq_bars[i].scale.y = level
+		_eq_bars[i].position.y = 0.55 + level * 0.5
 	if _tv_light:
 		_tv_light.light_color = _tv_light.light_color.lerp(mood, delta * 2.0)
 		_tv_light.light_energy = 3.0 + sin(_time * 7.0) * 0.12 + sin(_time * 2.3) * 0.15

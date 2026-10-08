@@ -8,10 +8,11 @@ var scene := "action"
 var bots: Dictionary = {}
 var t := 0.0
 var rng := RandomNumberGenerator.new()
+var _faces: Array = []
 
 const NAMES := ["Joep", "Mango", "Disco", "Waffle", "Pickle", "Rocket"]
-const COLORS := ["#ff5c5c", "#2dd4bf", "#ffb454", "#a78bfa", "#7be08a", "#ff8fd6"]
-const SKINS := ["#f5e9be", "#d7a477", "#edc59a", "#895735", "#b77b50", "#f5e9be"]
+const COLORS := ["#e36c76", "#49b8bc", "#d7ad43", "#a67bdd", "#4daf7c", "#cf7aaf"]  # the host's guest colours
+const SKINS := ["#f5e9be", "#d99b72", "#efc39a", "#905c40", "#bf855b", "#654332"]
 
 func _ready() -> void:
 	rng.seed = 42
@@ -40,8 +41,8 @@ func _ready() -> void:
 	if scene == "sleep": party.presence = [{"player_id": "p1", "state": "sleeping"}, {"player_id": "p3", "state": "sleeping"}]
 	main.set_party(party)
 	var links := {"room": {"room_code": "KJX4", "pending": [
-		{"id": "pend1", "profile": {"display_name": "Sanne", "skin_color": "#edc59a", "avatar": _face(4)}},
-		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(5)}}]}, "linked": {}}
+		{"id": "pend1", "profile": {"display_name": "Sanne", "skin_color": "#edc59a", "avatar": _face(8)}},
+		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(9)}}]}, "linked": {}}
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--links="):
 			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(argument.trim_prefix("--links=")))
@@ -115,43 +116,14 @@ func tick(delta: float) -> void:
 			w.players.p1.vy = 9.0; w.players.p1.grounded = false
 			w.players.p5.stun = 0.4
 
-func _face(style: int) -> String:
-	var px: Array = []
-	px.resize(48 * 48)
-	px.fill(null)
-	var ink := "#1d1b2c"
-	var set_px := func(x: int, y: int, c: String):
-		if x >= 0 and y >= 0 and x < 48 and y < 48: px[y * 48 + x] = c
-	var rect := func(x0: int, y0: int, w: int, h: int, c: String):
-		for y in range(y0, y0 + h):
-			for x in range(x0, x0 + w): set_px.call(x, y, c)
-	var hair: String = ["#3b2416", "#f2c14e", "#1d1b2c", "#c0392b", "#7b4a2a", "#e8e0d0"][style]
-	# Hair across the top of the head (the head circle is centred at 24,28).
-	match style % 3:
-		0:
-			rect.call(14, 16, 20, 4, hair); rect.call(13, 19, 4, 5, hair); rect.call(31, 19, 4, 5, hair)
-		1:
-			rect.call(15, 15, 18, 3, hair); rect.call(13, 17, 22, 3, hair); rect.call(20, 13, 4, 3, hair)
-		2:
-			for x in range(13, 36, 3): rect.call(x, 15, 2, 4, hair)
-			rect.call(14, 18, 20, 2, hair)
-	# Eyes, with variations.
-	if style == 2:
-		rect.call(17, 24, 6, 5, ink); rect.call(26, 24, 6, 5, ink); rect.call(23, 25, 3, 1, ink)
-		rect.call(18, 25, 4, 3, "#38d6ff"); rect.call(27, 25, 4, 3, "#38d6ff")
-	else:
-		rect.call(19, 25, 2, 3, ink); rect.call(27, 25, 2, 3, ink)
-		set_px.call(19, 25, "#ffffff"); set_px.call(27, 25, "#ffffff")
-	# Mouth.
-	match style:
-		0, 3: rect.call(21, 33, 6, 1, ink); set_px.call(20, 32, ink); set_px.call(27, 32, ink)
-		1: rect.call(22, 32, 4, 3, "#9e5546"); rect.call(22, 32, 4, 1, ink)
-		4: rect.call(20, 32, 8, 2, "#ffffff"); rect.call(20, 34, 8, 1, ink)
-		_: rect.call(22, 33, 4, 1, ink)
-	if style == 5: rect.call(17, 32, 14, 5, "#7b4a2a")
-	# Cheeks.
-	set_px.call(16, 30, "#f28b82"); set_px.call(17, 30, "#f28b82"); set_px.call(31, 30, "#f28b82"); set_px.call(32, 30, "#f28b82")
-	return JSON.stringify({"v": 1, "w": 48, "h": 48, "px": px})
+## Real GameNight faces: character editor recipes and the host's guest
+## faces, captured by tools/demo_faces.py.
+func _face(index: int) -> String:
+	if _faces.is_empty():
+		var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://assets/demo-faces.json"))
+		if data is Array: _faces = data
+	if _faces.is_empty(): return ""
+	return str(_faces[index % _faces.size()].avatar)
 
 ## Simple generated cover art so the demo screens are not just title cards.
 func _cover_art(library: Array) -> void:

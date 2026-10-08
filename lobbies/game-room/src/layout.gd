@@ -33,7 +33,7 @@ const TV_PADS := [-1.9, 0.0, 1.9]
 const PAD_HALF := 0.75
 const EXIT_DOOR := -11.0
 const JUKEBOX := 3.6
-const MUSIC_PADS := [2.95, 3.6, 4.25]
+const MUSIC_PADS := [3.05, 3.6, 4.15]
 const PROFILE_DOORS := [9.35, 10.75]
 const DOOR_HALF := 0.6
 

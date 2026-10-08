@@ -67,7 +67,6 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 	_rect(img, torso, cloth)
 	_rect(img, Rect2i(torso.position.x, torso.position.y, 2, torso.size.y), dark)
 	_rect(img, Rect2i(torso.end.x - 3, torso.position.y + 1, 2, torso.size.y - 2), light)
-	_rect(img, Rect2i(15, torso.position.y + 2, 2, torso.size.y - 3), dark)  # zip
 	img.set_pixel(torso.position.x, torso.end.y - 1, Color.TRANSPARENT)
 	img.set_pixel(torso.end.x - 1, torso.end.y - 1, Color.TRANSPARENT)
 	# Arms.

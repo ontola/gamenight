@@ -60,16 +60,10 @@ def game_loop(port, game_id, stop):
         pass
 
 
-def face(hair):
-    pixels = [None] * (48 * 48)
-    for y in range(15, 20):
-        for x in range(14, 34):
-            pixels[y * 48 + x] = hair
-    for x, y in ((19, 25), (20, 25), (27, 25), (28, 25), (19, 26), (20, 26), (27, 26), (28, 26)):
-        pixels[y * 48 + x] = "#1d1b2c"
-    for x in range(21, 27):
-        pixels[33 * 48 + x] = "#1d1b2c"
-    return json.dumps({"v": 1, "w": 48, "h": 48, "px": pixels})
+def editor_face(index):
+    """A face from the studio's character editor recipes (see tools/demo_faces.py)."""
+    faces = json.loads((ROOT / "lobbies/game-room/assets/demo-faces.json").read_text())
+    return [f for f in faces if f["source"].startswith("editor:")][index]["avatar"]
 
 
 def post(path, body):
@@ -115,8 +109,9 @@ def run(godot, capture_dir=None):
                     except OSError:
                         if time.monotonic() > deadline: raise
                         time.sleep(0.05)
-                for name, color in (("Nora", "#ff5c5c"), ("Jamal", "#2dd4bf"), ("Bo", "#a78bfa")):
-                    overlay.send({"type": "join_party", "name": name, "color": color, "avatar": face("#3b2416")})
+                # No art: the host hands out its own guest faces and colours.
+                for name in ("Nora", "Jamal", "Bo"):
+                    overlay.send({"type": "join_party", "name": name})
                     overlay.until(lambda p, n=name: any(player["name"] == n for player in p["players"]))
                 for game_id, _, _ in games:
                     threading.Thread(target=game_loop, args=(port, game_id, stop), daemon=True).start()
@@ -129,7 +124,7 @@ def run(godot, capture_dir=None):
                     except OSError:
                         if time.monotonic() > deadline: raise
                         time.sleep(0.2)
-                post("/api/profiles", {"id": "phone-sanne", "username": "Sanne", "skin_color": "#edc59a", "avatar": face("#f2c14e")})
+                post("/api/profiles", {"id": "phone-sanne", "username": "Sanne", "skin_color": "#edc59a", "avatar": editor_face(1)})
                 assert post("/api/local-room/join", {"code": room["room_code"], "profile": "phone-sanne"}) == 204
                 process.wait(timeout=600 if capture_dir else 120)
             except subprocess.TimeoutExpired:
