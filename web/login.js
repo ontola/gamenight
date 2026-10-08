@@ -11,6 +11,16 @@ if (invitation.has("pair") || invitation.has("room") || invitation.has("code")) 
 const $ = id => document.getElementById(id);
 let busy = false, resendAt = 0;
 let fromEmailLink = false;
+// Pages such as the developer portal ask to be reopened after sign-in. The
+// request lives in localStorage so it also works from the emailed link.
+function afterLogin() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("gamenight_after_login") || "null");
+    localStorage.removeItem("gamenight_after_login");
+    if (saved && saved.until > Date.now() && /^\/[a-z]/.test(saved.path)) return saved.path;
+  } catch {}
+  return "/studio";
+}
 function status(text) { $("status").textContent = text; }
 async function submit(path, body) {
   const result = await fetch(path, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
@@ -45,7 +55,7 @@ $("change").addEventListener("click", () => { $("code-form").hidden = true; $("e
 $("code").addEventListener("input", () => { $("code").value = $("code").value.replace(/\D/g, "").slice(0, 8); });
 $("code-form").addEventListener("submit", async event => {
   event.preventDefault(); if (busy) return; setBusy(true); status("Signing you in…");
-  try { await submit("/auth/email/verify", {code: $("code").value.trim()}); location.replace("/studio"); }
+  try { await submit("/auth/email/verify", {code: $("code").value.trim()}); location.replace(afterLogin()); }
   catch(error) { status(error.message); setBusy(false); $("code").focus(); }
 });
 setInterval(() => {

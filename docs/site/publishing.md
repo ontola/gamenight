@@ -1,15 +1,15 @@
 # Publish a game
 
-Use the [developer portal](/developers/publishing) to upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.
+Use the [developer portal](/developers) to announce your game, upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.
 
 ## Prepare a release
 
-For a new game, start with a [submission](/developers/releases), or [contact us](/developers) for integration help. Then choose **Set up** in the publishing portal. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.
+For a new game, sign in to the [developer portal](/developers) and choose **Announce a game**. Free games can upload builds right away; ask for integration help from the game's **Help** tab. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.
 
-1. Choose your game, then **Versions**.
+1. Choose your game, then **Builds**.
 2. Enter a version and platform. Upload a ZIP containing your exported executable and assets, or a standalone executable. Alternatively, import a direct HTTPS URL from S3 or another host. URL imports require the filename; signed URLs must remain valid throughout the import and must not redirect.
 3. Set the executable path relative to the ZIP root, such as `Game.exe` or `Game.app/Contents/MacOS/Game`. For a bare file, use its filename. Add release notes.
-4. After package verification, choose **Use as preview**, test the exact build, then **Publish to gamers**.
+4. After package verification, choose **Use as preview**, test the exact build, then **Send for review** in the **Review** tab. Once approved, choose **Publish to players**.
 
 Packages may be at most 512 MiB, with at most 2 GiB extracted from a ZIP. Use a ZIP for executables with DLLs, PCK files or other assets. LÖVE packages need a platform runtime registered by GameNight. GameNight copies URL imports into its own storage; gamers never depend on an expiring source URL.
 

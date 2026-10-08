@@ -1,6 +1,6 @@
 # Unity, Unreal and other engines
 
-There is no maintained Unity or Unreal plugin in this repository. Use the open protocol to write an adapter, or [ask for integration help](/developers). Do not assume a game is supported because its engine can open a socket. [Engine support](/docs/engines) lists what a Unity or Unreal adapter must cover.
+There is no maintained Unity or Unreal plugin in this repository. Use the open protocol to write an adapter, or [ask for integration help](/developers#help/new). Do not assume a game is supported because its engine can open a socket. [Engine support](/docs/engines) lists what a Unity or Unreal adapter must cover.
 
 ## Open the connection
 

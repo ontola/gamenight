@@ -10,19 +10,19 @@ A successful handshake alone is not a complete integration.
 
 ## Submit a game
 
-Start with a [short message to GameNight](https://gamenight.ontola.io/developers).
-Your email and a few words about the game are enough. Include a link if you have
-one. No account or protocol integration is required to start the conversation.
-Keep the private conversation link to read replies and follow up.
+Start in the [developer portal](https://gamenight.ontola.io/developers). Sign in
+with your email and announce your game: a title, a short pitch and a player count
+are enough. No protocol integration is required to start. Questions go to the
+portal's **Help** tab; replies appear there and in your inbox.
 
 We can help with integration, or you can use this guide with your own developers
 or AI tools. For assisted work, agree repository access, code handling and any AI use
 first. Private repositories can stay private. GameNight prepares a pull request;
 you review and merge it, then supply the resulting build for testing.
 
-When ready for review, use the [release workspace](https://gamenight.ontola.io/developers/releases).
+When ready for review, open your game in the portal and use its **Review** tab.
 Submit one platform build with a version, player limits and controls. Its SHA-256
-is required before approval. The workspace holds private feedback and revisions;
+is required before approval. The portal keeps private feedback and revisions;
 each revised build needs a new review. Code access does not grant distribution
 permission. Staff review the package, rights and test evidence before approving
 catalog publication. Listing is free. The first flow supports free releases;

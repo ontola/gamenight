@@ -24,7 +24,7 @@ Read [Game lifecycle](/docs/lifecycle), then [Controllers & players](/docs/contr
 
 ## Have a game already?
 
-[Tell us about it](/developers). An email and a link are enough to start. We can help with integration, or you can work through these guides yourself.
+[Announce it in the developer portal](/developers). Sign in with your email; a title, a short pitch and a player count are enough to start. We can help with integration, or you can work through these guides yourself.
 
 ## How these docs stay current
 

@@ -107,7 +107,7 @@ def push(client, args):
         build = client.request('PUT', f"/v1/developer/builds/{build['id']}/content", file=path)
     release = client.request('POST', f'/v1/developer/games/{game}/releases', {'build': build['id'], 'channel': args.channel})
     result = {'build_id': build['id'], 'sha256': build['sha256'], 'state': release['state'],
-              'portal_url': client.base + '/developers/publishing#' + game}
+              'portal_url': client.base + '/developers#game/' + game}
     print(json.dumps(result, indent=2))
     if os.environ.get('GITHUB_OUTPUT'):
         with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
