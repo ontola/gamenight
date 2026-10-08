@@ -474,6 +474,53 @@ async fn playing_an_uninstalled_game_bumps_the_prewarm_queue() {
     );
 }
 
+/// Download grants reach the background installer from the local web
+/// server (an overlay) only; a game cannot unlock paid downloads.
+#[tokio::test]
+async fn download_grants_reach_the_prewarm_from_overlays_only() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap().to_string();
+    let (prewarm, mut signals) = gamenight_installer::prewarm_channel();
+    tokio::spawn(gamenight_daemon::run_with_prewarm(
+        listener,
+        Vec::new(),
+        None,
+        Some(prewarm),
+    ));
+    let grants: std::collections::BTreeMap<String, String> =
+        [("paid-game".to_string(), "tok-1.a".to_string())].into();
+
+    let mut game = PlainGame::connect("sneaky", &addr).await;
+    game.send(ClientMessage::DownloadGrants {
+        grants: [("sneaky".to_string(), "forged".to_string())].into(),
+    })
+    .await;
+    loop {
+        if let ServerMessage::Error { message } = game.recv().await {
+            assert!(message.contains("download grants"), "{message}");
+            break;
+        }
+    }
+
+    let mut overlay = Overlay::connect(&addr).await;
+    overlay
+        .send(ClientMessage::DownloadGrants {
+            grants: grants.clone(),
+        })
+        .await;
+    let signal = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            match signals.recv().await.expect("channel open") {
+                gamenight_installer::PrewarmSignal::Grants(set) => return set,
+                _ => continue,
+            }
+        }
+    })
+    .await
+    .expect("prewarm should receive the grants");
+    assert_eq!(signal, grants, "the game's forged grant never arrived");
+}
+
 /// A game that quits is never respawned by its own departure.
 ///
 /// This is the crash-loop: losing the active game makes the night pick what

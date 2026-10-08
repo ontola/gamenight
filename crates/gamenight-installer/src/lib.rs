@@ -17,7 +17,7 @@
 //! party wants to warm something that isn't installed yet, jumping it ahead
 //! of whatever else `prewarm_all` was going to fetch next.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 pub mod catalog_refresh;
 use std::path::{Path, PathBuf};
 
@@ -68,7 +68,7 @@ impl Progress<'_> {
 
 #[derive(Debug, thiserror::Error)]
 pub enum InstallError {
-    #[error("not eligible for background install (paid, or no direct download for this platform)")]
+    #[error("not eligible for background install (paid with no grant from a seated owner, or no direct download for this platform)")]
     NotEligible,
     #[error("download failed: {0}")]
     Http(String),
@@ -199,7 +199,20 @@ fn binary_name(url: &str) -> &str {
 /// games playable immediately, before the (possibly slow) background
 /// prewarm pass even starts.
 pub async fn already_installed(entry: &CatalogEntry, root: &Path) -> Option<InstalledGame> {
-    let dl = entry.auto_download_here()?;
+    installed_from(entry, entry.auto_download_here()?, root).await
+}
+
+/// [`already_installed`], also accepting a paid game's download — for a game
+/// the installer just reported installed, which it only does for a paid game
+/// while a seated owner's grant was in hand.
+pub async fn already_installed_granted(entry: &CatalogEntry, root: &Path) -> Option<InstalledGame> {
+    let dl = entry
+        .auto_download_here()
+        .or_else(|| entry.granted_download_here())?;
+    installed_from(entry, dl, root).await
+}
+
+async fn installed_from(entry: &CatalogEntry, dl: &Download, root: &Path) -> Option<InstalledGame> {
     let game_dir = root.join(&entry.id).join(dl.sha256.to_ascii_lowercase());
     let executable = cached_artifact(dl, &game_dir).await?;
     let runtime = if let Some(runtime) = &dl.runtime {
@@ -284,12 +297,24 @@ pub async fn ensure_installed_reporting(
     root: &Path,
     reporter: Option<&InstallReporter>,
 ) -> Result<InstalledGame, InstallError> {
+    ensure_installed_granted(entry, root, None, reporter).await
+}
+
+/// [`ensure_installed_reporting`] with a seated owner's download `grant`, which
+/// makes a paid game eligible and is sent with its download. The token is a
+/// secret: it reaches the request only, never a label, log or marker.
+pub async fn ensure_installed_granted(
+    entry: &CatalogEntry,
+    root: &Path,
+    grant: Option<&str>,
+    reporter: Option<&InstallReporter>,
+) -> Result<InstalledGame, InstallError> {
     let progress = Progress {
         reporter,
         game: GameId::new(&entry.id),
         title: entry.title.clone(),
     };
-    let result = install_inner(entry, root, &progress).await;
+    let result = install_inner(entry, root, grant, &progress).await;
     match &result {
         Ok(_) => progress.report(InstallState::Installed, None, None),
         // The party needs to know whether to wait or pick something else, so
@@ -302,20 +327,28 @@ pub async fn ensure_installed_reporting(
 async fn install_inner(
     entry: &CatalogEntry,
     root: &Path,
+    grant: Option<&str>,
     progress: &Progress<'_>,
 ) -> Result<InstalledGame, InstallError> {
     let dl = entry
-        .auto_download_here()
+        .download_for(gamenight_catalog::current_platform(), grant)
         .ok_or(InstallError::NotEligible)?;
+    // Free games are fetched as published; only a paid download carries the grant.
+    let grant = grant.filter(|_| entry.auto_download_here().is_none());
     let runtime = if let Some(runtime) = &dl.runtime {
-        let executable =
-            ensure_artifact(&runtime.download(), &runtime_dir(root, runtime), progress).await?;
+        let executable = ensure_artifact(
+            &runtime.download(),
+            &runtime_dir(root, runtime),
+            None,
+            progress,
+        )
+        .await?;
         Some((executable, runtime.argument))
     } else {
         None
     };
     let game_dir = root.join(&entry.id).join(dl.sha256.to_ascii_lowercase());
-    let executable = ensure_artifact(dl, &game_dir, progress).await?;
+    let executable = ensure_artifact(dl, &game_dir, grant, progress).await?;
     remember_entry(entry, &game_dir).await;
     Ok(InstalledGame {
         dir: game_dir,
@@ -347,6 +380,7 @@ async fn cached_artifact(dl: &Download, dir: &Path) -> Option<PathBuf> {
 async fn ensure_artifact(
     dl: &Download,
     destination: &Path,
+    grant: Option<&str>,
     progress: &Progress<'_>,
 ) -> Result<PathBuf, InstallError> {
     if let Some(executable) = cached_artifact(dl, destination).await {
@@ -359,7 +393,7 @@ async fn ensure_artifact(
     let staging = parent.join(format!(".staging-{}", uuid::Uuid::new_v4()));
     let download = parent.join(format!(".download-{}", uuid::Uuid::new_v4()));
     let result = async {
-        download_and_verify(&dl.url, &dl.sha256, &download, progress).await?;
+        download_and_verify(dl, grant, &download, progress).await?;
         progress.report(InstallState::Extracting, None, None);
         tokio::fs::create_dir_all(&staging).await?;
         let (spec, source, target) = (dl.clone(), download.clone(), staging.clone());
@@ -399,12 +433,29 @@ async fn ensure_artifact(
 
 /// Something the party learned that should change what downloads next.
 /// Constructed via [`PrewarmHandle`] rather than directly.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum PrewarmSignal {
     /// Somebody wants this specific game now.
     Prioritize(String),
     /// This many people are on the couch.
     Players(u8),
+    /// The complete current set of download grants, game id to token: a paid
+    /// game is downloadable only while it has one. Replaces the previous set.
+    Grants(BTreeMap<String, String>),
+}
+
+// Hand-written so a grant token can never reach a log through `{:?}`.
+impl std::fmt::Debug for PrewarmSignal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Prioritize(game) => f.debug_tuple("Prioritize").field(game).finish(),
+            Self::Players(n) => f.debug_tuple("Players").field(n).finish(),
+            Self::Grants(grants) => f
+                .debug_tuple("Grants")
+                .field(&grants.keys().collect::<Vec<_>>())
+                .finish(),
+        }
+    }
 }
 
 /// A live handle into a running [`prewarm_all`]: lets the daemon reorder the
@@ -432,6 +483,15 @@ impl PrewarmHandle {
     /// started downloading yet.
     pub fn set_players(&self, players: u8) {
         let _ = self.tx.send(PrewarmSignal::Players(players));
+    }
+
+    /// Replace the download grants (game id to token) the cloud issued for
+    /// paid games someone seated owns. A newly granted game that isn't
+    /// installed is fetched next, like [`Self::prioritize`], including one
+    /// that failed before; a game whose grant is gone stops being eligible.
+    /// Every download starts with the latest token for its game.
+    pub fn set_grants(&self, grants: BTreeMap<String, String>) {
+        let _ = self.tx.send(PrewarmSignal::Grants(grants));
     }
 }
 
@@ -467,7 +527,8 @@ fn suitability(entry: &CatalogEntry, players: u8) -> u8 {
 /// installed one at a time — deliberately sequential, so a background
 /// prewarm never saturates the household's bandwidth or disk I/O the way a
 /// fan-out would. Bad entries fail loudly (returned per-game, logged) but
-/// never abort the rest of the run.
+/// never abort the rest of the run. Paid entries with a direct download wait
+/// for a grant (see [`PrewarmHandle::set_grants`]).
 ///
 /// `priority` (from [`prewarm_channel`]) lets a caller reorder what's left
 /// in the queue while this runs; pass `None` for a plain, catalogue-order
@@ -495,73 +556,133 @@ pub async fn prewarm_all_reporting(
             return Vec::new();
         }
     };
-    let queue: VecDeque<CatalogEntry> = entries
-        .into_iter()
-        .filter(|e| e.auto_download_here().is_some())
-        .collect();
-    prewarm_queue(queue, root, signals, reporter).await
+    prewarm_queue(entries, root, signals, reporter).await
+}
+
+/// The queue's state between signals: what downloads next, what failed (and
+/// waits for an explicit retry), and which paid games wait for a grant.
+struct Prewarm {
+    queue: VecDeque<CatalogEntry>,
+    failed: HashMap<String, CatalogEntry>,
+    /// Paid entries with a download for this platform and no grant yet.
+    locked: HashMap<String, CatalogEntry>,
+    grants: BTreeMap<String, String>,
+    reporter: Option<InstallReporter>,
+}
+
+impl Prewarm {
+    fn report(&self, entry: &CatalogEntry, state: InstallState, label: Option<String>) {
+        if let Some(tx) = &self.reporter {
+            let _ = tx.send(InstallStatus {
+                game: GameId::new(&entry.id),
+                title: entry.title.clone(),
+                state,
+                percent: None,
+                label,
+            });
+        }
+    }
+
+    /// Install the new grant set: newly granted games are bumped like an
+    /// explicit request; queued or failed paid games without one go back to
+    /// waiting, reported as not eligible so nobody waits on them.
+    fn set_grants(&mut self, grants: BTreeMap<String, String>, bumps: &mut Vec<String>) {
+        let revoked: Vec<CatalogEntry> = self
+            .queue
+            .iter()
+            .chain(self.failed.values())
+            .filter(|e| e.auto_download_here().is_none() && !grants.contains_key(&e.id))
+            .cloned()
+            .collect();
+        for entry in revoked {
+            self.queue.retain(|e| e.id != entry.id);
+            self.failed.remove(&entry.id);
+            self.report(
+                &entry,
+                InstallState::Failed,
+                Some(InstallError::NotEligible.to_string()),
+            );
+            self.locked.insert(entry.id.clone(), entry);
+        }
+        for game in grants.keys() {
+            if !self.grants.contains_key(game) {
+                if let Some(entry) = self.locked.remove(game) {
+                    self.report(&entry, InstallState::Queued, None);
+                    self.queue.push_back(entry);
+                }
+                bumps.push(game.clone());
+            }
+        }
+        self.grants = grants;
+    }
 }
 
 async fn prewarm_queue(
-    mut queue: VecDeque<CatalogEntry>,
+    entries: Vec<CatalogEntry>,
     root: &Path,
     mut signals: Option<mpsc::UnboundedReceiver<PrewarmSignal>>,
     reporter: Option<InstallReporter>,
 ) -> Vec<PrewarmResult> {
-    if queue.is_empty() {
+    let (queue, locked): (Vec<_>, Vec<_>) = entries
+        .into_iter()
+        .filter(|e| e.auto_download_here().is_some() || e.granted_download_here().is_some())
+        .partition(|e| e.auto_download_here().is_some());
+    let mut state = Prewarm {
+        queue: queue.into(),
+        failed: HashMap::new(),
+        // Without signals no grant can ever arrive.
+        locked: if signals.is_some() {
+            locked.into_iter().map(|e| (e.id.clone(), e)).collect()
+        } else {
+            HashMap::new()
+        },
+        grants: BTreeMap::new(),
+        reporter,
+    };
+    if state.queue.is_empty() && state.locked.is_empty() {
         return Vec::new();
     }
-    info!(count = queue.len(), "prewarming eligible games");
+    info!(count = state.queue.len(), "prewarming eligible games");
 
     // Announce the whole queue up front. A party that can see three games
     // waiting behind the one downloading knows the evening is filling itself
     // in, which an empty screen until the first install lands does not say.
-    if let Some(tx) = &reporter {
-        for entry in &queue {
-            let _ = tx.send(InstallStatus {
-                game: GameId::new(&entry.id),
-                title: entry.title.clone(),
-                state: InstallState::Queued,
-                percent: None,
-                label: None,
-            });
-        }
+    for entry in &state.queue {
+        state.report(entry, InstallState::Queued, None);
     }
 
-    let mut results = Vec::with_capacity(queue.len());
-    let mut failed = HashMap::new();
+    let mut results = Vec::with_capacity(state.queue.len());
     loop {
-        if queue.is_empty() {
-            if failed.is_empty() {
+        let mut waited = None;
+        if state.queue.is_empty() {
+            // Failed games wait for a retry, locked ones for a grant.
+            if state.failed.is_empty() && state.locked.is_empty() {
                 break;
             }
             let Some(rx) = &mut signals else { break };
             let Some(signal) = rx.recv().await else { break };
-            if let PrewarmSignal::Prioritize(game) = signal {
-                if let Some(entry) = failed.remove(&game) {
-                    queue.push_back(entry);
-                }
-            }
+            waited = Some(signal);
         }
         if let Some(rx) = &mut signals {
-            apply_signals(&mut queue, rx, &mut failed);
+            apply_signals(&mut state, waited, rx);
         }
-        let Some(entry) = queue.pop_front() else {
+        let Some(entry) = state.queue.pop_front() else {
             continue;
         };
-        if let Some(tx) = &reporter {
-            let _ = tx.send(InstallStatus {
-                game: GameId::new(&entry.id),
-                title: entry.title.clone(),
-                state: InstallState::Queued,
-                percent: None,
-                label: None,
-            });
-        }
-        let outcome = ensure_installed_reporting(&entry, root, reporter.as_ref()).await;
-        if let Err(e) = &outcome {
-            warn!(game = %entry.id, error = %e, "prewarm failed");
-            failed.insert(entry.id.clone(), entry.clone());
+        state.report(&entry, InstallState::Queued, None);
+        // Signals were drained just above, so this is the latest token.
+        let grant = state.grants.get(&entry.id).map(String::as_str);
+        let outcome = ensure_installed_granted(&entry, root, grant, state.reporter.as_ref()).await;
+        match &outcome {
+            // A paid game whose grant went away: wait for the next one.
+            Err(InstallError::NotEligible) if entry.granted_download_here().is_some() => {
+                state.locked.insert(entry.id.clone(), entry.clone());
+            }
+            Err(e) => {
+                warn!(game = %entry.id, error = %e, "prewarm failed");
+                state.failed.insert(entry.id.clone(), entry.clone());
+            }
+            Ok(_) => {}
         }
         results.push(PrewarmResult {
             game: entry.id.clone(),
@@ -571,25 +692,35 @@ async fn prewarm_queue(
     results
 }
 
-/// Drain every pending signal and reorder what's left.
+/// Drain every pending signal (after `first`, one already received) and
+/// reorder what's left.
 ///
 /// Player count is applied first and an explicit request second, so a game
 /// somebody actually asked for always ends up at the front — a direct request
 /// is evidence about what this party wants that beats any inference from how
-/// many of them are sitting down.
+/// many of them are sitting down. A newly granted game counts as a request.
 fn apply_signals(
-    queue: &mut VecDeque<CatalogEntry>,
+    state: &mut Prewarm,
+    first: Option<PrewarmSignal>,
     rx: &mut mpsc::UnboundedReceiver<PrewarmSignal>,
-    failed: &mut HashMap<String, CatalogEntry>,
 ) {
     let mut bumps = Vec::new();
     let mut players = None;
-    while let Ok(signal) = rx.try_recv() {
+    let mut grants = None;
+    for signal in first
+        .into_iter()
+        .chain(std::iter::from_fn(|| rx.try_recv().ok()))
+    {
         match signal {
             PrewarmSignal::Prioritize(game) => bumps.push(game),
             PrewarmSignal::Players(n) => players = Some(n),
+            PrewarmSignal::Grants(set) => grants = Some(set),
         }
     }
+    if let Some(grants) = grants {
+        state.set_grants(grants, &mut bumps);
+    }
+    let queue = &mut state.queue;
 
     if let Some(players) = players.filter(|n| *n > 0) {
         // Stable, so games that seat the party equally well keep catalogue
@@ -602,7 +733,7 @@ fn apply_signals(
 
     // Last request wins the front slot, so apply them in order.
     for game in bumps {
-        if let Some(entry) = failed.remove(&game) {
+        if let Some(entry) = state.failed.remove(&game) {
             queue.push_front(entry);
         }
         if let Some(pos) = queue.iter().position(|e| e.id == game) {
@@ -614,11 +745,15 @@ fn apply_signals(
 }
 
 async fn download_and_verify(
-    url: &str,
-    expected_sha256: &str,
+    dl: &Download,
+    grant: Option<&str>,
     dest: &Path,
     progress: &Progress<'_>,
 ) -> Result<(), InstallError> {
+    let expected_sha256 = &dl.sha256;
+    // Errors name the catalogue URL and never the granted one: a grant is a
+    // secret, and reqwest's own errors would otherwise quote it.
+    let url = grant.map_or_else(|| dl.url.clone(), |grant| dl.url_with_grant(grant));
     let resp = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(10))
         .timeout(std::time::Duration::from_secs(300))
@@ -627,11 +762,12 @@ async fn download_and_verify(
         .get(url)
         .send()
         .await
-        .map_err(|e| InstallError::Http(e.to_string()))?;
+        .map_err(|e| InstallError::Http(e.without_url().to_string()))?;
     if !resp.status().is_success() {
         return Err(InstallError::Http(format!(
-            "HTTP {} fetching {url}",
-            resp.status()
+            "HTTP {} fetching {}",
+            resp.status(),
+            dl.url
         )));
     }
     // Without a Content-Length there is no honest percentage to show, so the
@@ -645,7 +781,7 @@ async fn download_and_verify(
     let mut received: u64 = 0;
     let mut last_percent = 0u8;
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| InstallError::Http(e.to_string()))?;
+        let chunk = chunk.map_err(|e| InstallError::Http(e.without_url().to_string()))?;
         hasher.update(&chunk);
         file.write_all(&chunk).await?;
 
@@ -727,6 +863,24 @@ fn extract(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The queue-and-failures view of [`super::apply_signals`] most tests need.
+    fn apply_signals(
+        queue: &mut VecDeque<CatalogEntry>,
+        rx: &mut mpsc::UnboundedReceiver<PrewarmSignal>,
+        failed: &mut HashMap<String, CatalogEntry>,
+    ) {
+        let mut state = Prewarm {
+            queue: std::mem::take(queue),
+            failed: std::mem::take(failed),
+            locked: HashMap::new(),
+            grants: BTreeMap::new(),
+            reporter: None,
+        };
+        super::apply_signals(&mut state, None, rx);
+        *queue = state.queue;
+        *failed = state.failed;
+    }
 
     #[test]
     fn hex_matches_known_sha256() {

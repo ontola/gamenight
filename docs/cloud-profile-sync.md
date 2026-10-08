@@ -16,6 +16,11 @@ API contract: POST `/v1/lobbies/register` returns a bearer capability; authentic
 POST `/v1/lobbies/poll` takes `{seats:[{index,player,revision}]}` and returns profile
 updates for paired accounts; POST `/v1/lobbies/ticket` takes `{index}` and returns
 an expiring ticket. Browser pairing uses authenticated CSRF-protected account APIs.
+The poll response may include `grants` (game id to download token) for paid games
+owned by someone seated at the table; missing means none. The host passes the
+current set to its daemon, which downloads a granted game with `?grant=<token>`
+appended to the catalog URL and treats paid games without a grant as unavailable
+on this host. The cloud answers a paid download without a valid grant with HTTP 402.
 The relay also carries catalog selections, playlist changes and device-memory
 preferences. It does not stream gameplay controls or process purchases. See
 [player memory](player-memory.md). The first successful account link establishes

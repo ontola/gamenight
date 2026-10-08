@@ -963,6 +963,15 @@ pub enum ClientMessage {
         values: std::collections::BTreeMap<String, SettingValue>,
     },
 
+    /// Trusted local web server only: the complete current set of download
+    /// grants from the cloud, game id to token, for paid games someone
+    /// seated owns. Replaces the previous set; an empty map revokes all.
+    /// Tokens are secrets: never log or display them.
+    DownloadGrants {
+        #[serde(default)]
+        grants: std::collections::BTreeMap<String, String>,
+    },
+
     // -- game (SDK) messages ------------------------------------------------
     /// Assets loaded, controllers mapped — the session can start instantly.
     Ready {
@@ -1177,6 +1186,23 @@ mod tests {
         assert!(json.contains("\"type\":\"hello\""));
         let back: ClientMessage = serde_json::from_str(&json).unwrap();
         assert_eq!(back, msg);
+    }
+
+    #[test]
+    fn download_grants_are_a_flat_map_and_default_to_none() {
+        let msg = ClientMessage::DownloadGrants {
+            grants: [("paid-game".to_string(), "tok-1.a".to_string())].into(),
+        };
+        assert_eq!(
+            msg.to_json(),
+            r#"{"type":"download_grants","grants":{"paid-game":"tok-1.a"}}"#
+        );
+        assert_eq!(
+            serde_json::from_str::<ClientMessage>(r#"{"type":"download_grants"}"#).unwrap(),
+            ClientMessage::DownloadGrants {
+                grants: Default::default()
+            }
+        );
     }
 
     #[test]

@@ -826,7 +826,8 @@ async fn resolve_installed_meta(
 ) -> Option<GameMeta> {
     let entries = gamenight_catalog::load_dir(catalog_dir).ok()?;
     let entry = entries.iter().find(|e| e.id == game.0)?;
-    let installed = gamenight_installer::already_installed(entry, root).await?;
+    // Reported installed, so a paid game had its grant: accept its download.
+    let installed = gamenight_installer::already_installed_granted(entry, root).await?;
     Some(gamenight_installer::game_meta(entry, &installed))
 }
 
@@ -1565,6 +1566,26 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::DownloadGrants { grants } = parsed {
+                // Only the local web server's cloud bridge holds grants; a
+                // game must not unlock paid downloads. Tokens are never logged.
+                let s = shared.lock().await;
+                if !matches!(registration, Registration::Overlay(_)) {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the local web server reports download grants".into(),
+                        },
+                    );
+                } else if let Some(prewarm) = &s.prewarm {
+                    debug!(
+                        games = ?grants.keys().collect::<Vec<_>>(),
+                        "download grants updated"
+                    );
+                    prewarm.set_grants(grants);
+                }
+                continue;
+            }
             if matches!(
                 parsed,
                 ClientMessage::DeclareCompanion { .. }
@@ -1706,6 +1727,9 @@ fn message_to_command(
         }
         ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby => {
             return Err("lobby lifecycle requires dedicated routing".into())
+        }
+        ClientMessage::DownloadGrants { .. } => {
+            return Err("download grants require dedicated routing".into())
         }
         ClientMessage::Participation {
             session,

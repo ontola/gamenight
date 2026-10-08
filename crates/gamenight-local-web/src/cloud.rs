@@ -10,7 +10,7 @@ use futures_util::SinkExt;
 use gamenight_protocol::{ClientMessage, PlayerId, Role};
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -103,6 +103,10 @@ struct Updates {
     pending: Vec<serde_json::Value>,
     #[serde(default)]
     room_code: String,
+    /// Download grants (game id to token) for paid games someone seated
+    /// owns: the complete current set. Secrets: never log them.
+    #[serde(default)]
+    grants: BTreeMap<String, String>,
 }
 #[derive(Deserialize)]
 struct Update {
@@ -285,6 +289,8 @@ impl Bridge {
         let mut applied: HashMap<String, (Seat, u64)> = HashMap::new();
         let mut acknowledged: Option<String> = None;
         let mut receipt: Option<serde_json::Value> = None;
+        // What the daemon last accepted; resent only when the set changes.
+        let mut delivered_grants: Option<BTreeMap<String, String>> = None;
         loop {
             tokio::time::sleep(Duration::from_secs(3)).await;
             let Some((seats, party)) = self.snapshot(&state).await else {
@@ -339,6 +345,13 @@ impl Bridge {
             let Ok(updates) = response.json::<Updates>().await else {
                 continue;
             };
+            // Before applying a selection, so a newly granted game is already
+            // eligible when the party picks it.
+            if delivered_grants.as_ref() != Some(&updates.grants)
+                && deliver_grants(&state, &updates.grants).await
+            {
+                delivered_grants = Some(updates.grants.clone());
+            }
             if let Some(selection) = &updates.selection {
                 if selection.command.is_some() {
                     if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {
@@ -438,5 +451,38 @@ impl Bridge {
                 }
             }
         }
+    }
+}
+
+/// Hand the daemon the current download grants. False when it could not be
+/// reached, so the next poll tries again.
+async fn deliver_grants(state: &SharedState, grants: &BTreeMap<String, String>) -> bool {
+    let Ok((mut ws, _)) = daemon::connect(state).await else {
+        return false;
+    };
+    let sent = ws
+        .send(tokio_tungstenite::tungstenite::Message::Text(
+            ClientMessage::DownloadGrants {
+                grants: grants.clone(),
+            }
+            .to_json(),
+        ))
+        .await
+        .is_ok();
+    let _ = ws.close(None).await;
+    sent
+}
+
+#[cfg(test)]
+mod grant_tests {
+    use super::*;
+
+    #[test]
+    fn polls_without_grants_mean_none() {
+        let updates: Updates = serde_json::from_str(r#"{"updates":[]}"#).unwrap();
+        assert!(updates.grants.is_empty());
+        let updates: Updates =
+            serde_json::from_str(r#"{"updates":[],"grants":{"paid-game":"tok-1.a"}}"#).unwrap();
+        assert_eq!(updates.grants["paid-game"], "tok-1.a");
     }
 }

@@ -30,7 +30,11 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         .filter(|s| s.occupant.player_id().is_some())
         .count() as u8;
     for game in &party.library {
-        let install = party.installs.iter().find(|i| i.game == game.id);
+        let install = party
+            .installs
+            .iter()
+            .find(|i| i.game == game.id)
+            .filter(|i| !not_on_this_host(i));
         // Minimum counts are recommendations for an explicit selection, just
         // as in the daemon. Only capacity may exclude an already seated player.
         let selectable = game.max_players.is_none_or(|max| count <= max)
@@ -85,14 +89,35 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
         if games.iter().any(|g| g["id"] == install.game.0) {
             continue;
         }
+        if not_on_this_host(install) {
+            games.push(json!({"id":install.game,"selectable":false,"state":"unavailable","percent":null,"failure":failure_hint(install.label.as_deref())}));
+            continue;
+        }
         games.push(json!({"id":install.game,"selectable":true,"state":install.state,"percent":install.percent,"failure":(install.state==InstallState::Failed).then(||failure_hint(install.label.as_deref()))}));
     }
     json!({"controls":super::settings::controls(party),"session":party.active_session,"playlist":party.playlist,"games":games,"current":party.active_session.as_ref().or(party.warm_session.as_ref()).map(|s| &s.game),"next":party.warming.as_ref().map(|s| &s.game).or_else(|| party.warm_session.as_ref().map(|s| &s.game)),"acknowledged":acknowledged})
 }
 
+/// A paid game nobody seated owns (no download grant): not this host's to
+/// install, which is neither a failure to retry nor a network problem.
+fn not_on_this_host(install: &gamenight_protocol::InstallStatus) -> bool {
+    install.state == InstallState::Failed
+        && install
+            .label
+            .as_deref()
+            .is_some_and(|label| label.to_lowercase().contains("not eligible"))
+}
+
 fn failure_hint(label: Option<&str>) -> &'static str {
     let label = label.unwrap_or_default().to_lowercase();
-    if label.contains("space") || label.contains("os error 112") || label.contains("os error 28") {
+    if label.contains("http 402") {
+        "Someone at the table needs to buy this game first."
+    } else if label.contains("not eligible") {
+        "Someone at the table who owns this game needs to join before it can be installed."
+    } else if label.contains("space")
+        || label.contains("os error 112")
+        || label.contains("os error 28")
+    {
         "Free some disk space on the host, then retry."
     } else if label.contains("checksum") || label.contains("sha256") {
         "The download could not be verified. Retry to fetch a fresh copy."
@@ -235,6 +260,26 @@ mod tests {
             .unwrap()
             .contains("connection"));
     }
+    #[test]
+    fn paid_games_without_a_grant_are_unavailable_not_broken() {
+        let mut party = gamenight_core::GameNight::default().snapshot();
+        party.installs.push(serde_json::from_value(json!({"game":"paid","title":"Paid","state":"failed","label":"not eligible for background install (paid with no grant from a seated owner, or no direct download for this platform)"})).unwrap());
+        party.installs.push(serde_json::from_value(json!({"game":"refused","title":"Refused","state":"failed","label":"download failed: HTTP 402 Payment Required fetching https://cdn.example/refused.zip"})).unwrap());
+        let view = snapshot(&party, &None);
+        assert_eq!(view["games"][0]["state"], "unavailable");
+        assert_eq!(view["games"][0]["selectable"], false);
+        assert!(!view["games"][0]["failure"]
+            .as_str()
+            .unwrap()
+            .contains("connection"));
+        assert_eq!(view["games"][1]["state"], "failed");
+        assert_eq!(
+            view["games"][1]["failure"],
+            "Someone at the table needs to buy this game first."
+        );
+        assert!(!view.to_string().contains("cdn.example"));
+    }
+
     #[test]
     fn discovery_never_exports_launch_instructions() {
         let mut party = gamenight_core::GameNight::default().snapshot();

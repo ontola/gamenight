@@ -240,6 +240,13 @@ role; the runtime supplies its controller stream.
 | `set_setting {game?, key, value}` | change a match setting; `game` defaults to the active game (see [Match settings](#match-settings)) |
 | `media_control {action}` | `play_pause` \| `next_track` \| `previous_track` on the host's background music (see [The host's music](#the-hosts-music)) |
 
+`download_grants {grants}` is for the trusted local web server only: it hands the
+daemon the cloud's current download grants (game id to token) for paid games
+someone seated owns. Each message replaces the previous set. A paid catalog game
+downloads only while it has a grant, which is appended to its download URL as
+`?grant=` (or `&grant=`); a newly granted game is fetched next. Other roles get an
+`error`. Tokens are secrets and never appear in logs or `party_state`.
+
 ### The overlay is party state
 
 Whether the overlay is up is **server-authoritative** (`overlay_open` in the

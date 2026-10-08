@@ -92,7 +92,9 @@ Field rules (enforced by `cargo test -p gamenight-catalog`):
   account — see [`CatalogEntry::auto_download_here`](../crates/gamenight-catalog/src/lib.rs).
   `pay_what_you_want`/`paid` entries are never silently installed, even with
   a `downloads` URL present (paid + `downloads` is itself rejected by
-  `validate()`).
+  `validate()`). Only the hosted (published) catalog may give a paid game
+  `downloads`: the host fetches them only while the cloud grants a seated
+  owner's download (see [cloud sync](../docs/cloud-profile-sync.md)).
 - `downloads.<platform>.entrypoint` — path to the runnable executable,
   relative to the extracted archive's root (e.g. `your-game/your-game.exe`).
   Required whenever the URL is an archive (`.tar.gz`/`.tgz`/`.zip` —

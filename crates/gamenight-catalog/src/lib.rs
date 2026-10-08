@@ -236,10 +236,63 @@ impl CatalogEntry {
     pub fn auto_download_here(&self) -> Option<&Download> {
         self.auto_download_for(current_platform())
     }
+
+    /// The direct download a grant unlocks for `platform`: a paid (or
+    /// pay-what-you-want) hosted game whose download the cloud serves only
+    /// while someone seated at the table owns it. `None` for free games
+    /// (they need no grant) and platforms with no direct download.
+    pub fn granted_download_for(&self, platform: &str) -> Option<&Download> {
+        (self.price != Price::Free)
+            .then(|| self.downloads.get(platform))
+            .flatten()
+    }
+
+    /// [`Self::granted_download_for`] for the platform this process is running on.
+    pub fn granted_download_here(&self) -> Option<&Download> {
+        self.granted_download_for(current_platform())
+    }
+
+    /// What this host may fetch for `platform`: a free game's download
+    /// always, a paid one's only while `grant` (a seated owner's download
+    /// grant) is present. Fetch a granted download from
+    /// [`Download::url_with_grant`], never its bare `url`.
+    pub fn download_for(&self, platform: &str, grant: Option<&str>) -> Option<&Download> {
+        self.auto_download_for(platform).or_else(|| {
+            grant
+                .is_some()
+                .then(|| self.granted_download_for(platform))
+                .flatten()
+        })
+    }
+}
+
+impl Download {
+    /// `url` with a download grant appended as the `grant` query parameter,
+    /// which the cloud requires (HTTP 402 otherwise) for a paid game. The
+    /// result contains a secret: keep it out of logs, labels and markers.
+    pub fn url_with_grant(&self, grant: &str) -> String {
+        let separator = if self.url.contains('?') { '&' } else { '?' };
+        let mut url = format!("{}{separator}grant=", self.url);
+        for byte in grant.bytes() {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                url.push(byte as char);
+            } else {
+                url.push_str(&format!("%{byte:02X}"));
+            }
+        }
+        url
+    }
 }
 
 /// Validate one entry; returns human-readable problems (empty = valid).
 pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
+    validate_entry(entry, filename, false)
+}
+
+/// `hosted` entries come from the published catalogue, whose paid downloads
+/// the cloud serves only with a seated owner's grant. Committed entries
+/// still sell paid games through store `links` alone.
+fn validate_entry(entry: &CatalogEntry, filename: &str, hosted: bool) -> Vec<String> {
     let mut problems = Vec::new();
     let mut check = |ok: bool, msg: &str| {
         if !ok {
@@ -345,11 +398,11 @@ pub fn validate(entry: &CatalogEntry, filename: &str) -> Vec<String> {
     }
     if entry.price == Price::Paid {
         check(
-            entry.downloads.is_empty(),
+            hosted || entry.downloads.is_empty(),
             "paid games use links (stores), never direct downloads",
         );
         check(
-            !entry.links.is_empty(),
+            !entry.links.is_empty() || (hosted && !entry.downloads.is_empty()),
             "paid games must link to where they're sold",
         );
     }
@@ -457,7 +510,7 @@ pub fn validate_published(entries: &[CatalogEntry]) -> Result<(), Vec<String>> {
     let mut problems = Vec::new();
     let mut ids = std::collections::HashSet::new();
     for e in entries {
-        problems.extend(validate(e, &format!("{}.json", e.id)));
+        problems.extend(validate_entry(e, &format!("{}.json", e.id), true));
         if matches!(e.id.as_str(), "lobby" | "demo-game")
             || e.bundled.is_some()
             || !ids.insert(&e.id)
@@ -666,6 +719,86 @@ mod tests {
 
         let no_download = minimal("no-download");
         assert!(no_download.auto_download_here().is_none());
+    }
+
+    #[test]
+    fn paid_downloads_need_a_grant() {
+        let mut paid = minimal("paid-game");
+        paid.price = Price::Paid;
+        paid.downloads.insert(
+            current_platform().into(),
+            Download {
+                url: "https://example.com/x.tar.gz".into(),
+                sha256: "a".repeat(64),
+                size_mb: None,
+                entrypoint: Some("x/game".into()),
+                runtime: None,
+            },
+        );
+        assert!(paid.auto_download_here().is_none());
+        assert!(paid.download_for(current_platform(), None).is_none());
+        assert!(paid
+            .download_for(current_platform(), Some("t0k.en"))
+            .is_some());
+        assert!(paid
+            .download_for("not-a-real-platform", Some("t"))
+            .is_none());
+        assert!(paid.granted_download_here().is_some());
+
+        let mut free = paid.clone();
+        free.price = Price::Free;
+        assert!(free.download_for(current_platform(), None).is_some());
+        assert!(
+            free.granted_download_here().is_none(),
+            "free games need no grant"
+        );
+    }
+
+    #[test]
+    fn grant_is_appended_as_a_query_parameter() {
+        let mut dl = Download {
+            url: "https://cdn.example/games/x.zip".into(),
+            sha256: "a".repeat(64),
+            size_mb: None,
+            entrypoint: Some("x/game".into()),
+            runtime: None,
+        };
+        assert_eq!(
+            dl.url_with_grant("ab-1.c"),
+            "https://cdn.example/games/x.zip?grant=ab-1.c"
+        );
+        dl.url = "https://cdn.example/download?game=x&os=linux".into();
+        assert_eq!(
+            dl.url_with_grant("ab-1.c"),
+            "https://cdn.example/download?game=x&os=linux&grant=ab-1.c"
+        );
+        assert_eq!(
+            dl.url_with_grant("a b&c"),
+            "https://cdn.example/download?game=x&os=linux&grant=a%20b%26c"
+        );
+    }
+
+    #[test]
+    fn only_hosted_paid_games_may_carry_direct_downloads() {
+        let mut paid = minimal("hosted-paid");
+        paid.price = Price::Paid;
+        paid.downloads.insert(
+            "linux".into(),
+            Download {
+                url: "https://cdn.example/hosted-paid.zip".into(),
+                sha256: "a".repeat(64),
+                size_mb: None,
+                entrypoint: Some("game/run".into()),
+                runtime: None,
+            },
+        );
+        assert!(validate_published(std::slice::from_ref(&paid)).is_ok());
+        assert!(!validate(&paid, "hosted-paid.json").is_empty());
+        paid.downloads.clear();
+        assert!(
+            validate_published(&[paid]).is_err(),
+            "a paid game with neither store links nor a hosted download"
+        );
     }
 
     #[test]
