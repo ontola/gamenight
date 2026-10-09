@@ -122,3 +122,10 @@ For a game that prepares before being played, set `display/window/size/mode` to
 Minimizing in `_ready()` is too late to prevent the initial window appearing.
 Use `GameNightScreen` for Start/Resume and explicitly claim the screen in your
 standalone launch path. OS focus must never request gameplay.
+
+While warming, a minimized window never draws, so never await
+`RenderingServer.frame_post_draw` before `notify_ready()`: it does not return
+and the lobby waits on "preloading" forever. Await `get_tree().process_frame`
+instead whenever `DisplayServer.window_get_mode()` is `WINDOW_MODE_MINIMIZED`.
+Leave the window itself to `GameNightScreen`. Godot refuses `hide()` on the main
+window, and on Windows setting `borderless` shows the window again.
