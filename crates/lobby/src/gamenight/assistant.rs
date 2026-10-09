@@ -18,6 +18,11 @@ pub(super) fn open_lobby_chooser() {
     let url = std::env::var("GAMENIGHT_LOBBY_CHOOSER_URL").ok()
         .filter(|s| s.starts_with("http://127.0.0.1:") && !s.contains(['\n','\r']))
         .unwrap_or_else(|| "http://127.0.0.1:7913/host/lobby".into());
+    // Packaged hosts run lobbies in a kill-on-close job, where a browser
+    // started from here never shows up. The launcher opens it instead.
+    if let Some(request) = std::env::var_os("GAMENIGHT_BROWSER_REQUEST") {
+        if std::fs::write(request, &url).is_ok() { return; }
+    }
     open_url(url);
 }
 

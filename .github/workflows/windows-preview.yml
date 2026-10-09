@@ -10,6 +10,7 @@ on:
       - 'crates/gamenight-catalog/**'
       - 'catalog/**'
       - 'crates/lobby/**'
+      - 'lobbies/game-room/**'
       - 'vendor/bones/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
@@ -85,6 +86,13 @@ jobs:
             . -> target
             crates/lobby -> target
           key: windows-installer
+      - name: Install pinned Godot 4.5.2 for the Game Room lobby
+        shell: pwsh
+        run: |
+          $archive = "$env:RUNNER_TEMP/godot.zip"
+          Invoke-WebRequest 'https://github.com/godotengine/godot-builds/releases/download/4.5.2-stable/Godot_v4.5.2-stable_win64.exe.zip' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne '3766090865330AB2A0ED33594520394B711C620B1378F9223904FAEEF60F2F14') { throw 'Godot checksum mismatch' }
+          Expand-Archive $archive "$env:RUNNER_TEMP/godot"
       - name: Install pinned packaging tool
         run: dotnet tool install --global vpk --version 1.2.0
       - name: Authenticate for signing
@@ -110,6 +118,7 @@ jobs:
           $params = @{
             Version = $version; Channel = $channel; BuildProfile = $buildProfile
             OutputDir = "$env:RUNNER_TEMP/installer"; TargetDir = "$env:GITHUB_WORKSPACE/target"
+            Godot = "$env:RUNNER_TEMP/godot/Godot_v4.5.2-stable_win64_console.exe"
           }
           if (($env:GITHUB_EVENT_NAME -eq 'workflow_dispatch' -or $env:AUTOMATIC_RELEASE -eq 'true') -and $env:GITHUB_REF -eq 'refs/heads/main' -and $env:SIGNING_ENDPOINT) {
             if (!$env:SIGNING_ACCOUNT -or !$env:SIGNING_PROFILE) { throw 'Signing configuration is incomplete' }

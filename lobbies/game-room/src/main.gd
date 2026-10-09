@@ -374,7 +374,7 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 			"chooser":
 				var url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
 				if not url.begins_with("http://127.0.0.1:"): url = "http://127.0.0.1:7913/host/lobby"
-				OS.shell_open(url)
+				_open_chooser(url)
 				menus.erase(id)
 			"quit":
 				if menu.confirm:
@@ -836,3 +836,15 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 		if items[i].action == "quit" and menu.confirm and selected: label = "Press A again to quit"
 		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4), Color(VIOLET, 0.35))
 		_text(canvas, label, Vector2(rect.position.x + 32, y + size), size, TEXT if selected else DIM)
+
+## Packaged hosts run lobbies in a kill-on-close job, where a browser started
+## from here never shows up, so the launcher opens the chooser instead.
+func _open_chooser(url: String) -> void:
+	var request := OS.get_environment("GAMENIGHT_BROWSER_REQUEST")
+	if not request.is_empty():
+		var file := FileAccess.open(request, FileAccess.WRITE)
+		if file:
+			file.store_string(url)
+			file.close()
+			return
+	OS.shell_open(url)

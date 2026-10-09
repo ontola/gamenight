@@ -32,11 +32,30 @@ pub fn choices(path: &Path) -> Vec<GameMeta> {
         })
         .collect()
 }
-pub fn selected(config: &Path, registrations: &Path) -> Option<GameMeta> {
-    let value: Value = serde_json::from_slice(&std::fs::read(config).ok()?).ok()?;
-    choices(registrations)
-        .into_iter()
-        .find(|m| value["id"].as_str() == Some(m.id.0.as_str()))
+/// Lobbies the app ships with, then locally registered ones. The first
+/// bundled lobby is the default until the host picks another one.
+fn available(registrations: &Path, bundled: Option<&Path>) -> Vec<GameMeta> {
+    let mut all = bundled.map(choices).unwrap_or_default();
+    for meta in choices(registrations) {
+        if !all.iter().any(|m| m.id == meta.id) {
+            all.push(meta);
+        }
+    }
+    all
+}
+/// The replacement lobby to run, or `None` for the built-in Clubhouse.
+pub fn selected(config: &Path, registrations: &Path, bundled: Option<&Path>) -> Option<GameMeta> {
+    let value: Option<Value> = std::fs::read(config)
+        .ok()
+        .and_then(|v| serde_json::from_slice(&v).ok());
+    let id = value.as_ref().and_then(|v| v["id"].as_str());
+    if id == Some("lobby") {
+        return None;
+    }
+    let all = available(registrations, bundled);
+    let default = bundled.map(choices).unwrap_or_default().into_iter().next();
+    id.and_then(|id| all.into_iter().find(|m| m.id.0 == id))
+        .or(default)
 }
 fn native(peer: SocketAddr, headers: &HeaderMap) -> bool {
     peer.ip().is_loopback()
@@ -45,7 +64,12 @@ fn native(peer: SocketAddr, headers: &HeaderMap) -> bool {
             .and_then(|v| v.to_str().ok())
             == Some("1")
 }
-fn paths() -> Result<(std::path::PathBuf, std::path::PathBuf), StatusCode> {
+type Paths = (
+    std::path::PathBuf,
+    std::path::PathBuf,
+    Option<std::path::PathBuf>,
+);
+fn paths() -> Result<Paths, StatusCode> {
     Ok((
         std::env::var_os("GAMENIGHT_LOBBY_CONFIG")
             .ok_or(StatusCode::NOT_IMPLEMENTED)?
@@ -53,21 +77,31 @@ fn paths() -> Result<(std::path::PathBuf, std::path::PathBuf), StatusCode> {
         std::env::var_os("GAMENIGHT_LOCAL_GAMES")
             .ok_or(StatusCode::NOT_IMPLEMENTED)?
             .into(),
+        std::env::var_os("GAMENIGHT_BUNDLED_LOBBIES").map(Into::into),
     ))
 }
 pub async fn get(ConnectInfo(peer): ConnectInfo<SocketAddr>) -> Result<Json<Value>, StatusCode> {
     if !peer.ip().is_loopback() {
         return Err(StatusCode::FORBIDDEN);
     }
-    let (config, registrations) = paths()?;
-    let mut entries = vec![json!({"id":"lobby","title":"Clubhouse (platformer)"})];
+    let (config, registrations, bundled) = paths()?;
+    let bundled = bundled.as_deref();
+    let mut entries: Vec<Value> = bundled
+        .map(choices)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| json!({"id":m.id,"title":m.title}))
+        .collect();
+    entries.push(json!({"id":"lobby","title":"Clubhouse (platformer)"}));
     entries.extend(
-        choices(&registrations)
+        available(&registrations, None)
             .into_iter()
-            .map(|m| json!({"id":m.id,"title":m.title})),
+            .filter(|m| !entries.iter().any(|e| e["id"] == m.id.0))
+            .map(|m| json!({"id":m.id,"title":m.title}))
+            .collect::<Vec<_>>(),
     );
     Ok(Json(
-        json!({"selected":selected(&config,&registrations).map(|m|m.id.0).unwrap_or("lobby".into()),"choices":entries}),
+        json!({"selected":selected(&config,&registrations,bundled).map(|m|m.id.0).unwrap_or("lobby".into()),"choices":entries}),
     ))
 }
 #[derive(Deserialize)]
@@ -82,8 +116,12 @@ pub async fn select(
     if !native(peer, &headers) {
         return Err(StatusCode::FORBIDDEN);
     }
-    let (config, registrations) = paths()?;
-    if request.id != "lobby" && !choices(&registrations).iter().any(|m| m.id.0 == request.id) {
+    let (config, registrations, bundled) = paths()?;
+    if request.id != "lobby"
+        && !available(&registrations, bundled.as_deref())
+            .iter()
+            .any(|m| m.id.0 == request.id)
+    {
         return Err(StatusCode::BAD_REQUEST);
     }
     std::fs::write(config, json!({"id":request.id}).to_string())
@@ -178,11 +216,28 @@ mod tests {
         let config = dir.join("selected.json");
         std::fs::write(&games,json!([{ "id":"custom","title":"Custom", "launch":{"command":std::env::current_exe().unwrap(),"env":{"GAMENIGHT_LOBBY_API":"1"}}},{"id":"ordinary","title":"Game"}]).to_string()).unwrap();
         std::fs::write(&config, r#"{"id":"custom"}"#).unwrap();
-        assert_eq!(selected(&config, &games).unwrap().id.0, "custom");
+        assert_eq!(selected(&config, &games, None).unwrap().id.0, "custom");
         std::fs::write(&config, r#"{"id":"ordinary"}"#).unwrap();
-        assert!(selected(&config, &games).is_none());
+        assert!(selected(&config, &games, None).is_none());
         std::fs::remove_file(games).unwrap();
         std::fs::remove_file(config).unwrap();
         std::fs::remove_dir(dir).unwrap();
+    }
+    #[test]
+    fn bundled_lobby_is_the_default_until_clubhouse_is_chosen() {
+        let dir = std::env::temp_dir().join(format!("lobby-bundled-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir(&dir).unwrap();
+        let bundled = dir.join("bundled.json");
+        let games = dir.join("games.json");
+        let config = dir.join("selected.json");
+        std::fs::write(&bundled,json!([{ "id":"game-room","title":"Game Room", "launch":{"command":std::env::current_exe().unwrap(),"env":{"GAMENIGHT_LOBBY_API":"1"}}}]).to_string()).unwrap();
+        std::fs::write(&games, "[]").unwrap();
+        let pick = |c: &Path| selected(c, &games, Some(&bundled)).map(|m| m.id.0);
+        assert_eq!(pick(&config).as_deref(), Some("game-room"));
+        std::fs::write(&config, r#"{"id":"lobby"}"#).unwrap();
+        assert_eq!(pick(&config), None);
+        std::fs::write(&config, r#"{"id":"removed"}"#).unwrap();
+        assert_eq!(pick(&config).as_deref(), Some("game-room"));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

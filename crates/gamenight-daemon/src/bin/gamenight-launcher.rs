@@ -112,10 +112,29 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
          "emoji":"", "color":"#7c5cff", "launch":{"command":lobby, "cwd":lobby_dir,
          "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
     ]);
+    // Lobbies shipped in the package. The first one is the default lobby;
+    // the Clubhouse stays available from the lobby chooser.
+    let bundled_lobbies = local.join("bundled-lobbies.json");
+    let game_room = root.join("lobbies/game-room");
+    let bundled: Vec<serde_json::Value> = [game_room.join("GameRoom.exe")]
+        .into_iter()
+        .filter(|command| command.is_file())
+        .map(|command| {
+            serde_json::json!({"id":"game-room", "title":"Game Room", "players":"1-8",
+                "min_players":1, "max_players":8, "emoji":"", "color":"#7c5cff",
+                "launch":{"command":command, "cwd":game_room, "env":{"GAMENIGHT_LOBBY_API":"1"}}})
+        })
+        .collect();
+    fs::write(&bundled_lobbies, serde_json::to_vec_pretty(&bundled)?)?;
+    shelf.as_array_mut().unwrap().extend(bundled);
     data::merge_local_games(&mut shelf, &local)?;
     let lobby_config = local.join("selected-lobby.json");
     let registrations = local.join("local-games.json");
-    let custom = gamenight_local_web::host_lobby::selected(&lobby_config, &registrations);
+    let custom = gamenight_local_web::host_lobby::selected(
+        &lobby_config,
+        &registrations,
+        Some(&bundled_lobbies),
+    );
     let lobby_id = custom
         .as_ref()
         .map(|m| m.id.0.clone())
@@ -153,6 +172,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_LOBBY_GAME", &lobby_id)
         .env("GAMENIGHT_LOBBY_CONFIG", &lobby_config)
         .env("GAMENIGHT_LOCAL_GAMES", &registrations)
+        .env("GAMENIGHT_BUNDLED_LOBBIES", &bundled_lobbies)
         .env("GAMENIGHT_ONBOARDING_FILE", onboarding)
         .env("GAMENIGHT_BROWSER_REQUEST", &browser_request)
         .stdin(Stdio::piped())

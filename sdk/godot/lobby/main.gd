@@ -387,7 +387,7 @@ func _activate(action: String, controller: String = "") -> void:
 	if action == "choose-lobby":
 		var url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
 		if not url.begins_with("http://127.0.0.1:"): url = "http://127.0.0.1:7913/host/lobby"
-		OS.shell_open(url)
+		_open_chooser(url)
 		return
 	if _menu_open:
 		if action in ["quit", "room"]: _menu_open = false
@@ -931,3 +931,15 @@ func _draw_settings() -> void:
 	if specs.size()>count:
 		_button("Previous",Rect2(box.position.x+22,box.end.y-52,110,36),"settings-page:-1",false,_settings_page==0)
 		_button("Next",Rect2(box.end.x-132,box.end.y-52,110,36),"settings-page:1",false,(_settings_page+1)*count>=specs.size())
+
+## Packaged hosts run lobbies in a kill-on-close job, where a browser started
+## from here never shows up, so the launcher opens the chooser instead.
+func _open_chooser(url: String) -> void:
+	var request := OS.get_environment("GAMENIGHT_BROWSER_REQUEST")
+	if not request.is_empty():
+		var file := FileAccess.open(request, FileAccess.WRITE)
+		if file:
+			file.store_string(url)
+			file.close()
+			return
+	OS.shell_open(url)

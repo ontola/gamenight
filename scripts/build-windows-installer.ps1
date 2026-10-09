@@ -5,7 +5,8 @@ param(
     [ValidateSet('preview', 'stable')][string]$Channel = 'preview',
     [ValidateSet('dev', 'ci', 'release')][string]$BuildProfile = 'release',
     [string]$SigningMetadata,
-    [string]$Vpk = 'vpk'
+    [string]$Vpk = 'vpk',
+    [string]$Godot
 )
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version' }
@@ -13,7 +14,7 @@ if ($Version -match '^0\.0\.(0($|-)|1-)') { throw 'Velopack requires a version >
 if ($Channel -eq 'stable' -and ($Version.Contains('-') -or !$SigningMetadata)) {
     throw 'Stable installers require a stable version and code signing.'
 }
-& (Join-Path $PSScriptRoot 'build-windows-preview.ps1') -OutputDir $OutputDir -TargetDir $TargetDir -BuildProfile $BuildProfile
+& (Join-Path $PSScriptRoot 'build-windows-preview.ps1') -OutputDir $OutputDir -TargetDir $TargetDir -BuildProfile $BuildProfile -Godot $Godot
 if ($LASTEXITCODE -ne 0) { throw 'Preview staging failed' }
 $stage = Join-Path $OutputDir 'package/gamenight-windows-preview'
 & (Join-Path $PSScriptRoot 'test-windows-branding.ps1') -Executable (Join-Path $stage 'GameNight.exe')

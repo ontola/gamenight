@@ -21,6 +21,10 @@ resume the paused game after the transition guard. The TV also offers Resume.
 Games remain hidden and silent while preparing. Older downloaded previews may
 have different controls; these instructions describe the current source.
 
+The default lobby is the Game Room. To use the Clubhouse platformer instead, press
+Start in the lobby, choose **Select other lobby** and save; it applies the next
+time GameNight opens.
+
 Installed builds check the public GitHub releases for updates in the background.
 A downloaded update is applied only after the lobby and all game processes have
 closed. Slow, offline or failed downloads do not hold up startup or shutdown.

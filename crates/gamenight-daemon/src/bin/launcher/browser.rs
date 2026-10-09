@@ -52,12 +52,12 @@ pub fn open_lobby_settings() -> std::io::Result<()> {
     ))
 }
 fn valid_url(url: &str) -> bool {
-    if url
-        == format!(
-            "http://127.0.0.1:{}/host/lobby?recovery=1",
-            gamenight_protocol::DEFAULT_WEB_PORT
-        )
-    {
+    // The lobby chooser (asked for from a lobby's menu) and crash recovery.
+    let host = format!(
+        "http://127.0.0.1:{}/host/lobby",
+        gamenight_protocol::DEFAULT_WEB_PORT
+    );
+    if url == host || url == format!("{host}?recovery=1") {
         return true;
     }
 
