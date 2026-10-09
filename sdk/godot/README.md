@@ -23,6 +23,17 @@ jobs:
     uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
 ```
 
+## Crowd sound
+
+`addons/crowd_sound` is an optional procedural crowd: murmur, cheers, applause,
+"ooh"s, screams and chants, all synthesized at boot, no samples. It came from
+Growing Guns. Add it with `python sdk/godot/sync.py --add crowd_sound path/to/game`;
+after that the same sync and CI check keep it current. Use it as a node, set
+`active = true` while there is an audience, and call `kickoff()`, `hit()`,
+`roar()`, `celebrate()`, `excite()` or `scare()`. Extend the script to route
+one-shots through your own mixer or place sounds in 3D; the header lists the
+hooks. Ballkickers and Growing Guns both use it.
+
 Games that publish to the catalog can call
 `ontola/gamenight/.github/workflows/publish-game.yml@main` from a `workflow_run`
 workflow instead of copying the upload steps; the file shows an example.
