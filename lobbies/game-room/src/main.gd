@@ -260,7 +260,7 @@ func station_for(id: String) -> Dictionary:
 		var reason := _unavailable(game)
 		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
 			"label": reason if not reason.is_empty() else "Queue %s" % str(game.get("title", "game")),
-			"enabled": reason.is_empty(), "extra": "LB / RB browse" if shelf.size() > 1 else ""}
+			"enabled": reason.is_empty(), "extra": "LB RB browse" if shelf.size() > 1 else ""}
 	for i in Layout.TV_PADS.size():
 		if absf(p.x - Layout.TV_PADS[i]) <= Layout.PAD_HALF:
 			var pad := tv_pad(i)
@@ -773,7 +773,7 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	var extra := str(station.get("extra", ""))
 	var tw := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 	var small := int(size * 0.72)
-	var ew := font.get_string_size(extra, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x if not extra.is_empty() else 0.0
+	var ew := _extra_width(extra, small) if not extra.is_empty() else 0.0
 	var h := size + 14.0
 	var badge := h - 8
 	var w := tw + badge + 22 + (ew + 16 if extra else 0.0)
@@ -781,15 +781,39 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	# Keep the capsule and its round ends on screen near the walls.
 	rect.position.x = clampf(rect.position.x, h / 2 + 12, canvas.size.x - w - h / 2 - 12)
 	var bg := Color(0.03, 0.03, 0.06, 0.9)
-	canvas.draw_rect(rect, bg)
-	canvas.draw_circle(rect.position + Vector2(0, h / 2), h / 2, bg)
-	canvas.draw_circle(rect.position + Vector2(w, h / 2), h / 2, bg)
+	# One rounded box, so the translucent ends don't overlap and darken.
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = bg
+	pill.set_corner_radius_all(int(h / 2))
+	pill.anti_aliasing = true
+	canvas.draw_style_box(pill, rect.grow_individual(h / 2, 0, h / 2, 0))
 	var badge_color := Color("f8cd34") if station.enabled else Color("55516a")
 	canvas.draw_circle(rect.position + Vector2(badge / 2 - 2, h / 2), badge / 2, badge_color)
 	canvas.draw_string(bold, rect.position + Vector2(-2, h / 2 + size * 0.36), "Y", HORIZONTAL_ALIGNMENT_CENTER, badge, size, BG)
 	_text(canvas, text, rect.position + Vector2(badge + 10, h / 2 + size * 0.36), size, TEXT if station.enabled else DIM)
 	if extra:
-		_text(canvas, extra, rect.position + Vector2(badge + 26 + tw, h / 2 + small * 0.36), small, AMBER)
+		_draw_extra(canvas, extra, rect.position + Vector2(badge + 26 + tw, h / 2), small)
+
+## Hint extras like "LB RB browse": button names become bumper badges.
+const BUMPERS := ["LB", "RB", "LT", "RT"]
+
+func _extra_width(extra: String, size: int) -> float:
+	var w := 0.0
+	for token in extra.split(" ", false):
+		if token == "/": continue
+		w += (size * 2.0 if token in BUMPERS else font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x) + size * 0.3
+	return w
+
+func _draw_extra(canvas: Control, extra: String, at: Vector2, size: int) -> void:
+	var x := at.x
+	for token in extra.split(" ", false):
+		if token == "/": continue
+		if token in BUMPERS:
+			Room.draw_bumper(canvas, Rect2(x, at.y - size * 0.55, size * 2.0, size * 1.1), token, bold)
+			x += size * 2.3
+		else:
+			_text(canvas, token, Vector2(x, at.y + size * 0.36), size, AMBER)
+			x += font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size * 0.3
 
 func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	var items := menu_items(id)

@@ -499,8 +499,17 @@ func _game_shelf() -> void:
 	featured_box = game_box(Vector2(1.5, 2.1), Vector3(dx, 1.9, z + 0.1), front_texture, 1.45)
 	featured_box.rotation.x = -0.06
 	for side in [-1, 1]:
-		var arrow := label("< LB" if side < 0 else "RB >", Vector3(dx + side * 0.98, 1.9, z + 0.3), 32, Color(1.6, 1.3, 2.4), self, 6)
-		arrow.name = "shelf_lb" if side < 0 else "shelf_rb"
+		# Xbox-style bumper buttons, drawn smooth like the Y badge in the hints.
+		var key := "LB" if side < 0 else "RB"
+		var texture := screen("bumper_" + key, Vector2i(400, 200), func(canvas: Control):
+			draw_bumper(canvas, Rect2(60 if side < 0 else 20, 36, 320, 128), key, bold, side))
+		screens["bumper_" + key].viewport.transparent_bg = true
+		screens["bumper_" + key].viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var m := screen_material(texture, 1.6)
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		m.disable_fog = true
+		var button := quad(Vector2(0.7, 0.35), Vector3(dx + side * 1.15, 1.9, z + 0.3), m)
+		button.name = "shelf_lb" if side < 0 else "shelf_rb"
 	var spot := SpotLight3D.new()
 	spot.light_color = Color("ffd7a0")
 	spot.light_energy = 9.0
@@ -516,6 +525,29 @@ func _game_shelf() -> void:
 	glow.omni_range = 3.2
 	glow.position = Vector3(bx, 1.4, z + 1.0)
 	add_child(glow)
+
+## An Xbox-style bumper: dark rounded shape with a soft rim and the label in
+## white, plus a small chevron pointing the way it browses (-1 left, 1 right,
+## 0 none). Shared by the shelf stand and the HUD hints.
+static func draw_bumper(canvas: CanvasItem, rect: Rect2, text: String, f: Font, direction := 0) -> void:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color("30303f")
+	box.border_color = Color("b4b2c8")
+	box.set_border_width_all(maxi(1, int(rect.size.y * 0.05)))
+	var r := int(rect.size.y * 0.5)
+	box.corner_radius_top_left = r if text.begins_with("L") else int(r * 0.45)
+	box.corner_radius_top_right = r if text.begins_with("R") else int(r * 0.45)
+	box.corner_radius_bottom_left = int(r * 0.45)
+	box.corner_radius_bottom_right = int(r * 0.45)
+	box.anti_aliasing = true
+	canvas.draw_style_box(box, rect)
+	var size := int(rect.size.y * 0.58)
+	canvas.draw_string(f, Vector2(rect.position.x, rect.get_center().y + size * 0.36), text, HORIZONTAL_ALIGNMENT_CENTER, rect.size.x, size, Color("f2f1f8"))
+	if direction != 0:
+		var tip := Vector2(rect.position.x - rect.size.y * 0.32 if direction < 0 else rect.end.x + rect.size.y * 0.32, rect.get_center().y)
+		var back := tip.x - direction * rect.size.y * 0.24
+		var half := rect.size.y * 0.2
+		canvas.draw_colored_polygon(PackedVector2Array([tip, Vector2(back, tip.y - half), Vector2(back, tip.y + half)]), Color("f2f1f8"))
 
 ## A game box like a DVD case: dark plastic shell with the cover in front.
 func game_box(size: Vector2, pos: Vector3, cover: Texture2D, energy := 1.2, parent: Node = self) -> Node3D:
