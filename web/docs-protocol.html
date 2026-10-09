@@ -380,6 +380,14 @@ someone seated owns. Each message replaces the previous set. A paid catalog game
 downloads only while it has a grant, which is appended to its download URL as
 <code>?grant=</code> (or <code>&amp;grant=</code>); a newly granted game is fetched next. Other roles get an
 <code>error</code>. Tokens are secrets and never appear in logs or <code>party_state</code>.</p>
+<p><code>playtests {playtests}</code> is also for the trusted local web server only. Each item
+is a game's preview build that this table may play because someone seated owns
+or tests the game: <code>entry</code> (a catalog entry whose downloads point at the
+preview), <code>versions</code> (platform to version) and <code>grant</code> (sent with the download
+even for free games). The daemon installs the build apart from catalog installs
+and puts it on the shelf as &quot;Title (playtest)&quot;, replacing a released version of
+that game for the rest of the night. The same build announced again does
+nothing; a failed download is retried a minute later. Other roles get an <code>error</code>.</p>
 <h3 id="the-overlay-is-party-state">The overlay is party state</h3>
 <p>Whether the overlay is up is <strong>server-authoritative</strong> (<code>overlay_open</code> in the
 snapshot), so every screen shows the same thing. The rules:</p>
@@ -835,7 +843,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="d84a1953f1aadf4f57a7a6e751e86fc4e2770eb098c1bfa21c3483499123f8fa">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="8b15703bff922c4af17d970bf3eb552a98239a0acafab8381afa33ed89d86354">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

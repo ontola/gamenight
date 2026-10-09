@@ -2,12 +2,14 @@ import { mount } from 'svelte';
 import Navigation from './Navigation.svelte';
 import { startRouter, navigate } from './router';
 import './toast.js';
-import { signedIn, assistantUrl } from './state';
+import PlaytestFeedback from './PlaytestFeedback.svelte';
+import { signedIn, assistantUrl, playtestFeedback } from './state';
 const shell=document.getElementById('site-shell');
 if(shell){
   startRouter();
   shell.replaceChildren();
   mount(Navigation,{target:shell});
+  mount(PlaytestFeedback,{target:shell});
   const scannedRoom=new URLSearchParams(location.search).get('r');
   if(scannedRoom && /^[A-Z2-9]{6}$/.test(scannedRoom)){
     sessionStorage.setItem('gamenight_room_code',scannedRoom);
@@ -27,6 +29,8 @@ if(shell){
       window.updateRoomNavigation?.(local?!!state.linked:state.status==='connected');
       // A host advertises its assistant; standalone local servers need not have one.
       assistantUrl.set(state.assistant_url === '/agent' ? '/agent' : '');
+      const asked=state.playtest_feedback;
+      playtestFeedback.set(!local && asked && typeof asked.game==='string' && typeof asked.title==='string' && typeof asked.version==='string' ? {game:asked.game,title:asked.title,version:asked.version} : null);
     }catch{ /* Keep known state during a transient network failure. */ }
   }
   void refreshRoom();

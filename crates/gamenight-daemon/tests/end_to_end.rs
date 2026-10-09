@@ -521,6 +521,106 @@ async fn download_grants_reach_the_prewarm_from_overlays_only() {
     assert_eq!(signal, grants, "the game's forged grant never arrived");
 }
 
+/// A playtest from the cloud bridge downloads with its grant and joins the
+/// shelf marked as a playtest; a game cannot announce one, and announcing the
+/// same build again downloads nothing.
+#[tokio::test]
+async fn playtests_join_the_shelf_from_overlays_only() {
+    let install =
+        std::env::temp_dir().join(format!("gamenight-playtest-e2e-{}", uuid::Uuid::new_v4()));
+    std::env::set_var("GAMENIGHT_INSTALL_DIR", &install);
+    let bytes = b"#!/bin/sh\nexit 0\n".to_vec();
+    let server = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", server.local_addr().unwrap());
+    let targets = std::sync::Arc::new(std::sync::Mutex::new(Vec::<String>::new()));
+    {
+        let (bytes, targets) = (bytes.clone(), targets.clone());
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            loop {
+                let (mut stream, _) = server.accept().await.unwrap();
+                let mut request = [0; 4096];
+                let n = stream.read(&mut request).await.unwrap();
+                let target = String::from_utf8_lossy(&request[..n])
+                    .split(' ')
+                    .nth(1)
+                    .unwrap_or_default()
+                    .to_string();
+                targets.lock().unwrap().push(target.clone());
+                if !target.contains("grant=9.ok") {
+                    let _ = stream.write_all(b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").await;
+                    continue;
+                }
+                let head = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    bytes.len()
+                );
+                let _ = stream.write_all(head.as_bytes()).await;
+                let _ = stream.write_all(&bytes).await;
+            }
+        });
+    }
+    use sha2::Digest;
+    let sha: String = sha2::Sha256::digest(&bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let platform = gamenight_catalog::current_platform();
+    let playtest = gamenight_protocol::Playtest {
+        entry: serde_json::json!({"id":"preview-game","title":"Preview Game","players":{"min":1,"max":4},
+            "price":"free","integration":{"level":"integrated","protocol":1},
+            "downloads":{(platform):{"url":format!("{base}/preview-game"),"sha256":sha}}}),
+        versions: [(platform.to_string(), "0.3.1".to_string())].into(),
+        grant: "9.ok".into(),
+    };
+    let addr = start_daemon().await;
+
+    let mut game = PlainGame::connect("sneaky", &addr).await;
+    game.send(ClientMessage::Playtests {
+        playtests: vec![playtest.clone()],
+    })
+    .await;
+    loop {
+        if let ServerMessage::Error { message } = game.recv().await {
+            assert!(message.contains("playtests"), "{message}");
+            break;
+        }
+    }
+
+    let mut overlay = Overlay::connect(&addr).await;
+    overlay
+        .send(ClientMessage::Playtests {
+            playtests: vec![playtest.clone()],
+        })
+        .await;
+    let party = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        overlay.wait_for(|p| p.library.iter().any(|g| g.id.0 == "preview-game")),
+    )
+    .await
+    .expect("the playtest should join the shelf");
+    let meta = party
+        .library
+        .iter()
+        .find(|g| g.id.0 == "preview-game")
+        .unwrap();
+    assert_eq!(meta.title, "Preview Game (playtest)");
+    assert_eq!(meta.tagline.as_deref(), Some("Playtest build 0.3.1"));
+    let launch = meta.launch.as_ref().expect("a playtest is launchable");
+    assert!(launch.command.contains(".playtests"), "{}", launch.command);
+    overlay
+        .send(ClientMessage::Playtests {
+            playtests: vec![playtest],
+        })
+        .await;
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert_eq!(
+        targets.lock().unwrap().as_slice(),
+        ["/preview-game?grant=9.ok"]
+    );
+    let _ = std::fs::remove_dir_all(install);
+}
+
 /// A game that quits is never respawned by its own departure.
 ///
 /// This is the crash-loop: losing the active game makes the night pick what

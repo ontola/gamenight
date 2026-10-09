@@ -236,3 +236,24 @@ body:has(.site-menu-dialog[open]){overflow:hidden}
   #site-shell .site-menu-dialog{margin:auto auto max(12px,env(safe-area-inset-bottom));}
 }
 @media(prefers-reduced-motion:no-preference){#site-shell .site-links a,#site-shell .site-menu-toggle{transition:background .15s ease,color .15s ease}}
+/* After a playtest: ask every phone at the table how it went. */
+#site-shell .playtest-dialog{margin:auto;padding:0;width:calc(100% - 32px);max-width:440px;max-height:calc(100dvh - 32px);box-sizing:border-box;border:1px solid #343b55;border-radius:18px;background:#191e30;color:#eef0fc;font:16px/1.5 system-ui,sans-serif;box-shadow:0 24px 80px #0008}
+#site-shell .playtest-dialog::backdrop{background:#0009}
+#site-shell .playtest-dialog form{padding:24px}
+#site-shell .playtest-dialog h2{font-size:24px;line-height:1.2;margin:4px 0 8px}
+#site-shell .playtest-dialog p{margin:0 0 18px;color:#b9bfd1}
+#site-shell .playtest-dialog p[role=alert]{color:#ffb4a6}
+#site-shell .playtest-eyebrow{font-size:12px;letter-spacing:.12em;font-weight:750;margin:0!important}
+#site-shell .playtest-verdict{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 18px}
+#site-shell .playtest-verdict button{min-height:56px;border-radius:12px;border:1px solid #424961;background:#252c40;color:#fff;font:inherit;font-weight:650;cursor:pointer}
+#site-shell .playtest-verdict button span{font-size:20px;margin-right:6px}
+#site-shell .playtest-verdict button.chosen{border-color:#8d80fa;background:#3a3478;box-shadow:inset 0 0 0 1px #8d80fa}
+#site-shell .playtest-dialog label{display:block;font-weight:650;margin:0 0 8px}
+#site-shell .playtest-dialog label span{font-weight:400;color:#a8adc4;margin-left:6px}
+#site-shell .playtest-dialog textarea{display:block;width:100%;box-sizing:border-box;font:inherit;color:#eef0fc;background:#11162a;border:1px solid #424961;border-radius:10px;padding:12px;resize:vertical;margin:0 0 18px}
+#site-shell .playtest-actions{display:flex;justify-content:flex-end;gap:12px}
+#site-shell .playtest-actions button{border-radius:10px;padding:12px 18px;min-height:46px;font:inherit;cursor:pointer;border:1px solid #424961;background:#252c40;color:#fff}
+#site-shell .playtest-actions .btn-primary{background:#6555e8}
+#site-shell .playtest-actions .playtest-skip{background:none;border-color:transparent;color:#b9bfd1}
+#site-shell .playtest-dialog button:disabled{opacity:.6;cursor:not-allowed}
+#site-shell .playtest-dialog :is(button,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:3px}

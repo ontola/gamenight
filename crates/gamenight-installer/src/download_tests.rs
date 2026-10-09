@@ -289,6 +289,36 @@ async fn paid_game_downloads_only_with_a_grant_which_never_leaks() {
 }
 
 #[tokio::test]
+async fn a_playtest_sends_its_grant_even_for_a_free_game() {
+    let game = archive("game/main.lua", b"preview");
+    let server = Server::new(game.clone(), Vec::new());
+    let entry: CatalogEntry = serde_json::from_value(serde_json::json!({
+        "id":"free-preview", "title":"Preview", "players":{"min":1,"max":4},
+        "price":"free", "integration":{"level":"integrated","protocol":1},
+        "downloads": { (gamenight_catalog::current_platform()): {
+            "url":format!("{}/preview.zip",server.address), "sha256":hex(&Sha256::digest(&game)),
+            "entrypoint":"game/main.lua"
+        }}
+    }))
+    .unwrap();
+    let root = std::env::temp_dir().join(format!("gamenight-playtest-{}", uuid::Uuid::new_v4()));
+    let installed = ensure_playtest_installed(&entry, &root, "tok-9.p", None)
+        .await
+        .unwrap();
+    assert!(installed.executable.is_file());
+    assert_eq!(
+        server.targets.lock().unwrap().as_slice(),
+        ["/preview.zip?grant=tok-9.p"]
+    );
+    let marker = std::fs::read_to_string(installed.dir.join(".gamenight-install.json")).unwrap();
+    assert!(
+        !marker.contains("tok-9"),
+        "the grant is not written to disk"
+    );
+    tokio::fs::remove_dir_all(root).await.unwrap();
+}
+
+#[tokio::test]
 async fn a_refused_grant_is_a_402_that_never_names_the_token() {
     let game = archive("game/main.lua", b"paid");
     let server = Server::new(game.clone(), Vec::new());

@@ -5,6 +5,8 @@ export const room = writable<boolean|null>(null);
 export const player = writable(sessionStorage.getItem('gamenight_nav_name') || localStorage.getItem('gamenight_player_name') || 'Your player');
 export const route = writable(location.pathname + location.hash);
 export const busy = writable(false);
+/** The test build this table just played, while this player has not answered. */
+export const playtestFeedback = writable<{game:string,title:string,version:string}|null>(null);
 declare global {
   interface Window {
     gamenightRoomConnected?: boolean;

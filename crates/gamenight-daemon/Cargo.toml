@@ -32,6 +32,7 @@ objc2 = "0.6"
 
 [dev-dependencies]
 gamenight-sdk = { workspace = true }
+sha2 = "0.10"
 
 [[bin]]
 name = "gamenight-daemon"

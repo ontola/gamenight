@@ -247,6 +247,15 @@ downloads only while it has a grant, which is appended to its download URL as
 `?grant=` (or `&grant=`); a newly granted game is fetched next. Other roles get an
 `error`. Tokens are secrets and never appear in logs or `party_state`.
 
+`playtests {playtests}` is also for the trusted local web server only. Each item
+is a game's preview build that this table may play because someone seated owns
+or tests the game: `entry` (a catalog entry whose downloads point at the
+preview), `versions` (platform to version) and `grant` (sent with the download
+even for free games). The daemon installs the build apart from catalog installs
+and puts it on the shelf as "Title (playtest)", replacing a released version of
+that game for the rest of the night. The same build announced again does
+nothing; a failed download is retried a minute later. Other roles get an `error`.
+
 ### The overlay is party state
 
 Whether the overlay is up is **server-authoritative** (`overlay_open` in the

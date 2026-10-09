@@ -972,6 +972,14 @@ pub enum ClientMessage {
         grants: std::collections::BTreeMap<String, String>,
     },
 
+    /// Trusted local web server only: preview builds the cloud lets this
+    /// table play, because someone seated owns or tests the game. The daemon
+    /// installs each one and puts it on the shelf as a playtest.
+    Playtests {
+        #[serde(default)]
+        playtests: Vec<Playtest>,
+    },
+
     // -- game (SDK) messages ------------------------------------------------
     /// Assets loaded, controllers mapped — the session can start instantly.
     Ready {
@@ -1171,6 +1179,28 @@ impl ClientMessage {
     }
 }
 
+/// One game's playtest, as the cloud's room poll hands it to a host.
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Playtest {
+    /// The catalogue entry for the preview build, downloads included.
+    pub entry: serde_json::Value,
+    /// The preview's version on each platform, for the shelf.
+    #[serde(default)]
+    pub versions: std::collections::BTreeMap<String, String>,
+    /// Unlocks this game's preview downloads. A secret: never log it.
+    pub grant: String,
+}
+
+// Hand-written so the grant never reaches a log through `{:?}`.
+impl std::fmt::Debug for Playtest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Playtest")
+            .field("game", &self.entry.get("id"))
+            .field("versions", &self.versions)
+            .finish_non_exhaustive()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1202,6 +1232,23 @@ mod tests {
             ClientMessage::DownloadGrants {
                 grants: Default::default()
             }
+        );
+    }
+
+    #[test]
+    fn playtests_carry_an_entry_and_never_debug_their_grant() {
+        let msg: ClientMessage = serde_json::from_str(
+            r#"{"type":"playtests","playtests":[{"entry":{"id":"hexstead"},"versions":{"windows":"0.3.1"},"grant":"9.secret"}]}"#,
+        )
+        .unwrap();
+        let ClientMessage::Playtests { playtests } = &msg else {
+            panic!("{msg:?}")
+        };
+        assert_eq!(playtests[0].versions["windows"], "0.3.1");
+        assert!(!format!("{msg:?}").contains("secret"));
+        assert_eq!(
+            serde_json::from_str::<ClientMessage>(r#"{"type":"playtests"}"#).unwrap(),
+            ClientMessage::Playtests { playtests: vec![] }
         );
     }
 

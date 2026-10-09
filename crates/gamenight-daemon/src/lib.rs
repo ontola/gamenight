@@ -100,6 +100,9 @@ struct Shared {
     lobby_recovery_opened: bool,
     /// Phone screens declared by connected games, by game.
     companions: HashMap<GameId, gamenight_protocol::CompanionScreen>,
+    /// Playtests on this host, by game: the sha256 of the preview build being
+    /// installed or on the shelf, and when its install last failed.
+    playtests: HashMap<GameId, (String, Option<std::time::Instant>)>,
 }
 
 impl Shared {
@@ -139,6 +142,7 @@ impl Shared {
             lobby_restarts: 0,
             lobby_recovery_opened: false,
             companions: HashMap::new(),
+            playtests: HashMap::new(),
         }
     }
 
@@ -813,6 +817,105 @@ fn spawn_install_progress_pump(
             let mut s = shared.lock().await;
             let fx = s.night.handle(Command::InstallProgress { status });
             s.apply_effects(fx, None);
+        }
+    });
+}
+
+/// How long a failed playtest download waits before the next poll retries it.
+const PLAYTEST_RETRY: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// The shelf name and tagline that mark a preview build.
+fn playtest_entry(
+    mut entry: gamenight_catalog::CatalogEntry,
+    version: Option<&String>,
+) -> gamenight_catalog::CatalogEntry {
+    entry.title = format!("{} (playtest)", entry.title);
+    entry.tagline = Some(match version {
+        Some(version) => format!("Playtest build {version}"),
+        None => "Playtest build".into(),
+    });
+    entry
+}
+
+/// Install a playtest the cloud announced and put it on the shelf, replacing
+/// a released version of the same game for the rest of the night. Repeated
+/// announcements of the same build do nothing; a new preview build replaces
+/// the old one once it is installed. The playtest stays on the shelf until the
+/// host restarts, even when the tester leaves the table.
+fn start_playtest(
+    s: &mut Shared,
+    shared: &Arc<Mutex<Shared>>,
+    playtest: gamenight_protocol::Playtest,
+) {
+    let platform = gamenight_catalog::current_platform();
+    let entry = match serde_json::from_value::<gamenight_catalog::CatalogEntry>(playtest.entry) {
+        Ok(entry) => entry,
+        Err(error) => {
+            warn!(%error, "ignoring a playtest with an invalid catalogue entry");
+            return;
+        }
+    };
+    let game = GameId::new(&entry.id);
+    if s.lobby_game.as_ref() == Some(&game) || entry.id == "lobby" {
+        return;
+    }
+    let Some(sha256) = entry
+        .downloads
+        .get(platform)
+        .map(|d| d.sha256.to_ascii_lowercase())
+    else {
+        return;
+    };
+    match s.playtests.get(&game) {
+        Some((known, None)) if *known == sha256 => return,
+        Some((known, Some(failed))) if *known == sha256 && failed.elapsed() < PLAYTEST_RETRY => {
+            return
+        }
+        _ => {}
+    }
+    s.playtests.insert(game.clone(), (sha256.clone(), None));
+    let entry = playtest_entry(entry, playtest.versions.get(platform));
+    let grant = playtest.grant;
+    let shared = shared.clone();
+    info!(%game, "installing a playtest build");
+    tokio::spawn(async move {
+        let root = gamenight_installer::install_dir().join(".playtests");
+        let (reporter, mut progress) = gamenight_installer::progress_channel();
+        let forward = {
+            let shared = shared.clone();
+            tokio::spawn(async move {
+                while let Some(status) = progress.recv().await {
+                    let mut s = shared.lock().await;
+                    let fx = s.night.handle(Command::InstallProgress { status });
+                    s.apply_effects(fx, None);
+                }
+            })
+        };
+        let result =
+            gamenight_installer::ensure_playtest_installed(&entry, &root, &grant, Some(&reporter))
+                .await;
+        drop(reporter);
+        let _ = forward.await;
+        let mut s = shared.lock().await;
+        // A newer build may have been announced while this one downloaded.
+        if s.playtests.get(&game).map(|p| &p.0) != Some(&sha256) {
+            return;
+        }
+        match result {
+            Ok(installed) => {
+                let meta = gamenight_installer::game_meta(&entry, &installed);
+                info!(%game, "playtest build joined the shelf");
+                if let Some(launch) = &meta.launch {
+                    s.launch_specs.insert(game.clone(), launch.clone());
+                }
+                let fx = s.night.add_to_library(meta);
+                s.apply_effects(fx, None);
+            }
+            Err(error) => {
+                warn!(%game, %error, "playtest install failed");
+                s.playtests
+                    .insert(game, (sha256, Some(std::time::Instant::now())));
+            }
         }
     });
 }
@@ -1586,6 +1689,24 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::Playtests { playtests } = parsed {
+                // Like grants: only the cloud bridge may put private builds
+                // on the shelf.
+                let mut s = shared.lock().await;
+                if !matches!(registration, Registration::Overlay(_)) {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the local web server reports playtests".into(),
+                        },
+                    );
+                } else {
+                    for playtest in playtests {
+                        start_playtest(&mut s, &shared, playtest);
+                    }
+                }
+                continue;
+            }
             if matches!(
                 parsed,
                 ClientMessage::DeclareCompanion { .. }
@@ -1728,7 +1849,7 @@ fn message_to_command(
         ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby => {
             return Err("lobby lifecycle requires dedicated routing".into())
         }
-        ClientMessage::DownloadGrants { .. } => {
+        ClientMessage::DownloadGrants { .. } | ClientMessage::Playtests { .. } => {
             return Err("download grants require dedicated routing".into())
         }
         ClientMessage::Participation {

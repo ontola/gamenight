@@ -309,12 +309,36 @@ pub async fn ensure_installed_granted(
     grant: Option<&str>,
     reporter: Option<&InstallReporter>,
 ) -> Result<InstalledGame, InstallError> {
+    install_reporting(entry, root, grant, false, reporter).await
+}
+
+/// Install a playtest: a game's private preview build, unlocked by the
+/// table's playtest `grant`. Unlike a catalogue install the grant is sent even
+/// for a free game, because preview downloads are never public. Keep `root`
+/// apart from [`install_dir`]'s catalogue installs so a preview is never
+/// mistaken for a released version.
+pub async fn ensure_playtest_installed(
+    entry: &CatalogEntry,
+    root: &Path,
+    grant: &str,
+    reporter: Option<&InstallReporter>,
+) -> Result<InstalledGame, InstallError> {
+    install_reporting(entry, root, Some(grant), true, reporter).await
+}
+
+async fn install_reporting(
+    entry: &CatalogEntry,
+    root: &Path,
+    grant: Option<&str>,
+    private: bool,
+    reporter: Option<&InstallReporter>,
+) -> Result<InstalledGame, InstallError> {
     let progress = Progress {
         reporter,
         game: GameId::new(&entry.id),
         title: entry.title.clone(),
     };
-    let result = install_inner(entry, root, grant, &progress).await;
+    let result = install_inner(entry, root, grant, private, &progress).await;
     match &result {
         Ok(_) => progress.report(InstallState::Installed, None, None),
         // The party needs to know whether to wait or pick something else, so
@@ -328,13 +352,15 @@ async fn install_inner(
     entry: &CatalogEntry,
     root: &Path,
     grant: Option<&str>,
+    private: bool,
     progress: &Progress<'_>,
 ) -> Result<InstalledGame, InstallError> {
     let dl = entry
         .download_for(gamenight_catalog::current_platform(), grant)
         .ok_or(InstallError::NotEligible)?;
-    // Free games are fetched as published; only a paid download carries the grant.
-    let grant = grant.filter(|_| entry.auto_download_here().is_none());
+    // Free games are fetched as published; only a paid or private download
+    // carries the grant.
+    let grant = grant.filter(|_| private || entry.auto_download_here().is_none());
     let runtime = if let Some(runtime) = &dl.runtime {
         let executable = ensure_artifact(
             &runtime.download(),

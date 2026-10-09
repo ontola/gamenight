@@ -107,7 +107,22 @@ struct Updates {
     /// owns: the complete current set. Secrets: never log them.
     #[serde(default)]
     grants: BTreeMap<String, String>,
+    /// Preview builds this table may play because someone seated owns or
+    /// tests the game. Each carries a secret grant: never log them.
+    #[serde(default)]
+    playtests: Vec<gamenight_protocol::Playtest>,
 }
+/// What a playtest announcement says, without its short-lived grant.
+type PlaytestKey = Vec<(serde_json::Value, BTreeMap<String, String>)>;
+fn playtest_key(playtests: &[gamenight_protocol::Playtest]) -> PlaytestKey {
+    playtests
+        .iter()
+        .map(|p| (p.entry.clone(), p.versions.clone()))
+        .collect()
+}
+/// Resend unchanged playtests this often, so a failed download retries with a
+/// fresh grant.
+const PLAYTEST_RESEND: Duration = Duration::from_secs(300);
 #[derive(Deserialize)]
 struct Update {
     seat: Seat,
@@ -291,6 +306,7 @@ impl Bridge {
         let mut receipt: Option<serde_json::Value> = None;
         // What the daemon last accepted; resent only when the set changes.
         let mut delivered_grants: Option<BTreeMap<String, String>> = None;
+        let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
         loop {
             tokio::time::sleep(Duration::from_secs(3)).await;
             let Some((seats, party)) = self.snapshot(&state).await else {
@@ -351,6 +367,21 @@ impl Bridge {
                 && deliver_grants(&state, &updates.grants).await
             {
                 delivered_grants = Some(updates.grants.clone());
+            }
+            let key = playtest_key(&updates.playtests);
+            if !updates.playtests.is_empty()
+                && delivered_playtests
+                    .as_ref()
+                    .is_none_or(|(known, at)| *known != key || at.elapsed() > PLAYTEST_RESEND)
+                && deliver(
+                    &state,
+                    ClientMessage::Playtests {
+                        playtests: updates.playtests.clone(),
+                    },
+                )
+                .await
+            {
+                delivered_playtests = Some((key, std::time::Instant::now()));
             }
             if let Some(selection) = &updates.selection {
                 if selection.command.is_some() {
@@ -457,15 +488,23 @@ impl Bridge {
 /// Hand the daemon the current download grants. False when it could not be
 /// reached, so the next poll tries again.
 async fn deliver_grants(state: &SharedState, grants: &BTreeMap<String, String>) -> bool {
+    deliver(
+        state,
+        ClientMessage::DownloadGrants {
+            grants: grants.clone(),
+        },
+    )
+    .await
+}
+
+/// Send the daemon one message. False when it could not be reached.
+async fn deliver(state: &SharedState, message: ClientMessage) -> bool {
     let Ok((mut ws, _)) = daemon::connect(state).await else {
         return false;
     };
     let sent = ws
         .send(tokio_tungstenite::tungstenite::Message::Text(
-            ClientMessage::DownloadGrants {
-                grants: grants.clone(),
-            }
-            .to_json(),
+            message.to_json(),
         ))
         .await
         .is_ok();
@@ -484,5 +523,11 @@ mod grant_tests {
         let updates: Updates =
             serde_json::from_str(r#"{"updates":[],"grants":{"paid-game":"tok-1.a"}}"#).unwrap();
         assert_eq!(updates.grants["paid-game"], "tok-1.a");
+        assert!(updates.playtests.is_empty());
+        let updates: Updates = serde_json::from_str(
+            r#"{"updates":[],"playtests":[{"entry":{"id":"hexstead"},"versions":{"windows":"0.3.1"},"grant":"9.a"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(playtest_key(&updates.playtests)[0].1["windows"], "0.3.1");
     }
 }

@@ -9,13 +9,21 @@ For a new game, sign in to the [developer portal](/developers) and choose **Anno
 1. Choose your game, then **Builds**.
 2. Enter a version and platform. Upload a ZIP containing your exported executable and assets, or a standalone executable. Alternatively, import a direct HTTPS URL from S3 or another host. URL imports require the filename; signed URLs must remain valid throughout the import and must not redirect.
 3. Set the executable path relative to the ZIP root, such as `Game.exe` or `Game.app/Contents/MacOS/Game`. For a bare file, use its filename. Add release notes.
-4. After package verification, choose **Use as preview**, test the exact build, then **Send for review** in the **Review** tab. Once approved, choose **Publish to players**.
+4. After package verification, choose **Use as preview** and [playtest](#playtests) the exact build at real tables, then **Send for review** in the **Review** tab. Once approved, choose **Publish to players**.
 
 Packages may be at most 512 MiB, with at most 2 GiB extracted from a ZIP. Use a ZIP for executables with DLLs, PCK files or other assets. LÖVE packages need a platform runtime registered by GameNight. GameNight copies URL imports into its own storage; gamers never depend on an expiring source URL.
 
 A version identifies immutable bytes for one game and platform. Retrying the same version and checksum returns the same build. Changed bytes require a new version. Interrupted uploads can be retried. Choosing an older ready build for stable rolls back that platform without uploading again.
 
-Previews are private to the owner and their game-scoped keys. Public releases remain downloadable after rollback so cached catalogs still work. The portal shows upload failures and publishing activity.
+Previews are private to the owner, their game-scoped keys and tables with a tester seated. Public releases remain downloadable after rollback so cached catalogs still work. The portal shows upload failures and publishing activity.
+
+## Playtests
+
+Play your preview with real people before it reaches the store. In the portal, open your game's **Playtest** tab and create an invite link. Anyone who opens it and signs in with a GameNight account becomes a tester; you are always one yourself.
+
+When you or a tester join a GameNight table with your phone, the host downloads the current preview build and shows it in the lobby as "Title (playtest)". Everyone at that table can play it, testers or not. After the game, every phone at the table asks how it went: a thumbs up or down and an optional comment. Answers appear in the **Playtest** tab with the version and the player's name.
+
+Every new preview, from CI or by hand, becomes the playtest build. A new invite link stops the old one from working; testers who joined stay until you remove them. A playtest build stays on a host's shelf until GameNight restarts, even after the tester leaves. When tables like it, send the build for review.
 
 ## Connect GitHub Actions
 
