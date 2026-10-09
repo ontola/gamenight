@@ -51,6 +51,9 @@ func run() -> void:
 	view.party.seats[0]["controller"] = "test:0"
 	view.party.seats[1]["controller"] = "test:1"
 	await process_frame
+	# A party snapshot may land during that frame and reset the seats.
+	view.party.seats[0]["controller"] = "test:0"
+	view.party.seats[1]["controller"] = "test:1"
 	var frames: Array = [{"controller":"test:0", "buttons":0}, {"controller":"test:1", "buttons":0}]
 	view._controllers_changed(frames)
 	check(view._cursors.size() == 2, "each joined controller gets a selection")
