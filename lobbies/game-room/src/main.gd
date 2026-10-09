@@ -685,26 +685,23 @@ func _draw_queue_box(canvas: Control, index: int) -> void:
 	_draw_box(canvas, game, str(index + 1))
 
 func _draw_jukebox(canvas: Control) -> void:
-	# Lit like the jukebox dome: warm glass with dark lettering, the way a
-	# real title strip sits behind the glass. Long titles shrink to fit.
+	# Transparent strip on the glowing dome: dark lettering only, no panel.
+	# Long titles shrink to fit, so nothing leaves the circle.
 	var size := canvas.size
-	for y in int(size.y):
-		var t := float(y) / size.y
-		canvas.draw_line(Vector2(0, y), Vector2(size.x, y), Color("ffe2b0").lerp(Color("f4a96a"), t))
 	var ink := Color("4a1428")
-	canvas.draw_rect(Rect2(10, 10, size.x - 20, size.y - 20), Color(ink, 0.35), false, 2)
 	var track: Variant = party.get("now_playing")
 	if not track is Dictionary or track.is_empty():
-		_text(canvas, "JUKEBOX", Vector2(0, 92), 48, ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(canvas, "JUKEBOX", Vector2(0, 96), _fit("JUKEBOX", 48, size.x - 40), ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		return
 	var playing: bool = track.get("playing", false)
-	var title := str(track.get("title", ""))
+	var title := _short(str(track.get("title", "")), 28)
 	var artist := str(track.get("artist", ""))
 	if artist.is_empty(): artist = str(track.get("source", ""))
+	artist = _short(artist, 32)
 	var width := size.x - 40
-	_text(canvas, "NOW PLAYING" if playing else "PAUSED", Vector2(0, 40), 18, Color(ink, 0.7), size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(canvas, _short(title, 28), Vector2(0, 92), _fit(_short(title, 28), 44, width, 22), ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(canvas, _short(artist, 32), Vector2(0, 128), _fit(_short(artist, 32), 24, width, 16), Color("8a2e3c"), size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, "NOW PLAYING" if playing else "PAUSED", Vector2(0, 44), 18, Color(ink, 0.7), size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, title, Vector2(0, 94), _fit(title, 44, width, 22), ink, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	_text(canvas, artist, Vector2(0, 128), _fit(artist, 24, width - 40, 16), Color("8a2e3c"), size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _draw_plaque(canvas: Control) -> void:
 	var size := canvas.size

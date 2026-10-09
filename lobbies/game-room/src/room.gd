@@ -198,8 +198,19 @@ func _environment() -> void:
 	environment.background_mode = Environment.BG_COLOR
 	environment.background_color = Color("06060b")
 	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("2a2050")
-	environment.ambient_light_energy = 0.8
+	environment.ambient_light_color = Color("3b3170")
+	environment.ambient_light_energy = 1.3
+	# Indirect light: the neon, screens and spots bounce off walls and floor,
+	# so the room reads as a dim lived-in space instead of black.
+	environment.sdfgi_enabled = true
+	environment.sdfgi_use_occlusion = true
+	environment.sdfgi_energy = 1.6
+	environment.sdfgi_bounce_feedback = 0.6
+	environment.sdfgi_cascades = 4
+	environment.sdfgi_min_cell_size = 0.1
+	environment.ssil_enabled = true
+	environment.ssil_intensity = 1.4
+	environment.ssil_radius = 4.0
 	environment.tonemap_mode = Environment.TONE_MAPPER_AGX
 	environment.tonemap_exposure = 1.05
 	environment.glow_enabled = true
@@ -270,11 +281,11 @@ func _wallpaper_texture() -> ImageTexture:
 	for y in 256:
 		for x in 256:
 			var stripe := (x / 32) % 2 == 0
-			var c := Color("191634") if stripe else Color("15122c")
+			var c := Color("2b2552") if stripe else Color("251f49")
 			# Small diamond pattern, like a retro arcade carpet on the wall.
 			var dx := absi((x % 32) - 16)
 			var dy := absi((y % 32) - 16)
-			if dx + dy == 9: c = Color("231d48")
+			if dx + dy == 9: c = Color("372e66")
 			img.set_pixel(x, y, c)
 	img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
@@ -290,14 +301,13 @@ func _shell() -> void:
 	floor_node.material_override = floor_mat
 	floor_node.position = Vector3(0, 0, Layout.BACK + 4.8)
 	add_child(floor_node)
-	# Back wall with wallpaper, wainscot and a skirting LED strip.
+	# Back wall with wallpaper and wainscot.
 	var wall_mat := mat(Color.WHITE, 0.9)
 	wall_mat.albedo_texture = _wallpaper_texture()
 	wall_mat.uv1_scale = Vector3(12, 5.4, 1)
 	quad(Vector2(26, 11.2), Vector3(0, 5.6, Layout.BACK), wall_mat)
-	box(Vector3(26, 1.2, 0.08), Vector3(0, 0.6, Layout.BACK + 0.04), mat(Color("1d1530"), 0.6))
+	box(Vector3(26, 1.2, 0.08), Vector3(0, 0.6, Layout.BACK + 0.04), mat(Color("2c2140"), 0.6))
 	box(Vector3(26, 0.06, 0.12), Vector3(0, 1.22, Layout.BACK + 0.06), mat(Color("392a52"), 0.5))
-	_strip(Vector3(0, 0.05, Layout.BACK + 0.1), 26)
 	# Side walls, slightly warmer, so the perspective reads.
 	var side := mat(Color("1a1530"), 0.85)
 	side.albedo_texture = wall_mat.albedo_texture
@@ -305,13 +315,17 @@ func _shell() -> void:
 	for s in [-1, 1]:
 		var wall := quad(Vector2(10, 11.2), Vector3(s * 12.0, 5.6, Layout.BACK + 5), side)
 		wall.rotation.y = -s * PI / 2
-		box(Vector3(0.1, 0.05, 10), Vector3(s * 11.95, 10.35, Layout.BACK + 5), mat(VIOLET, 0.4, 0, VIOLET, 3.0), self, false)
-	# Ceiling with beams and an LED strip along the back.
+	# Ceiling with beams.
 	var ceiling := quad(Vector2(26, 10), Vector3(0, 10.9, Layout.BACK + 5), mat(Color("0f0c1e"), 0.9))
 	ceiling.rotation.x = PI / 2
 	for i in 6:
 		box(Vector3(26, 0.35, 0.4), Vector3(0, 10.7, Layout.BACK + 0.6 + i * 1.8), mat(Color("1c1530"), 0.8))
-	_strip(Vector3(0, 10.45, Layout.BACK + 0.1), 26)
+
+## Everything you can stand on gets the same light oak lip along its front
+## top edge, and nothing else in the room has one.
+func platform_edge(x0: float, x1: float, top: float, z_front: float) -> void:
+	var lip := mat(Color("e2bd88"), 0.45, 0.0, Color("ffd9a0"), 0.25)
+	box(Vector3(x1 - x0, 0.045, 0.06), Vector3((x0 + x1) / 2, top - 0.0225, z_front), lip, self, false)
 
 func _strip(pos: Vector3, length: float) -> void:
 	var m := mat(VIOLET, 0.4, 0, VIOLET, 4.0)
@@ -421,12 +435,10 @@ func _tv() -> void:
 	box(Vector3(s.x + 0.36, s.y + 0.36, 0.22), c + Vector3(0, 0, -0.08), mat(Color("0e0d16"), 0.35, 0.4))
 	var texture := screen("tv", Vector2i(896, 504), func(_canvas): pass)
 	quad(s, c + Vector3(0, 0, 0.05), screen_material(texture, 1.35))
-	# TV console with game boxes and LED strip.
+	# TV console with game boxes; its top is a platform.
 	box(Vector3(6.6, 0.85, 0.9), Vector3(0, 0.43, Layout.BACK + 0.5), mat(Color("231a2e"), 0.5))
 	box(Vector3(6.6, 0.05, 0.92), Vector3(0, 0.87, Layout.BACK + 0.5), mat(Color("3b2c4a"), 0.3))
-	var led := mat(AMBER, 0.4, 0, AMBER, 3.5)
-	box(Vector3(6.4, 0.04, 0.04), Vector3(0, 0.08, Layout.BACK + 0.97), led, self, false)
-	_strip_materials.append(led)
+	platform_edge(-3.3, 3.3, 0.9, Layout.BACK + 0.96)
 	var cases := [VIOLET, GREEN, AMBER, PINK, CYAN, Color("f5e663")]
 	for i in cases.size():
 		box(Vector3(0.12, 0.62, 0.45), Vector3(-2.9 + i * 0.15, 1.2, Layout.BACK + 0.45), mat(cases[i].darkened(0.3), 0.5))
@@ -447,7 +459,8 @@ func _tv() -> void:
 	# Speakers either side, sitting on floating shelves.
 	for s2 in [-1, 1]:
 		var x: float = s2 * 4.2
-		box(Vector3(1.0, 0.1, 0.6), Vector3(x, 3.55, Layout.BACK + 0.3), mat(Color("3b2c4a"), 0.4))
+		box(Vector3(1.0, 0.1, 0.6), Vector3(x, 3.55, Layout.BACK + 0.3), mat(Color("5b3b2a"), 0.55))
+		platform_edge(x - 0.5, x + 0.5, 3.6, Layout.BACK + 0.61)
 		var body := box(Vector3(0.8, 1.3, 0.55), Vector3(x, 2.85, Layout.BACK + 0.32), mat(Color("4a3a5e"), 0.45))
 		cylinder(0.3, 0.04, Vector3(x, 2.65, Layout.BACK + 0.61), mat(Color("1a1622"), 0.3, 0.6)).rotation.x = PI / 2
 		cylinder(0.12, 0.04, Vector3(x, 3.22, Layout.BACK + 0.61), mat(Color("1a1622"), 0.3, 0.6)).rotation.x = PI / 2
@@ -466,10 +479,7 @@ func _game_shelf() -> void:
 		box(Vector3(0.08, 2.65, 0.66), Vector3(bx + side * (bw / 2 - 0.04), 1.325, z), wood)
 	for y in Layout.SPINE_ROWS + [1.79, 2.65]:
 		box(Vector3(bw, 0.07, 0.66), Vector3(bx, y - 0.035, z), wood)
-	var led := mat(VIOLET, 0.3, 0, VIOLET, 3.0)
-	for y in Layout.SPINE_ROWS:
-		box(Vector3(bw - 0.2, 0.025, 0.025), Vector3(bx, y + 0.76, z + 0.3), led, self, false)
-	_strip_materials.append(led)
+	platform_edge(Layout.BOOKCASE.x, Layout.BOOKCASE.y, 2.65, z + 0.34)
 	# Top compartment: a retro console and a plant, so the case never looks empty.
 	box(Vector3(0.6, 0.14, 0.4), Vector3(bx - 0.25, 1.86, z), mat(Color("c9c4d8"), 0.4, 0.2))
 	box(Vector3(0.12, 0.02, 0.02), Vector3(bx - 0.4, 1.9, z + 0.21), mat(PINK, 0.3, 0, PINK, 3.0), self, false)
@@ -484,6 +494,7 @@ func _game_shelf() -> void:
 	box(Vector3(dw, 0.78, 0.8), Vector3(dx, 0.39, z + 0.05), wood)
 	box(Vector3(dw - 0.14, 0.5, 0.02), Vector3(dx, 0.39, z + 0.46), mat(Color("24170f"), 0.5))
 	box(Vector3(dw + 0.05, 0.05, 0.85), Vector3(dx, 0.8, z + 0.05), dark)
+	platform_edge(Layout.DISPLAY.x, Layout.DISPLAY.y, 0.83, z + 0.48)
 	var front_texture := screen("box_front", Vector2i(300, 420), func(_canvas): pass)
 	featured_box = game_box(Vector2(1.5, 2.1), Vector3(dx, 1.9, z + 0.1), front_texture, 1.45)
 	featured_box.rotation.x = -0.06
@@ -574,10 +585,7 @@ func _shelves() -> void:
 		var w := x1 - x0
 		var cx := (x0 + x1) / 2
 		box(Vector3(w, 0.12, 0.7), Vector3(cx, d[2] - 0.06, Layout.BACK + 0.35), wood)
-		var strip_color: Color = [VIOLET, CYAN, PINK, AMBER][rng.randi() % 4]
-		var led := mat(strip_color, 0.3, 0, strip_color, 3.0)
-		box(Vector3(w - 0.1, 0.03, 0.03), Vector3(cx, d[2] - 0.13, Layout.BACK + 0.68), led, self, false)
-		_strip_materials.append(led)
+		platform_edge(x0, x1, d[2], Layout.BACK + 0.71)
 		# Props: books, a plant or a trophy, kept to the back of the shelf.
 		var x := x0 + 0.25
 		while x < x1 - 0.4 and not bare:
@@ -619,9 +627,7 @@ func _couch_corner() -> void:
 	var q := Layout.QUEUE_BOARD
 	var ledge := q.y
 	box(Vector3(3.3, 0.1, 0.4), Vector3(q.x, ledge - 0.05, q.z + 0.16), mat(Color("5b3b2a"), 0.55))
-	var strip := mat(GREEN, 0.3, 0, GREEN, 3.0)
-	box(Vector3(3.2, 0.025, 0.025), Vector3(q.x, ledge - 0.11, q.z + 0.36), strip, self, false)
-	_strip_materials.append(strip)
+	platform_edge(q.x - 1.65, q.x + 1.65, ledge, q.z + 0.37)
 	label("UP NEXT", Vector3(q.x - 0.95, ledge - 0.3, q.z + 0.3), 32, Color(0.8, 3.0, 1.8), self, 8)
 	var sizes := [Vector2(1.2, 1.68), Vector2(0.82, 1.15), Vector2(0.82, 1.15)]
 	var xs := [-0.95, 0.24, 1.14]
@@ -672,24 +678,32 @@ func _jukebox() -> void:
 	var chrome := mat(Color("d8d4e8"), 0.15, 0.9)
 	var rim := cylinder(0.88, 0.06, Vector3(x, 2.1, z + 0.44), chrome)
 	rim.rotation.x = PI / 2
-	var dome := cylinder(0.74, 0.04, Vector3(x, 2.1, z + 0.47), mat(Color("ffcf8a"), 0.2, 0, AMBER, 2.2))
+	var dome := cylinder(0.74, 0.04, Vector3(x, 2.1, z + 0.47), mat(Color("ffcf8a"), 0.2, 0, AMBER, 1.3))
 	dome.rotation.x = PI / 2
-	_neon.append({"material": dome.material_override, "base": 2.2, "phase": 0.0, "speed": 1.3})
+	_neon.append({"material": dome.material_override, "base": 1.3, "phase": 0.0, "speed": 1.3})
+	# The title strip has a transparent background and stays inside the dome.
 	var texture := screen("jukebox", Vector2i(320, 160), func(_canvas): pass)
-	quad(Vector2(1.3, 0.65), Vector3(x, 2.2, z + 0.5), screen_material(texture, 1.4))
+	screens.jukebox.viewport.transparent_bg = true
+	var strip_mat := screen_material(texture, 1.0)
+	strip_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	quad(Vector2(1.1, 0.55), Vector3(x, 2.15, z + 0.5), strip_mat)
 	for i in 7:
 		var c := Color.from_hsv(i / 7.0, 0.75, 1.0)
-		var tube := box(Vector3(0.1, 1.0, 0.05), Vector3(x - 0.6 + i * 0.2, 1.05, z + 0.47), mat(c, 0.3, 0, c, 3.0), self, false)
+		var tube := box(Vector3(0.1, 0.7, 0.05), Vector3(x - 0.6 + i * 0.2, 0.9, z + 0.47), mat(c, 0.3, 0, c, 3.0), self, false)
 		_neon.append({"material": tube.material_override, "base": 3.0, "phase": i * 1.2, "speed": 3.0})
 		_eq_bars.append(tube)
 	box(Vector3(1.75, 0.08, 0.95), Vector3(x, 0.45, z), chrome)
-	box(Vector3(1.75, 0.08, 0.95), Vector3(x, 1.62, z), chrome)
-	var icons := ["<<", "> ||", ">>"]
+	box(Vector3(1.75, 0.08, 0.95), Vector3(x, 1.3, z), chrome)
 	for i in 3:
 		var px: float = Layout.MUSIC_PADS[i]
 		var button := cylinder(0.13, 0.06, Vector3(px, 0.28, z + 0.48), mat(PINK, 0.3, 0, PINK, 2.0))
 		button.rotation.x = PI / 2
-		label(icons[i], Vector3(px, 0.28, z + 0.53), 22, Color(0.05, 0.02, 0.08), self)
+		var icon_texture := screen("music_icon%d" % i, Vector2i(64, 64), _draw_music_icon.bind(i))
+		screens["music_icon%d" % i].viewport.transparent_bg = true
+		screens["music_icon%d" % i].viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var icon_mat := screen_material(icon_texture, 1.0)
+		icon_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		quad(Vector2(0.18, 0.18), Vector3(px, 0.28, z + 0.52), icon_mat)
 		box(Vector3(0.5, 0.03, 0.7), Vector3(px, 0.015, 0.0), mat(Color("1c1530"), 0.3, 0.2, PINK, 0.8), self, false)
 	var light := OmniLight3D.new()
 	light.light_color = Color("ff8fb8")
@@ -923,7 +937,7 @@ func _process(delta: float) -> void:
 		var level := 0.35
 		if music_playing: level = 0.45 + 0.55 * absf(sin(_time * (3.1 + i * 0.7) + i * 1.9) * sin(_time * 1.7 + i))
 		_eq_bars[i].scale.y = level
-		_eq_bars[i].position.y = 0.55 + level * 0.5
+		_eq_bars[i].position.y = 0.55 + level * 0.35  # grows up from the base, never into the dome
 	if _tv_light:
 		_tv_light.light_color = _tv_light.light_color.lerp(mood, delta * 2.0)
 		_tv_light.light_energy = 3.0 + sin(_time * 7.0) * 0.12 + sin(_time * 2.3) * 0.15
@@ -942,3 +956,19 @@ func set_pad_glow(index: int, color: Color, energy: float) -> void:
 	if pad.is_empty(): return
 	pad.material.emission = color
 	pad.material.emission_energy_multiplier = energy
+
+## Previous, play/pause and next, drawn as clean shapes.
+func _draw_music_icon(canvas: Control, index: int) -> void:
+	var ink := Color(0.12, 0.03, 0.08)
+	var c := Vector2(32, 32)
+	match index:
+		0:
+			canvas.draw_rect(Rect2(14, 18, 5, 28), ink)
+			canvas.draw_colored_polygon(PackedVector2Array([Vector2(48, 18), Vector2(48, 46), Vector2(21, 32)]), ink)
+		1:
+			canvas.draw_colored_polygon(PackedVector2Array([Vector2(13, 17), Vector2(13, 47), Vector2(33, 32)]), ink)
+			canvas.draw_rect(Rect2(38, 18, 5, 28), ink)
+			canvas.draw_rect(Rect2(47, 18, 5, 28), ink)
+		_:
+			canvas.draw_colored_polygon(PackedVector2Array([Vector2(16, 18), Vector2(16, 46), Vector2(43, 32)]), ink)
+			canvas.draw_rect(Rect2(45, 18, 5, 28), ink)

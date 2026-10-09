@@ -15,6 +15,8 @@ const PLATFORMS := [
 	[-11.6, -8.6, 4.7], [-7.4, -5.2, 5.9],
 	# Neon shelf above the TV.
 	[-2.6, 2.6, 6.55],
+	# TV console.
+	[-3.3, 3.3, 0.9],
 	# Little floating speakers either side of the TV.
 	[-4.7, -3.7, 3.6], [3.7, 4.7, 3.6],
 	# Couch seat and back.

@@ -4,8 +4,13 @@ extends RefCounted
 ## The head is radius 12 at 1:1, the canonical face scale, so profile art
 ## keeps every pixel. Frames are laid out in one row (see FRAMES).
 
-const W := 32
-const H := 46
+# The frame leaves room around the 32x46 body for hats and for profile art
+# (48x48 around the head), so nothing gets cropped. Drawing code uses body
+# coordinates; OX/OY shift them into the frame.
+const W := 48
+const H := 62
+const OX := 8
+const OY := 16
 const HEAD := Vector2(16, 13)
 const RADIUS := 12
 const INK := Color("0b0b12")
@@ -67,8 +72,8 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 	_rect(img, torso, cloth)
 	_rect(img, Rect2i(torso.position.x, torso.position.y, 2, torso.size.y), dark)
 	_rect(img, Rect2i(torso.end.x - 3, torso.position.y + 1, 2, torso.size.y - 2), light)
-	img.set_pixel(torso.position.x, torso.end.y - 1, Color.TRANSPARENT)
-	img.set_pixel(torso.end.x - 1, torso.end.y - 1, Color.TRANSPARENT)
+	_px(img, torso.position.x, torso.end.y - 1, Color.TRANSPARENT)
+	_px(img, torso.end.x - 1, torso.end.y - 1, Color.TRANSPARENT)
 	# Arms.
 	for side in 2:
 		var x := 6 if side == 0 else 23
@@ -89,10 +94,10 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 				_rect(img, Rect2i(29, y + 4, 2, 3), skin)
 	# Head: skin disc, the player's face art at 1:1, then the hat.
 	var head := HEAD + Vector2(0, bob)
-	for y in H:
-		for x in W:
+	for y in range(-OY, H - OY):
+		for x in range(-OX, W - OX):
 			if Vector2(x + 0.5, y + 0.5).distance_to(head) <= RADIUS:
-				img.set_pixel(x, y, skin)
+				_px(img, x, y, skin)
 	if face.has("image"):
 		var art: Image = face.image
 		var origin := Vector2i(head - face.center)
@@ -101,8 +106,7 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 				var c := art.get_pixel(u, v)
 				if c.a < 0.5: continue
 				var p := origin + Vector2i(u, v)
-				if p.x >= 0 and p.y >= 0 and p.x < W and p.y < H:
-					img.set_pixel(p.x, p.y, c)
+				_px(img, p.x, p.y, c)
 	else:
 		# Same default face as the shared helpers.
 		var eye_y := int(head.y) - 2
@@ -136,7 +140,7 @@ static func _hat(img: Image, hat: String, head: Vector2, cloth: Color) -> void:
 			_rect(img, Rect2i(x - 8, top - 1, 16, 4), gold)
 			for i in 4:
 				_rect(img, Rect2i(x - 8 + i * 5, top - 4, 2, 3), gold)
-			img.set_pixel(x - 1, top, Color("ff4f8b")); img.set_pixel(x, top, Color("ff4f8b"))
+			_px(img, x - 1, top, Color("ff4f8b")); _px(img, x, top, Color("ff4f8b"))
 		"party":
 			var pink := Color("ff4f8b")
 			for i in 10:
@@ -159,7 +163,12 @@ static func _hat(img: Image, hat: String, head: Vector2, cloth: Color) -> void:
 			_rect(img, Rect2i(x - 13, int(head.y) - 4, 4, 8), Color("ffb454"))
 			_rect(img, Rect2i(x + 9, int(head.y) - 4, 4, 8), Color("ffb454"))
 
+static func _px(img: Image, x: int, y: int, color: Color) -> void:
+	x += OX; y += OY
+	if x >= 0 and y >= 0 and x < img.get_width() and y < img.get_height(): img.set_pixel(x, y, color)
+
 static func _rect(img: Image, rect: Rect2i, color: Color) -> void:
+	rect.position += Vector2i(OX, OY)
 	var clipped := rect.intersection(Rect2i(0, 0, img.get_width(), img.get_height()))
 	if clipped.size.x > 0 and clipped.size.y > 0:
 		img.fill_rect(clipped, color)
