@@ -16,7 +16,7 @@ your engine, then follow its guide. If your engine is not listed as
 | Engine | Level | Start with | Games using it |
 | --- | --- | --- | --- |
 | [Godot 4](/docs/godot) | Full | `sdk/godot` addon | Spaceracer, Ballkickers, Growing Guns, Frog Fighter, Downhill Rush, The Voice and the Will |
-| [LÖVE / Lua](/docs/love) | Full | Shared party runner | Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies, Pinpals, Hexstead |
+| [LÖVE / Lua](/docs/love) | Full | Shared party runner | Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies, Hexstead |
 | [Rust / Bevy](/docs/rust) | Partial | `gamenight-sdk` crate | Demo game, Bevy lobby |
 | [C / C++](/docs/c) | Partial | `sdk/c/gamenight.h` | None yet (transport example only) |
 | [Unity](/docs/other-engines) | Protocol only | Wire protocol | None |

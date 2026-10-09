@@ -8,7 +8,7 @@ const platform=process.platform==='darwin'?'mac':process.platform==='win32'?'win
 const ids=catalog ? fs.readdirSync(catalog).filter(n=>n.endsWith('.json'))
   .map(n=>JSON.parse(fs.readFileSync(path.join(catalog,n),'utf8')))
   .filter(e=>e.downloads?.[platform]).map(e=>e.id)
-  : ['neon-trails','blast-party','neon-siege','ricochet-club','volley-trouble','stack-together','bubble-buddies','pinpals'];
+  : ['neon-trails','blast-party','neon-siege','ricochet-club','volley-trouble','stack-together','bubble-buddies'];
 if(!ids.length) throw Error('No downloadable games in the supplied catalog');
 const results=[]; let party; let failure; let ws;
 const endpoint=process.argv[2] || 'ws://127.0.0.1:7912';

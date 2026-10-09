@@ -26,7 +26,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let root = exe.parent().unwrap();
     let source = velopack::sources::FileSource::new(feed);
     let manager = velopack::UpdateManager::new(source.clone(), None, None)?;
-    let content = seed_content(root, &data, "pinpals", "fixture-1")?;
+    let content = seed_content(root, &data, "bundled-game", "fixture-1")?;
     let updates = windows::Updates::with_source(&data, source);
     use std::os::windows::process::CommandExt;
     let child = std::process::Command::new(&exe)
@@ -116,22 +116,22 @@ mod tests {
         let temp = std::env::temp_dir().join(format!("gamenight-data-{}", uuid::Uuid::new_v4()));
         let package = temp.join("app-v1");
         let data = temp.join("user");
-        fs::create_dir_all(package.join("pinpals")).unwrap();
-        fs::write(package.join("pinpals/main.lua"), "first").unwrap();
-        let content = seed_content(&package, &data, "pinpals", "1").unwrap();
+        fs::create_dir_all(package.join("bundled-game")).unwrap();
+        fs::write(package.join("bundled-game/main.lua"), "first").unwrap();
+        let content = seed_content(&package, &data, "bundled-game", "1").unwrap();
         fs::write(data.join("settings.json"), "keep me").unwrap();
         // An update replaces the entire package directory, not the user's content.
         fs::rename(&package, temp.join("app-v2")).unwrap();
         assert_eq!(
-            seed_content(&temp.join("app-v2"), &data, "pinpals", "1").unwrap(),
+            seed_content(&temp.join("app-v2"), &data, "bundled-game", "1").unwrap(),
             content
         );
         assert_eq!(
             fs::read_to_string(data.join("settings.json")).unwrap(),
             "keep me"
         );
-        fs::write(temp.join("app-v2/pinpals/main.lua"), "second").unwrap();
-        let next = seed_content(&temp.join("app-v2"), &data, "pinpals", "2").unwrap();
+        fs::write(temp.join("app-v2/bundled-game/main.lua"), "second").unwrap();
+        let next = seed_content(&temp.join("app-v2"), &data, "bundled-game", "2").unwrap();
         assert_eq!(
             fs::read_to_string(content.join("main.lua")).unwrap(),
             "first"

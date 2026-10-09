@@ -61,11 +61,6 @@ installed releases need newly built packages before the controls appear.</p>
 <td>Next run</td>
 </tr>
 <tr>
-<td>Pinpals</td>
-<td>Simulation speed 60–125%</td>
-<td>Next game instance</td>
-</tr>
-<tr>
 <td>Mineclonia prototype</td>
 <td>Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; <a href="https://github.com/ontola/gamenight/blob/main/examples/mineclonia/README.md">ranges and effects</a></td>
 <td>Live, after the world acknowledges the change</td>
@@ -75,8 +70,7 @@ installed releases need newly built packages before the controls appear.</p>
 <p>The default values preserve the existing games. Blast Party's pickup chance
 controls drops from crates; its two opening prizes remain. Neon Siege's enemy
 count remains capped. Disabling gravity also removes gravitational hazards;
-wormholes have their own switch. Pinpals changes simulation speed, including its
-simulation timers, while keeping the physics fixed step.</p>
+wormholes have their own switch.</p>
 <h2 id="godot-game-controls">Godot game controls</h2>
 <p>These independent game repositories use the same typed contract. Source builds
 have been tested against the real daemon, including setting changes and Undo.</p>
@@ -197,11 +191,10 @@ cd examples/mineclonia
 python -m unittest test_settings test_managed test_mod_lifecycle
 </code></pre></div>
 <p>The live-settings process test checks typed batches, stale/invalid rejection and
-undo against observations from all eight running games. It does not test a
+undo against observations from all seven running games. It does not test a
 microphone, physical controllers or newly downloaded release packages.</p>
-<p>The LÖVE suite checks all eight active modules: declarations, host message
-routing, invalid values, snapshots and gameplay effects. It stages the Pinpals
-modules as the release pack does. <code>--settings-output settings.json</code> exports the
+<p>The LÖVE suite checks all seven active modules: declarations, host message
+routing, invalid values, snapshots and gameplay effects. <code>--settings-output settings.json</code> exports the
 tested declarations for UI previews. The Mineclonia tests cover value validation,
 nonblocking updates, coalescing and mailbox conflicts. Packaged process tests also require a nonempty declaration and prepare each game
 with non-default values. Native integration tests check lifecycle and input.
@@ -210,7 +203,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="892e2f6f4799ed6ca96d5d89ddbcb716b332450394f8439d7cd7355db236d725">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="deec5bfcc30d0d68129e10d1acb343b813a8344640a22fb9bc0d40333bfaa5b9">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

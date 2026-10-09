@@ -16,7 +16,7 @@ import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
-/// A GameNight computer that has Ballkickers but not Pinpals, playing a game
+/// A GameNight computer that has Ballkickers but not Stack Together, playing a game
 /// with two settings.
 class FakeRoom {
   final calls = <String>[];
@@ -59,7 +59,7 @@ class FakeRoom {
                   'selectable': true,
                   'state': 'available'
                 },
-                {'id': 'pinpals', 'title': 'Pinpals', 'selectable': false, 'state': 'unavailable'},
+                {'id': 'stack-together', 'title': 'Stack Together', 'selectable': false, 'state': 'unavailable'},
               ]
             }),
             200);
@@ -102,7 +102,7 @@ void main() {
         GameNightApi(Uri.parse('http://192.168.1.5:3000'), client: room.client), 'prof_me');
 
     final games = await controls.games();
-    expect(games.map((g) => (g.id, g.playable)), [('ballkickers', true), ('pinpals', false)]);
+    expect(games.map((g) => (g.id, g.playable)), [('ballkickers', true), ('stack-together', false)]);
     expect(room.calls.last, 'GET /api/games profile=prof_me');
 
     await controls.addToQueue('ballkickers');

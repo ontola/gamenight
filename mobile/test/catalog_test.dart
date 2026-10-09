@@ -13,7 +13,7 @@ Object fixture() => jsonDecode(File('test/fixtures/catalog.json').readAsStringSy
 void main() {
   test('reads games, their covers and player counts from the catalog', () {
     final games = parseCatalog(fixture());
-    expect(games.map((g) => g.id), ['ballkickers', 'growing-guns', 'pinpals'],
+    expect(games.map((g) => g.id), ['ballkickers', 'growing-guns', 'stack-together'],
         reason: 'the lobby and entries without an id are not games to pick');
 
     final ball = games[0];
@@ -32,23 +32,23 @@ void main() {
     expect(guns.coverUrl, isNull);
     expect(guns.color, const Color(0xFFFFB454), reason: 'no cover: a tile in its colour');
 
-    final pinpals = games[2];
-    expect(pinpals.coverUrl, Uri.parse('https://gamenight.ontola.io/media/pinpals/cover.png'));
-    expect(pinpals.players, '2 players');
-    expect(pinpals.color, isNull);
+    final stack = games[2];
+    expect(stack.coverUrl, Uri.parse('https://gamenight.ontola.io/media/stack-together/cover.png'));
+    expect(stack.players, '2 players');
+    expect(stack.color, isNull);
   });
 
   test('reads the same videos, screenshots and facts as the website', () {
     final games = parseCatalog(fixture());
-    final pinpals = games[2];
-    expect(pinpals.media.map((m) => m.kind),
+    final stack = games[2];
+    expect(stack.media.map((m) => m.kind),
         [MediaKind.video, MediaKind.trailer, MediaKind.image],
         reason: 'looping preview first, images last, insecure videos dropped');
-    expect(pinpals.media[0].preview, isTrue);
-    expect(pinpals.media[0].poster!.url.toString(), 'https://gamenight.ontola.io/media/pinpals/preview.jpg');
-    expect(pinpals.platformLabel, 'Windows · Linux');
-    expect(pinpals.links.keys, ['homepage'], reason: 'only web links');
-    expect(pinpals.mediaSource, Uri.parse('https://example.org/pinpals'));
+    expect(stack.media[0].preview, isTrue);
+    expect(stack.media[0].poster!.url.toString(), 'https://gamenight.ontola.io/media/stack-together/preview.jpg');
+    expect(stack.platformLabel, 'Windows · Linux');
+    expect(stack.links.keys, ['homepage'], reason: 'only web links');
+    expect(stack.mediaSource, Uri.parse('https://example.org/stack-together'));
 
     final ball = games[0];
     expect(ball.media.single.image!.url, Uri.parse('https://gamenight.ontola.io/game-images/ballkickers.png'),

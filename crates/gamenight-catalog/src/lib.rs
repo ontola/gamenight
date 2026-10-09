@@ -628,8 +628,8 @@ mod tests {
     #[test]
     fn runtime_metadata_rejects_escaping_paths_and_unverified_downloads() {
         let mut entry: CatalogEntry =
-            serde_json::from_str(include_str!("../../../catalog/games/pinpals.json")).unwrap();
-        assert!(validate(&entry, "pinpals.json").is_empty());
+            serde_json::from_str(include_str!("../../../catalog/games/blast-party.json")).unwrap();
+        assert!(validate(&entry, "blast-party.json").is_empty());
         let runtime = entry
             .downloads
             .get_mut("windows")
@@ -641,7 +641,7 @@ mod tests {
         runtime.id = "../outside".into();
         runtime.url = "http://example.com/runtime.zip".into();
         runtime.sha256 = "bad".into();
-        let errors = validate(&entry, "pinpals.json");
+        let errors = validate(&entry, "blast-party.json");
         assert!(errors.len() >= 4, "{errors:?}");
         for path in [
             "/absolute",

@@ -63,8 +63,7 @@ when a profile changes.
 
 Blast Party and Bubble Buddies draw the face on the character. Neon Trails,
 Neon Siege and Ricochet Club use player portraits beside their names, preserving
-the shape of the vehicle or trail. Stack Together uses its player cards, and
-Pinpals places one portrait above each player's board.
+the shape of the vehicle or trail. Stack Together uses its player cards.
 
 Pass `{outline = player.color}` for a small clothing-coloured portrait rim.
 The circle itself remains skin-coloured. This is optional and does not change

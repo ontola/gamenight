@@ -78,8 +78,8 @@ def main():
     shutil.copy2(args.binary, stage / 'Smoke.exe')
     for library in find_crt().glob('*.dll'):
         shutil.copy2(library, stage / library.name)
-    (stage / 'pinpals').mkdir()
-    (stage / 'pinpals/main.lua').write_text('original content')
+    (stage / 'bundled-game').mkdir()
+    (stage / 'bundled-game/main.lua').write_text('original content')
     app_id = 'GameNightSmoke.' + uuid.uuid4().hex
     for version in ['1.0.0', '2.0.0']:
         (stage / 'version.txt').write_text(version)

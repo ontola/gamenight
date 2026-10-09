@@ -37,10 +37,6 @@ does not intentionally delete its external user data or the game's saves.
 ## Application and starter game versions
 
 - GameNight: native Windows developer build (unsigned).
-- Pinpals (downloaded separately): Polle Pas's MIT-licensed game, using the GameNight integration fork
-  at `95ea42fe544cf3906c90aeb556359180964c1e88`.
-  [Upstream integration PR](https://github.com/Polleps/pinpals/pull/1) is pending;
-  this is not an upstream Pinpals release.
 - LÖVE 11.5 (downloaded once and shared by compatible games): official Windows x64 runtime, including its license notices.
 - Lobby/Bones: see the included notices and media credits.
 

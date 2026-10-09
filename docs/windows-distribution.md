@@ -31,7 +31,7 @@ are separate from `%LOCALAPPDATA%\GameNight` user data. Application updates
 replace the complete application folder, while games and shared runtimes download independently
 into hash-specific directories under the user data folder. Old content versions are retained.
 Both channels share GameNight user data and cannot run simultaneously against
-that directory. LOVE manages Pinpals saves independently.
+that directory. LÖVE games manage their saves independently.
 
 ## CI and releases
 
@@ -134,8 +134,7 @@ launcher sets it to `%LOCALAPPDATA%\GameNight\games` (or its test data override)
 
 ## Release acceptance
 
-The package includes every catalog entry with a Windows download, not just
-Pinpals. Game archives stay outside the installer and use immutable HTTPS URLs
+The package includes every catalog entry with a Windows download. Game archives stay outside the installer and use immutable HTTPS URLs
 plus SHA-256 checksums. Test against an empty `GAMENIGHT_DATA_DIR`; a developer
 shelf containing local `.love` paths is not download acceptance.
 
@@ -145,7 +144,7 @@ After launching the extracted release with the isolated data directory, run:
 node scripts/test-installed-downloads.mjs ws://127.0.0.1:7912 download-e2e.json
 ```
 
-This checks all eight party games appearing in the installed library, preparing,
+This checks all seven party games appearing in the installed library, preparing,
 starting, pausing and resuming through the real host. It refuses a party with
 existing user profiles. It uses AI seats and does not replace a physical
 controller/focus test or visual inspection. Keep the JSON and daemon logs.

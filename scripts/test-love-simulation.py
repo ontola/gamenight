@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the shared LÖVE suite with the same Pinpals modules as the release pack."""
+"""Run the shared LÖVE suite against the game source used by the release pack."""
 from game_sources import game_sources
 import argparse
 import os
@@ -24,8 +24,6 @@ def main():
     with tempfile.TemporaryDirectory(prefix='gamenight-party-tests-') as temporary:
         source = Path(temporary) / 'party'
         shutil.copytree(game_sources() / 'love-party', source)
-        for folder in ('core', 'sim', 'app', 'data'):
-            shutil.copytree(game_sources() / 'pinpals' / folder, source / folder)
         env = dict(os.environ, GNLOVE_TEST='1', GNLOVE_HEADLESS='1')
         declaration_file = Path(temporary) / 'settings.json'
         env['GNLOVE_SETTINGS_OUTPUT'] = str(declaration_file)

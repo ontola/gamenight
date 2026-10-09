@@ -29,7 +29,7 @@ meet the preview quality bar. Apply this when adding a playable catalog entry to
 
 # Game source boundaries
 
-Keep game source outside this repository. LÖVE games and Pinpals live in
+Keep game source outside this repository. LÖVE games live in
 `ontola/gamenight-games`; both lobby implementations stay public here. Run
 `python scripts/fetch-game-sources.py` before building docs or game packages.
 CI uses the revision in `game-sources.json`. For development, explicitly set

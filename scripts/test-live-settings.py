@@ -26,8 +26,6 @@ def running(game):
     with tempfile.TemporaryDirectory(prefix="gn-settings-") as tmp:
         root=Path(tmp);source=root/"party"
         shutil.copytree(game_sources()/"love-party",source)
-        for folder in ("core","sim","app","data"):
-            shutil.copytree(game_sources()/"pinpals"/folder,source/folder)
         with socket.socket() as sock:
             sock.bind(("127.0.0.1",0));port=sock.getsockname()[1]
         (root/"library.json").write_text(json.dumps([{"id":game,"title":game}]))
@@ -69,7 +67,6 @@ CASES={
  "volley-trouble":{"arena":"lava","target":3,"bomb":True},
  "stack-together":{"target":8,"speed":75},
  "bubble-buddies":{"hearts":8,"waves":3},
- "pinpals":{"speed":80},
 }
 
 def selection(host,values=None,action="set"):

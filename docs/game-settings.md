@@ -18,14 +18,12 @@ installed releases need newly built packages before the controls appear.
 | Volley Trouble | Court; exploding ball; rotating rules; 1–21 points to win | Next match, not the next point |
 | Stack Together | 4–40 rows to win; falling speed 50–175% | Next round |
 | Bubble Buddies | 2–12 shared hearts; 1–10 waves; 30–150 seconds per wave | Next run |
-| Pinpals | Simulation speed 60–125% | Next game instance |
 | Mineclonia prototype | Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; [ranges and effects](https://github.com/ontola/gamenight/blob/main/examples/mineclonia/README.md) | Live, after the world acknowledges the change |
 
 The default values preserve the existing games. Blast Party's pickup chance
 controls drops from crates; its two opening prizes remain. Neon Siege's enemy
 count remains capped. Disabling gravity also removes gravitational hazards;
-wormholes have their own switch. Pinpals changes simulation speed, including its
-simulation timers, while keeping the physics fixed step.
+wormholes have their own switch.
 
 ## Godot game controls
 
@@ -149,12 +147,11 @@ python -m unittest test_settings test_managed test_mod_lifecycle
 ```
 
 The live-settings process test checks typed batches, stale/invalid rejection and
-undo against observations from all eight running games. It does not test a
+undo against observations from all seven running games. It does not test a
 microphone, physical controllers or newly downloaded release packages.
 
-The LÖVE suite checks all eight active modules: declarations, host message
-routing, invalid values, snapshots and gameplay effects. It stages the Pinpals
-modules as the release pack does. `--settings-output settings.json` exports the
+The LÖVE suite checks all seven active modules: declarations, host message
+routing, invalid values, snapshots and gameplay effects. `--settings-output settings.json` exports the
 tested declarations for UI previews. The Mineclonia tests cover value validation,
 nonblocking updates, coalescing and mailbox conflicts. Packaged process tests also require a nonempty declaration and prepare each game
 with non-default values. Native integration tests check lifecycle and input.

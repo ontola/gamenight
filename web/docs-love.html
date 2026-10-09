@@ -48,9 +48,9 @@ function M.update(s, dt, inputs)
 		end
 	end
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight-games/blob/63c775850c3f8783ad216c1b3eb27b899060de91/love-party/games/trails.lua#L30">Source: games/love-party/games/trails.lua</a></p>
+<p><a href="https://github.com/ontola/gamenight-games/blob/f2f8af9ac2d8806c31c3bebb4d86b76da0635897/love-party/games/trails.lua#L30">Source: games/love-party/games/trails.lua</a></p>
 <p>The input entries belong to the supplied player slots. Do not replace them with <code>love.joystick.getJoysticks()</code> in managed mode. The shared input adapter neutralises disconnected devices and frames older than 250 ms.</p>
-<p>Register a new module in <code>modes</code> in <a href="https://github.com/ontola/gamenight-games/blob/63c775850c3f8783ad216c1b3eb27b899060de91/love-party/main.lua">main.lua</a>, add its renderer and add its ID to <code>GAMES</code> in <a href="https://github.com/ontola/gamenight/blob/main/scripts/package-love-party.py">the packaging script</a>. These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.</p>
+<p>Register a new module in <code>modes</code> in <a href="https://github.com/ontola/gamenight-games/blob/f2f8af9ac2d8806c31c3bebb4d86b76da0635897/love-party/main.lua">main.lua</a>, add its renderer and add its ID to <code>GAMES</code> in <a href="https://github.com/ontola/gamenight/blob/main/scripts/package-love-party.py">the packaging script</a>. These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.</p>
 <h2 id="draw-a-player-face">Draw a player face</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-lua">local Face = require(&quot;shared.face&quot;)
 Face.drawFace(player, x, y, 24, { facing = -1 })
@@ -68,7 +68,7 @@ python scripts/package-love-party.py --output dist/my-party-build
 <h2 id="game-settings">Game settings</h2>
 <p>Use the <a href="/docs/settings">settings helper and game reference</a> to expose choices, toggles and bounded numbers to the lobby and phone. Validate each change and snapshot round rules when creating a round.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="7098287c627b3d8adc77c12ea14dee4dec7add4b305e879ba0975db813f05f5c">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/love.md">Edit this page</a><span data-source-fingerprint="a7e9b79ed7841278d1b8dfe0b59895af78b061b3dcdcb89d04fd567f5dc1f801">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/lifecycle"><small>Previous</small>Game lifecycle</a><a href="/docs/rust"><small>Next</small>Rust / Bevy</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-reference-game">Run the reference game</a><a href="#add-your-game-module">Add your game module</a><a href="#draw-a-player-face">Draw a player face</a><a href="#keep-the-shared-window-path">Keep the shared window path</a><a href="#package-and-test">Package and test</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#game-settings">Game settings</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

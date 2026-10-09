@@ -43,8 +43,8 @@
     "color": "#ffb454"
   },
   {
-    "id": "pinpals",
-    "title": "Pinpals",
+    "id": "stack-together",
+    "title": "Stack Together",
     "tagline": "Head-to-head pinball.",
     "developer": "Polle Pas",
     "players": {
@@ -58,20 +58,20 @@
       "local-multiplayer",
       "love2d"
     ],
-    "cover": "https://gamenight.ontola.io/media/pinpals/cover.png",
+    "cover": "https://gamenight.ontola.io/media/stack-together/cover.png",
     "media": {
-      "source": "https://example.org/pinpals",
+      "source": "https://example.org/stack-together",
       "items": [
         {
           "kind": "image",
-          "url": "https://gamenight.ontola.io/media/pinpals/shot.png",
+          "url": "https://gamenight.ontola.io/media/stack-together/shot.png",
           "label": "Gameplay"
         },
         {
           "kind": "video",
-          "url": "https://gamenight.ontola.io/media/pinpals/preview.mp4",
+          "url": "https://gamenight.ontola.io/media/stack-together/preview.mp4",
           "label": "Preview",
-          "poster": "https://gamenight.ontola.io/media/pinpals/preview.jpg",
+          "poster": "https://gamenight.ontola.io/media/stack-together/preview.jpg",
           "preview": true,
           "duration": 5
         },
@@ -92,7 +92,7 @@
       "linux"
     ],
     "links": {
-      "homepage": "https://example.org/pinpals",
+      "homepage": "https://example.org/stack-together",
       "bad": "javascript:alert(1)"
     }
   },

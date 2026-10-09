@@ -18,7 +18,6 @@ SOURCES = {
  'volley-trouble': 'volley-trouble/preview-beach.png',
  'stack-together': 'gamenight-coop-arcade/preview-stack.png',
  'bubble-buddies': 'gamenight-coop-arcade/preview-bubbles.png',
- 'pinpals': 'pinpals/shot-240.png',
 }
 # Tiny game-specific glyphs derived from the games' mechanics. Palette stays
 # shared across the icon family; a publisher can replace any PNG independently.

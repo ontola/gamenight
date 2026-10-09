@@ -26,7 +26,7 @@ def verify(app):
     assert manifest["assets"], "Empty asset manifest"
     for name, digest in manifest["assets"].items():
         assert hashlib.sha256((resources / name).read_bytes()).hexdigest() == digest, name
-    assert (resources / "catalog/games/pinpals.json").is_file()
+    assert (resources / "catalog/games/blast-party.json").is_file()
     for file in (resources / "catalog/games").glob("*.json"):
         download = json.loads(file.read_text())["downloads"]["mac"]
         if download["url"].endswith(".love"):

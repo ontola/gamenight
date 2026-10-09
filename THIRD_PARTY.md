@@ -33,8 +33,7 @@ The app-local copies must be refreshed through GameNight releases when Microsoft
 updates the runtime; they are not maintained by Windows Update.
 
 The separately downloaded, pinned LOVE distribution includes its own runtime libraries and license
-notices. Pinpals and its selected source revision are listed in the Windows
-preview instructions shipped with the package.
+notices.
 
 ## Bevy gamepad backend
 

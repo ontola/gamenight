@@ -29,11 +29,11 @@ func _ready() -> void:
 		{"id": "ballkickers", "title": "Ball Kickers", "color": "#3ddc97", "players": "2-8", "max_players": 8},
 		{"id": "downhill-rush", "title": "Downhill Rush", "color": "#ffb454", "players": "1-4", "max_players": 4},
 		{"id": "god-game", "title": "God Game", "color": "#ff4f8b", "players": "2-6", "max_players": 6},
-		{"id": "pinpals", "title": "Pinpals", "color": "#a78bfa", "players": "1-4", "max_players": 4},
+		{"id": "blast-party", "title": "Blast Party", "color": "#a78bfa", "players": "2-4", "max_players": 4},
 	]
 	_cover_art(library)
 	var entries := [{"game": "spaceracer", "title": "Space Racer"}, {"game": "ballkickers", "title": "Ball Kickers"},
-		{"game": "god-game", "title": "God Game"}, {"game": "pinpals", "title": "Pinpals"}]
+		{"game": "god-game", "title": "God Game"}, {"game": "blast-party", "title": "Blast Party"}]
 	var party := {"players": players, "seats": seats, "library": library,
 		"playlist": {"entries": entries if scene != "empty" else []}, "presence": [],
 		"warm_session": {"game": "spaceracer", "phase": "preparing", "progress": 64, "progress_label": "Loading"},

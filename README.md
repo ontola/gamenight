@@ -88,9 +88,9 @@ Game sources live outside this repository. Both GameNight lobbies stay here:
 [the Godot lobby](sdk/godot/lobby) and [the Rust lobby](crates/lobby).
 The SDKs, catalog and integration checks also belong here.
 
-The [shared LÖVE package](https://github.com/ontola/gamenight-games/tree/main/love-party) contains eight games:
+The [shared LÖVE package](https://github.com/ontola/gamenight-games/tree/main/love-party) contains seven games:
 Neon Trails, Blast Party, Neon Siege, Ricochet Club, Volley Trouble,
-Stack Together, Bubble Buddies and Pinpals.
+Stack Together and Bubble Buddies.
 
 [SpaceRacer](https://github.com/joepio/spaceracer) is a standalone Godot 3D hover
 racer with three procedural worlds, flight, weapons and 1–4 player split-screen.

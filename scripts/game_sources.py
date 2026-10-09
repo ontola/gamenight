@@ -10,7 +10,7 @@ MANIFEST = json.loads((ROOT / "game-sources.json").read_text())
 def game_sources():
     override = os.environ.get("GAMENIGHT_GAMES_DIR")
     folder = Path(override).resolve() if override else ROOT.parent / "gamenight-games"
-    if not (folder / "love-party/main.lua").is_file() or not (folder / "pinpals/main.lua").is_file():
+    if not (folder / "love-party/main.lua").is_file():
         raise RuntimeError("Game source is separate. Run python scripts/fetch-game-sources.py first, or set GAMENIGHT_GAMES_DIR to your game checkout.")
     if not override:
         revision = subprocess.check_output(["git", "-C", str(folder), "rev-parse", "HEAD"], text=True).strip()

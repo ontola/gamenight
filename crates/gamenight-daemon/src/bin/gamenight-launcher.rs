@@ -56,7 +56,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(not(target_os = "macos"))]
     let lobby = root.join("bin/lobby.exe");
     let lobby_dir = root.join("lobby");
-    for path in [&daemon, &lobby, &root.join("catalog/games/pinpals.json")] {
+    for path in [
+        &daemon,
+        &lobby,
+        &root.join("catalog/games/blast-party.json"),
+    ] {
         if !path.is_file() {
             return Err(format!("Missing package file: {}", path.display()).into());
         }

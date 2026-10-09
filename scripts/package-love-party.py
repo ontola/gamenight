@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import zipfile
 
-GAMES = {"neon-trails": "Neon Trails", "blast-party": "Blast Party", "neon-siege": "Neon Siege", "ricochet-club": "Ricochet Club", "volley-trouble": "Volley Trouble", "stack-together": "Stack Together", "bubble-buddies": "Bubble Buddies", "pinpals": "Pinpals"}
+GAMES = {"neon-trails": "Neon Trails", "blast-party": "Blast Party", "neon-siege": "Neon Siege", "ricochet-club": "Ricochet Club", "volley-trouble": "Volley Trouble", "stack-together": "Stack Together", "bubble-buddies": "Bubble Buddies"}
 RUNTIME = {
     "id": "love-11-5",
     "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
@@ -45,15 +45,10 @@ def main():
     for game, title in GAMES.items():
         artifact = output / f"{game}.love"
         game_files = dict(files)
-        if game == "pinpals":
-            pinpals = source.parent / 'pinpals'
-            for folder in ('core', 'sim', 'app', 'data'):
-                game_files.update({p.relative_to(pinpals).as_posix():p.read_bytes() for p in (pinpals/folder).rglob('*') if p.is_file()})
-            game_files['PINPALS-LICENSE'] = (pinpals/'LICENSE').read_bytes()
         write_zip(artifact, {**game_files, "game.lua": f'return {{id="{game}"}}\n'.encode()})
         digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
         sums.append(f"{digest}  {artifact.name}")
-        meta = {"id": game, "title": title, "min_players": 2, "max_players": 2 if game in ("stack-together", "pinpals") else 4, "players": "2" if game in ("stack-together", "pinpals") else "2–4"}
+        meta = {"id": game, "title": title, "min_players": 2, "max_players": 2 if game == "stack-together" else 4, "players": "2" if game == "stack-together" else "2–4"}
         if args.love:
             meta["launch"] = {"command": str(args.love.resolve()), "args": [str(artifact)], "cwd": str(output)}
             shelf.append(meta)
