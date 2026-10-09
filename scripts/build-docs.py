@@ -21,6 +21,12 @@ PAGES = json.loads((ROOT / "docs/site/pages.json").read_text())
 REPO = "https://github.com/ontola/gamenight/blob/main/"
 
 
+# Shown on every docs page, so makers can always reach the portal.
+PORTAL = ('<a class="docs-portal{extra}" href="https://gamenight.ontola.io/developers">'
+          '<strong>Developer portal <span aria-hidden="true">→</span></strong>'
+          '<span>Announce, upload and sell your game</span></a>')
+
+
 def route(slug):
     return "/docs" + ("/" + slug if slug else "")
 
@@ -147,8 +153,9 @@ def render(page):
 <script src="/web/shell.js" defer></script><script src="/web/docs.js" defer></script></head><body>
 <div id="site-shell"></div><main class="docs-page">
 <a class="docs-skip" href="#docs-article">Skip to article</a>
+{PORTAL.format(extra=" docs-portal-mobile")}
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-{page['slug'] or 'start'}">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-{page['slug'] or 'start'}" aria-label="Documentation">{''.join(nav)}</nav>
+<nav class="docs-sidebar" id="docs-nav-{page['slug'] or 'start'}" aria-label="Documentation">{PORTAL.format(extra="")}{''.join(nav)}</nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p>{body}
 <footer class="docs-source"><a href="{REPO}{page['source']}">Edit this page</a><span data-source-fingerprint="{fingerprint.hexdigest()}">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages">{pager}</nav></article>
