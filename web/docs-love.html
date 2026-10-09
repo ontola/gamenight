@@ -48,9 +48,9 @@ function M.update(s, dt, inputs)
 		end
 	end
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight-games/blob/f2f8af9ac2d8806c31c3bebb4d86b76da0635897/love-party/games/trails.lua#L30">Source: games/love-party/games/trails.lua</a></p>
+<p><a href="https://github.com/ontola/gamenight-games/blob/ecc5a942cf7af5f95bab254d8e48559824dc7403/love-party/games/trails.lua#L30">Source: games/love-party/games/trails.lua</a></p>
 <p>The input entries belong to the supplied player slots. Do not replace them with <code>love.joystick.getJoysticks()</code> in managed mode. The shared input adapter neutralises disconnected devices and frames older than 250 ms.</p>
-<p>Register a new module in <code>modes</code> in <a href="https://github.com/ontola/gamenight-games/blob/f2f8af9ac2d8806c31c3bebb4d86b76da0635897/love-party/main.lua">main.lua</a>, add its renderer and add its ID to <code>GAMES</code> in <a href="https://github.com/ontola/gamenight/blob/main/scripts/package-love-party.py">the packaging script</a>. These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.</p>
+<p>Register a new module in <code>modes</code> in <a href="https://github.com/ontola/gamenight-games/blob/ecc5a942cf7af5f95bab254d8e48559824dc7403/love-party/main.lua">main.lua</a>, add its renderer and add its ID to <code>GAMES</code> in <a href="https://github.com/ontola/gamenight/blob/main/scripts/package-love-party.py">the packaging script</a>. These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.</p>
 <h2 id="draw-a-player-face">Draw a player face</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-lua">local Face = require(&quot;shared.face&quot;)
 Face.drawFace(player, x, y, 24, { facing = -1 })
