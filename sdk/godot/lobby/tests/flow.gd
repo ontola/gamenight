@@ -48,12 +48,14 @@ func run() -> void:
 	await wait_until(func(): return view.client.active, "lobby ready owns screen")
 	# Exercise the actual scene's per-player cursors with deterministic frames.
 	var original_seats: Array = view.party.seats.duplicate(true)
-	view.party.seats[0]["controller"] = "test:0"
-	view.party.seats[1]["controller"] = "test:1"
+	# A party snapshot may land during any awaited frame and reset the seats,
+	# so bind the test controllers again after each one.
+	var bind := func():
+		view.party.seats[0]["controller"] = "test:0"
+		view.party.seats[1]["controller"] = "test:1"
+	bind.call()
 	await process_frame
-	# A party snapshot may land during that frame and reset the seats.
-	view.party.seats[0]["controller"] = "test:0"
-	view.party.seats[1]["controller"] = "test:1"
+	bind.call()
 	var frames: Array = [{"controller":"test:0", "buttons":0}, {"controller":"test:1", "buttons":0}]
 	view._controllers_changed(frames)
 	check(view._cursors.size() == 2, "each joined controller gets a selection")
@@ -67,6 +69,7 @@ func run() -> void:
 	view._controllers_changed(frames)
 	check(fake.starts == 0 and view._menu_open, "Start opens menu without recording")
 	await process_frame
+	bind.call()
 	check(view.hits.any(func(hit): return hit.action == "choose-lobby"), "Start menu exposes the lobby chooser")
 	check(view.hits.all(func(hit): return not hit.action.begins_with("select:")), "menu prevents underlying game actions")
 	view._activate("menu-close")
@@ -108,6 +111,7 @@ func run() -> void:
 	check(view._cursors["test:0"].game == view.games.size()-1, "LT wraps around the catalog")
 	view._cycle_game("test:0",1)
 	await process_frame
+	bind.call()
 	frames[0].axes = [0,0,0,0,0,0]
 	frames[0].buttons = 1 << 10
 	view._controllers_changed(frames)
