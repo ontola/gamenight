@@ -849,6 +849,9 @@ let initializing = true;
         if (JSON.stringify(view) !== JSON.stringify(playlistView)) {
           playlistView = view;
           renderPlaylist();
+          const index=openGame?view.playlist.entries.findIndex((e,i)=>e.game===openGame.game&&(i===openGame.index||!view.playlist.entries[openGame.index]||view.playlist.entries[openGame.index].game!==openGame.game)):-1;
+          if(openGame&&index<0)closeGameDialog();
+          else if(openGame){openGame.index=index;openGame.status=entryStatus(index);renderGameDialog();}
         }
         document.getElementById('playlist-status').textContent = view.playlist.entries.length ? '' : 'No games queued yet.';
       } catch (error) {
@@ -883,19 +886,17 @@ let initializing = true;
         handle.disabled = playlistBusy || past || playing;
         if(!past)row.append(handle);
         else row.classList.add('playlist-past');
-        const title = document.createElement('div');
-        title.className = 'playlist-title';
+        // The title opens the game: start it, change its settings, see it in the store.
+        const title = document.createElement('button');
+        title.type = 'button';
+        title.className = 'playlist-title playlist-title-button';
         title.textContent = entry.title;
+        title.setAttribute('aria-label', `Open ${entry.title}`);
+        title.onclick = () => openPlaylistGame(index);
         const badge = document.createElement('small');
         badge.textContent = [playlistView.playlist.current === index ? 'Playing' : '', playlistView.next === entry.game ? 'Up next' : ''].filter(Boolean).join(' · ');
         title.append(badge);
         row.append(title);
-        const details=document.createElement('a');
-        details.className='playlist-catalog-link';
-        details.href='/catalog#game='+encodeURIComponent(entry.game);
-        details.textContent='View game';
-        details.setAttribute('aria-label',`View ${entry.title} in the catalog`);
-        row.append(details);
         handle.onkeydown=event=>{
           if(handle.disabled || !['ArrowUp','ArrowDown'].includes(event.key))return;
           event.preventDefault();
@@ -954,6 +955,151 @@ let initializing = true;
       });
       if (focusIndex !== undefined) list.querySelector(`[data-index="${focusIndex}"] button:not(:disabled)`)?.focus();
     }
+
+    // One game from the playlist, opened in a dialog.
+    const gameDialog=document.getElementById('playlist-game');
+    let openGame=null, gameSettings=null, settingsBusy=false, settingsTimer=null, confirmStart=false;
+    function entryStatus(index){
+      const current=playlistView.playlist.current;
+      if(index===current)return 'playing';
+      if(playlistView.next===playlistView.playlist.entries[index].game)return 'next';
+      return index<(current??0)?'played':'queued';
+    }
+    function openPlaylistGame(index){
+      const entry=playlistView.playlist.entries[index];
+      openGame={index,game:entry.game,title:entry.title,status:entryStatus(index)};
+      gameSettings=null;confirmStart=false;
+      document.getElementById('playlist-game-settings').replaceChildren();
+      document.getElementById('playlist-game-settings-hint').textContent='Loading…';
+      renderGameDialog();
+      if(!gameDialog.open)gameDialog.showModal();
+      loadGameSettings();
+      clearInterval(settingsTimer);
+      settingsTimer=setInterval(()=>{if(!document.hidden)loadGameSettings();},4000);
+    }
+    function renderGameDialog(){
+      const {game,title,status}=openGame;
+      const playing=playlistView.playlist.entries[playlistView.playlist.current];
+      document.getElementById('playlist-game-title').textContent=title;
+      const label=document.getElementById('playlist-game-status');
+      label.textContent={playing:'Playing now',next:'Up next',queued:'In the queue',played:'Played earlier tonight'}[status];
+      label.classList.toggle('playing',status==='playing');
+      const start=document.getElementById('playlist-game-start');
+      start.disabled=status==='playing';
+      start.textContent=status==='playing'?'Playing':confirmStart?'▶ Yes, start now':'▶ Start now';
+      const confirm=document.getElementById('playlist-game-confirm');
+      confirm.hidden=!confirmStart;
+      confirm.textContent=playing?`This ends ${playing.title} for everyone as soon as ${title} has loaded.`:'';
+      document.getElementById('playlist-game-next').hidden=status==='playing'||status==='next';
+      const store=document.getElementById('playlist-game-store');
+      store.href='/catalog#game='+encodeURIComponent(game);
+      store.setAttribute('aria-label',`View ${title} in the store`);
+      document.getElementById('playlist-game-remove').hidden=status==='playing'||status==='played';
+    }
+    function closeGameDialog(){
+      clearInterval(settingsTimer);openGame=null;
+      if(gameDialog.open)gameDialog.close();
+    }
+    async function loadGameSettings(){
+      const game=openGame?.game;
+      if(!game||settingsBusy)return;
+      try{
+        const settings=await storage.settings(game);
+        if(openGame?.game!==game||settingsBusy)return;
+        if(JSON.stringify(settings)!==JSON.stringify(gameSettings)){gameSettings=settings;renderGameSettings();}
+        else if(!settings)renderGameSettings();
+      }catch(error){
+        if(openGame?.game===game)document.getElementById('playlist-game-settings-hint').textContent=error.message;
+      }
+    }
+    async function applyGameSettings(values,action='set'){
+      if(!gameSettings||settingsBusy)return;
+      settingsBusy=true;renderGameSettings();
+      try{gameSettings=await storage.applySettings(gameSettings,values,action);}
+      catch(error){window.showToast?.(error.message);}
+      finally{settingsBusy=false;renderGameSettings();loadGameSettings();}
+    }
+    function renderGameSettings(){
+      const box=document.getElementById('playlist-game-settings');
+      const hint=document.getElementById('playlist-game-settings-hint');
+      box.replaceChildren();
+      if(!openGame)return;
+      const {title,status}=openGame;
+      if(!gameSettings){
+        hint.textContent=status==='playing'?'This game has no settings to change.'
+          :status==='next'?`No settings to change yet. They show up here once ${title} has loaded, if it has any.`
+          :storage.cloud?`Settings can be changed while ${title} is on screen.`
+          :`Settings can be changed once ${title} is up next and has loaded. Choose Play next to load it.`;
+        return;
+      }
+      hint.textContent='';
+      for(const [key,setting] of Object.entries(gameSettings.settings)){
+        const row=document.createElement('div');row.className='setting-row';
+        const text=document.createElement('div');
+        const label=document.createElement('label');label.textContent=setting.label;label.htmlFor='setting-'+key;
+        text.append(label);
+        if(setting.description){const d=document.createElement('small');d.textContent=setting.description;text.append(d);}
+        row.append(text);
+        if(setting.kind==='toggle'){
+          const input=document.createElement('input');input.type='checkbox';input.id='setting-'+key;
+          input.checked=!!setting.value;input.disabled=settingsBusy;
+          input.onchange=()=>applyGameSettings({[key]:input.checked});
+          row.append(input);
+        }else if(setting.kind==='number'){
+          const group=document.createElement('div');group.className='setting-number';
+          const less=document.createElement('button'),more=document.createElement('button'),value=document.createElement('output');
+          less.type=more.type='button';less.className=more.className='tool-btn';
+          less.textContent='−';more.textContent='+';value.id='setting-'+key;value.textContent=setting.value;
+          less.setAttribute('aria-label','Less '+setting.label);more.setAttribute('aria-label','More '+setting.label);
+          less.disabled=settingsBusy||setting.value<=setting.min;more.disabled=settingsBusy||setting.value>=setting.max;
+          less.onclick=()=>applyGameSettings({[key]:setting.value-1});
+          more.onclick=()=>applyGameSettings({[key]:setting.value+1});
+          group.append(less,value,more);row.append(group);
+        }else if(setting.kind==='choice'){
+          row.classList.add('setting-choice');
+          const choices=document.createElement('div');choices.className='setting-choices';choices.id='setting-'+key;
+          for(const option of setting.options||[]){
+            const b=document.createElement('button');b.type='button';b.className='tool-btn';b.textContent=option;
+            b.setAttribute('aria-pressed',String(option===setting.value));b.disabled=settingsBusy;
+            b.onclick=()=>{if(option!==setting.value)applyGameSettings({[key]:option});};
+            choices.append(b);
+          }
+          text.append(choices);
+        }
+        box.append(row);
+      }
+      const footer=document.createElement('div');footer.className='settings-footer';
+      footer.append(document.createTextNode(settingsBusy?'Saving…':'Everyone in the room shares these.'));
+      if(gameSettings.can_undo&&!settingsBusy){
+        const undo=document.createElement('button');undo.type='button';undo.className='tool-btn';undo.textContent='↶ Undo';
+        undo.onclick=()=>applyGameSettings({},'undo');footer.append(undo);
+      }
+      box.append(footer);
+    }
+    async function playFromDialog(start){
+      if(!openGame)return;
+      const playing=playlistView.playlist.current!=null&&playlistView.playlist.current!==openGame.index;
+      if(start&&playing&&!confirmStart){confirmStart=true;renderGameDialog();return;}
+      const {game,title}=openGame;
+      const buttons=[document.getElementById('playlist-game-start'),document.getElementById('playlist-game-next')];
+      buttons.forEach(b=>b.disabled=true);
+      try{
+        await storage.playNext(game,start);
+        window.showToast?.(start?`${title} starts as soon as it has loaded`:`${title} will play next`);
+        closeGameDialog();
+        await loadPlaylist();
+      }catch(error){window.showToast?.(error.message);buttons.forEach(b=>b.disabled=false);}
+    }
+    document.getElementById('playlist-game-start').onclick=()=>playFromDialog(true);
+    document.getElementById('playlist-game-next').onclick=()=>playFromDialog(false);
+    document.getElementById('playlist-game-close').onclick=closeGameDialog;
+    document.getElementById('playlist-game-store').onclick=()=>closeGameDialog();
+    document.getElementById('playlist-game-remove').onclick=()=>{
+      const index=openGame?.index;closeGameDialog();
+      if(index!=null)updatePlaylist({from:index,remove:true},index);
+    };
+    gameDialog.addEventListener('close',()=>{clearInterval(settingsTimer);openGame=null;});
+    gameDialog.addEventListener('click',event=>{if(event.target===gameDialog)closeGameDialog();});
 
     async function movePlaylistEntry(from, to) {
       if (from === to) return;

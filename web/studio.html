@@ -38,6 +38,7 @@
     <div id="tab-playlist" class="tab-content">
       <section class="playlist-editor">
         <h2>Tonight’s playlist</h2><div class="playlist-heading-actions"><span id="playlist-saving" role="status" aria-live="polite" hidden>↻<span class="sr-only"> Saving changes</span></span></div>
+        <p id="playlist-hint">Tap a game to start it, change its settings or see it in the store.</p>
         <p id="playlist-status" role="status" aria-live="polite"></p>
         <ol id="playlist-list" aria-label="Game playlist"></ol>
       </section>
@@ -166,6 +167,18 @@
   <div class="scanner-actions"><button type="button" class="tool-btn" id="qr-retry">Use camera</button>
   <label class="tool-btn" for="qr-photo">Scan a photo<input id="qr-photo" type="file" accept="image/*" capture="environment" hidden></label></div>
   <p class="scanner-privacy">Images stay on your device.</p>
+</dialog>
+<dialog id="playlist-game" aria-labelledby="playlist-game-title">
+  <div class="scanner-heading"><div><h2 id="playlist-game-title"></h2><p id="playlist-game-status"></p></div><button type="button" id="playlist-game-close" class="tool-btn" aria-label="Close">✕</button></div>
+  <div class="playlist-game-actions"><button type="button" class="btn-primary" id="playlist-game-start">▶ Start now</button><button type="button" class="tool-btn" id="playlist-game-next">Play next</button></div>
+  <p id="playlist-game-confirm" role="alert" hidden></p>
+  <section class="playlist-game-settings" aria-labelledby="playlist-game-settings-title">
+    <h3 id="playlist-game-settings-title">Settings</h3>
+    <div id="playlist-game-settings"></div>
+    <p id="playlist-game-settings-hint" class="identity-hint" role="status" aria-live="polite"></p>
+  </section>
+  <a class="tool-btn playlist-game-link" id="playlist-game-store">View in the store <span aria-hidden="true">→</span></a>
+  <button type="button" class="tool-btn playlist-game-remove" id="playlist-game-remove">Remove from the playlist</button>
 </dialog>
 <script src="/assets/jsQR.js"></script>
 <script src="/assets/qr-scanner.js"></script>

@@ -17,7 +17,14 @@ class SettingsSection extends StatefulWidget {
   /// Says so instead of hiding when there is nothing to set.
   final bool showEmpty;
 
-  const SettingsSection({super.key, this.controls, this.title, this.showEmpty = false});
+  /// This game's settings instead of the current game's.
+  final String? game;
+
+  /// What to say when [showEmpty] and the game has nothing to set right now.
+  final String? emptyHint;
+
+  const SettingsSection(
+      {super.key, this.controls, this.title, this.showEmpty = false, this.game, this.emptyHint});
 
   @override
   State<SettingsSection> createState() => _SettingsSectionState();
@@ -39,7 +46,9 @@ class _SettingsSectionState extends State<SettingsSection> {
   @override
   void didUpdateWidget(SettingsSection old) {
     super.didUpdateWidget(old);
-    if ((old.controls == null) != (widget.controls == null) || old.title != widget.title) {
+    if ((old.controls == null) != (widget.controls == null) ||
+        old.title != widget.title ||
+        old.game != widget.game) {
       _load();
     }
   }
@@ -58,7 +67,7 @@ class _SettingsSectionState extends State<SettingsSection> {
       return;
     }
     try {
-      final settings = await controls.settings();
+      final settings = await controls.settings(game: widget.game);
       if (mounted && !_busy) {
         setState(() {
           _settings = settings;
@@ -91,11 +100,13 @@ class _SettingsSectionState extends State<SettingsSection> {
     final settings = _settings;
     if (settings == null) {
       if (!widget.showEmpty) return const SizedBox.shrink();
-      return Section(title: 'Game settings', children: [
+      return Section(
+          title: widget.title == null ? 'Game settings' : '${widget.title} settings',
+          children: [
         Hint(_loaded || widget.controls == null
-            ? 'This game has no settings to change.'
+            ? widget.emptyHint ?? 'This game has no settings to change.'
             : 'Loading…'),
-      ]);
+          ]);
     }
     return Section(
       title: widget.title == null ? 'Game settings' : '${widget.title} settings',

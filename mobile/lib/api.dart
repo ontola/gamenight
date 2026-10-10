@@ -295,11 +295,6 @@ class GameNightApi {
           body: {'expected': view.snapshot, 'from': index, 'remove': true},
           failure: 'Playlist changed. Refresh and try again.') as Map<String, dynamic>);
 
-  Future<void> playNext(String game, String profile, String requestId) =>
-      _send('POST', '/api/dev-catalog/next',
-          body: {'game': game, 'request_id': requestId, 'profile': profile},
-          failure: 'Could not queue that game.');
-
   /// Body sprite the lobby uses, for the character preview.
   Uri get characterSprite => _u('/assets/characters/living-room');
 

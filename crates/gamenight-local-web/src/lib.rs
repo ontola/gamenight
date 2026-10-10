@@ -182,6 +182,7 @@ pub fn create_router(state: SharedState) -> Router {
             get(playlist::get).post(playlist::move_entry),
         )
         .route("/api/playlist/queue", post(room_controls::queue))
+        .route("/api/playlist/next", post(room_controls::next))
         .route("/api/games", get(room_controls::games))
         .route(
             "/api/settings",

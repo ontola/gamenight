@@ -20,6 +20,9 @@ pub(crate) struct Selection {
     pub game: String,
     pub seat: Seat,
     pub expires: u64,
+    /// Start the game right away instead of only making it the next one up.
+    #[serde(default)]
+    pub start: bool,
 }
 
 pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> Value {
@@ -193,50 +196,70 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
         {
             return None;
         }
-        // Retried deliveries after a lost HTTP response do not reorder the queue.
-        let failed = party
-            .installs
-            .iter()
-            .any(|i| i.game.0 == selection.game && i.state == InstallState::Failed);
-        if !failed
-            && (party
+        let playing = |party: &PartySnapshot| {
+            party
+                .active_session
+                .as_ref()
+                .is_some_and(|s| s.game.0 == selection.game)
+        };
+        let up_next = |party: &PartySnapshot| {
+            party
                 .warming
                 .as_ref()
                 .is_some_and(|s| s.game.0 == selection.game)
                 || party
                     .warm_session
                     .as_ref()
-                    .is_some_and(|s| s.game.0 == selection.game))
-        {
+                    .is_some_and(|s| s.game.0 == selection.game)
+        };
+        // Starting the game that is already on screen changes nothing.
+        if selection.start && playing(&party) {
             return Some(());
         }
-        ws.send(Message::Text(
-            ClientMessage::QueueNext {
-                game: GameId(selection.game.clone()),
-            }
-            .to_json(),
-        ))
-        .await
-        .ok()?;
-        while let Some(Ok(message)) = ws.next().await {
-            if let Message::Text(text) = message {
+        // Retried deliveries after a lost HTTP response do not reorder the queue.
+        let failed = party
+            .installs
+            .iter()
+            .any(|i| i.game.0 == selection.game && i.state == InstallState::Failed);
+        if failed || !up_next(&party) {
+            ws.send(Message::Text(
+                ClientMessage::QueueNext {
+                    game: GameId(selection.game.clone()),
+                }
+                .to_json(),
+            ))
+            .await
+            .ok()?;
+            loop {
+                let Message::Text(text) = ws.next().await?.ok()? else {
+                    continue;
+                };
                 if let Ok(ServerMessage::PartyState { party }) = serde_json::from_str(&text) {
-                    if party
-                        .warming
-                        .as_ref()
-                        .is_some_and(|s| s.game.0 == selection.game)
-                        || party
-                            .warm_session
-                            .as_ref()
-                            .is_some_and(|s| s.game.0 == selection.game)
-                    {
-                        let _ = ws.close(None).await;
-                        return Some(());
+                    if up_next(&party) {
+                        break;
                     }
                 }
             }
         }
-        None
+        if selection.start {
+            // Like the party pressing Next: the current game ends as soon as
+            // this one has loaded.
+            ws.send(Message::Text(ClientMessage::Next.to_json()))
+                .await
+                .ok()?;
+            loop {
+                let Message::Text(text) = ws.next().await?.ok()? else {
+                    continue;
+                };
+                match serde_json::from_str(&text) {
+                    Ok(ServerMessage::PartyState { .. }) => break,
+                    Ok(ServerMessage::Error { .. }) => return None,
+                    _ => {}
+                }
+            }
+        }
+        let _ = ws.close(None).await;
+        Some(())
     })
     .await
     .ok()
@@ -364,6 +387,7 @@ mod tests {
             .unwrap();
         let mut selection = Selection {
             edit: None,
+            start: false,
             command: None,
             id: uuid::Uuid::new_v4().to_string(),
             game: "target".into(),

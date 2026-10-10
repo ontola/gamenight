@@ -489,6 +489,34 @@
     #qr-open { background:var(--accent); color:white; font-weight:700; min-height:48px; margin-top:8px; width:100%; }
     #qr-scanner { position:fixed; inset:0; margin:auto; box-sizing:border-box; width:calc(100% - 32px); max-width:480px; max-height:calc(100dvh - 32px); overflow:auto; background:var(--card-bg); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:20px; }
     #qr-scanner::backdrop { background:rgba(0,0,0,.7); }
+    #playlist-game { position:fixed; inset:0; margin:auto; box-sizing:border-box; width:calc(100% - 32px); max-width:480px; max-height:calc(100dvh - 32px); overflow:auto; background:var(--card-bg); color:var(--text); border:1px solid var(--border); border-radius:16px; padding:20px; }
+    #playlist-game::backdrop { background:rgba(0,0,0,.7); }
+    #playlist-game [hidden] { display:none !important; }
+    #playlist-game h2 { margin:0; }
+    #playlist-game-status { margin:.15rem 0 0; color:var(--muted); font-weight:600; }
+    #playlist-game-status.playing { color:#34d399; }
+    .playlist-game-actions { display:flex; gap:8px; margin:16px 0 8px; }
+    .playlist-game-actions button { flex:1; min-height:48px; font-weight:700; }
+    #playlist-game-start:not(:disabled) { background:#5143ae; border-color:#8d80fa; color:#fff; }
+    #playlist-game-confirm { margin:0 0 8px; color:#fbbf24; }
+    .playlist-game-settings { border-top:1px solid var(--border); margin-top:12px; padding-top:4px; }
+    .playlist-game-settings h3 { margin:.6rem 0 .3rem; font-size:1rem; }
+    .setting-row { display:flex; align-items:center; gap:12px; padding:8px 0; }
+    .setting-row > div { flex:1; min-width:0; }
+    .setting-row small { display:block; color:var(--muted); }
+    .setting-row input[type=checkbox] { width:22px; height:22px; accent-color:var(--accent); }
+    .setting-number { display:flex; align-items:center; gap:6px; }
+    .setting-number output { min-width:2ch; text-align:center; font-weight:700; }
+    .setting-number button { min-width:40px; min-height:40px; }
+    .setting-choices { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
+    .setting-choice .setting-row { display:block; }
+    .settings-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; color:var(--muted); font-size:.9rem; }
+    .settings-footer button { white-space:nowrap; flex:none; }
+    .playlist-game-link, .playlist-game-remove { display:flex; justify-content:center; align-items:center; gap:6px; width:100%; box-sizing:border-box; min-height:44px; margin-top:8px; text-decoration:none; }
+    #playlist-game .playlist-game-remove { color:#f87171; }
+    #playlist-hint { color:var(--muted); margin:-.4rem 0 .8rem; }
+    .playlist-row .playlist-title-button { flex:1; min-width:0; text-align:left; background:none; border:0; color:inherit; font:inherit; padding:0; cursor:pointer; }
+    .playlist-row .playlist-title-button:hover:not(:disabled), .playlist-row .playlist-title-button:focus-visible { background:none; color:inherit; text-decoration:underline; }
     .scanner-heading { display:flex; justify-content:space-between; align-items:center; gap:12px; }
     .scanner-heading h2 { margin:0; }
     #qr-close { min-width:44px; min-height:44px; cursor:pointer; }

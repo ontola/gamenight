@@ -21,10 +21,23 @@ pub(crate) struct Command {
     pub values: BTreeMap<String, SettingValue>,
 }
 pub(crate) fn controls(party: &PartySnapshot) -> Option<Value> {
-    let session = party
-        .active_session
-        .as_ref()
-        .or(party.warm_session.as_ref())?;
+    controls_for(party, None)
+}
+
+/// Like [`controls`], for `game` when it is being played or warmed up, so a
+/// phone can set up the next game before it starts.
+pub(crate) fn controls_for(party: &PartySnapshot, game: Option<&str>) -> Option<Value> {
+    let session = match game {
+        None => party
+            .active_session
+            .as_ref()
+            .or(party.warm_session.as_ref())?,
+        Some(game) => party
+            .active_session
+            .iter()
+            .chain(party.warm_session.iter())
+            .find(|s| s.game.0 == game)?,
+    };
     if !party.connected_games.contains(&session.game) {
         return None;
     }
@@ -225,7 +238,7 @@ mod tests {
             json!(["earth", "moon"])
         );
         let mut selection=Selection {
-            edit:None,id:"batch".into(),game:"test".into(),
+            edit:None,start:false,id:"batch".into(),game:"test".into(),
             seat:Seat {index:0,player:player.0.to_string(),revision:0},
             expires:std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()+60,
             command:Some(serde_json::from_value(json!({"action":"set","instance":advertised["instance"],

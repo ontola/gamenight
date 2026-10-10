@@ -16,6 +16,18 @@
     if(!response.ok)throw Error('Not synced. Your work is saved on this device; try again when connected.');
     return response.status===204?null:response.json();
   }
+  // Room actions answer with what went wrong in words a player understands.
+  async function roomFetch(path,body) {
+    const response=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),
+      ...(body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json',...(csrf?{'X-GameNight-CSRF':csrf}:{})},body:JSON.stringify(body)})});
+    if(response.ok)return response.status===204?null:response.json();
+    let reason='';try{reason=(await response.json()).error||'';}catch{}
+    if(response.status===401&&cloud){location.replace('/auth/login');throw Error('Please sign in.');}
+    if(response.status===403)throw Error(cloud&&path.includes('/control')?'In an online room, only the main player can change settings.':'Join the room first.');
+    if(response.status===409)throw Error(reason||(path.includes('settings')||path.includes('/control')?'The game changed meanwhile. Look again and retry.':'GameNight cannot play that game right now.'));
+    if(response.status===503)throw Error('The GameNight computer is not answering. Try again in a moment.');
+    throw Error('GameNight did not answer. Try again.');
+  }
   try {
     if(cloud){
       csrf=(await request('/auth/session')).csrf;
@@ -24,9 +36,30 @@
       window.initAccountSettings(account,request);
     }
     window.gamenightStorage={cloud,local,initial:documentState,
-      async playNext(game){
-        const requestId=Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('');
-        await request(cloud?'/v1/rooms/next':'/api/dev-catalog/next','POST',{game,request_id:requestId,...(!cloud?{profile:local.getItem('gamenight_profile_id')}:{})});
+      // Makes a game the next one up (it starts loading); with start, the
+      // current game ends as soon as it has loaded.
+      async playNext(game,start=false){
+        if(!cloud)return roomFetch('/api/playlist/next',{profile:local.getItem('gamenight_profile_id'),game,start});
+        await roomFetch('/v1/rooms/next',{game,request_id:crypto.randomUUID(),...(start?{start:true}:{})});
+      },
+      // The settings of a game being played or loaded, or null. Online rooms
+      // only report the game on screen.
+      async settings(game){
+        if(!cloud)return roomFetch('/api/settings?profile='+encodeURIComponent(local.getItem('gamenight_profile_id'))+'&game='+encodeURIComponent(game));
+        const controls=(await roomFetch('/v1/rooms/status')).discovery?.controls;
+        return controls?.game===game?controls:null;
+      },
+      async applySettings(current,values,action='set'){
+        const command={action,instance:current.instance,expected_revision:current.revision,values};
+        if(!cloud)return roomFetch('/api/settings',{profile:local.getItem('gamenight_profile_id'),command});
+        await roomFetch('/v1/rooms/agent/control',{request_id:crypto.randomUUID(),game:current.game,command});
+        // The host picks the change up on its next check-in.
+        for(let attempt=0;attempt<8;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,1000));
+          const next=await window.gamenightStorage.settings(current.game);
+          if(!next || next.revision!==current.revision)return next;
+        }
+        return window.gamenightStorage.settings(current.game);
       },
       async playlist(change) {
         if (!cloud) {

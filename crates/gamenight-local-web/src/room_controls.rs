@@ -1,6 +1,6 @@
 //! What a linked phone may do to the room over the LAN: see which games this
-//! host can play, add one to the end of the queue, and change the current
-//! game's match settings.
+//! host can play, add one to the end of the queue, play or start one next,
+//! and change the match settings of the current or next game.
 //!
 //! A phone proves who it is with its profile id, which this server bound to a
 //! party member when the phone signed in (like `/api/profiles/:id/*` and the
@@ -40,6 +40,10 @@ pub(crate) fn seat(state: &SharedState, party: &PartySnapshot, profile: &str) ->
 #[derive(Deserialize)]
 pub struct ProfileQuery {
     profile: String,
+    /// For settings: this game instead of the one on screen, when it is
+    /// being played or warmed up.
+    #[serde(default)]
+    game: Option<String>,
 }
 
 /// `GET /api/games?profile=…`: the games on this host and whether the party
@@ -142,15 +146,53 @@ pub(crate) async fn queue(
     .map_err(|_| StatusCode::GATEWAY_TIMEOUT)?
 }
 
-/// `GET /api/settings?profile=…`: the match settings of the game being
-/// played or warmed up, or `null` when it declared none.
+#[derive(Deserialize)]
+pub struct NextRequest {
+    profile: String,
+    game: String,
+    /// Start it right away; otherwise it only becomes the next game.
+    #[serde(default)]
+    start: bool,
+}
+
+/// `POST /api/playlist/next`: makes a game this host can play the next one
+/// up (it starts loading), or with `start` plays it now: the current game
+/// ends as soon as it has loaded. Answers with the playlist.
+pub(crate) async fn next(
+    State(state): State<SharedState>,
+    Json(request): Json<NextRequest>,
+) -> Result<Json<playlist::View>, StatusCode> {
+    let party = daemon::party(&state).await?;
+    let seat = seat(&state, &party, &request.profile).ok_or(StatusCode::FORBIDDEN)?;
+    let selection = discovery::Selection {
+        command: None,
+        edit: None,
+        id: uuid::Uuid::new_v4().to_string(),
+        game: request.game,
+        seat,
+        expires: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            + 30,
+        start: request.start,
+    };
+    if !discovery::apply(&state, &selection).await {
+        return Err(StatusCode::CONFLICT);
+    }
+    playlist::get(State(state)).await
+}
+
+/// `GET /api/settings?profile=…[&game=…]`: the match settings of the game
+/// being played or warmed up (or of `game`, when it is either), or `null`
+/// when it declared none.
 pub(crate) async fn get_settings(
     State(state): State<SharedState>,
     Query(query): Query<ProfileQuery>,
 ) -> Result<Json<Option<Value>>, StatusCode> {
     let party = daemon::party(&state).await?;
     seat(&state, &party, &query.profile).ok_or(StatusCode::FORBIDDEN)?;
-    Ok(Json(settings::controls(&party)))
+    Ok(Json(settings::controls_for(&party, query.game.as_deref())))
 }
 
 #[derive(Deserialize)]
@@ -266,7 +308,10 @@ mod tests {
     }
 
     fn profile(id: &str) -> Query<ProfileQuery> {
-        Query(ProfileQuery { profile: id.into() })
+        Query(ProfileQuery {
+            profile: id.into(),
+            game: None,
+        })
     }
 
     #[tokio::test]
@@ -320,6 +365,55 @@ mod tests {
             add("stranger", "test").await.unwrap_err(),
             StatusCode::FORBIDDEN
         );
+        tasks.iter().for_each(|t| t.abort());
+    }
+
+    #[tokio::test]
+    async fn linked_phone_plays_or_starts_a_game_next() {
+        let (state, _, tasks) = room().await;
+        let next = |profile: &str, game: &str, start: bool| {
+            next(
+                State(state.clone()),
+                Json(NextRequest {
+                    profile: profile.into(),
+                    game: game.into(),
+                    start,
+                }),
+            )
+        };
+        let Json(view) = next("phone", "test", false).await.unwrap();
+        let view = serde_json::to_value(view).unwrap();
+        assert_eq!(view["next"], "test");
+        assert!(next("phone", "test", true).await.is_ok());
+        assert_eq!(
+            next("phone", "elsewhere", true).await.unwrap_err(),
+            StatusCode::CONFLICT
+        );
+        assert_eq!(
+            next("stranger", "test", true).await.unwrap_err(),
+            StatusCode::FORBIDDEN
+        );
+        tasks.iter().for_each(|t| t.abort());
+    }
+
+    #[tokio::test]
+    async fn settings_can_be_read_for_the_warm_game_by_name() {
+        let (state, _, tasks) = room().await;
+        let for_game = |game: &str| {
+            get_settings(
+                State(state.clone()),
+                Query(ProfileQuery {
+                    profile: "phone".into(),
+                    game: Some(game.into()),
+                }),
+            )
+        };
+        let Json(Some(controls)) = for_game("test").await.unwrap() else {
+            panic!("the warm game declared settings")
+        };
+        assert_eq!(controls["game"], "test");
+        let Json(none) = for_game("elsewhere").await.unwrap();
+        assert!(none.is_none());
         tasks.iter().for_each(|t| t.abort());
     }
 

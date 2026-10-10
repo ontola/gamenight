@@ -54,6 +54,7 @@ pub async fn next(
         seat,
         expires,
         edit: None,
+        start: false,
     };
     if !discovery::apply(&state, &selection).await {
         return Err(StatusCode::CONFLICT);

@@ -9,6 +9,7 @@ import 'package:gamenight/app_state.dart';
 import 'package:gamenight/catalog.dart';
 import 'package:gamenight/room_controls.dart';
 import 'package:gamenight/screens/game_screen.dart';
+import 'package:gamenight/screens/playlist_screen.dart';
 import 'package:gamenight/theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -59,18 +60,25 @@ class FakeRoom {
                   'selectable': true,
                   'state': 'available'
                 },
-                {'id': 'stack-together', 'title': 'Stack Together', 'selectable': false, 'state': 'unavailable'},
+                {
+                  'id': 'stack-together',
+                  'title': 'Stack Together',
+                  'selectable': false,
+                  'state': 'unavailable'
+                },
               ]
             }),
             200);
-      case 'POST /api/playlist/queue':
+      case 'POST /api/playlist/queue' || 'POST /api/playlist/next':
         return http.Response(
             jsonEncode({
               'playlist': {'entries': []}
             }),
             200);
       case 'GET /api/settings':
-        return http.Response(jsonEncode(controls), 200);
+        final game = request.url.queryParameters['game'];
+        return http.Response(
+            jsonEncode(game == null || game == 'ballkickers' ? controls : null), 200);
       case 'POST /api/settings':
         final command = jsonDecode(request.body)['command'] as Map;
         if (command['expected_revision'] != revision) {
@@ -102,11 +110,20 @@ void main() {
         GameNightApi(Uri.parse('http://192.168.1.5:3000'), client: room.client), 'prof_me');
 
     final games = await controls.games();
-    expect(games.map((g) => (g.id, g.playable)), [('ballkickers', true), ('stack-together', false)]);
+    expect(
+        games.map((g) => (g.id, g.playable)), [('ballkickers', true), ('stack-together', false)]);
     expect(room.calls.last, 'GET /api/games profile=prof_me');
 
     await controls.addToQueue('ballkickers');
     expect(room.bodies['POST /api/playlist/queue'], {'profile': 'prof_me', 'game': 'ballkickers'});
+
+    await controls.playNext('ballkickers', start: true);
+    expect(room.bodies['POST /api/playlist/next'],
+        {'profile': 'prof_me', 'game': 'ballkickers', 'start': true});
+
+    expect(await controls.settings(game: 'growing-guns'), isNull);
+    expect(room.calls.last, 'GET /api/settings profile=prof_me&game=growing-guns');
+    expect((await controls.settings(game: 'ballkickers'))?.game, 'ballkickers');
 
     final settings = (await controls.settings())!;
     expect(settings.settings.map((s) => (s.key, s.kind)), [
@@ -259,6 +276,89 @@ void main() {
       expect(find.text('4'), findsOneWidget);
       expect(find.text('Undo'), findsOneWidget);
       await close(tester);
+    });
+  });
+
+  group('A game opened from the playlist', () {
+    late FakeRoom room;
+    late LocalRoomControls controls;
+
+    setUp(() {
+      room = FakeRoom();
+      controls = LocalRoomControls(
+          GameNightApi(Uri.parse('http://192.168.1.5:3000'), client: room.client), 'prof_me');
+      Catalog.instance = Catalog(
+        client: MockClient((_) async =>
+            http.Response.bytes(File('test/fixtures/catalog.json').readAsBytesSync(), 200)),
+      );
+    });
+
+    Future<List<String>> show(WidgetTester tester, String game, EntryStatus status) async {
+      final actions = <String>[];
+      tester.view.physicalSize = const Size(1080, 4000);
+      tester.view.devicePixelRatio = 2.5;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(MaterialApp(
+        theme: gameNightTheme(),
+        home: Scaffold(
+          body: PlaylistGameSheet(
+            entry: PlaylistEntry(
+                {'game': game, 'title': game == 'ballkickers' ? 'Ballkickers' : 'Growing Guns'}),
+            status: status,
+            controls: controls,
+            playingTitle: status == EntryStatus.playing ? null : 'Ballkickers',
+            onStart: () => actions.add('start'),
+            onPlayNext: () => actions.add('next'),
+            onRemove: () => actions.add('remove'),
+          ),
+        ),
+      ));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      return actions;
+    }
+
+    testWidgets('the game on screen shows its settings and can be changed', (tester) async {
+      await show(tester, 'ballkickers', EntryStatus.playing);
+      expect(find.text('Playing now'), findsOneWidget);
+      expect(find.text('Ballkickers settings'), findsOneWidget);
+      expect(
+          tester
+              .widget<FilledButton>(find.ancestor(
+                  of: find.text('Playing'),
+                  matching: find.byWidgetPredicate((w) => w is FilledButton)))
+              .onPressed,
+          isNull);
+      await tester.tap(find.byType(Switch));
+      await tester.pump();
+      await tester.pump();
+      expect((room.bodies['POST /api/settings']['command'] as Map)['values'], {'items': false});
+      await tester.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('a queued game starts after a warning and opens in the store', (tester) async {
+      final actions = await show(tester, 'growing-guns', EntryStatus.queued);
+      expect(find.text('In the queue'), findsOneWidget);
+      expect(find.textContaining('Choose Play next to load it'), findsOneWidget);
+
+      await tester.tap(find.text('Start now'));
+      await tester.pumpAndSettle();
+      expect(find.text('This ends Ballkickers for everyone as soon as Growing Guns has loaded.'),
+          findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Start now').last);
+      await tester.pumpAndSettle();
+      expect(actions, ['start']);
+
+      await tester.tap(find.text('Play next'));
+      expect(actions, ['start', 'next']);
+
+      await tester.tap(find.text('View in the store'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.widgetWithText(AppBar, 'Growing Guns'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
     });
   });
 }

@@ -53,8 +53,15 @@ the end of the queue without starting or interrupting play. It answers with the
 same playlist view as `GET /api/playlist`, or 409 when the host cannot play the
 game.
 
+`POST /api/playlist/next` with `{"profile", "game", "start"}` makes a
+selectable game the next one up, so it starts loading. With `"start": true` it
+also ends the current game as soon as the new one has loaded, like the party
+choosing Next. It answers with the playlist view, or 409 when the host cannot
+play the game.
+
 `GET /api/settings?profile=<id>` returns the match settings of the active or
-warm game: `game`, `instance` (the session), `revision`, `can_undo` and a
+warm game; add `&game=<id>` to ask for that game, which must be active or warm.
+The answer has `game`, `instance` (the session), `revision`, `can_undo` and a
 `settings` map of `toggle`, `number` and `choice` controls with their current
 `value`. It returns `null` when that game declared none.
 

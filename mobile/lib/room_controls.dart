@@ -1,5 +1,6 @@
-// What a player in a room can do from the Game tab: queue a game the room's
-// host can play, and change the current game's match settings.
+// What a player in a room can do from the Game and Playlist tabs: queue a
+// game the room's host can play, play or start one next, and change the
+// match settings of the current (or loaded next) game.
 //
 // [RoomControls] is the seam between the screen and where the room lives.
 // [LocalRoomControls] talks to a GameNight computer on the same Wi-Fi; a
@@ -135,9 +136,13 @@ abstract class RoomControls {
   /// Adds [game] to the end of the room's queue. Never interrupts play.
   Future<void> addToQueue(String game);
 
+  /// Makes [game] the next one up, so it starts loading. With [start] the
+  /// current game ends as soon as it has loaded.
+  Future<void> playNext(String game, {bool start = false});
+
   /// The settings of the game being played or warmed up, or null when it
-  /// has none.
-  Future<GameSettings?> settings();
+  /// has none. With [game], that game's, when it is played or warmed up.
+  Future<GameSettings?> settings({String? game});
 
   /// Changes settings (or undoes the last change) as this player, against
   /// [current]'s revision. Returns the settings afterwards.
@@ -175,9 +180,16 @@ class LocalRoomControls implements RoomControls {
       body: {'profile': profile, 'game': game}, failure: 'Could not add that game to the queue.');
 
   @override
-  Future<GameSettings?> settings() async {
+  Future<void> playNext(String game, {bool start = false}) =>
+      api.request('POST', '/api/playlist/next',
+          body: {'profile': profile, 'game': game, 'start': start},
+          failure: start ? 'Could not start that game.' : 'Could not queue that game.');
+
+  @override
+  Future<GameSettings?> settings({String? game}) async {
+    final only = game == null ? '' : '&game=${Uri.encodeQueryComponent(game)}';
     try {
-      return GameSettings.fromJson(await api.request('GET', '/api/settings?$_query'));
+      return GameSettings.fromJson(await api.request('GET', '/api/settings?$_query$only'));
     } on ApiError catch (e) {
       if (e.status == 404 || e.status == 403) return null;
       rethrow;
@@ -237,17 +249,26 @@ class CloudRoomControls implements RoomControls {
 
   /// Online rooms queue by asking the host to play the game next.
   @override
-  Future<void> addToQueue(String game) => cloud.request('POST', '/v1/rooms/next', body: {
+  Future<void> addToQueue(String game) => playNext(game);
+
+  @override
+  Future<void> playNext(String game, {bool start = false}) =>
+      cloud.request('POST', '/v1/rooms/next', body: {
         'game': game,
-        'request_id': _requestId()
+        'request_id': _requestId(),
+        if (start) 'start': true,
       }, errors: {
         503: 'The GameNight computer is not answering. Try again in a moment.',
         403: 'Join the room first.',
+        409: 'The GameNight computer cannot play that game right now.',
       });
 
+  /// Online rooms only report the settings of the game on screen.
   @override
-  Future<GameSettings?> settings() async =>
-      GameSettings.fromJson((await _discovery())?['controls']);
+  Future<GameSettings?> settings({String? game}) async {
+    final current = GameSettings.fromJson((await _discovery())?['controls']);
+    return game == null || current?.game == game ? current : null;
+  }
 
   @override
   Future<GameSettings?> applySettings(GameSettings current,

@@ -647,13 +647,6 @@ class AppState extends ChangeNotifier {
     await refreshHostedRoom();
   }
 
-  // ---- Playlist ---------------------------------------------------------
-
-  String newRequestId() {
-    final rng = Random.secure();
-    return List.generate(16, (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
-  }
-
   bool _disposed = false;
 
   @override
