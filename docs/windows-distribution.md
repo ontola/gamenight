@@ -107,8 +107,10 @@ desktop daemon; the launcher terminates and waits for all remaining descendants
 before applying a pending update. Killing the launcher also closes its job.
 The standalone/headless daemon retains its existing resident behavior.
 
-An unfinished download does not delay exit and is retried during a later
-session. Update failures are recorded in `updater.log`. There is no in-game
+The launcher checks for an update at startup and again every 30 minutes until
+one is downloaded, so a PC that keeps GameNight open all evening still picks up
+new releases. The update is applied when GameNight closes. An unfinished
+download does not delay exit and is retried during a later session. Update failures are recorded in `updater.log`. There is no in-game
 restart prompt and no update replacement while a session is running. Controller
 input, focus, silent prewarm and fullscreen still require a real hardware check
 before promoting a preview to stable.

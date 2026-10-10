@@ -85,9 +85,14 @@ impl Drop for ProcessTree {
     }
 }
 
+/// A party PC can keep GameNight open for days, so look again now and then.
+const RECHECK: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
 pub struct Updates {
     manager: Option<velopack::UpdateManager>,
-    worker: Option<std::thread::JoinHandle<()>>,
+    /// True while a check or download is running; never block exit on it.
+    busy: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     log: PathBuf,
 }
 impl Updates {
@@ -102,6 +107,7 @@ impl Updates {
         data: &Path,
         source: impl velopack::sources::UpdateSource + 'static,
     ) -> Self {
+        use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
         let log = data.join("updater.log");
         let manager = match velopack::UpdateManager::new(source, None, None) {
             Ok(manager) if !manager.get_is_portable() => Some(manager),
@@ -111,36 +117,57 @@ impl Updates {
                 None
             }
         };
-        let worker = manager.clone().map(|manager| {
-            let log = log.clone();
-            std::thread::spawn(move || {
-                let result = (|| -> Result<(), velopack::Error> {
+        let busy = Arc::new(AtomicBool::new(manager.is_some()));
+        let stop = Arc::new(AtomicBool::new(false));
+        if let Some(manager) = manager.clone() {
+            let (log, busy, stop) = (log.clone(), busy.clone(), stop.clone());
+            std::thread::spawn(move || loop {
+                busy.store(true, Ordering::SeqCst);
+                let result = (|| -> Result<bool, velopack::Error> {
                     if let velopack::UpdateCheck::UpdateAvailable(update) =
                         manager.check_for_updates()?
                     {
                         manager.download_updates(&update, None)?;
-                        append_log(&log, "Update downloaded; waiting for GameNight to close.");
+                        append_log(
+                            &log,
+                            &format!(
+                                "Update {} downloaded; waiting for GameNight to close.",
+                                update.TargetFullRelease.Version
+                            ),
+                        );
+                        return Ok(true);
                     }
-                    Ok(())
+                    Ok(false)
                 })();
-                if let Err(error) = result {
-                    append_log(&log, &format!("Update check/download skipped: {error}"));
+                busy.store(false, Ordering::SeqCst);
+                match result {
+                    Ok(true) => return,
+                    Ok(false) => {}
+                    Err(error) => {
+                        append_log(&log, &format!("Update check/download skipped: {error}"))
+                    }
                 }
-            })
-        });
+                let wake = std::time::Instant::now() + RECHECK;
+                while std::time::Instant::now() < wake {
+                    if stop.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    std::thread::sleep(std::time::Duration::from_secs(1));
+                }
+            });
+        }
         Self {
             manager,
-            worker,
+            busy,
+            stop,
             log,
         }
     }
     /// Call only after all application children have stopped. Never block exit on networking.
     pub fn apply_on_exit(self) {
-        if self
-            .worker
-            .as_ref()
-            .is_some_and(|worker| !worker.is_finished())
-        {
+        use std::sync::atomic::Ordering;
+        self.stop.store(true, Ordering::SeqCst);
+        if self.busy.load(Ordering::SeqCst) {
             append_log(
                 &self.log,
                 "Download still running; update deferred to a later session.",
