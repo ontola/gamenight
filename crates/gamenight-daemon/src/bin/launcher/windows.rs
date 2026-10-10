@@ -123,26 +123,28 @@ impl Updates {
             let (log, busy, stop) = (log.clone(), busy.clone(), stop.clone());
             std::thread::spawn(move || loop {
                 busy.store(true, Ordering::SeqCst);
-                let result = (|| -> Result<bool, velopack::Error> {
+                let result = (|| -> Result<Option<String>, velopack::Error> {
                     if let velopack::UpdateCheck::UpdateAvailable(update) =
                         manager.check_for_updates()?
                     {
                         manager.download_updates(&update, None)?;
+                        return Ok(Some(update.TargetFullRelease.Version.clone()));
+                    }
+                    Ok(None)
+                })();
+                // Clear before logging, so whoever reads the log may exit and apply.
+                busy.store(false, Ordering::SeqCst);
+                match result {
+                    Ok(Some(version)) => {
                         append_log(
                             &log,
                             &format!(
-                                "Update downloaded ({}); waiting for GameNight to close.",
-                                update.TargetFullRelease.Version
+                                "Update downloaded ({version}); waiting for GameNight to close."
                             ),
                         );
-                        return Ok(true);
+                        return;
                     }
-                    Ok(false)
-                })();
-                busy.store(false, Ordering::SeqCst);
-                match result {
-                    Ok(true) => return,
-                    Ok(false) => {}
+                    Ok(None) => {}
                     Err(error) => {
                         append_log(&log, &format!("Update check/download skipped: {error}"))
                     }
