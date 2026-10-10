@@ -4,8 +4,8 @@ extends Node3D
 ## everyone runs, jumps and fights over bombs while choosing the next game.
 ##
 ## Controls: stick/D-pad move, A jump (down + A drops through), B grab/throw,
-## X punch/use, Y use the station you stand at, LB/RB browse the game shelf,
-## Start opens your menu.
+## X punch/use (queue at the game shelf), Y use the station you stand at,
+## LB/RB browse the game shelf, Start opens your menu.
 
 const LobbyClient = preload("res://addons/gamenight/lobby.gd")
 const Artwork = preload("res://addons/gamenight/artwork.gd")
@@ -64,6 +64,8 @@ var _capture_at := 4.0
 var _captured := false
 var _fullscreen := false
 var _last_input: Dictionary = {}
+var _last_queue: Array = []          # up next game ids at the last redraw
+var _pending_fly := ""               # game the shelf just sent up next
 
 func _ready() -> void:
 	room = Room.new()
@@ -87,7 +89,10 @@ func _ready() -> void:
 	for argument in args:
 		if argument.begins_with("--capture="): _capture_path = argument.trim_prefix("--capture=")
 		if argument.begins_with("--capture-at="): _capture_at = float(argument.trim_prefix("--capture-at="))
-	_fullscreen = OS.get_environment("GAMENIGHT_LOBBY_FULLSCREEN") == "1"
+	# Fullscreen like the other lobbies; GAMENIGHT_LOBBY_FULLSCREEN=0 keeps a window.
+	_fullscreen = OS.get_environment("GAMENIGHT_LOBBY_FULLSCREEN") != "0"
+	if _fullscreen and DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
+		get_window().mode = Window.MODE_FULLSCREEN
 	if args.has("--demo"):
 		demo = Demo.new()
 		demo.main = self
@@ -236,9 +241,12 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 		_menu_input(id, pressed, stick)
 		world.set_input(id, 0, Vector2.ZERO)
 		return
-	world.set_input(id, buttons, stick)
+	var at_shelf: bool = station_for(id).get("kind") == "shelf"
+	# At the shelf X queues the box instead of punching.
+	world.set_input(id, buttons & ~World.BTN_X if at_shelf else buttons, stick)
 	if pressed & World.BTN_Y: _use_station(id)
-	if pressed & (BTN_LB | BTN_RB) and station_for(id).get("kind") == "shelf":
+	if at_shelf and pressed & World.BTN_X: _use_station(id, true)
+	if at_shelf and pressed & (BTN_LB | BTN_RB):
 		_browse(-1 if pressed & BTN_LB else 1)
 
 func _browse(step: int) -> void:
@@ -259,14 +267,13 @@ func station_for(id: String) -> Dictionary:
 		var game: Dictionary = shelf[shelf_offset % shelf.size()]
 		var reason := _unavailable(game)
 		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
-			"label": reason if not reason.is_empty() else "Queue %s" % str(game.get("title", "game")),
-			"enabled": reason.is_empty(), "extra": "LB RB browse" if shelf.size() > 1 else ""}
-	for i in Layout.TV_PADS.size():
-		if absf(p.x - Layout.TV_PADS[i]) <= Layout.PAD_HALF:
-			var pad := tv_pad(i)
-			pad["id"] = "pad%d" % i
-			pad["kind"] = "pad"
-			return pad
+			"label": reason if not reason.is_empty() else "Play %s next" % str(game.get("title", "game")),
+			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
+	if p.x >= Layout.TV_STATION.x and p.x <= Layout.TV_STATION.y:
+		var tv := tv_station()
+		tv["id"] = "tv"
+		tv["kind"] = "tv"
+		return tv
 	if not party.get("now_playing", {}).is_empty():
 		var labels := ["Previous track", "Play / pause music", "Next track"]
 		var actions := ["previous_track", "play_pause", "next_track"]
@@ -284,17 +291,13 @@ func station_for(id: String) -> Dictionary:
 				"label": "Unlink first to pick up %s" % name if linked else "Pick up %s" % name, "enabled": not linked}
 	return {}
 
-func tv_pad(index: int) -> Dictionary:
-	var live := not current_game().is_empty()
+## The TV: Y resumes the paused game, or starts the next one.
+func tv_station() -> Dictionary:
+	if not current_game().is_empty():
+		return {"label": "Resume %s" % current_game().get("title", "game"), "short": "Resume", "action": "resume", "enabled": true}
 	var queue := upcoming()
-	match index:
-		0:
-			if live: return {"label": "Resume %s" % current_game().get("title", "game"), "action": "resume", "enabled": true}
-			return {"label": "Play %s" % queue[0].title if not queue.is_empty() else "Queue a game first", "action": "next", "enabled": not queue.is_empty()}
-		1:
-			return {"label": "Start %s" % queue[0].title if not queue.is_empty() else "Nothing queued", "action": "next", "enabled": not queue.is_empty()}
-		_:
-			return {"label": "Skip to %s" % queue[1].title if queue.size() > 1 else "Nothing to skip to", "action": "skip", "enabled": queue.size() > 1}
+	if queue.is_empty(): return {"label": "Pick a game at the shelf first", "short": "Start", "action": "next", "enabled": false}
+	return {"label": "Start %s" % queue[0].title, "short": "Start", "action": "next", "enabled": true}
 
 func _unavailable(game: Dictionary) -> String:
 	if not client.connected and demo == null: return "Waiting for GameNight"
@@ -303,23 +306,28 @@ func _unavailable(game: Dictionary) -> String:
 	if game.get("min_players") != null and count < int(game.min_players): return "Needs %d players" % int(game.min_players)
 	return ""
 
-func _use_station(id: String) -> void:
+## Y uses the station; at the shelf, queue (X) adds the box at the end.
+func _use_station(id: String, queue := false) -> void:
 	var station := station_for(id)
 	if station.is_empty() or not station.enabled: return
 	var now := Time.get_ticks_msec() / 1000.0
-	if now < float(_station_cooldown.get(station.id, 0.0)): return
-	_station_cooldown[station.id] = now + 0.4
+	var key := "%s:%s" % [station.id, station.get("action", "")]
+	if now < float(_station_cooldown.get(key, 0.0)): return
+	_station_cooldown[key] = now + 0.4
 	match station.kind:
 		"shelf":
-			client.queue_game(str(station.game), false)
-			toast("%s added to the queue." % station.title, GREEN)
-		"pad":
+			_pending_fly = str(station.game)
+			if queue:
+				client.queue_game(str(station.game), false)
+				toast("%s added to the queue." % station.title, GREEN)
+			else:
+				# queue_next makes it next without starting it, unlike play_next.
+				client._command({"type": "queue_next", "game": str(station.game)})
+				toast("%s is up next." % station.title, GREEN)
+		"tv":
 			match station.action:
 				"resume": client.resume_game()
 				"next": client.start_next()
-				"skip":
-					var queue := upcoming()
-					if queue.size() > 1: client._command({"type": "queue_next", "game": queue[1].game})
 		"music": client.media_control(str(station.action))
 		"exit":
 			client.leave(id)
@@ -469,7 +477,7 @@ func _process(delta: float) -> void:
 	_update_sleep()
 	view.sync_profiles(profiles, world.players)
 	view.update(world, delta)
-	_update_pads()
+	_update_prompts()
 	var next := current_game()
 	if next.is_empty():
 		var queue := upcoming()
@@ -488,17 +496,17 @@ func _process(delta: float) -> void:
 		print("LOBBY_CAPTURE ", _capture_path, " ", error)
 		if demo != null: get_tree().quit()
 
-func _update_pads() -> void:
+## The floating buttons light up while someone stands where they work.
+func _update_prompts() -> void:
 	var occupied := {}
 	for id in world.players:
 		var station := station_for(id)
 		if not station.is_empty(): occupied[station.id] = station
-	for i in Layout.TV_PADS.size():
-		var pad := tv_pad(i)
-		var since := _time - float(_pressed_flash.get("pad%d" % i, -10.0))
-		var energy := 0.6 if not pad.enabled else (1.6 if occupied.has("pad%d" % i) else 0.9 + sin(_time * 2.0 + i) * 0.25)
-		energy += maxf(0, 1.0 - since * 2.5) * 6.0
-		room.set_pad_glow(i, [GREEN, AMBER, VIOLET][i] if pad.enabled else Color("3a3550"), energy)
+	var tv := tv_station()
+	var flash := _time - float(_pressed_flash.get("tv", -10.0)) < 0.3
+	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv") or flash)
+	var shelf_live := not shelf_games().is_empty()
+	room.set_prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], shelf_live, occupied.has("shelf"))
 
 func toast(message: String, color: Color = TEXT) -> void:
 	toasts.append({"text": message, "color": color, "until": _time + 3.5})
@@ -527,7 +535,28 @@ func _redraw_screens() -> void:
 		room.set_shelf(shelf, shelf_offset)
 	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = shelf.size() > 1
 	var queue := upcoming()
+	_animate_queue(queue.map(func(e): return e.game))
 	room.set_queue(mini(queue.size(), 3), maxi(queue.size() - 3, 0))
+
+## Shows how up next changed: the box from the stand flies into its slot,
+## and the row slides when the next game starts or one is pushed in front.
+func _animate_queue(ids: Array) -> void:
+	var old := _last_queue
+	if ids == old: return
+	_last_queue = ids.duplicate()
+	var slot := -1
+	if not _pending_fly.is_empty():
+		for i in mini(ids.size(), 3):
+			if ids[i] == _pending_fly and (i >= old.size() or old[i] != _pending_fly or ids.size() > old.size()):
+				slot = i
+				break
+		_pending_fly = ""
+	if slot >= 0:
+		# Boxes after the new one were pushed one place along.
+		if ids.size() > old.size() and slot < mini(old.size(), 3): room.shift_queue(-1, slot)
+		room.fly_to_queue(slot)
+	elif old.size() > 0 and ids == old.slice(1):
+		room.shift_queue(1)
 
 func _short(value: String, length: int) -> String:
 	return value if value.length() <= length else value.left(length - 1) + "…"
@@ -578,7 +607,7 @@ func _draw_tv(canvas: Control) -> void:
 	if not game.is_empty():
 		kicker = "PAUSED" if game.get("phase") == "paused" else "NOW PLAYING"
 		kicker_color = GREEN
-		detail = "Stand on the left pad and press Y to resume"
+		detail = "Press Y at the TV to resume"
 	else:
 		var queue := upcoming()
 		if not queue.is_empty():
@@ -590,7 +619,7 @@ func _draw_tv(canvas: Control) -> void:
 			if not issue.is_empty():
 				kicker = issue.to_upper()
 				kicker_color = PINK
-				detail = "Press Y on Play to retry"
+				detail = "Press Y at the TV to retry"
 			elif warm is Dictionary and str(warm.get("game")) == str(game.id):
 				if warm.get("phase") == "ready":
 					kicker = "UP NEXT · READY"
@@ -598,7 +627,7 @@ func _draw_tv(canvas: Control) -> void:
 				else:
 					kicker = "LOADING %d%%" % int(warm.get("progress", 0)) if warm.get("progress") != null else "LOADING…"
 					kicker_color = AMBER
-			detail = "Press Y on Play to start"
+			detail = "Press Y at the TV to start"
 	if game.is_empty():
 		_draw_idle_tv(canvas)
 		return
@@ -730,7 +759,7 @@ func _draw_hud(canvas: Control) -> void:
 	# Name tags and station hints follow the players.
 	for id in world.players:
 		var p: Dictionary = world.players[id]
-		var head := Vector3(p.x, p.y + 2.25, 0)
+		var head := Vector3(p.x, p.y + 2.25, view.depth(id))
 		if camera.is_position_behind(head): continue
 		var at := camera.unproject_position(head) / canvas.get_global_transform().get_scale()
 		var color := Color.from_string(str(profiles.get(id, {}).get("color", "")), VIOLET)
@@ -794,14 +823,17 @@ func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void
 	if extra:
 		_draw_extra(canvas, extra, rect.position + Vector2(badge + 26 + tw, h / 2), small)
 
-## Hint extras like "LB RB browse": button names become bumper badges.
+## Hint extras like "X queue LB RB browse": button names become badges.
 const BUMPERS := ["LB", "RB", "LT", "RT"]
+const FACES := {"A": Color("5cb85c"), "B": Color("e2574c"), "X": Color("3b8eea"), "Y": Color("f8cd34")}
 
 func _extra_width(extra: String, size: int) -> float:
 	var w := 0.0
 	for token in extra.split(" ", false):
 		if token == "/": continue
-		w += (size * 2.0 if token in BUMPERS else font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x) + size * 0.3
+		if token in BUMPERS: w += size * 2.3
+		elif FACES.has(token): w += size * 1.45
+		else: w += font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size * 0.6
 	return w
 
 func _draw_extra(canvas: Control, extra: String, at: Vector2, size: int) -> void:
@@ -811,9 +843,13 @@ func _draw_extra(canvas: Control, extra: String, at: Vector2, size: int) -> void
 		if token in BUMPERS:
 			Room.draw_bumper(canvas, Rect2(x, at.y - size * 0.55, size * 2.0, size * 1.1), token, bold)
 			x += size * 2.3
+		elif FACES.has(token):
+			canvas.draw_circle(Vector2(x + size * 0.6, at.y), size * 0.62, FACES[token])
+			canvas.draw_string(bold, Vector2(x, at.y + size * 0.36), token, HORIZONTAL_ALIGNMENT_CENTER, size * 1.2, size, BG)
+			x += size * 1.45
 		else:
 			_text(canvas, token, Vector2(x, at.y + size * 0.36), size, AMBER)
-			x += font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size * 0.3
+			x += font.get_string_size(token, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size * 0.6
 
 func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	var items := menu_items(id)

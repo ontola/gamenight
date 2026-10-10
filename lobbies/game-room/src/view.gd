@@ -4,6 +4,7 @@ extends Node3D
 
 const Character = preload("res://src/character.gd")
 const Face = preload("res://addons/gamenight/face.gd")
+const Layout = preload("res://src/layout.gd")
 
 var room                       # room.gd
 var faces = Face.new()
@@ -11,6 +12,7 @@ var actors: Dictionary = {}    # player id -> {node, sprite, light, zzz, key}
 var item_nodes: Dictionary = {}
 var shot_nodes: Array = []
 var _time := 0.0
+var _next_order := 0
 
 func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
 	for id in actors.keys():
@@ -21,7 +23,10 @@ func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
 		var profile: Dictionary = profiles.get(id, {})
 		var hat: String = sim_players[id].hat
 		var key := "%s|%s|%s|%s" % [profile.get("color", ""), profile.get("skin_color", ""), str(profile.get("avatar", "")).hash(), hat]
-		if not actors.has(id): actors[id] = _make_actor(profile)
+		if not actors.has(id):
+			actors[id] = _make_actor(profile)
+			actors[id].order = _next_order
+			_next_order += 1
 		var actor: Dictionary = actors[id]
 		if actor.key != key:
 			actor.key = key
@@ -69,7 +74,14 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	zzz.position = Vector3(0.6, 1.8, 0.1)
 	zzz.visible = false
 	node.add_child(zzz)
-	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "key": ""}
+	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "key": "", "depth": 0.0, "order": 0}
+
+## The z a player is drawn at: the surface they stand on (couch, shelf) so
+## they sit on it, plus a small per-player step so overlapping sprites never
+## share a depth and flicker.
+func depth(id: String) -> float:
+	if not actors.has(id): return 0.0
+	return actors[id].depth + (actors[id].order % 8) * 0.03
 
 func update(world, delta: float) -> void:
 	_time += delta
@@ -77,7 +89,11 @@ func update(world, delta: float) -> void:
 		if not actors.has(id): continue
 		var p: Dictionary = world.players[id]
 		var actor: Dictionary = actors[id]
-		actor.node.position = Vector3(p.x, p.y, 0)
+		# Ease towards the depth of the surface below, so landing on the couch
+		# or a shelf slides the sprite back instead of popping.
+		var target := Layout.depth_at(p.x, p.y)
+		actor.depth = lerpf(actor.depth, target, 1.0 - exp(-delta * 12.0))
+		actor.node.position = Vector3(p.x, p.y, depth(id))
 		var sprite: Sprite3D = actor.sprite
 		sprite.flip_h = p.facing < 0
 		sprite.frame = Character.frame_index(_frame(p))

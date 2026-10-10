@@ -30,8 +30,8 @@ from their files at runtime.
 | Stick / D-pad | Walk |
 | A | Jump; down + A drops through a shelf; jump off the side walls |
 | B | Grab an item, throw it; open a hat box |
-| X | Punch, fire the confetti blaster, throw a lit bomb |
-| Y | Use the station you stand at (hint above your name) |
+| X | Punch, fire the confetti blaster, throw a lit bomb; at the game shelf: queue the box |
+| Y | Use the station you stand at (hint above your name); at the game shelf: play the box next |
 | LB / RB | At the game shelf: browse the boxes |
 | Start | Your menu: leave, unlink, choose another lobby, quit |
 
@@ -40,19 +40,22 @@ The runtime joins controllers and handles Back, as for every lobby.
 ## Stations
 
 - **Game shelf**: a bookcase of game box spines and a stand with the selected
-  box face forward. LB/RB pick the previous or next box, Y adds it to the queue
-  (`queue_game`).
-- **TV pads**: left resumes the paused game (or starts the queue head when
-  nothing runs), middle starts the queue head (`next`), right skips to the
-  following game (`queue_next`).
-- **Up next ledge** above the couch shows the next three boxes, the first one
-  biggest; the TV shows the current
-  or next game with loading progress and stopped-game issues.
+  box face forward. LB/RB pick the previous or next box, Y makes it the next
+  game without starting it (`queue_next`), X adds it to the end of the queue
+  (`queue_game`). Floating button prompts above the stand show both.
+- **Up next cabinet** beside the stand shows the next three boxes, the first
+  one biggest. A chosen box flies from the stand to its slot, and the boxes
+  slide along when the queue advances.
+- **TV**: Y resumes the paused game, or starts the queue head (`next`) when
+  nothing runs. The TV shows the current or next game with loading progress
+  and stopped-game issues.
 - **Profile doors** appear for phone profiles waiting in the room. An unlinked
   player presses Y at the door to pick it up (`/api/room-pickup`).
 - **QR plaque** shows the room QR and code from `/api/player-links`.
-- **Jukebox pads** control host music when something is playing.
+- **Jukebox** buttons control host music when something is playing.
 - **Exit door** leaves the party.
+
+The room starts fullscreen; set `GAMENIGHT_LOBBY_FULLSCREEN=0` for a window.
 
 Items drop from the ceiling every few seconds: bombs (knock everyone back),
 confetti blasters, hat boxes and one beach ball. Nobody gets hurt; hits only

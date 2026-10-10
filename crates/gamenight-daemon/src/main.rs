@@ -3,6 +3,12 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    // Lobbies that cannot call user32 themselves (Godot) start us as a child
+    // to hand the foreground to the game they are about to show.
+    if std::env::args().nth(1).as_deref() == Some("--allow-foreground") {
+        gamenight_daemon::allow_any_foreground();
+        return Ok(());
+    }
     // The desktop launcher attaches us to its Windows job before allowing any
     // descendants to spawn. EOF means the launcher failed before ownership was set.
     if std::env::var_os("GAMENIGHT_STARTUP_GATE").is_some() {

@@ -554,6 +554,12 @@ impl Shared {
         if let Some(cwd) = &spec.cwd {
             cmd.current_dir(cwd);
         }
+        // Lobbies that cannot call user32 (Godot) run us with
+        // --allow-foreground to hand the screen to a warm game.
+        #[cfg(windows)]
+        if let Ok(exe) = std::env::current_exe() {
+            cmd.env("GAMENIGHT_FOREGROUND_HELPER", exe);
+        }
         // Forward our own overlay URL, if set, so games can raise it (e.g. on
         // a controller Guide-button press) with zero per-game setup.
         if let Ok(overlay_url) = std::env::var(ENV_OVERLAY_URL) {
@@ -1105,6 +1111,23 @@ pub async fn run_with_library(
     library: Vec<GameMeta>,
 ) -> std::io::Result<()> {
     run_with_lobby(listener, library, None).await
+}
+
+/// Let any process take the foreground, until the next user input. Started as
+/// a child of the foreground lobby right before it asks for a game, so the
+/// warm game window can come to the front (Windows only; a no-op elsewhere).
+pub fn allow_any_foreground() {
+    #[cfg(windows)]
+    {
+        #[link(name = "user32")]
+        extern "system" {
+            fn AllowSetForegroundWindow(process_id: u32) -> i32;
+        }
+        // ASFW_ANY: the protocol has no process IDs to name.
+        unsafe {
+            AllowSetForegroundWindow(u32::MAX);
+        }
+    }
 }
 
 /// Like [`run_with_library`], additionally watching every connected

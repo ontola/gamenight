@@ -34,6 +34,9 @@ var _time := 0.0
 var doors: Array = []              # profile door nodes, see set_doors
 var featured_box: Node3D
 var queue_boxes: Array = []
+var _queue_slots: Array = []        # [{pos, size, rot}] where each up next box rests
+var _flying: Dictionary = {}        # up next slots waiting for a flying box
+var _prompts: Dictionary = {}       # floating button rows, see prompt()
 var queue_more: Label3D
 var queue_empty: Label3D
 var _spine_root: Node3D
@@ -54,6 +57,7 @@ func _ready() -> void:
 	_logo()
 	_tv()
 	_game_shelf()
+	_up_next()
 	_shelves()
 	_couch_corner()
 	_jukebox()
@@ -444,11 +448,8 @@ func _tv() -> void:
 		box(Vector3(0.12, 0.62, 0.45), Vector3(-2.9 + i * 0.15, 1.2, Layout.BACK + 0.45), mat(cases[i].darkened(0.3), 0.5))
 	box(Vector3(0.9, 0.18, 0.5), Vector3(2.45, 0.98, Layout.BACK + 0.45), mat(Color("e9e6f5"), 0.3))
 	box(Vector3(0.3, 0.04, 0.02), Vector3(2.45, 0.98, Layout.BACK + 0.71), mat(GREEN, 0.3, 0, GREEN, 4.0), self, false)
-	# Floor pads in front of the TV.
-	for i in Layout.TV_PADS.size():
-		var pad_mat := mat(Color("1c1530"), 0.3, 0.2, VIOLET, 1.0)
-		box(Vector3(Layout.PAD_HALF * 2 - 0.1, 0.04, 1.4), Vector3(Layout.TV_PADS[i], 0.02, 0), pad_mat, self, false)
-		screens["pad%d" % i] = {"material": pad_mat}
+	# A floating button over the console says the TV is something to use.
+	prompt("tv", [["Y", "Start"]], Vector3(0, 1.55, Layout.BACK + 1.2))
 	_tv_light = OmniLight3D.new()
 	_tv_light.light_color = VIOLET
 	_tv_light.light_energy = 3.0
@@ -510,6 +511,7 @@ func _game_shelf() -> void:
 		m.disable_fog = true
 		var button := quad(Vector2(0.7, 0.35), Vector3(dx + side * 1.15, 1.9, z + 0.3), m)
 		button.name = "shelf_lb" if side < 0 else "shelf_rb"
+	prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], Vector3(dx, 3.3, z + 0.3))
 	var spot := SpotLight3D.new()
 	spot.light_color = Color("ffd7a0")
 	spot.light_energy = 9.0
@@ -598,11 +600,137 @@ func pop_box(step: int) -> void:
 	tween.tween_property(featured_box, "rotation:y", 0.0, 0.35)
 	tween.tween_property(featured_box, "scale", Vector3.ONE, 0.35)
 
-## Up next: boxes on a ledge over the couch. count of up to 3 visible.
+## Up next: count of up to 3 boxes visible, more is the "+N" beyond.
 func set_queue(count: int, more: int) -> void:
-	for i in queue_boxes.size(): queue_boxes[i].visible = i < count
+	for i in queue_boxes.size(): queue_boxes[i].visible = i < count and not _flying.has(i)
 	queue_more.text = "+%d" % more if more > 0 else ""
 	queue_empty.visible = count == 0
+
+## Up next sits right beside the stand: the chosen box visibly travels from
+## the stand into its slot, and the row slides along as games are played.
+func _up_next() -> void:
+	var wood := mat(Color("5b3b2a"), 0.55)
+	var z := Layout.BACK + 0.45
+	var x0 := Layout.UP_NEXT.x
+	var x1 := Layout.UP_NEXT.y
+	var cx := (x0 + x1) / 2
+	box(Vector3(x1 - x0, 0.7, 0.75), Vector3(cx, 0.35, z), wood)
+	box(Vector3(x1 - x0 + 0.05, 0.05, 0.8), Vector3(cx, 0.72, z), mat(Color("3a261c"), 0.6))
+	box(Vector3(x1 - x0 - 0.14, 0.42, 0.02), Vector3(cx, 0.35, z + 0.38), mat(Color("24170f"), 0.5))
+	label("UP NEXT", Vector3(cx, 0.38, z + 0.41), 30, Color(0.8, 3.0, 1.8), self, 8)
+	var sizes := [Vector2(0.9, 1.26), Vector2(0.68, 0.95), Vector2(0.68, 0.95)]
+	var xs := [x0 + 0.65, x0 + 1.5, x0 + 2.22]
+	for i in 3:
+		var texture := screen("queue%d" % i, Vector2i(200, 280), func(_canvas): pass)
+		var size: Vector2 = sizes[i]
+		var pos := Vector3(xs[i], 0.75 + size.y / 2, z + 0.05)
+		var node := game_box(size, pos, texture, 1.3 if i == 0 else 1.05)
+		node.rotation.z = [0.0, -0.03, 0.04][i]
+		queue_boxes.append(node)
+		_queue_slots.append({"pos": pos, "size": size, "rot": node.rotation.z})
+	queue_more = label("", Vector3(x1 - 0.35, 0.38, z + 0.41), 30, Color(0.8, 2.2, 1.4), self, 6)
+	queue_empty = label("Y on a box plays it next", Vector3(cx, 1.3, z + 0.2), 22, Color(0.9, 0.9, 1.1), self, 6)
+	var light := OmniLight3D.new()
+	light.light_color = Color("bff5dc")
+	light.light_energy = 2.0
+	light.omni_range = 3.0
+	light.position = Vector3(cx, 2.0, z + 1.2)
+	add_child(light)
+
+## The chosen box flies from the stand into up next slot `slot`.
+func fly_to_queue(slot: int) -> void:
+	if slot >= _queue_slots.size() or featured_box == null: return
+	if DisplayServer.get_name() == "headless": return  # nothing to see
+	var image: Image = screens.box_front.viewport.get_texture().get_image()
+	if image == null or image.is_empty(): return  # headless: nothing to see
+	var cover := ImageTexture.create_from_image(image)
+	var start_size := Vector2(1.5, 2.1)
+	var flyer := game_box(start_size, featured_box.position, cover, 1.45)
+	var target: Dictionary = _queue_slots[slot]
+	var end_scale := Vector3(target.size.x / start_size.x, target.size.y / start_size.y, 1)
+	var from: Vector3 = featured_box.position
+	_flying[slot] = true
+	queue_boxes[slot].visible = false
+	var tween := create_tween()
+	tween.tween_method(func(t: float):
+		# A little arc over the stand, easing into the slot.
+		var e := ease(t, -2.2)
+		flyer.position = from.lerp(target.pos, e) + Vector3(0, sin(t * PI) * 0.9, 0.35 * sin(t * PI))
+		flyer.scale = Vector3.ONE.lerp(end_scale, e)
+		flyer.rotation.z = lerpf(0.0, target.rot, e) + sin(t * PI) * 0.25, 0.0, 1.0, 0.6)
+	tween.tween_callback(func():
+		flyer.queue_free()
+		_flying.erase(slot)
+		queue_boxes[slot].visible = true
+		pop_queue(slot))
+	pop_box(1)
+
+## Slide the row: every box comes from the slot `step` away (1: the queue
+## moved up because a game started, -1: a box was pushed in at the front).
+func shift_queue(step: int, skip := -1) -> void:
+	for i in queue_boxes.size():
+		var j := i + step
+		if i == skip or j < 0 or j >= _queue_slots.size(): continue
+		var node: Node3D = queue_boxes[i]
+		var slot: Dictionary = _queue_slots[i]
+		var from: Dictionary = _queue_slots[j]
+		node.position = from.pos
+		node.scale = Vector3(from.size.x / slot.size.x, from.size.y / slot.size.y, 1)
+		var tween := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_property(node, "position", slot.pos, 0.45)
+		tween.tween_property(node, "scale", Vector3.ONE, 0.45)
+
+## A box landing in its slot gives a small bounce.
+func pop_queue(slot: int) -> void:
+	var node: Node3D = queue_boxes[slot]
+	node.scale = Vector3(1.12, 0.9, 1)
+	var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(node, "scale", Vector3.ONE, 0.3)
+
+## A floating row of controller buttons over a station, e.g. [["Y", "Play next"]].
+## Bright while someone can use it, calm otherwise.
+func prompt(name: String, items: Array, pos: Vector3) -> void:
+	var state := {"items": items, "enabled": true}
+	var width := 0.0
+	for item in items: width += 96 + font.get_string_size(str(item[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x + 36
+	var px := Vector2i(int(width) + 40, 96)
+	var texture := screen("prompt_" + name, px, func(canvas: Control): draw_prompt(canvas, state, bold))
+	screens["prompt_" + name].viewport.transparent_bg = true
+	var m := screen_material(texture, 1.0)
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.disable_fog = true
+	var node := quad(Vector2(px.x, px.y) * 0.0042, pos, m)
+	node.name = "prompt_" + name
+	_prompts[name] = {"node": node, "material": m, "base": pos, "state": state, "active": false}
+
+func set_prompt(name: String, items: Array, enabled: bool, active: bool) -> void:
+	var p: Dictionary = _prompts.get(name, {})
+	if p.is_empty(): return
+	p.active = active
+	if JSON.stringify(p.state.items) != JSON.stringify(items) or p.state.enabled != enabled:
+		p.state.items = items
+		p.state.enabled = enabled
+		redraw("prompt_" + name)
+
+## Xbox face buttons in their colours, each followed by what it does.
+static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
+	var colors := {"A": Color("5cb85c"), "B": Color("e2574c"), "X": Color("3b8eea"), "Y": Color("f8cd34")}
+	var h: float = canvas.get_viewport_rect().size.y
+	var x := 20.0
+	for item in state.items:
+		var key := str(item[0])
+		var text := str(item[1])
+		var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x
+		var pill := StyleBoxFlat.new()
+		pill.bg_color = Color(0.03, 0.03, 0.06, 0.82)
+		pill.set_corner_radius_all(int(h / 2) - 6)
+		pill.anti_aliasing = true
+		canvas.draw_style_box(pill, Rect2(x, 6, 96 + tw + 16, h - 12))
+		var color: Color = colors.get(key, Color("f2f1f8")) if state.enabled else Color("55516a")
+		canvas.draw_circle(Vector2(x + h / 2 - 4, h / 2), h / 2 - 14, color)
+		canvas.draw_string(f, Vector2(x + 10, h / 2 + 17), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
+		canvas.draw_string(f, Vector2(x + 90, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
+		x += 96 + tw + 36
 
 func _shelves() -> void:
 	var wood := mat(Color("5b3b2a"), 0.55)
@@ -654,29 +782,6 @@ func _couch_corner() -> void:
 		box(Vector3(1.02, 0.18, 1.0), Vector3(5.4 + i * 1.05, 0.8, z + 0.15), fabric)
 	box(Vector3(0.5, 0.42, 0.18), Vector3(5.2, 1.08, z - 0.12), mat(AMBER, 0.9)).rotation.z = 0.25
 	box(Vector3(0.5, 0.42, 0.18), Vector3(7.7, 1.08, z - 0.12), mat(GREEN.darkened(0.2), 0.9)).rotation.z = -0.2
-	# Up next: game boxes on a ledge above the couch, next in line on the left,
-	# high enough that people on the couch do not hide them.
-	var q := Layout.QUEUE_BOARD
-	var ledge := q.y
-	box(Vector3(3.3, 0.1, 0.4), Vector3(q.x, ledge - 0.05, q.z + 0.16), mat(Color("5b3b2a"), 0.55))
-	platform_edge(q.x - 1.65, q.x + 1.65, ledge, q.z + 0.37)
-	label("UP NEXT", Vector3(q.x - 0.95, ledge - 0.3, q.z + 0.3), 32, Color(0.8, 3.0, 1.8), self, 8)
-	var sizes := [Vector2(1.2, 1.68), Vector2(0.82, 1.15), Vector2(0.82, 1.15)]
-	var xs := [-0.95, 0.24, 1.14]
-	for i in 3:
-		var texture := screen("queue%d" % i, Vector2i(200, 280), func(_canvas): pass)
-		var size: Vector2 = sizes[i]
-		var node := game_box(size, Vector3(q.x + xs[i], ledge + size.y / 2 + 0.03, q.z + 0.14), texture, 1.3 if i == 0 else 1.05)
-		node.rotation.z = [0.0, -0.03, 0.04][i]
-		queue_boxes.append(node)
-	queue_more = label("", Vector3(q.x + 1.14, ledge - 0.32, q.z + 0.3), 32, Color(0.8, 2.2, 1.4), self, 6)
-	queue_empty = label("Press Y at the game shelf", Vector3(q.x + 0.3, ledge + 0.5, q.z + 0.2), 24, Color(0.9, 0.9, 1.1), self, 6)
-	var light := OmniLight3D.new()
-	light.light_color = Color("bff5dc")
-	light.light_energy = 2.0
-	light.omni_range = 3.0
-	light.position = Vector3(q.x, ledge + 1.0, q.z + 1.4)
-	add_child(light)
 	# Floor lamp: warm light, a nice contrast to the neon.
 	var lamp_x := 8.55
 	cylinder(0.025, 2.6, Vector3(lamp_x, 1.3, Layout.BACK + 0.5), mat(Color("c8a46a"), 0.3, 0.8))
@@ -700,7 +805,7 @@ func _couch_corner() -> void:
 
 func _jukebox() -> void:
 	# A proper jukebox: arched cabinet, now-playing screen, bubbling tubes
-	# that dance while music plays, and three buttons above the floor pads.
+	# that dance while music plays, and three buttons on the front.
 	var x := Layout.JUKEBOX
 	var z := Layout.BACK + 0.55
 	var wood := mat(Color("5a2438"), 0.35, 0.1)
@@ -736,7 +841,6 @@ func _jukebox() -> void:
 		var icon_mat := screen_material(icon_texture, 1.0)
 		icon_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		quad(Vector2(0.18, 0.18), Vector3(px, 0.28, z + 0.52), icon_mat)
-		box(Vector3(0.5, 0.03, 0.7), Vector3(px, 0.015, 0.0), mat(Color("1c1530"), 0.3, 0.2, PINK, 0.8), self, false)
 	var light := OmniLight3D.new()
 	light.light_color = Color("ff8fb8")
 	light.light_energy = 1.8
@@ -751,7 +855,6 @@ func _exit_door() -> void:
 	box(Vector3(1.0, 2.1, 0.06), Vector3(x, 1.05, z + 0.08), mat(Color("9a6544"), 0.55))
 	for p in [[Vector3(-0.62, 0, 0.14), Vector3(-0.62, 2.32, 0.14)], [Vector3(0.62, 0, 0.14), Vector3(0.62, 2.32, 0.14)], [Vector3(-0.62, 2.32, 0.14), Vector3(0.62, 2.32, 0.14)]]:
 		neon_line(Vector3(x, 0, z) + p[0], Vector3(x, 0, z) + p[1], GREEN, 2.5, 0.04)
-	box(Vector3(1.1, 0.03, 0.9), Vector3(x, 0.015, 0.0), mat(Color("0b2a1c"), 0.3, 0, GREEN, 1.2), self, false)
 	sphere(0.05, Vector3(x + 0.35, 1.05, z + 0.14), mat(Color("ffcf5a"), 0.2, 0.9))
 	var sign_node := box(Vector3(0.8, 0.3, 0.06), Vector3(x, 2.55, z + 0.06), mat(Color("0b2a1c"), 0.3, 0, GREEN, 1.4), self, false)
 	sign_node.name = "exit_sign"
@@ -977,17 +1080,17 @@ func _process(delta: float) -> void:
 		f.light.light_energy = move_toward(f.light.light_energy, 0, f.energy * delta * 3.5)
 		if f.light.light_energy <= 0.01: f.light.queue_free()
 	_flash_lights = _flash_lights.filter(func(f): return is_instance_valid(f.light) and f.light.light_energy > 0.01)
+	for name in _prompts:
+		var p: Dictionary = _prompts[name]
+		p.node.position = p.base + Vector3(0, sin(_time * 2.2 + p.base.x) * 0.05, 0)
+		var target := 1.6 if p.active else 0.85
+		var energy := move_toward(p.material.albedo_color.r, target, delta * 3.0)
+		p.material.albedo_color = Color(energy, energy, energy, 1.0 if p.active else 0.8)
 	_shake = move_toward(_shake, 0, delta * 1.8)
 	var sway := Vector3(sin(_time * 0.21) * 0.25, sin(_time * 0.17) * 0.12, 0)
 	var jitter := Vector3(randf_range(-1, 1), randf_range(-1, 1), 0) * _shake * 0.25
 	camera.position = _camera_base + sway + jitter
 	camera.look_at(_camera_target + sway * 0.5)
-
-func set_pad_glow(index: int, color: Color, energy: float) -> void:
-	var pad: Dictionary = screens.get("pad%d" % index, {})
-	if pad.is_empty(): return
-	pad.material.emission = color
-	pad.material.emission_energy_multiplier = energy
 
 ## Previous, play/pause and next, drawn as clean shapes.
 func _draw_music_icon(canvas: Control, index: int) -> void:

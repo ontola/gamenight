@@ -79,7 +79,18 @@ func _command(message: Dictionary) -> void:
 	if not connected:
 		rejected.emit("Reconnecting to GameNight. Please try again when connected.")
 		return
+	if message.get("type") in ["next", "play_next", "close_overlay"]: _allow_game_foreground()
 	_send(message)
+
+## Windows keeps a background process from taking focus unless the foreground
+## app hands it over. A warm game started before this press would stay behind
+## the lobby, so grant it first. GDScript cannot call user32; the host ships a
+## helper (GAMENIGHT_FOREGROUND_HELPER) that does, as a child of this process.
+func _allow_game_foreground() -> void:
+	if OS.get_name() != "Windows": return
+	var helper := OS.get_environment("GAMENIGHT_FOREGROUND_HELPER")
+	if helper.is_empty() or not FileAccess.file_exists(helper): return
+	OS.execute(helper, ["--allow-foreground"])
 
 func join_guest(name: String) -> void:
 	_command({"type": "join_party", "name": name})
