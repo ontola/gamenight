@@ -92,10 +92,16 @@ jobs:
           tar -czf release/game-contract-windows.tar.gz -C evidence .
           tar -czf release/catalog.tar.gz catalog/games
           python scripts/release-manifest.py release --version "$VERSION" --revision "$REVISION" --run "$GITHUB_RUN_ID"
-      - name: Publish only if this commit is still current
+      # A build takes about 45 minutes and main often moves meanwhile. Waiting
+      # for a commit that stays current would publish nothing on a busy day,
+      # so publish unless a newer preview is already out. Versions follow the
+      # CI run number, so newer commits always have higher versions.
+      - name: Publish unless a newer preview is already out
         run: |
-          if [ "$(gh api repos/$GH_REPO/commits/main --jq .sha)" != "$REVISION" ]; then
-            echo 'Superseded by a newer main commit; keeping the existing release.' >> "$GITHUB_STEP_SUMMARY"
+          newest=$(gh release list --limit 100 --json tagName,isDraft \
+            --jq '[.[] | select(.isDraft | not) | .tagName | select(test("^v0[.]2[.][0-9]+$")) | ltrimstr("v0.2.") | tonumber] | max // 0')
+          if [ "${VERSION#0.2.}" -le "$newest" ]; then
+            echo "Preview 0.2.$newest is already out; keeping it." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if gh release view "v$VERSION" --json isDraft --jq .isDraft > /tmp/draft; then
