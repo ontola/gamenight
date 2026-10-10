@@ -45,7 +45,9 @@ jobs:
             echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/gamenight.p12"
             echo "GAMENIGHT_KEYSTORE_FILE=$RUNNER_TEMP/gamenight.p12" >> "$GITHUB_ENV"
           fi
-      - run: flutter build apk --release
+      # The run number is both the versionCode and the build the app compares
+      # with version.json to offer updates.
+      - run: flutter build apk --release --build-number=${{ github.run_number }} --dart-define=GAMENIGHT_BUILD=${{ github.run_number }}
         env:
           GAMENIGHT_KEYSTORE_PASSWORD: ${{ secrets.GAMENIGHT_KEYSTORE_PASSWORD }}
       - name: Show the APK's signing fingerprint
@@ -77,4 +79,7 @@ jobs:
           gh release view app-latest >/dev/null 2>&1 \
             || gh release create app-latest --title "GameNight for Android" --notes "$notes" --latest
           gh release edit app-latest --notes "$notes"
+          echo "{\"build\":${{ github.run_number }},\"commit\":\"$GITHUB_SHA\"}" > version.json
+          # The APK first: an app that sees the new version.json must find its APK.
           gh release upload app-latest gamenight.apk --clobber
+          gh release upload app-latest version.json --clobber

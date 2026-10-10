@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart' show ApiError;
+import 'app_update.dart';
 import 'app_state.dart';
 import 'link.dart';
 import 'screens/game_screen.dart';
@@ -112,7 +113,12 @@ class _HomeScreenState extends State<HomeScreen> {
           PlaylistScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
         ];
         return Scaffold(
-          body: SafeArea(child: IndexedStack(index: _tab, children: pages)),
+          body: SafeArea(
+            child: Column(children: [
+              UpdateBanner(),
+              Expanded(child: IndexedStack(index: _tab, children: pages)),
+            ]),
+          ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _tab,
             onDestinationSelected: (i) => setState(() => _tab = i),

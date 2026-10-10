@@ -64,3 +64,11 @@ CI signs every build from `main` with the GameNight key and publishes it as
 the `app-latest` release, so this link always has the newest app:
 
 <https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk>
+
+The app updates itself from there. CI builds with the workflow's run number
+as versionCode and as `GAMENIGHT_BUILD`, and publishes a `version.json` with
+that number next to the APK. When a newer build is out, a strip above the
+tabs offers it; Android asks the player to confirm, then replaces the app.
+The app checks at start and when it comes back after six hours. Local builds
+(`GAMENIGHT_BUILD` unset) never offer updates. The first build with this
+check has to be installed by hand once.
