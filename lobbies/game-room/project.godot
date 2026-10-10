@@ -6,6 +6,8 @@ config/name="GameNight Game Room"
 config/description="A 2.5D platformer lobby for GameNight: pixel-art players in a neon game room."
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
+config/icon="res://assets/icon.svg"
+config/windows_native_icon="res://assets/gamenight.ico"
 
 [display]
 window/size/viewport_width=1920

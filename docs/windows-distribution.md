@@ -94,6 +94,30 @@ Account creation and publisher identity validation must be completed separately;
 adding the workflow alone does not create a signing identity. Signing also does
 not guarantee that every machine will immediately suppress SmartScreen prompts.
 
+Setup for Ontola (one time, in the Azure portal):
+
+1. Create an Artifact Signing account (Basic tier) in a resource group, and note
+   its endpoint, for example `https://weu.codesigning.azure.net/`.
+2. Create a Public Trust identity validation for Ontola as an organization and
+   wait for approval. Microsoft checks the company details against public records.
+3. Create a Public Trust certificate profile on that validated identity.
+4. Create an app registration with a federated credential for GitHub Actions,
+   entity `Branch`, repository `ontola/gamenight`, branch `main`.
+5. Give that app the role *Artifact Signing Certificate Profile Signer* (formerly *Trusted
+   Signing Certificate Profile Signer*) on the
+   certificate profile.
+6. Add the six repository variables above (Settings, Secrets and variables,
+   Actions, Variables). They are identifiers, not secrets.
+
+The next automatic preview from `main` is then signed: Setup, `GameNight.exe`,
+the updater and the bundled binaries. SmartScreen stops warning once the signing
+certificate has built reputation; with Artifact Signing that usually happens
+after a modest number of downloads, not immediately on the first release.
+
+The Windows icon has classic BMP frames for 16 to 64 px and a PNG frame only at
+256 px. Explorer and the taskbar ignore PNG-compressed small frames in some
+places, which shows up as a missing or generic `.exe` icon.
+
 For a local signed build, pass `-SigningMetadata C:/signing/metadata.json` after
 authenticating with Azure. Do not commit credentials or account-specific files.
 
