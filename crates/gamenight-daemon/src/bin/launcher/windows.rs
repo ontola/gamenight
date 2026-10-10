@@ -131,7 +131,7 @@ impl Updates {
                         append_log(
                             &log,
                             &format!(
-                                "Update {} downloaded; waiting for GameNight to close.",
+                                "Update downloaded ({}); waiting for GameNight to close.",
                                 update.TargetFullRelease.Version
                             ),
                         );
