@@ -981,6 +981,30 @@ impl GameNight {
         self.now_playing.as_ref()
     }
 
+    /// The games whose processes the night still needs: the one being
+    /// played, the one warming up, and the one it will warm next. A game
+    /// process outside this set is idle and may be stopped; a queue of
+    /// fifteen games must not mean fifteen games loaded at once.
+    pub fn wanted_games(&self) -> Vec<GameId> {
+        let mut wanted: Vec<GameId> = Vec::new();
+        let target = self
+            .warm_target()
+            .and_then(|i| self.playlist.get(i))
+            .map(|e| e.game.clone());
+        for game in self
+            .active
+            .iter()
+            .chain(self.warm.iter())
+            .map(|s| s.game.clone())
+            .chain(target)
+        {
+            if !wanted.contains(&game) {
+                wanted.push(game);
+            }
+        }
+        wanted
+    }
+
     /// Players who currently hold a seat — the set whose consensus decides votes.
     fn voters(&self) -> Vec<PlayerId> {
         self.seats

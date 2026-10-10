@@ -81,6 +81,10 @@ struct Shared {
     /// so this is "don't bring it back on your own", not "banned for the
     /// night".
     quit_games: std::collections::HashSet<GameId>,
+    /// Titles the daemon stopped itself because the night no longer needed
+    /// them (see `retire_idle_games`). Their disconnect is expected: not a
+    /// crash to report and not a quit to respect.
+    retired: std::collections::HashSet<GameId>,
     game_issues: HashMap<GameId, gamenight_protocol::GameIssueKind>,
     /// The background catalogue prewarm, if one is running — lets `launch`
     /// bump a game to the front of the download queue instead of silently
@@ -128,6 +132,7 @@ impl Shared {
             running_children: HashMap::new(),
             quitting: None,
             quit_games: std::collections::HashSet::new(),
+            retired: std::collections::HashSet::new(),
             game_issues: HashMap::new(),
             prewarm,
             // A fresh night genuinely has nobody seated, so recording that up
@@ -363,6 +368,38 @@ impl Shared {
         }
         if broadcast {
             self.broadcast_party();
+        }
+        self.retire_idle_games();
+    }
+
+    /// Stop game processes we launched that the night no longer needs. Only
+    /// the game being played and the next one stay loaded: changing the next
+    /// game over and over, or a long queue, must not leave every game it
+    /// touched running (seven at once, 650 MB each, on a living room PC).
+    /// A retired game launches again when its turn comes.
+    fn retire_idle_games(&mut self) {
+        let wanted = self.night.wanted_games();
+        let idle: Vec<GameId> = self
+            .running_children
+            .keys()
+            .chain(self.pending_launches.keys())
+            .filter(|game| !wanted.contains(game) && self.lobby_game.as_ref() != Some(*game))
+            .cloned()
+            .collect();
+        for game in idle {
+            let child = self
+                .running_children
+                .remove(&game)
+                .or_else(|| self.pending_launches.remove(&game).map(|p| p.child));
+            let Some(mut child) = child else { continue };
+            info!(%game, "stopping a game the night no longer needs");
+            if self.games.contains_key(&game) {
+                self.retired.insert(game.clone());
+            }
+            let _ = child.start_kill();
+            tokio::spawn(async move {
+                let _ = child.wait().await;
+            });
         }
     }
 
@@ -1778,7 +1815,17 @@ async fn serve(
                         let _ = child.wait().await;
                     });
                 }
-                s.record_game_issue(game_id.clone(), kind);
+                if s.retired.remove(game_id) {
+                    // We stopped it ourselves; it may come back when it's wanted.
+                    s.dispatch(
+                        Command::GameDisconnected {
+                            game: game_id.clone(),
+                        },
+                        None,
+                    );
+                } else {
+                    s.record_game_issue(game_id.clone(), kind);
+                }
             }
             Registration::Overlay(id) => {
                 info!(overlay = id, "overlay disconnected");
@@ -2074,6 +2121,54 @@ mod replacement_lobby_tests {
         s.dispatch(Command::QueueNext { game: game.clone() }, None);
         assert!(s.game_issues.is_empty());
         assert!(s.pending_launches.contains_key(&game));
+        s.kill_all_children();
+    }
+
+    #[cfg(not(windows))]
+    #[tokio::test]
+    async fn changing_the_next_game_stops_the_one_it_replaced() {
+        let library = ["one", "two", "three"]
+            .map(|id| {
+                serde_json::from_value(serde_json::json!({"id":id,"title":id,
+                    "launch":{"command":"sleep","args":["30"]}}))
+                .unwrap()
+            })
+            .to_vec();
+        let mut s = Shared::new(library, "127.0.0.1:0".into(), None);
+        s.night.set_lobby_game(Some(GameId::new("lobby")));
+        for id in ["one", "two", "three"] {
+            s.dispatch(
+                Command::QueueGame {
+                    game: GameId::new(id),
+                    first: false,
+                },
+                None,
+            );
+        }
+        let loaded = |s: &Shared| {
+            let mut games: Vec<String> = s
+                .pending_launches
+                .keys()
+                .chain(s.running_children.keys())
+                .map(|g| g.0.clone())
+                .collect();
+            games.sort();
+            games
+        };
+        assert_eq!(loaded(&s), ["one"]);
+        for id in ["two", "three", "two"] {
+            s.dispatch(
+                Command::QueueNext {
+                    game: GameId::new(id),
+                },
+                None,
+            );
+            assert_eq!(loaded(&s), [id], "only the next game stays loaded");
+        }
+        assert!(
+            s.game_issues.is_empty(),
+            "a stopped preload is not a failure"
+        );
         s.kill_all_children();
     }
 
