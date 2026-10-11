@@ -1,5 +1,10 @@
 extends SceneTree
 ## Offline queue hierarchy test; run with -- --demo --scene=stations.
+class RecordingClient extends "res://addons/gamenight/lobby.gd":
+	var commands: Array = []
+	func _ready() -> void: pass
+	func _command(message: Dictionary) -> void: commands.append(message)
+
 var failures := 0
 
 func _initialize() -> void:
@@ -17,6 +22,9 @@ func _run() -> void:
 	main.set_physics_process(false)
 	main._links.free()
 	main._pickup.free()
+	main.client.free()
+	var recorder := RecordingClient.new()
+	main.client = recorder
 	var party: Dictionary = main.party.duplicate(true)
 	party.playlist.current = 0
 	party.active_session = {"game": "spaceracer", "phase": "paused"}
@@ -27,6 +35,31 @@ func _run() -> void:
 	check(main.room.screens.has("queue0") and main.room.screens.has("queue_titles"), "Next preview and title surfaces exist")
 	check(not main.room.screens.has("queue1") and not main.room.screens.has("queue2"), "Later games have no cover surfaces")
 	check(main.Room.NEXT_SIZE.x > 2.5 and main.Room.NEXT_SIZE.x < main.Layout.TV_SIZE.x, "Next preview is substantial but smaller than current TV")
+	var p: Dictionary = main.world.players.p0
+	p.x = -4.95; p.y = 0.0; p.grounded = true; p.sleeping = false
+	check(main.station_for("p0").kind == "queue", "Queue has its own station, separate from browsing")
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands == [{"type": "next"}], "Y at the queue starts next while the current game is paused")
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands.size() == 1, "Holding Y cannot advance twice")
+	main.input("p0", 0, Vector2.ZERO)
+	p.x = 0.0
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands[-1] == {"type": "close_overlay"}, "Y at TV still resumes the current game")
+	main.input("p0", 0, Vector2.ZERO)
+	p.x = -7.5
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands[-1].type == "queue_next", "Selector sets next without starting it")
+	check(main.station_for("p0").label.begins_with("Set "), "Selector label describes queue placement")
+	main.world.players.p1.x = 0.0
+	main.world.players.p1.y = 0.0
+	main.world.players.p2.x = -4.95
+	main.world.players.p2.y = 0.0
+	main.world.players.p1.grounded = true
+	main.world.players.p2.grounded = true
+	main._update_prompts()
+	check(main.room._prompts.queue.node.visible, "Queue shows its floating Y action in range")
+	check(main.room._prompts.shelf.state.items[0][1] == "Set up next", "Selector prompt does not promise immediate play")
 	await capture(main, "queue-hierarchy")
 	for i in 6: party.playlist.entries.append({"game": "extra-%d" % i, "title": "Later game %d" % i})
 	main.set_party(party)
@@ -41,6 +74,12 @@ func _run() -> void:
 	party.erase("active_session")
 	main.set_party(party)
 	check(main.upcoming().is_empty() and main.queue_title_rows().is_empty(), "Empty queue clears both surfaces")
+	main._station_cooldown.clear()
+	main.input("p0", 0, Vector2.ZERO)
+	p.x = -4.95
+	var command_count := recorder.commands.size()
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands.size() == command_count, "Empty queue cannot launch a game")
 	print("GAME_ROOM_QUEUE_", "PASS" if failures == 0 else "FAIL")
 	var client: Node = main.client
 	main.free()

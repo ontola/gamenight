@@ -48,7 +48,7 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 		"walk3": legs = [0, 0]; lift = [1, 0]; bob = -1
 		"jump": legs = [1, -1]; lift = [2, 0]; arms = ["up", "up"]; bob = -1
 		"fall": legs = [-1, 1]; lift = [0, 1]; arms = ["out", "out"]
-		"sleep": bob = 5; arms = ["down", "down"]
+		"sleep": bob = 1; arms = ["folded", "folded"]
 		"carry": arms = ["forward", "forward"]
 		"throw": arms = ["up", "forward"]; legs = [2, -1]
 		"cheer": arms = ["up", "up"]; bob = -1
@@ -56,10 +56,11 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 	var light := cloth.lightened(0.25)
 	var pants := Color("2a2840")
 	var shoe := Color("15141f")
-	# Legs and shoes. Sleeping players sit, so their legs fold forward.
+	# Tuck the knees while sleeping; the view lays this curled pose on its side.
 	if sleeping:
-		_rect(img, Rect2i(9, 40, 15, 4), pants)
-		_rect(img, Rect2i(22, 40, 4, 4), shoe)
+		_rect(img, Rect2i(9, 35, 16, 5), pants)
+		_rect(img, Rect2i(20, 38, 5, 5), pants)
+		_rect(img, Rect2i(16, 41, 9, 3), shoe)
 	else:
 		for side in 2:
 			var x: int = (11 if side == 0 else 17) + legs[side]
@@ -68,7 +69,7 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 			_rect(img, Rect2i(x, top, 4, bottom - top), pants)
 			_rect(img, Rect2i(x - (1 if side == 0 else 0), bottom - 1, 5, 2), shoe)
 	# Torso: a rounded jacket with a darker side and a highlight.
-	var torso := Rect2i(9, 25 + bob, 14, 12 if not sleeping else 9)
+	var torso := Rect2i(9, 25 + bob, 14, 12)
 	_rect(img, torso, cloth)
 	_rect(img, Rect2i(torso.position.x, torso.position.y, 2, torso.size.y), dark)
 	_rect(img, Rect2i(torso.end.x - 3, torso.position.y + 1, 2, torso.size.y - 2), light)
@@ -118,13 +119,18 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 			_rect(img, Rect2i(int(head.x) + 5, eye_y - 1, 2, 2), INK)
 		_rect(img, Rect2i(int(head.x) + 2, int(head.y) + 5, 4, 1), INK)
 	if sleeping:
-		# Hands over the eyes, like the platformer lobby: drawn faces cannot close their eyes.
-		var hand := skin.darkened(0.08)
-		for side in [-1, 1]:
-			var hx: int = int(head.x) + (side * 5) - 3 + (2 if side > 0 else 0)
-			_rect(img, Rect2i(hx, int(head.y) - 5, 7, 6), hand)
-			_rect(img, Rect2i(hx, int(head.y) - 5, 7, 1), skin.lightened(0.15))
-			_rect(img, Rect2i(hx + 1, int(head.y) + 1, 5, 4), cloth.darkened(0.2))
+		# Bent forearms join the shoulders to the face, above custom artwork.
+		# Cover the whole eye band: profile drawings can have open eyes anywhere.
+		var hx := int(head.x)
+		var hy := int(head.y)
+		_rect(img, Rect2i(hx - 10, hy - 2, 5, 18), dark)
+		_rect(img, Rect2i(hx - 9, hy - 3, 9, 5), cloth)
+		_rect(img, Rect2i(hx + 7, hy + 1, 5, 14), dark)
+		_rect(img, Rect2i(hx + 3, hy + 1, 9, 5), cloth)
+		_rect(img, Rect2i(hx - 5, hy - 6, 9, 9), skin.darkened(0.06))
+		_rect(img, Rect2i(hx + 3, hy - 5, 9, 10), skin)
+		_rect(img, Rect2i(hx - 4, hy - 6, 7, 1), skin.lightened(0.14))
+		_rect(img, Rect2i(hx + 4, hy - 5, 7, 1), skin.lightened(0.14))
 	_hat(img, hat, head, cloth)
 
 static func _hat(img: Image, hat: String, head: Vector2, cloth: Color) -> void:

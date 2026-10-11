@@ -103,16 +103,27 @@ func update(world, delta: float) -> void:
 		elif not p.grounded and p.vy > 4: squash = 1.08
 		sprite.scale = Vector3(1.0 / sqrt(squash), squash, 1)
 		if p.spawn > 0: sprite.scale *= 1.0 - p.spawn * 0.8
-		# The shadow body follows the pose: lower when sleeping or squashed.
 		var body: MeshInstance3D = actor.body
-		body.scale = Vector3(sprite.scale.x, sprite.scale.y * (0.6 if p.sleeping else 1.0), 1)
-		body.position.y = 0.85 * body.scale.y
-		if p.stun > 0: sprite.rotation.z = sin(_time * 30) * 0.15
-		else: sprite.rotation.z = 0
+		sprite.position = Vector3.ZERO
+		body.rotation.z = 0.0
+		body.scale = Vector3(sprite.scale.x, sprite.scale.y, 1)
+		body.position = Vector3(0, 0.85 * body.scale.y, -0.42)
+		sprite.rotation.z = sin(_time * 30) * 0.15 if p.stun > 0 else 0.0
 		actor.zzz.visible = p.sleeping
 		if p.sleeping:
+			# Rotate the whole pose, including the player's drawing and hat.
+			# Centre the curled body over its resting spot, with its cheek on
+			# the supporting surface. Breathing expands upward, never below it.
+			var side: float = p.facing
+			var breath := (sin(_time * 1.8 + actor.order) + 1.0) * 0.5
+			sprite.rotation.z = side * PI * 0.5
+			sprite.scale = Vector3(1.0 + breath * 0.025, 1.0, 1.0)
+			sprite.position = Vector3(side * 0.94, 0.52 + breath * 0.012, 0)
+			body.rotation.z = PI * 0.5
+			body.scale = Vector3(0.65, 0.9, 1.0)
+			body.position = Vector3(0, 0.3, -0.42)
 			var t := fmod(_time * 0.45, 1.0)
-			actor.zzz.position = Vector3(0.6 + t * 0.3, 1.5 + t * 0.9, 0.1)
+			actor.zzz.position = Vector3(-side * (0.6 + t * 0.3), 0.95 + t * 0.65, 0.1)
 			actor.zzz.modulate.a = 1.0 - t
 			actor.zzz.text = ["z", "zZ", "zZz"][int(_time * 0.45 * 3) % 3]
 	_update_items(world)

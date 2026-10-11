@@ -399,8 +399,10 @@ func station_for(id: String) -> Dictionary:
 		var game: Dictionary = shelf[shelf_offset % shelf.size()]
 		var reason := _unavailable(game)
 		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
-			"label": reason if not reason.is_empty() else "Play %s next" % str(game.get("title", "game")),
+			"label": reason if not reason.is_empty() else "Set %s up next" % str(game.get("title", "game")),
 			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
+	if p.x >= Layout.UP_NEXT.x and p.x <= Layout.UP_NEXT.y:
+		return queue_station()
 	if p.x >= Layout.TV_STATION.x and p.x <= Layout.TV_STATION.y:
 		var tv := tv_station()
 		tv["id"] = "tv"
@@ -430,6 +432,13 @@ func tv_station() -> Dictionary:
 	if queue.is_empty(): return {"label": "No queued games for this party", "short": "Start", "action": "next", "enabled": false}
 	return {"label": "Start %s" % queue[0].title, "short": "Start", "action": "next", "enabled": true}
 
+## The queue cabinet always starts the next game, even while another is paused.
+func queue_station() -> Dictionary:
+	var entries := upcoming()
+	return {"id": "queue", "kind": "queue", "action": "next", "short": "Play next",
+		"label": "Play %s" % entries[0].title if not entries.is_empty() else "Queue is empty",
+		"enabled": not entries.is_empty() and (client.connected or demo != null)}
+
 func _unavailable(game: Dictionary) -> String:
 	if not client.connected and demo == null: return "Waiting for GameNight"
 	var count := _human_count()
@@ -454,6 +463,7 @@ func _use_station(id: String, queue := false) -> void:
 				# queue_next makes it next without starting it, unlike play_next.
 				client._command({"type": "queue_next", "game": str(station.game)})
 				toast("%s is up next." % station.title, GREEN)
+		"queue": client.start_next()
 		"tv":
 			match station.action:
 				"resume": client.resume_game()
@@ -638,8 +648,10 @@ func _update_prompts() -> void:
 		if not station.is_empty() and (not occupied.has(station.id) or station.enabled): occupied[station.id] = station
 	var tv := tv_station()
 	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv"))
+	var queued := queue_station()
+	room.set_prompt("queue", [["Y", "Play next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
-	room.set_prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
+	room.set_prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
 	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = occupied.has("shelf") and shelf_games().size() > 1
 	var playing: bool = party.get("now_playing", {}).get("playing", false) if party.get("now_playing") is Dictionary else false
 	room.set_prompt("music", [["LB", "Previous"], ["Y", "Pause" if playing else "Play"], ["RB", "Next"]], true, occupied.has("music1"))
@@ -927,7 +939,7 @@ func _draw_hud(canvas: Control) -> void:
 	# Only names and open menus follow players; action buttons stay at their objects.
 	for id in world.players:
 		var p: Dictionary = world.players[id]
-		var head := Vector3(p.x, p.y + 2.25, view.depth(id))
+		var head := Vector3(p.x, p.y + (1.3 if p.sleeping else 2.25), view.depth(id))
 		if camera.is_position_behind(head): continue
 		var at := camera.unproject_position(head) / canvas.get_global_transform().get_scale()
 		var color := Color.from_string(str(profiles.get(id, {}).get("color", "")), VIOLET)

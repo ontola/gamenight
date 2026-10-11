@@ -518,7 +518,7 @@ func _game_shelf() -> void:
 		var button := quad(Vector2(0.7, 0.35), Vector3(dx + side * 1.15, 1.9, z + 0.3), m)
 		button.name = "shelf_lb" if side < 0 else "shelf_rb"
 		button.visible = false
-	prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], Vector3(dx, 3.3, z + 0.3))
+	prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], Vector3(dx, 3.3, z + 0.3))
 	var spot := SpotLight3D.new()
 	spot.light_color = Color("ffd7a0")
 	spot.light_energy = 9.0
@@ -613,6 +613,7 @@ func _up_next() -> void:
 	var frame := mat(Color("211d32"), 0.5)
 	box(Vector3(2.88, 1.38, 0.65), Vector3(-4.95, 0.72, z), frame)
 	box(Vector3(2.88, 1.94, 0.16), NEXT_POSITION - Vector3(0, 0, 0.1), frame)
+	prompt("queue", [["Y", "Play next"]], Vector3(-4.95, 3.5, z + 0.3))
 	var texture := screen("queue0", Vector2i(640, 420), func(_canvas): pass)
 	queue_preview = quad(NEXT_SIZE, NEXT_POSITION, screen_material(texture, 1.05))
 	var titles := screen("queue_titles", Vector2i(640, 300), func(_canvas): pass)
