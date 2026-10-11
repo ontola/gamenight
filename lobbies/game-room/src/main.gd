@@ -53,6 +53,7 @@ var _pickup := HTTPRequest.new()
 var _pickup_cooldown := 0.0
 var _accumulator := 0.0
 var _station_cooldown: Dictionary = {}
+var _item_prompt_presses: Dictionary = {}
 var _pressed_flash: Dictionary = {}  # station id -> time of last press
 var _door_nodes: Array = []
 var _door_key := ""
@@ -360,12 +361,18 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 		_menu_input(id, pressed, stick)
 		world.set_input(id, 0, Vector2.ZERO)
 		return
+	if pressed & World.BTN_B:
+		var item: Dictionary = world.pickup_target(world.players[id])
+		if not item.is_empty():
+			var node: Node3D = view.item_nodes.get(item.id)
+			if node != null: _item_prompt_presses[item.id] = {"item": item.duplicate(), "position": node.global_position, "time": _time}
 	var at_shelf: bool = station_for(id).get("kind") == "shelf"
 	# At the shelf X queues the box instead of punching.
 	world.set_input(id, buttons & ~World.BTN_X if at_shelf else buttons, stick)
 	if pressed & World.BTN_Y: _use_station(id)
 	if at_shelf and pressed & World.BTN_X: _use_station(id, true)
 	if at_shelf and pressed & (BTN_LB | BTN_RB):
+		room.press_prompt("shelf", "LB" if pressed & BTN_LB else "RB")
 		_browse(-1 if pressed & BTN_LB else 1)
 	elif pressed & (BTN_LB | BTN_RB):
 		_skip_music(id, -1 if pressed & BTN_LB else 1)
@@ -378,6 +385,7 @@ func _skip_music(id: String, direction: int) -> void:
 	var now := Time.get_ticks_msec() / 1000.0
 	if now < float(_station_cooldown.get(key, 0.0)): return
 	_station_cooldown[key] = now + 0.4
+	room.press_prompt("music", "LB" if direction < 0 else "RB")
 	client.media_control(action)
 	_celebrate(id, station_id)
 
@@ -393,7 +401,16 @@ func _browse(step: int) -> void:
 ## What the player can use where they stand, or {} when nothing.
 func station_for(id: String) -> Dictionary:
 	var p: Dictionary = world.players.get(id, {})
-	if p.is_empty() or not p.grounded or p.y > 0.1 or p.sleeping: return {}
+	if p.is_empty() or not p.grounded or p.sleeping: return {}
+	var on_floor: bool = absf(p.y) <= 0.1
+	var at_tv_floor: bool = on_floor and p.x >= Layout.TV_STATION.x and p.x <= Layout.TV_STATION.y
+	var on_tv_console: bool = absf(p.y - Layout.TV_CONSOLE[2]) <= 0.1 and p.x >= Layout.TV_CONSOLE[0] and p.x <= Layout.TV_CONSOLE[1]
+	if at_tv_floor or on_tv_console:
+		var tv := tv_station()
+		tv["id"] = "tv"
+		tv["kind"] = "tv"
+		return tv
+	if not on_floor: return {}
 	var shelf := shelf_games()
 	if p.x >= Layout.GAME_SHELF.x and p.x <= Layout.GAME_SHELF.y and not shelf.is_empty():
 		var game: Dictionary = shelf[shelf_offset % shelf.size()]
@@ -403,11 +420,6 @@ func station_for(id: String) -> Dictionary:
 			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
 	if p.x >= Layout.UP_NEXT.x and p.x <= Layout.UP_NEXT.y:
 		return queue_station()
-	if p.x >= Layout.TV_STATION.x and p.x <= Layout.TV_STATION.y:
-		var tv := tv_station()
-		tv["id"] = "tv"
-		tv["kind"] = "tv"
-		return tv
 	var track: Variant = party.get("now_playing")
 	if track is Dictionary and not track.is_empty() and absf(p.x - Layout.JUKEBOX) <= 0.85:
 		return {"id": "music1", "kind": "music", "label": "Pause music" if track.get("playing", false) else "Play music",
@@ -454,6 +466,7 @@ func _use_station(id: String, queue := false) -> void:
 	var key := "%s:%s" % [station.id, station.get("action", "")]
 	if now < float(_station_cooldown.get(key, 0.0)): return
 	_station_cooldown[key] = now + 0.4
+	room.press_prompt("music" if station.kind == "music" else str(station.id), "X" if queue else "Y")
 	match station.kind:
 		"shelf":
 			if queue:
@@ -936,7 +949,7 @@ func _draw_plaque(canvas: Control) -> void:
 func _draw_hud(canvas: Control) -> void:
 	var camera: Camera3D = room.camera
 	var scale := canvas.size.y / 1080.0
-	_draw_item_hints(canvas, camera, scale)
+	_draw_item_hints(canvas, camera)
 	# Only names and open menus follow players; action buttons stay at their objects.
 	for id in world.players:
 		var p: Dictionary = world.players[id]
@@ -983,22 +996,35 @@ func pickup_hint_items() -> Dictionary:
 		if not item.is_empty(): targets[item.id] = item
 	return targets
 
-func _draw_item_hints(canvas: Control, camera: Camera3D, scale: float) -> void:
-	var size := maxi(14, int(23 * scale))
-	var radius := size * 0.72
-	for item in pickup_hint_items().values():
-		# Use the prop's rendered position, including the hat box's gentle bob.
+func _draw_item_hints(canvas: Control, camera: Camera3D) -> void:
+	var targets := pickup_hint_items()
+	for key in _item_prompt_presses.keys():
+		if _time - _item_prompt_presses[key].time >= .2:
+			_item_prompt_presses.erase(key)
+		else: targets[key] = _item_prompt_presses[key].item
+	for item in targets.values():
+		var press: Dictionary = _item_prompt_presses.get(item.id, {})
 		var node: Node3D = view.item_nodes.get(item.id)
-		if node == null or not node.visible: continue
-		var top := node.global_position + Vector3(0, 1.2 if item.kind == "hatbox" else 0.95, 0)
+		var top: Vector3
+		if not press.is_empty(): top = press.position
+		elif node != null and node.visible: top = node.global_position
+		else: continue
+		top += Vector3(0, 1.2 if item.kind == "hatbox" else 0.95, 0)
 		if camera.is_position_behind(top): continue
-		var at := camera.unproject_position(top) / canvas.get_global_transform().get_scale()
-		at.y -= radius + 6 * scale + sin(_time * 3.0 + item.id) * 3 * scale
-		at.x = clampf(at.x, radius + 4, canvas.size.x - radius - 4)
-		at.y = clampf(at.y, radius + 4, canvas.size.y - radius - 4)
-		canvas.draw_circle(at, radius + 4 * scale, Color(BG, 0.9))
-		canvas.draw_circle(at, radius, FACES.B)
-		canvas.draw_string(bold, at + Vector2(-radius, size * 0.36), "B", HORIZONTAL_ALIGNMENT_CENTER, radius * 2, size, BG)
+		var ui_scale := canvas.get_global_transform().get_scale()
+		var at := camera.unproject_position(top) / ui_scale
+		var above := camera.unproject_position(top + Vector3(0, .4032, 0)) / ui_scale
+		var factor := at.distance_to(above) / 96.0
+		var label := "Open" if item.kind == "hatbox" else ("Kick" if item.kind == "ball" else "Pick up")
+		var items := [["B", label]]
+		var size := Vector2(room._prompt_size(items)) * factor
+		at -= size * .5
+		at.x = clampf(at.x, 4, canvas.size.x - size.x - 4)
+		at.y = clampf(at.y, 4, canvas.size.y - size.y - 4)
+		var pressed := maxf(0.0, 1.0 - (_time - float(press.get("time", -1.0))) / .2) if not press.is_empty() else 0.0
+		canvas.draw_set_transform(at, 0, Vector2.ONE * factor)
+		Room.draw_prompt(canvas, {"items": items, "enabled": true, "pressed": {"B": pressed}}, bold)
+		canvas.draw_set_transform(Vector2.ZERO)
 
 ## A black capsule with a yellow Y badge, like the platformer lobby.
 func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void:

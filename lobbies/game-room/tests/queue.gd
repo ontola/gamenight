@@ -47,12 +47,25 @@ func _run() -> void:
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1] == {"type": "close_overlay"}, "Y at TV still resumes the current game")
 	main.input("p0", 0, Vector2.ZERO)
+	for x in [-3.1, 0.0, 3.1]:
+		p.x = x; p.y = main.Layout.TV_CONSOLE[2]
+		check(main.station_for("p0").get("action") == "resume", "Low console shelf offers Resume across its width")
+	main._station_cooldown.clear()
+	var before_resume := recorder.commands.size()
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands.size() == before_resume + 1 and recorder.commands[-1].type == "close_overlay", "Y on the low shelf resumes the current game")
+	p.grounded = false
+	check(main.station_for("p0").is_empty(), "Jumping past the TV does not trigger the station")
+	p.grounded = true; p.y = 6.55
+	check(main.station_for("p0").is_empty(), "High shelf is outside TV interaction range")
+	p.y = 0.0
+	main.input("p0", 0, Vector2.ZERO)
 	p.x = -9.6
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1].type == "queue_next", "Selector sets next without starting it")
 	check(main.station_for("p0").label.begins_with("Set "), "Selector label describes queue placement")
 	main.world.players.p1.x = 0.0
-	main.world.players.p1.y = 0.0
+	main.world.players.p1.y = main.Layout.TV_CONSOLE[2]
 	main.world.players.p2.x = -4.95
 	main.world.players.p2.y = 0.0
 	main.world.players.p1.grounded = true

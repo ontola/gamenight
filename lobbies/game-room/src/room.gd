@@ -41,6 +41,7 @@ const NEXT_SIZE := Vector2(2.7, 1.77)
 const NEXT_POSITION := Vector3(-4.95, 2.38, Layout.BACK + 0.92)
 const TITLES_POSITION := Vector3(-4.95, 0.8, Layout.BACK + 0.96)
 var _prompts: Dictionary = {}       # floating button rows, see prompt()
+var _bumper_presses: Dictionary = {}
 var _spine_root: Node3D
 var _eq_bars: Array = []
 var music_playing := false
@@ -455,7 +456,7 @@ func _tv() -> void:
 	box(Vector3(0.9, 0.18, 0.5), Vector3(2.45, 0.98, Layout.BACK + 0.45), mat(Color("e9e6f5"), 0.3))
 	box(Vector3(0.3, 0.04, 0.02), Vector3(2.45, 0.98, Layout.BACK + 0.71), mat(GREEN, 0.3, 0, GREEN, 4.0), self, false)
 	# A floating button over the console says the TV is something to use.
-	prompt("tv", [["Y", "Start"]], Vector3(0, 1.55, Layout.BACK + 1.2))
+	prompt("tv", [["Y", "Start"]], Vector3(0, 5.9, Layout.BACK + 0.3))
 	_tv_light = OmniLight3D.new()
 	_tv_light.light_color = VIOLET
 	_tv_light.light_energy = 3.0
@@ -502,14 +503,14 @@ func _game_shelf() -> void:
 	box(Vector3(dw + 0.05, 0.05, 0.85), Vector3(dx, 0.8, z + 0.05), dark)
 	platform_edge(Layout.DISPLAY.x, Layout.DISPLAY.y, 0.83, z + 0.48)
 	var front_texture := screen("box_front", Vector2i(300, 420), func(_canvas): pass)
-	featured_box = game_box(Vector2(1.25, 1.75), Vector3(bx, 3.56, z + 0.1), front_texture, 1.45)
+	featured_box = game_box(Vector2(1.25, 1.75), Vector3(bx, 3.56, z + 0.1), front_texture)
 	featured_box.visible = false
 	featured_box.rotation.x = -0.06
 	for side in [-1, 1]:
 		# Xbox-style bumper buttons, drawn smooth like the Y badge in the hints.
 		var key := "LB" if side < 0 else "RB"
 		var texture := screen("bumper_" + key, Vector2i(400, 200), func(canvas: Control):
-			draw_bumper(canvas, Rect2(60 if side < 0 else 20, 36, 320, 128), key, bold, side))
+			draw_bumper(canvas, Rect2(60 if side < 0 else 20, 36, 320, 128), key, bold, side, _bumper_presses.get(key, 0.0)))
 		screens["bumper_" + key].viewport.transparent_bg = true
 		screens["bumper_" + key].viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 		var m := screen_material(texture, 1.6)
@@ -538,9 +539,10 @@ func _game_shelf() -> void:
 ## An Xbox-style bumper: dark rounded shape with a soft rim and the label in
 ## white, plus a small chevron pointing the way it browses (-1 left, 1 right,
 ## 0 none). Shared by the shelf stand and the HUD hints.
-static func draw_bumper(canvas: CanvasItem, rect: Rect2, text: String, f: Font, direction := 0) -> void:
+static func draw_bumper(canvas: CanvasItem, rect: Rect2, text: String, f: Font, direction := 0, pressed := 0.0) -> void:
 	var box := StyleBoxFlat.new()
-	box.bg_color = Color("30303f")
+	box.bg_color = Color("30303f").darkened(pressed * .3)
+	rect.position.y += pressed * 6.0
 	box.border_color = Color("b4b2c8")
 	box.set_border_width_all(maxi(1, int(rect.size.y * 0.05)))
 	var r := int(rect.size.y * 0.5)
@@ -559,14 +561,16 @@ static func draw_bumper(canvas: CanvasItem, rect: Rect2, text: String, f: Font, 
 		canvas.draw_colored_polygon(PackedVector2Array([tip, Vector2(back, tip.y - half), Vector2(back, tip.y + half)]), Color("f2f1f8"))
 
 ## A game box like a DVD case: dark plastic shell with the cover in front.
-func game_box(size: Vector2, pos: Vector3, cover: Texture2D, energy := 1.2, parent: Node = self) -> Node3D:
+func game_box(size: Vector2, pos: Vector3, cover: Texture2D, parent: Node = self) -> Node3D:
 	var root := Node3D.new()
 	root.position = pos
 	parent.add_child(root)
 	box(Vector3(size.x + 0.05, size.y + 0.05, 0.1), Vector3.ZERO, mat(Color("12141f"), 0.35, 0.2), root)
 	box(Vector3(0.05, size.y + 0.05, 0.11), Vector3(-size.x / 2 - 0.0, 0, 0), mat(Color("23263a"), 0.3, 0.3), root, false)
-	var face := screen_material(cover, energy)
-	face.disable_fog = true  # covers stay crisp through the haze
+	var face := mat(Color.WHITE, 0.85)
+	face.albedo_texture = cover
+	face.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
+	# Printed artwork belongs to the room: receive its light and fog, unlike the TV.
 	quad(size, Vector3(0, 0, 0.051), face, root)
 	return root
 
@@ -662,10 +666,18 @@ func set_prompt(name: String, items: Array, enabled: bool, active: bool) -> void
 		p.node.mesh.size = Vector2(px) * 0.0042
 		redraw("prompt_" + name)
 
+func press_prompt(name: String, key: String) -> void:
+	if _prompts.has(name):
+		_prompts[name].state["pressed"] = {key: 1.0}
+		redraw("prompt_" + name)
+	if name == "shelf" and key in ["LB", "RB"]:
+		_bumper_presses[key] = 1.0
+		redraw("bumper_" + key)
+
 ## Xbox face buttons in their colours, each followed by what it does.
 static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
 	var colors := {"A": Color("5cb85c"), "B": Color("e2574c"), "X": Color("3b8eea"), "Y": Color("f8cd34")}
-	var h: float = canvas.get_viewport_rect().size.y
+	var h := 96.0
 	var x := 20.0
 	for item in state.items:
 		var key := str(item[0])
@@ -679,11 +691,14 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
 		pill.anti_aliasing = true
 		canvas.draw_style_box(pill, Rect2(x, 6, badge_width + tw + 16, h - 12))
 		var color: Color = colors.get(key, Color("f2f1f8")) if state.enabled else Color("55516a")
+		var pressed: float = state.get("pressed", {}).get(key, 0.0)
 		if bumper:
-			draw_bumper(canvas, Rect2(x + 12, 18, 122, 60), key, f)
+			draw_bumper(canvas, Rect2(x + 12, 18, 122, 60), key, f, 0, pressed)
 		else:
-			canvas.draw_circle(Vector2(x + h / 2 - 4, h / 2), h / 2 - 14, color)
-			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
+			var center := Vector2(x + h / 2 - 4, h / 2)
+			if pressed > 0: canvas.draw_circle(center, h / 2 - 14, color.darkened(.5))
+			canvas.draw_circle(center + Vector2(0, pressed * 6), h / 2 - 14, color)
+			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17 + pressed * 6), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
 		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
 		x += badge_width + tw + 36
 
@@ -1008,6 +1023,16 @@ func set_mood(color: Color) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	for name in _prompts:
+		var presses: Dictionary = _prompts[name].state.get("pressed", {})
+		for key in presses.keys():
+			presses[key] = maxf(0.0, presses[key] - delta / .2)
+			if presses[key] == 0.0: presses.erase(key)
+			redraw("prompt_" + name)
+	for key in _bumper_presses.keys():
+		_bumper_presses[key] = maxf(0.0, _bumper_presses[key] - delta / .2)
+		if _bumper_presses[key] == 0.0: _bumper_presses.erase(key)
+		redraw("bumper_" + key)
 	for n in _neon:
 		var f := 1.0
 		if n.speed > 0: f = 0.75 + 0.25 * sin(_time * n.speed + n.phase)

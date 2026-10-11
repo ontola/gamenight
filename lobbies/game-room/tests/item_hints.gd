@@ -97,6 +97,17 @@ func _capture(main, directory: String) -> void:
 	for frame in 12: await process_frame
 	await RenderingServer.frame_post_draw
 	check(root.get_texture().get_image().save_png(directory.path_join("item-hints-near.png")) == OK, "Save nearby-item preview")
+	# A pickup removes its normal hint immediately; keep the press feedback
+	# at the old item position long enough to see the button depress.
+	main.input("p0", 0, Vector2.ZERO)
+	main.input("p0", World.BTN_B, Vector2.ZERO)
+	w.step()
+	main.view.update(w, 0.0)
+	main.hud.queue_redraw()
+	for frame in 3: await process_frame
+	await RenderingServer.frame_post_draw
+	check(root.get_texture().get_image().save_png(directory.path_join("item-hints-pressed.png")) == OK, "Save pickup press feedback")
+	main._time += .3
 	for p in w.players.values(): p.x -= 1.5
 	main.view.update(w, 0.1)
 	main.hud.queue_redraw()

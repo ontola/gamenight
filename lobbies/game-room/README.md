@@ -35,6 +35,10 @@ from their files at runtime.
 | LB / RB | At the game shelf: browse the boxes; at the jukebox: previous / next track |
 | Start | Your menu: leave, unlink, choose another lobby, quit |
 
+Floating prompts share one pill and button style. Pressing a control briefly
+depresses its badge while the action label stays in place. Item prompts use the
+same style for B, including a short confirmation after an item is picked up.
+
 The runtime joins controllers and handles Back, as for every lobby.
 
 ## Stations
@@ -48,7 +52,8 @@ The runtime joins controllers and handles Back, as for every lobby.
   list slides when the queue changes; later games never have cover images.
   Stand at the cabinet and press Y (Play next) to start the first queued game,
   including when the TV offers Resume for a paused game.
-- **TV**: Y resumes the paused game, or starts the queue head (`next`) when
+- **TV**: the floating prompt sits above the screen. Y works from the floor
+  or the low console shelf beneath it. It resumes the paused game, or starts the queue head (`next`) when
   nothing runs. The TV shows the current or next game with loading progress
   and stopped-game issues.
 - **Profile doors** appear for phone profiles waiting in the room. An unlinked
@@ -118,3 +123,5 @@ audio or phone camera scanning; those need a playtest on the TV.
   this lobby yet.
 - No export preset yet; an export must include `assets/fonts/*` and
   `assets/icon.svg` as non-resource files.
+
+The library cover uses a lit, non-emissive material and receives room fog, like the physical case around it. TV content remains self-lit.

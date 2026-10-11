@@ -6,6 +6,7 @@ const LEFT := -11.6
 const RIGHT := 11.6
 const CEILING := 10.4
 const BACK := -2.6
+const TV_CONSOLE := [-3.3, 3.3, 0.9, -1.8]
 
 ## One-way platforms: [x0, x1, top, depth]. Depth is the z a player stands
 ## at on that surface, so the sprite sits on it instead of hovering in front.
@@ -17,7 +18,7 @@ const PLATFORMS := [
 	# Neon shelf above the TV.
 	[-2.6, 2.6, 6.55, -2.0],
 	# TV console.
-	[-3.3, 3.3, 0.9, -1.8],
+	TV_CONSOLE,
 	# Little floating speakers either side of the TV.
 	[-4.7, -3.7, 3.6, -2.05], [3.7, 4.7, 3.6, -2.05],
 	# Couch seat and back.
