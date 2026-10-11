@@ -1,10 +1,11 @@
 # Homepage intro video
 
-`web/intro.webm` (VP9) and `web/intro.mp4` (H.264), 58 s at 1920×1080 without sound, and their poster `web/intro.jpg` play
+`web/intro.webm` (VP9) and `web/intro.mp4` (H.264), 48.6 s at 1920×1080 without sound, and their poster `web/intro.jpg` play
 under the homepage hero. The video is rendered from `compose.html`: each frame
 is `render(t)` in Chromium, captured by `render.cjs` and encoded with FFmpeg.
 
-Scenes: intro, Game Room lobby, fast switching, zero friction (controllers stay
+The core message is that the next game loads in the background, so nobody
+waits. Scenes: intro, Game Room lobby with background loading, instant switching, zero friction (controllers stay
 linked), phone companion, open protocol, free and open source, submit your own
 game, outro.
 
@@ -21,7 +22,14 @@ All game footage is real. Put these next to `compose.html` (not committed):
 - `stills/*.jpg`: 1280×720 crops of Ballkickers, SpaceRacer, Downhill Rush and
   God Game screenshots.
 - `fonts/`: Outfit 600/800 (`lobbies/game-room/assets/fonts`) and the Ark pixel
-  font (`web/fonts`); `icon.svg` from `web/`.
+  font (`web/fonts`); `icon.svg` from `web/`. The logo is Bungee and the
+  tried variants are Monoton, Lilita One and Unbounded (Google Fonts, OFL), as
+  `fonts/<Name>.woff2`. `compose.html?logo=A|B|C|F|G` switches variants; C is
+  the chosen one.
+- `f/lobby2/`: a chaotic take of the same demo (bots active from the first
+  frame, bombs dropping every 0.9 s), recorded from a scratch copy of
+  `src/demo.gd`; the lobby itself is unchanged.
+- Faces are the real demo faces from `lobbies/game-room/assets/demo-faces.json`.
 
 ## Render
 
