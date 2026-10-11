@@ -90,7 +90,8 @@ def run(godot, capture_dir=None):
         shelf.append({"id": "game-room", "title": "Game Room", "launch": {"command": godot, "args": args, "env": {"GAMENIGHT_LOBBY_API": "1"}}})
         (temp / "shelf.json").write_text(json.dumps(shelf))
         env = {k: v for k, v in os.environ.items() if not k.startswith("GAMENIGHT")}
-        env.update(GAMENIGHT_ADDR=f"127.0.0.1:{port}", GAMENIGHT_LIBRARY=str(temp / "shelf.json"), GAMENIGHT_WEB="1",
+        # This fixture exercises local pairing, never the production room registry.
+        env.update(GAMENIGHT_OFFLINE="1", GAMENIGHT_ADDR=f"127.0.0.1:{port}", GAMENIGHT_LIBRARY=str(temp / "shelf.json"), GAMENIGHT_WEB="1",
                    GAMENIGHT_LOBBY_GAME="game-room", GAMENIGHT_NO_PREWARM="1", GAMENIGHT_NO_MUSIC="1",
                    GAMENIGHT_TEST_NO_CONTROLLERS="1", GAMENIGHT_EXIT_WITH_LOBBY="1", GAMENIGHT_DATA_DIR=str(temp / "data"), HOME=str(temp))
         log_path = ROOT / ".local" / "game-room-flow.log"
