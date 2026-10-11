@@ -3,6 +3,7 @@ extends SceneTree
 var room: Node3D
 var failed := false
 
+
 func _initialize() -> void:
 	OS.set_environment("GAMENIGHT_ADDR", "127.0.0.1:1")
 	OS.set_environment("GAMENIGHT_LINKS_URL", "disabled")
@@ -28,9 +29,10 @@ func run() -> void:
 		quit(1)
 		return
 	# Exercise real native window state without rendering the room every frame.
-	RenderingServer.render_loop_enabled = false
-	room = load("res://main.tscn").instantiate()
+	root.disable_3d = true
+	room = load("res://tests/display_probe.gd").new()
 	root.add_child(room)
+	room.client.set_process(false) # This display test has no host/reconnect lifecycle.
 	room.client.active = true
 	await settle()
 	check_fit("startup")
@@ -45,22 +47,66 @@ func run() -> void:
 		room._focus_changed(true)
 		await settle()
 		check_fit("game return %d" % i)
-	# Another native window must keep focus even if the host repeats its grant.
-	root.gui_embed_subwindows = false
-	var other := Window.new()
-	other.title = "Isolated Alt-Tab target"
-	other.size = Vector2i(400, 300)
-	root.add_child(other)
-	other.show()
-	other.grab_focus()
-	await settle()
+	# Deterministic focus adapter: Xvfb/Godot can cache a stale focus flag.
+	# Window geometry is native; foreground-lock behavior needs Windows testing.
+	room.reported_focus = true
+	room._display_active = false
+	var before: int = room.focus_requests
 	room._focus_changed(true)
-	for i in 3: room._fit_fullscreen()
-	await settle()
-	if root.always_on_top or not other.has_focus():
+	if room.focus_requests != before + 1:
 		failed = true
-		push_error("DISPLAY_TEST: lobby stole focus from another window")
-	other.queue_free()
+		push_error("DISPLAY_TEST: stale focused flag skipped explicit host handoff")
+	room._focus_changed(true)
+	if room.focus_requests != before + 1:
+		failed = true
+		push_error("DISPLAY_TEST: duplicate host grant requested focus again")
+	room.reported_focus = false
+	# Deny the initial handoff as Windows does before the game grants rights.
+	room._display_active = false
+	room.allow_focus = false
+	before = room.focus_requests
+	room._focus_changed(true)
+	await create_timer(0.25).timeout
+	if room.focus_requests < before + 2 or room._window_has_focus():
+		failed = true
+		push_error("DISPLAY_TEST: denied host handoff was not retried")
+	room.allow_focus = true
+	await create_timer(0.25).timeout
+	if not room._window_has_focus():
+		failed = true
+		push_error("DISPLAY_TEST: delayed host handoff never acquired focus")
+	room.reported_focus = false
+	root.focus_exited.emit()
+	await settle()
+	before = room.focus_requests
+	await create_timer(0.25).timeout
+	if room._window_has_focus() or room.focus_requests != before:
+		failed = true
+		push_error("DISPLAY_TEST: completed handoff fought subsequent Alt-Tab")
+	# A denied handoff has a deadline even when no native focus event arrives.
+	room._display_active = false
+	room.allow_focus = false
+	room._focus_changed(true)
+	await create_timer(1.2).timeout
+	before = room.focus_requests
+	await create_timer(0.2).timeout
+	if room.focus_requests != before or room._window_has_focus():
+		failed = true
+		push_error("DISPLAY_TEST: denied handoff exceeded its deadline")
+	room._display_active = false
+	room._focus_changed(true)
+	room.client.active = false
+	room._focus_changed(false)
+	before = room.focus_requests
+	await create_timer(0.25).timeout
+	if room.focus_requests != before or root.mode != Window.MODE_MINIMIZED:
+		failed = true
+		push_error("DISPLAY_TEST: deactivation did not cancel handoff")
+	room.allow_focus = true
+	room.client.active = true
+	room._focus_changed(true)
+	await settle()
+	room.reported_focus = null
 	await settle()
 	# Focus notifications themselves do not resize or start an async restore.
 	root.size = Vector2i(1280, 720)
@@ -82,4 +128,7 @@ func run() -> void:
 		failed = true
 		push_error("DISPLAY_TEST: stale resize raised the lobby")
 	print("GAME_ROOM_DISPLAY_", "FAIL" if failed else "PASS")
+	room._links.free()
+	room._pickup.free()
+	room.free()
 	quit(1 if failed else 0)

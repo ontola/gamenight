@@ -93,9 +93,11 @@ xvfb-run -a -s '-screen 0 1920x1080x24' sh -c 'openbox >/tmp/game-room-display-w
 ```
 
 The display test requires a window manager to handle minimize/restore and checks
-full monitor bounds, repeated game returns, non-topmost behavior and focus staying
-on another native window without
-connecting to the running party. On Windows,
+full monitor bounds, repeated game returns and non-topmost behavior without
+connecting to the running party. A deterministic focus adapter checks delayed
+grants, the one-second deadline and cancellation after focus loss/deactivation;
+Xvfb can leave Godot's native focus flag stale even after X11 changes foreground.
+On Windows,
 run the Godot command directly when the desktop is free; that
 native run is needed to verify Windows taskbar and DPI behavior.
 

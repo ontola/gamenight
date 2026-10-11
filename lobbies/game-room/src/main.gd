@@ -65,6 +65,7 @@ var _capture_at := 4.0
 var _captured := false
 var _fullscreen := false
 var _display_active: Variant = null
+var _focus_handoff := 0
 var _last_input: Dictionary = {}
 var _last_queue: Array = []          # up next game ids at the last redraw
 
@@ -95,6 +96,10 @@ func _ready() -> void:
 	if _fullscreen and DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
 		get_window().min_size = Vector2i.ZERO
 		_fit_fullscreen()
+	if DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
+		# Native focus only cancels a host handoff; it never initiates one.
+		get_window().focus_entered.connect(_cancel_focus_handoff)
+		get_window().focus_exited.connect(_cancel_focus_handoff)
 	if args.has("--demo"):
 		demo = Demo.new()
 		demo.main = self
@@ -141,6 +146,7 @@ func _notification(what: int) -> void:
 func _connection_changed(connected: bool) -> void:
 	if not connected:
 		_display_active = null
+		_cancel_focus_handoff()
 		_suspend_input()
 		toast("Reconnecting… your party is still here.", AMBER)
 	hud.queue_redraw()
@@ -150,6 +156,7 @@ func _focus_changed(active: bool) -> void:
 	# and native Alt-Tab focus events must leave the user's chosen app alone.
 	if _display_active == active: return
 	_display_active = active
+	_cancel_focus_handoff()
 	_suspend_input()
 	Engine.max_fps = 60 if active else 10
 	AudioServer.set_bus_mute(0, not active)
@@ -157,9 +164,36 @@ func _focus_changed(active: bool) -> void:
 		if active:
 			if _fullscreen: _fit_fullscreen()
 			else: get_window().mode = Window.MODE_WINDOWED
-			get_window().grab_focus()
+			_claim_lobby_focus(_focus_handoff)
 		else:
 			get_window().mode = Window.MODE_MINIMIZED
+
+func _cancel_focus_handoff() -> void:
+	_focus_handoff += 1
+
+func _request_window_focus() -> void:
+	get_window().grab_focus()
+
+func _window_has_focus() -> bool:
+	return get_window().has_focus()
+
+func _claim_lobby_focus(revision: int) -> void:
+	# Pause and lobby_focus travel to separate processes. The game may still
+	# be granting Windows foreground rights when the first attempt arrives.
+	# Retry only this explicit handoff, at most one second; any focus event
+	# cancels it, so a successful handoff can never fight subsequent Alt-Tab.
+	var deadline := Time.get_ticks_msec() + 1000
+	# Native focus flags may lag behind a switch. Every new host grant gets
+	# one real attempt, even if the cached flag still says we have focus.
+	_request_window_focus()
+	var requested_at := Time.get_ticks_msec()
+	while revision == _focus_handoff and _display_active == true and not _window_has_focus():
+		var now := Time.get_ticks_msec()
+		if now >= deadline: return
+		if now - requested_at >= 100:
+			_request_window_focus()
+			requested_at = now
+		await get_tree().process_frame
 
 func _fit_fullscreen() -> void:
 	# Windows may restore MODE_FULLSCREEN to the old windowed rectangle while
