@@ -60,6 +60,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late int _tab = widget.state.host == null ? 0 : 2;
   String? _openedFor;
+  final _roomKey = GlobalKey<RoomScreenState>();
   StreamSubscription<Uri>? _links;
 
   @override
@@ -81,11 +82,22 @@ class _HomeScreenState extends State<HomeScreen> {
   /// The link in the sign-in email opens the app and signs in here.
   Future<void> _onLink(Uri uri) async {
     final link = SignInLink.parse(uri);
-    if (link == null) return;
+    if (link == null) {
+      // Only trusted GameNight links can ask the app to join a room.
+      if (uri.scheme != 'https' || uri.origin != hostedOrigin) return;
+      try {
+        final room = parseHostLink(uri.toString());
+        if (room.roomCode == null && room.pair == null) return;
+        if (mounted) setState(() => _tab = 0);
+        await _roomKey.currentState?.openLink(uri.toString());
+      } on LinkError {
+        // Not a room invitation.
+      }
+      return;
+    }
     String message;
     try {
       message = await widget.state.signInWithLink(link);
-      if (mounted) setState(() => _tab = 2);
     } on ApiError catch (e) {
       message = e.message;
     }
@@ -107,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, _) {
         final linked = widget.state.session?.linked ?? false;
         final pages = [
-          RoomScreen(state: widget.state),
+          RoomScreen(key: _roomKey, state: widget.state),
           GameScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
           PlayerScreen(state: widget.state),
           PlaylistScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),

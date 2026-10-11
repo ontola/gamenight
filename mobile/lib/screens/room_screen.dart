@@ -14,10 +14,10 @@ class RoomScreen extends StatefulWidget {
   const RoomScreen({super.key, required this.state});
 
   @override
-  State<RoomScreen> createState() => _RoomScreenState();
+  State<RoomScreen> createState() => RoomScreenState();
 }
 
-class _RoomScreenState extends State<RoomScreen> {
+class RoomScreenState extends State<RoomScreen> {
   final _address = TextEditingController();
   final _code = TextEditingController();
   bool _busy = false;
@@ -49,7 +49,7 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  Future<void> _open(String text) => _withAccount(() => state.connect(parseHostLink(text)));
+  Future<void> openLink(String text) => _withAccount(() => state.connect(parseHostLink(text)));
 
   /// Runs [action]; when it needs an account, signs in first and retries.
   Future<void> _withAccount(Future<String> Function() action) => _run(() async {
@@ -72,7 +72,7 @@ class _RoomScreenState extends State<RoomScreen> {
     final text = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const ScannerScreen()),
     );
-    if (text != null) await _open(text);
+    if (text != null) await openLink(text);
   }
 
   Future<void> _joinCode() async {
@@ -266,11 +266,11 @@ class _RoomScreenState extends State<RoomScreen> {
                 autocorrect: false,
                 decoration: const InputDecoration(
                     labelText: 'GameNight address', hintText: '192.168.1.20:7913'),
-                onSubmitted: _busy ? null : _open,
+                onSubmitted: _busy ? null : openLink,
               ),
               const SizedBox(height: 12),
               OutlinedButton(
-                onPressed: _busy ? null : () => _open(_address.text),
+                onPressed: _busy ? null : () => openLink(_address.text),
                 child: Text(_busy ? 'Connecting…' : 'Connect'),
               ),
               const SizedBox(height: 8),
@@ -315,11 +315,11 @@ class _RoomScreenState extends State<RoomScreen> {
         Hint(state.sessionError != null
             ? 'Showing what this phone last knew. It updates when GameNight is reachable again.'
             : linked
-            ? '${s!.seat == null ? 'Your profile is linked to this party.' : 'Player ${s.seat! + 1}.'} '
-                'Your name and face follow you into every game.'
-            : waiting
-                ? 'Walk your character to your profile door in the lobby and stand there to connect.'
-                : 'Enter the room code from the lobby, or scan the QR above your character.'),
+                ? '${s!.seat == null ? 'Your profile is linked to this party.' : 'Player ${s.seat! + 1}.'} '
+                    'Your name and face follow you into every game.'
+                : waiting
+                    ? 'Walk your character to your profile door in the lobby and stand there to connect.'
+                    : 'Enter the room code from the lobby, or scan the QR above your character.'),
         const SizedBox(height: 12),
         _Facts(rows: [
           ('Players in the party', s == null ? '—' : '${s.players}'),

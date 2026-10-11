@@ -23,6 +23,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _code = TextEditingController();
   bool _sent = false;
   bool _busy = false;
+  bool _completed = false;
   String? _error;
 
   @override
@@ -33,7 +34,21 @@ class _SignInScreenState extends State<SignInScreen> {
 
   /// The link in the email can finish the sign-in while this screen is open.
   void _signedInElsewhere() {
-    if (widget.state.signedIn && !_busy && mounted) Navigator.of(context).pop(true);
+    if (widget.state.signedIn && !widget.state.signingIn && !_busy) _finish();
+  }
+
+  void _finish() {
+    if (!mounted || _completed) return;
+    final route = ModalRoute.of(context);
+    // Popped routes stay mounted during their exit animation. Further account
+    // updates must never pop the home screen underneath this screen.
+    if (route == null || !route.isActive || route.isFirst) return;
+    _completed = true;
+    if (route.isCurrent) {
+      Navigator.of(context).pop(true);
+    } else {
+      Navigator.of(context).removeRoute(route, true);
+    }
   }
 
   @override
@@ -68,7 +83,7 @@ class _SignInScreenState extends State<SignInScreen> {
         final message = await widget.state.verifySignInCode(_code.text);
         if (!mounted) return;
         toast(context, message);
-        Navigator.of(context).pop(true);
+        _finish();
       });
 
   @override
@@ -102,7 +117,7 @@ class _SignInScreenState extends State<SignInScreen> {
             )
           else ...[
             Hint('We sent an 8-digit code to ${_email.text.trim()}. '
-                'It works once and expires in 10 minutes.'),
+                'Open the email link on this phone, or paste the code here. It expires in 10 minutes.'),
             const SizedBox(height: 12),
             TextField(
               controller: _code,

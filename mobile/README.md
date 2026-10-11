@@ -26,10 +26,20 @@ browser does, as an installable app for Android and iOS:
 - **Playlist.** Tonight's queue: drag to reorder, remove a game, or play an
   earlier game again.
 
-The app only talks to the local web server on the GameNight PC (port 7913),
-over the same HTTP endpoints as `web/studio.js`, plus `/api/companion` for
-phone screens. It never touches the daemon's control port. Hosted rooms on
-gamenight.ontola.io still open in the browser.
+The app signs in to gamenight.ontola.io and joins centrally registered rooms.
+Email sign-in uses an eight-digit, single-use code tied to the app that requested
+it. The email link opens the Android app; pasting the code into the app also
+works. Browser and app sessions are separate. A code requested in the browser
+cannot sign the app in: request a new code in the app instead.
+
+Verified Android links cover `/auth/login`, `/join`, `/studio` and the root
+room-code URL. Room invitations retain their target while you sign in. The
+production proxy must serve `/.well-known/assetlinks.json` with the certificate
+fingerprint of the published APK. Flutter's default deep-link routing is disabled
+on the Activity because `app_links` handles those URLs.
+
+Optional local-network connections use the phone server on port 7913. The app
+never talks directly to the daemon's control port.
 
 ## Run
 
@@ -56,7 +66,6 @@ server sends no CORS headers.
 ## Not yet
 
 - Phones as plain gamepads for games without a phone screen.
-- Signing in to a GameNight account and hosted rooms.
 
 ## Download
 
@@ -72,3 +81,24 @@ tabs offers it; Android asks the player to confirm, then replaces the app.
 The app checks at start and when it comes back after six hours. Local builds
 (`GAMENIGHT_BUILD` unset) never offer updates. The first build with this
 check has to be installed by hand once.
+
+## Verify Android sign-in and room links
+
+Run `flutter test test/sign_in_navigation_test.dart test/account_test.dart`.
+The navigation regression covers entering a room code, signing in by pasted
+code or duplicate email-link callbacks, then receiving room polling updates.
+The home screen must remain visible and the room must still be joined.
+
+On an Android device with the signed release installed, verify the domain and
+open a real sign-in link requested from that same app. Never put real codes in
+logs or committed fixtures.
+
+```sh
+adb shell pm verify-app-links --re-verify io.ontola.gamenight
+adb shell pm get-app-links io.ontola.gamenight
+```
+
+Check warm and cold app launches, expired codes, and joining a room after sign-in.
+The domain should report `verified`. Existing installs can retain an earlier
+failed verification until Android checks again; installing the updated APK also
+requests verification. A browser chosen by the user can still override app links.

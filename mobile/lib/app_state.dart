@@ -415,6 +415,8 @@ class AppState extends ChangeNotifier {
   bool _pushingAccount = false, _accountPending = false;
 
   bool get signedIn => cloud.signedIn;
+  Future<String>? _signInOperation;
+  bool get signingIn => _signInOperation != null;
 
   /// Step 1 of signing in: GameNight emails a code to [email].
   Future<void> requestSignInCode(String email) async {
@@ -441,6 +443,7 @@ class AppState extends ChangeNotifier {
 
   /// Finishes a sign-in from the link in the email.
   Future<String> signInWithLink(SignInLink link) async {
+    if (_signInOperation != null) return _signInOperation!;
     if (signedIn) return 'You are already signed in.';
     if (cloud.emailBinding == null) {
       throw const ApiError('This sign-in link belongs to another phone or browser. '
@@ -452,7 +455,16 @@ class AppState extends ChangeNotifier {
   /// Step 2: the emailed code signs this phone in. The player saved on the
   /// account comes to the phone (faces are merged, nothing is lost), and the
   /// result is saved back.
-  Future<String> verifySignInCode(String code) async {
+  Future<String> verifySignInCode(String code) {
+    // Android can deliver an initial link through the live stream too. A
+    // pasted code and an arriving email link must also share one exchange.
+    return _signInOperation ??= _verifySignInCode(code).whenComplete(() {
+      _signInOperation = null;
+      notifyListeners();
+    });
+  }
+
+  Future<String> _verifySignInCode(String code) async {
     await cloud.verifyCode(code);
     await prefs.remove('email_binding');
     await prefs.remove('email_binding_at');
