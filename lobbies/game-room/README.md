@@ -57,8 +57,8 @@ The runtime joins controllers and handles Back, as for every lobby.
 - **Exit door** leaves the party.
 
 The room fills the monitor with a borderless desktop window, without changing
-the display resolution. It covers the taskbar while focused and releases that
-priority when a game or another app takes focus. Set `GAMENIGHT_LOBBY_FULLSCREEN=0`
+the display resolution. It never uses always-on-top priority or reclaims focus
+after Alt-Tab; only a host ownership transition returns to it. Set `GAMENIGHT_LOBBY_FULLSCREEN=0`
 for a window.
 
 Station buttons stay anchored to the TV, shelf, jukebox or door and only appear
@@ -93,7 +93,8 @@ xvfb-run -a -s '-screen 0 1920x1080x24' sh -c 'openbox >/tmp/game-room-display-w
 ```
 
 The display test requires a window manager to handle minimize/restore and checks
-full monitor bounds, repeated game returns and stale restore cancellation without
+full monitor bounds, repeated game returns, non-topmost behavior and focus staying
+on another native window without
 connecting to the running party. On Windows,
 run the Godot command directly when the desktop is free; that
 native run is needed to verify Windows taskbar and DPI behavior.

@@ -64,7 +64,7 @@ var _capture_path := ""
 var _capture_at := 4.0
 var _captured := false
 var _fullscreen := false
-var _display_restore := 0
+var _display_active: Variant = null
 var _last_input: Dictionary = {}
 var _last_queue: Array = []          # up next game ids at the last redraw
 
@@ -95,8 +95,6 @@ func _ready() -> void:
 	if _fullscreen and DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
 		get_window().min_size = Vector2i.ZERO
 		_fit_fullscreen()
-		get_window().focus_entered.connect(_window_restored)
-		get_window().focus_exited.connect(_window_focus_lost)
 	if args.has("--demo"):
 		demo = Demo.new()
 		demo.main = self
@@ -142,11 +140,16 @@ func _notification(what: int) -> void:
 
 func _connection_changed(connected: bool) -> void:
 	if not connected:
+		_display_active = null
 		_suspend_input()
 		toast("Reconnecting… your party is still here.", AMBER)
 	hud.queue_redraw()
 
 func _focus_changed(active: bool) -> void:
+	# Only a host ownership transition may claim the screen. Repeated grants
+	# and native Alt-Tab focus events must leave the user's chosen app alone.
+	if _display_active == active: return
+	_display_active = active
 	_suspend_input()
 	Engine.max_fps = 60 if active else 10
 	AudioServer.set_bus_mute(0, not active)
@@ -156,17 +159,7 @@ func _focus_changed(active: bool) -> void:
 			else: get_window().mode = Window.MODE_WINDOWED
 			get_window().grab_focus()
 		else:
-			_display_restore += 1
-			get_window().always_on_top = false
 			get_window().mode = Window.MODE_MINIMIZED
-
-func _window_restored() -> void:
-	await get_tree().process_frame
-	if _fullscreen and client.active and get_window().has_focus(): _fit_fullscreen()
-
-func _window_focus_lost() -> void:
-	# Cover the taskbar only while the lobby owns focus; Alt-Tab must still work.
-	get_window().always_on_top = false
 
 func _fit_fullscreen() -> void:
 	# Windows may restore MODE_FULLSCREEN to the old windowed rectangle while
@@ -174,18 +167,12 @@ func _fit_fullscreen() -> void:
 	# using full monitor bounds (not the work area that excludes the taskbar).
 	var window := get_window()
 	var screen := window.current_screen
-	window.mode = Window.MODE_WINDOWED
-	window.borderless = true
-	window.position = DisplayServer.screen_get_position(screen)
-	window.size = DisplayServer.screen_get_size(screen)
-	_display_restore += 1
-	var revision := _display_restore
-	await get_tree().process_frame
-	if revision != _display_restore or window.mode == Window.MODE_MINIMIZED: return
-	# Reconcile native restore/resize messages, including a monitor's DPI change.
-	DisplayServer.window_set_position(DisplayServer.screen_get_position(screen), window.get_window_id())
-	DisplayServer.window_set_size(DisplayServer.screen_get_size(screen), window.get_window_id())
-	window.always_on_top = client.active and window.has_focus()
+	var origin := DisplayServer.screen_get_position(screen)
+	var size := DisplayServer.screen_get_size(screen)
+	if window.mode != Window.MODE_WINDOWED: window.mode = Window.MODE_WINDOWED
+	if not window.borderless: window.borderless = true
+	if window.position != origin: window.position = origin
+	if window.size != size: window.size = size
 
 # ---------------------------------------------------------------- party state
 
