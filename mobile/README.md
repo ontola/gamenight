@@ -32,7 +32,10 @@ it. The email link opens the Android app; pasting the code into the app also
 works. Browser and app sessions are separate. A code requested in the browser
 cannot sign the app in: request a new code in the app instead.
 
-Verified Android links cover `/auth/login`, `/join`, `/studio` and the root
+Browser-requested sign-in links use `/auth/login` and stay in the browser.
+App requests include `client: "app"` and receive `/auth/app` links.
+
+Verified Android links cover `/auth/app`, `/join`, `/studio` and the root
 room-code URL. Room invitations retain their target while you sign in. The
 production proxy must serve `/.well-known/assetlinks.json` with the certificate
 fingerprint of the published APK. Flutter's default deep-link routing is disabled

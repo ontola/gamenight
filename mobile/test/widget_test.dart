@@ -13,7 +13,8 @@ void main() {
     final state = AppState(await SharedPreferences.getInstance());
     await tester.pumpWidget(GameNightApp(state: state));
     expect(find.text('Scan the QR on the TV'), findsOneWidget);
-    expect(find.text('Sign in with email'), findsNothing, reason: 'signing in lives on the You tab');
+    expect(find.text('Sign in with email'), findsNothing,
+        reason: 'signing in lives on the You tab');
     await tester.tap(find.text('You'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsWidgets);
@@ -28,7 +29,7 @@ void main() {
     final links = StreamController<Uri>();
     addTearDown(links.close);
     await tester.pumpWidget(GameNightApp(state: state, links: links.stream));
-    links.add(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'));
+    links.add(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
     await tester.pumpAndSettle();
     expect(find.textContaining('belongs to another phone or browser'), findsOneWidget,
         reason: 'no code was asked for on this phone');

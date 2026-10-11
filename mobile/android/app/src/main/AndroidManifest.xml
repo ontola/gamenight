@@ -39,7 +39,7 @@
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="gamenight.ontola.io" android:path="/auth/login"/>
+                <data android:scheme="https" android:host="gamenight.ontola.io" android:path="/auth/app"/>
                 <data android:path="/join"/>
                 <data android:path="/studio"/>
                 <data android:path="/"/>

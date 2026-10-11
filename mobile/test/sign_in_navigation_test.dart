@@ -38,8 +38,8 @@ void main() {
       await tester.tap(find.text('Email me a code'));
       await tester.pumpAndSettle();
       if (viaLink) {
-        links.add(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'));
-        links.add(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'));
+        links.add(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
+        links.add(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
       } else {
         await tester.enterText(find.byType(TextField).last, '12345678');
       }

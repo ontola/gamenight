@@ -105,8 +105,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     cloud = FakeCloud();
-    state = AppState(await SharedPreferences.getInstance(),
-        cloud: CloudApi(client: cloud.client));
+    state = AppState(await SharedPreferences.getInstance(), cloud: CloudApi(client: cloud.client));
   });
 
   tearDown(() => state.dispose());
@@ -122,6 +121,7 @@ void main() {
 
     await state.requestSignInCode(' Joep@Example.com ');
     expect(state.accountEmail, 'joep@example.com');
+    expect(cloud.bodies['POST /auth/email/request']['client'], 'app');
     await expectLater(state.verifySignInCode('00000000'), throwsA(isA<Exception>()));
     // A wrong code keeps the binding so the right one still works.
     await state.requestSignInCode('joep@example.com');
@@ -180,14 +180,15 @@ void main() {
   });
 
   test('the link in the email finishes the sign-in, even after a restart', () async {
-    final link = SignInLink.parse(Uri.parse('https://gamenight.ontola.io/auth/login#code=12345678'))!;
+    final link = SignInLink.parse(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'))!;
     expect(link.code, '12345678');
     for (final other in [
-      'https://gamenight.ontola.io/auth/login',
-      'https://gamenight.ontola.io/auth/login#code=1234',
+      'https://gamenight.ontola.io/auth/login#code=12345678',
+      'https://gamenight.ontola.io/auth/app',
+      'https://gamenight.ontola.io/auth/app#code=1234',
       'https://gamenight.ontola.io/studio#code=12345678',
-      'https://evil.example/auth/login#code=12345678',
-      'http://gamenight.ontola.io/auth/login#code=12345678',
+      'https://evil.example/auth/app#code=12345678',
+      'http://gamenight.ontola.io/auth/app#code=12345678',
     ]) {
       expect(SignInLink.parse(Uri.parse(other)), isNull, reason: other);
     }

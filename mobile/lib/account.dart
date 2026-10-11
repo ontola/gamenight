@@ -156,7 +156,8 @@ class CloudApi {
 
   /// Emails an 8-digit code (and a link) to [email].
   Future<void> requestCode(String email) async {
-    final response = await _raw('POST', '/auth/email/request', body: {'email': email.trim()});
+    final response =
+        await _raw('POST', '/auth/email/request', body: {'email': email.trim(), 'client': 'app'});
     switch (response.statusCode) {
       case 204:
         emailBinding = cookie(response, 'gn_email');
