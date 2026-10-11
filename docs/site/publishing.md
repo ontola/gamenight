@@ -1,10 +1,10 @@
 # Publish a game
 
-Use the [developer portal](/developers) to announce your game, upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.
+Use the [developer portal](/developers) to add your game, upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.
 
 ## Prepare a release
 
-For a new game, sign in to the [developer portal](/developers) and choose **Announce a game**. Free games can upload builds right away; ask for integration help from the game's **Help** tab. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.
+For a new game, sign in to the [developer portal](/developers) and choose **Add your game**. Free games can upload builds right away; ask for integration help from the game's **Help** tab. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.
 
 1. Choose your game, then **Builds**.
 2. Enter a version and platform. Upload a ZIP containing your exported executable and assets, or a standalone executable. Alternatively, import a direct HTTPS URL from S3 or another host. URL imports require the filename; signed URLs must remain valid throughout the import and must not redirect.

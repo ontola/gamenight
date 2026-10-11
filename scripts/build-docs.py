@@ -24,7 +24,7 @@ REPO = "https://github.com/ontola/gamenight/blob/main/"
 # Shown on every docs page, so makers can always reach the portal.
 PORTAL = ('<a class="docs-portal{extra}" href="https://gamenight.ontola.io/developers">'
           '<strong>Developer portal</strong>'
-          '<span>Announce, upload and sell your game</span></a>')
+          '<span>Add your game</span></a>')
 
 
 def route(slug):
