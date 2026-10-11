@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GameNight intro</title>
+<style>
+@font-face { font-family: Outfit; font-weight: 600; src: url(fonts/outfit-600.woff2); }
+@font-face { font-family: Outfit; font-weight: 800; src: url(fonts/outfit-800.woff2); }
+@font-face { font-family: Pixel; src: url(fonts/ark-pixel-16px-latin.ttf); }
+:root { --bg:#0b0b12; --text:#f2f1f8; --dim:#9a98ad; --violet:#7c5cff; --lilac:#a78bfa; --green:#3ddc97; --amber:#ffb454; --line:rgba(255,255,255,.12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+body { font-family: Outfit, sans-serif; color: var(--text); font-weight: 600; }
+#stage { position: absolute; inset: 0; overflow: hidden;
+  background: radial-gradient(90% 70% at 12% 0%, #1d1844 0%, transparent 60%), radial-gradient(80% 60% at 92% 100%, #0e2f2a 0%, transparent 55%), var(--bg); }
+.scene { position: absolute; inset: 0; opacity: 0; will-change: opacity, transform; }
+.abs { position: absolute; }
+.kicker { font-family: Pixel; font-size: 30px; letter-spacing: 3px; color: var(--amber); text-transform: uppercase; }
+.h { font-weight: 800; font-size: 92px; line-height: 1.02; letter-spacing: -1.5px; }
+.h .g { background: linear-gradient(100deg, #c4b5fd, #7c5cff 45%, #3ddc97); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sub { font-size: 34px; color: var(--dim); line-height: 1.35; }
+.frame { position: absolute; overflow: hidden; border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 2px rgba(255,255,255,.08); background: #000; }
+.frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.pill { display: inline-flex; align-items: center; gap: 12px; padding: 10px 22px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid var(--line); font-size: 26px; }
+.dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+
+/* intro */
+#bgwall { position: absolute; left: -300px; top: -260px; width: 2600px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 26px; transform: rotate(-8deg); }
+#bgwall img { width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 16px; }
+.word { font-family: Pixel; font-size: 168px; letter-spacing: 10px; color: #ffe7c2;
+  text-shadow: 0 0 18px rgba(255,180,84,.9), 0 0 60px rgba(255,140,60,.55), 0 0 120px rgba(124,92,255,.5); white-space: nowrap; }
+.word span { display: inline-block; }
+
+/* switching list */
+.row { position: absolute; left: 0; width: 400px; height: 104px; border-radius: 18px; display: flex; align-items: center; gap: 18px; padding: 0 16px; background: rgba(255,255,255,.04); border: 1px solid transparent; }
+.row img { width: 112px; height: 63px; object-fit: cover; border-radius: 10px; flex: none; }
+.row .t { font-size: 27px; font-weight: 800; }
+.row .s { font-size: 21px; color: var(--dim); display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.row .bar { position: absolute; left: 146px; right: 20px; bottom: 12px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; }
+.row .bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green); border-radius: 3px; }
+
+/* friction */
+.pad { position: absolute; width: 150px; height: 100px; }
+.chip { position: absolute; display: flex; align-items: center; gap: 16px; padding: 10px 26px 10px 10px; border-radius: 999px; background: rgba(255,255,255,.07); border: 2px solid; font-size: 30px; font-weight: 800; }
+.face { width: 58px; height: 58px; border-radius: 50%; position: relative; overflow: hidden; }
+.mini { position: absolute; display: flex; align-items: center; gap: 8px; padding: 5px 14px 5px 5px; border-radius: 999px; background: rgba(10,10,18,.78); font-size: 20px; font-weight: 800; border: 2px solid; }
+.mini .face { width: 30px; height: 30px; }
+.strike { position: relative; font-size: 32px; color: var(--dim); white-space: nowrap; }
+.strike i { position: absolute; left: -6px; top: 52%; height: 4px; background: #ff5d73; border-radius: 2px; }
+
+/* phone */
+#phone { position: absolute; left: 250px; top: 120px; width: 420px; height: 860px; border-radius: 64px; background: #05050a; box-shadow: 0 0 0 4px #2a2a3a, 0 0 0 12px #14141d, 0 40px 120px rgba(0,0,0,.7); overflow: hidden; }
+#phone .notch { position: absolute; left: 150px; top: 14px; width: 120px; height: 34px; border-radius: 20px; background: #000; z-index: 9; }
+.screen { position: absolute; inset: 0; opacity: 0; }
+.step { position: absolute; left: 0; display: flex; align-items: center; gap: 26px; font-size: 40px; font-weight: 800; white-space: nowrap; }
+.step b { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 30px; background: rgba(255,255,255,.08); border: 2px solid var(--line); flex: none; }
+
+/* code */
+.code { position: absolute; left: 110px; top: 210px; width: 980px; height: 680px; border-radius: 24px; background: #0f0f19; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.5); overflow: hidden; font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 25px; font-weight: 400; }
+.code .bar { height: 56px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; padding: 0 22px; color: var(--dim); font-family: Outfit; font-size: 22px; }
+.code .bar .dot { width: 14px; height: 14px; }
+.line { position: absolute; left: 30px; white-space: pre; }
+.k { color: #c4b5fd; } .s2 { color: #3ddc97; } .n { color: #ffb454; } .c { color: #6f6d85; }
+.eng { position: relative; white-space: nowrap; padding: 14px 30px; border-radius: 999px; border: 2px solid var(--line); background: rgba(255,255,255,.06); font-size: 32px; font-weight: 800; }
+
+/* wall */
+#wall { position: absolute; left: -400px; top: -160px; width: 2800px; height: 1500px; transform: perspective(1600px) rotateX(24deg) rotateZ(-7deg); transform-origin: 50% 40%; }
+.wrow { position: absolute; left: 0; height: 330px; display: flex; gap: 28px; }
+.wrow .frame { position: relative; width: 586px; height: 330px; flex: none; border-radius: 20px; }
+.badge { padding: 14px 28px; border-radius: 999px; background: rgba(11,11,18,.85); border: 2px solid var(--line); font-size: 30px; font-weight: 800; display: inline-flex; gap: 12px; align-items: center; }
+
+/* publish */
+.term { position: absolute; left: 110px; top: 330px; width: 900px; height: 520px; border-radius: 24px; background: #0f0f19; border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0,0,0,.5); font-family: ui-monospace, "DejaVu Sans Mono", monospace; font-size: 27px; font-weight: 400; overflow: hidden; }
+.card { position: absolute; width: 250px; border-radius: 18px; overflow: hidden; background: #15151f; border: 1px solid var(--line); }
+.card img, .card .art { width: 250px; height: 141px; object-fit: cover; display: block; }
+.card div.t { padding: 10px 16px 14px; font-size: 23px; font-weight: 800; }
+.card div.t small { display: block; font-size: 17px; color: var(--dim); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+<!-- 1 intro -->
+<div class="scene" id="s1">
+  <div id="bgwall"></div>
+  <div class="abs" style="inset:0;background:radial-gradient(60% 60% at 50% 50%, rgba(11,11,18,.55), rgba(11,11,18,.96))"></div>
+  <div class="abs" id="introBox" style="left:0;right:0;top:0;bottom:0">
+    <img id="icon1" class="abs" src="icon.svg" style="left:880px;top:190px;width:160px;height:160px">
+    <div class="abs word" id="word1" style="left:0;right:0;top:400px;text-align:center"></div>
+    <div class="abs sub" id="tag1" style="left:0;right:0;top:640px;text-align:center;font-size:46px;color:#d8d6e8">Couch multiplayer, without the friction.</div>
+  </div>
+</div>
+
+<!-- 2 lobby -->
+<div class="scene" id="s2">
+  <div class="abs" id="lobbyWrap" style="inset:0;overflow:hidden"><img id="lobbyImg" style="width:100%;height:100%;object-fit:cover"></div>
+  <div class="abs" style="inset:0;background:linear-gradient(0deg, rgba(8,8,14,.92) 0%, rgba(8,8,14,.55) 30%, transparent 55%)"></div>
+  <div class="abs kicker" id="k2" style="left:110px;top:770px">The lobby</div>
+  <div class="abs h" id="h2" style="left:110px;top:820px;font-size:84px">Hang out together while<br>the <span class="g">next game loads.</span></div>
+</div>
+
+<!-- 3 switching -->
+<div class="scene" id="s3">
+  <div class="abs kicker" id="k3" style="left:100px;top:70px">Fast switching</div>
+  <div class="abs h" id="h3" style="left:100px;top:112px;font-size:80px">Switch games <span class="g">in seconds.</span></div>
+  <div class="abs" id="list3" style="left:100px;top:262px;width:400px;height:720px"></div>
+  <div class="frame" id="frame3" style="left:560px;top:262px;width:1260px;height:709px"></div>
+  <div class="abs pill" id="ready3" style="left:1450px;top:120px;font-size:28px"><span class="dot" style="background:var(--green)"></span><span>Loading screens: <b style="color:var(--green)">0</b></span></div>
+</div>
+
+<!-- 4 friction -->
+<div class="scene" id="s4">
+  <div class="abs kicker" id="k4" style="left:100px;top:70px">Zero friction</div>
+  <div class="abs h" id="h4" style="left:100px;top:112px;font-size:80px">Your controller <span class="g">stays yours.</span></div>
+  <svg class="abs" id="links4" style="left:0;top:0" width="1920" height="1080"></svg>
+  <div id="pads4"></div>
+  <div class="frame" id="mon4" style="left:900px;top:300px;width:920px;height:518px"></div>
+  <div id="strikes4" class="abs" style="left:900px;top:870px;width:920px;display:flex;justify-content:space-between"></div>
+</div>
+
+<!-- 5 phone -->
+<div class="scene" id="s5">
+  <div id="phone"><div class="notch"></div>
+    <div class="screen" id="ph-scan"></div>
+    <div class="screen" id="ph-draw"></div>
+    <div class="screen" id="ph-me"></div>
+    <div class="screen" id="ph-list"></div>
+  </div>
+  <div class="abs kicker" id="k5" style="left:860px;top:170px">Phone companion</div>
+  <div class="abs h" id="h5" style="left:860px;top:215px;font-size:84px">Your phone<br><span class="g">joins the party.</span></div>
+  <div id="steps5"></div>
+</div>
+
+<!-- 6 protocol -->
+<div class="scene" id="s6">
+  <div class="code" id="code6"><div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span style="margin-left:14px">your-game ⇄ GameNight</span></div></div>
+  <div class="abs kicker" id="k6" style="left:1170px;top:220px">Open specification</div>
+  <div class="abs h" id="h6" style="left:1170px;top:265px;font-size:84px">One open<br>protocol.<br><span class="g">Any engine.</span></div>
+  <div class="abs sub" id="sub6" style="left:1170px;top:575px;width:660px;font-size:32px">Integrate once. GameNight brings the players, controllers and playlist.</div>
+  <div id="eng6" class="abs" style="left:1170px;top:720px;width:700px;display:flex;flex-wrap:wrap;gap:16px"></div>
+</div>
+
+<!-- 7 open source -->
+<div class="scene" id="s7">
+  <div id="wall"></div>
+  <div class="abs" style="inset:0;background:radial-gradient(55% 55% at 50% 52%, rgba(11,11,18,.93) 0%, rgba(11,11,18,.75) 55%, rgba(11,11,18,.25) 100%)"></div>
+  <div class="abs kicker" id="k7" style="left:0;right:0;top:300px;text-align:center">Free &amp; open source</div>
+  <div class="abs h" id="h7" style="left:0;right:0;top:350px;text-align:center;font-size:118px">Free. Open source.<br><span class="g">The games too.</span></div>
+  <div class="abs" id="badges7" style="left:0;right:0;top:680px;display:flex;justify-content:center;gap:22px"></div>
+</div>
+
+<!-- 8 publish -->
+<div class="scene" id="s8">
+  <div class="abs kicker" id="k8" style="left:110px;top:110px">Submit your own games</div>
+  <div class="abs h" id="h8" style="left:110px;top:155px;font-size:84px">Made a game? <span class="g">Bring it to game night.</span></div>
+  <div class="term" id="term8"><div class="code" style="position:static;width:auto;height:auto;border:0;box-shadow:none;background:none"><div class="bar"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span style="margin-left:14px">terminal</span></div></div></div>
+  <div id="cards8"></div>
+</div>
+
+<!-- 9 outro -->
+<div class="scene" id="s9">
+  <div id="bgwall9" class="abs" style="inset:0"></div>
+  <img id="icon9" class="abs" src="icon.svg" style="left:880px;top:150px;width:160px;height:160px">
+  <div class="abs word" id="word9" style="left:0;right:0;top:350px;text-align:center">GAMENIGHT</div>
+  <div class="abs h" id="h9" style="left:0;right:0;top:600px;text-align:center;font-size:72px">Less setup. <span class="g">More playing together.</span></div>
+  <div class="abs" id="cta9" style="left:0;right:0;top:780px;display:flex;justify-content:center;gap:24px">
+    <div class="badge" style="background:var(--violet);border-color:var(--violet)">Free download · Windows &amp; macOS</div>
+    <div class="badge">gamenight.ontola.io</div>
+  </div>
+</div>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const eo = p => 1 - Math.pow(1 - p, 3);
+const eio = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const back = p => { const c = 1.7, c3 = c + 1; return 1 + c3 * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const FPS = 30;
+const COUNT = { lobby: 240 };
+const frame = (name, sec, start = 1) => { const n = COUNT[name] || 150; const i = clamp(Math.floor(sec * FPS) + start, 1, n); return `f/${name}/${String(i).padStart(3, '0')}.jpg`; };
+const loopFrame = (name, sec, start = 1) => { const n = COUNT[name] || 150; const i = ((Math.floor(sec * FPS) + start - 1) % n + n) % n + 1; return `f/${name}/${String(i).padStart(3, '0')}.jpg`; };
+const pend = [];
+function setSrc(img, src) { if (img.getAttribute('src') !== src) { img.setAttribute('src', src); pend.push(img.decode().catch(() => {})); } }
+function rise(el, p, dist = 50) { el.style.opacity = p; el.style.transform = `translateY(${(1 - p) * dist}px)`; }
+function show(el, t, a, b, fin = .35, fout = .35) { const o = Math.min(prog(t, a, a + fin), 1 - prog(t, b - fout, b)); el.style.opacity = o; return o; }
+function el(tag, attrs = {}, html = '') { const e = document.createElement(tag); for (const k in attrs) e.setAttribute(k, attrs[k]); e.innerHTML = html; return e; }
+
+const PLAYERS = [
+  { name: 'Joep', color: '#e36c76', skin: '#f5e9be' },
+  { name: 'Mango', color: '#49b8bc', skin: '#d99b72' },
+  { name: 'Disco', color: '#d7ad43', skin: '#efc39a' },
+  { name: 'Waffle', color: '#a67bdd', skin: '#905c40' },
+];
+const faceSvg = (p, i) => `<svg viewBox="0 0 40 40" width="100%" height="100%"><rect width="40" height="40" fill="${p.skin}"/>` +
+  [`<rect x="10" y="13" width="5" height="6" fill="#222"/><rect x="25" y="13" width="5" height="6" fill="#222"/><path d="M11 26 Q20 33 29 26" stroke="#222" stroke-width="3" fill="none"/>`,
+   `<circle cx="13" cy="16" r="3" fill="#222"/><circle cx="27" cy="16" r="3" fill="#222"/><rect x="14" y="26" width="12" height="3" fill="#222"/>`,
+   `<rect x="8" y="12" width="10" height="7" rx="2" fill="#222"/><rect x="22" y="12" width="10" height="7" rx="2" fill="#222"/><rect x="18" y="14" width="4" height="2" fill="#222"/><path d="M13 26 Q20 31 27 26" stroke="#222" stroke-width="3" fill="none"/>`,
+   `<path d="M9 17 L15 14 M25 14 L31 17" stroke="#222" stroke-width="3"/><circle cx="13" cy="19" r="2.5" fill="#222"/><circle cx="27" cy="19" r="2.5" fill="#222"/><circle cx="20" cy="28" r="4" fill="#222"/>`][i] + `</svg>`;
+
+/* ---------- build ---------- */
+const POSTERS = ['spaceracer', 'ballkickers', 'frog-fighter', 'growing-guns', 'mineclonia', 'blast-party', 'neon-siege', 'stack-together', 'volley-trouble', 'neon-trails', 'bubble-buddies', 'ricochet-club'];
+const STILLS = ['bk-stadium', 'sr-city', 'dh-race', 'god-plain', 'sr-ocean', 'bk-scorer', 'god-ride', 'sr-worm', 'dh-alps', 'bk-goalcam', 'god-ui'];
+for (let i = 0; i < 20; i++) { const im = el('img'); im.src = i % 2 ? `stills/${STILLS[(i >> 1) % STILLS.length]}.jpg` : `f/${POSTERS[(i >> 1) % POSTERS.length]}/075.jpg`; $('bgwall').appendChild(im); }
+$('word1').innerHTML = [...'GAMENIGHT'].map(c => `<span>${c}</span>`).join('');
+
+// scene 3
+const GAMES3 = [
+  { id: 'spaceracer', title: 'SpaceRacer', start: 15 },
+  { id: 'ballkickers', title: 'Ballkickers', start: 20 },
+  { id: 'frog-fighter', title: 'Frog Fighter', start: 1 },
+  { id: 'growing-guns', title: 'Growing Guns', start: 40 },
+  { id: 'mineclonia', title: 'Mineclonia', start: 1 },
+  { id: 'blast-party', title: 'Blast Party', start: 45 },
+];
+GAMES3.forEach((g, i) => {
+  const r = el('div', { class: 'row', id: 'row' + i }, `<img src="f/${g.id}/075.jpg"><div><div class="t">${g.title}</div><div class="s"></div></div><div class="bar"><i></i></div>`);
+  r.style.top = (i * 120) + 'px'; $('list3').appendChild(r);
+  const a = el('img'); a.style.opacity = 0; $('frame3').appendChild(a);
+});
+$('frame3').appendChild(el('div', { class: 'abs', id: 'title3', style: 'left:28px;top:24px' }, ''));
+
+// scene 4
+const padSvg = c => `<svg viewBox="-40 -10 260 140" width="150" height="100"><g fill="${c}"><rect x="10" y="0" width="160" height="74" rx="26"/><circle cx="38" cy="62" r="36"/><circle cx="142" cy="62" r="36"/></g><g fill="#0b0b12"><rect x="30" y="28" width="40" height="12" rx="6"/><rect x="44" y="14" width="12" height="40" rx="6"/><circle cx="126" cy="24" r="10.5"/><circle cx="150" cy="48" r="10.5"/></g></svg>`;
+PLAYERS.forEach((p, i) => {
+  const y = 330 + i * 130;
+  const pad = el('div', { class: 'pad', id: 'pad' + i }, padSvg(p.color)); pad.style.left = '100px'; pad.style.top = y + 'px'; $('pads4').appendChild(pad);
+  const ch = el('div', { class: 'chip', id: 'chip' + i }, `<div class="face">${faceSvg(p, i)}</div>${p.name}`); ch.style.left = '480px'; ch.style.top = (y + 12) + 'px'; ch.style.borderColor = p.color; $('pads4').appendChild(ch);
+  const ln = document.createElementNS('http://www.w3.org/2000/svg', 'path'); ln.setAttribute('d', `M265 ${y + 50} C 360 ${y + 50}, 380 ${y + 50}, 470 ${y + 50}`); ln.setAttribute('stroke', p.color); ln.setAttribute('stroke-width', '5'); ln.setAttribute('fill', 'none'); ln.setAttribute('stroke-dasharray', '10 12'); ln.id = 'ln' + i; $('links4').appendChild(ln);
+});
+const MON = ['ballkickers', 'volley-trouble', 'neon-trails', 'stack-together'];
+MON.forEach(() => { const a = el('img'); $('mon4').appendChild(a); });
+const corners = [[20, 20], [null, 20], [20, null], [null, null]];
+PLAYERS.forEach((p, i) => { const m = el('div', { class: 'mini', id: 'mini' + i }, `<div class="face">${faceSvg(p, i)}</div>${p.name}`); m.style.borderColor = p.color; const c = corners[i]; if (c[0] !== null) m.style.left = c[0] + 'px'; else m.style.right = '20px'; if (c[1] !== null) m.style.top = c[1] + 'px'; else m.style.bottom = '20px'; $('mon4').appendChild(m); });
+['Pairing controllers again', 'Setup menus', '“Who’s Player 2?”'].forEach((s, i) => { const d = el('div', { class: 'strike', id: 'st' + i }, s + '<i></i>'); $('strikes4').appendChild(d); });
+
+// scene 5 phone screens
+function qrSvg() { let s = '<svg viewBox="0 0 29 29" width="100%" height="100%" shape-rendering="crispEdges"><rect width="29" height="29" fill="#fff"/>'; let r = 7; const rnd = () => (r = (r * 9301 + 49297) % 233280) / 233280; for (let y = 0; y < 29; y++) for (let x = 0; x < 29; x++) { const f = (x < 8 && y < 8) || (x > 20 && y < 8) || (x < 8 && y > 20); if (!f && rnd() > .52) s += `<rect x="${x}" y="${y}" width="1" height="1" fill="#111"/>`; } for (const [x, y] of [[0, 0], [21, 0], [0, 21]]) s += `<rect x="${x + .5}" y="${y + .5}" width="6" height="6" fill="none" stroke="#111"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" fill="#111"/>`; return s + '</svg>'; }
+$('ph-scan').innerHTML = `<img src="f/lobby/090.jpg" style="position:absolute;height:100%;left:-520px;filter:blur(3px) brightness(.55)">
+  <div class="abs" style="left:60px;top:250px;width:300px;height:300px;padding:16px;background:#fff;border-radius:12px" id="qr">${qrSvg()}</div>
+  <div class="abs" id="scanbox" style="left:40px;top:230px;width:340px;height:340px;border:6px solid var(--green);border-radius:28px"></div>
+  <div class="abs" id="scanline" style="left:56px;width:308px;height:4px;background:var(--green);box-shadow:0 0 20px var(--green)"></div>
+  <div class="abs" style="left:0;right:0;top:100px;text-align:center;font-size:30px;font-weight:800">Scan to join</div>
+  <div class="abs pill" id="joined" style="left:50px;top:640px;font-size:26px;background:rgba(61,220,151,.18);border-color:var(--green)">✓ Joined room <b>KJX4</b></div>`;
+const PAL = ['#222', '#e36c76', '#49b8bc', '#d7ad43', '#a67bdd', '#fff'];
+$('ph-draw').innerHTML = `<div style="position:absolute;inset:0;background:#141420"></div>
+  <div class="abs" style="left:0;right:0;top:86px;text-align:center;font-size:30px;font-weight:800">Draw your face</div>
+  <svg class="abs" style="left:40px;top:160px" width="340" height="340" viewBox="0 0 48 48" shape-rendering="crispEdges">
+   <rect width="48" height="48" fill="#efc39a"/>
+   ${Array.from({ length: 47 }, (_, i) => `<path d="M${i + 1} 0V48M0 ${i + 1}H48" stroke="rgba(0,0,0,.06)" stroke-width=".15"/>`).join('')}
+   <g id="strokes" fill="none" stroke-linecap="round" stroke-linejoin="round" shape-rendering="auto">
+    <path d="M6 7 Q24 -3 42 7 L40 13 Q24 7 8 13 Z" stroke="#7c5cff" stroke-width="2.4" fill="#7c5cff"/>
+    <path d="M12 21 L19 19" stroke="#222" stroke-width="2.4"/>
+    <path d="M29 19 L36 21" stroke="#222" stroke-width="2.4"/>
+    <path d="M15 25 l0 4" stroke="#222" stroke-width="3.6"/>
+    <path d="M33 25 l0 4" stroke="#222" stroke-width="3.6"/>
+    <path d="M13 34 Q24 44 35 34" stroke="#e36c76" stroke-width="3"/>
+   </g></svg>
+  <div class="abs" style="left:40px;top:530px;display:flex;gap:14px">${PAL.map((c, i) => `<div style="width:44px;height:44px;border-radius:50%;background:${c};border:3px solid ${i === 4 ? '#fff' : 'rgba(255,255,255,.2)'}"></div>`).join('')}</div>
+  <div class="abs" id="pen" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.35);border:3px solid #fff"></div>
+  <div class="abs" style="left:40px;right:40px;top:700px;height:76px;border-radius:20px;background:var(--violet);display:grid;place-items:center;font-size:30px;font-weight:800">Done</div>`;
+$('ph-me').innerHTML = `<div style="position:absolute;inset:0;background:radial-gradient(80% 50% at 50% 40%, #2a2350, #0d0d16)"></div>
+  <div class="abs" style="left:0;right:0;top:86px;text-align:center;font-size:30px;font-weight:800">That's you!</div>
+  <div class="abs" id="hero5" style="left:110px;top:220px;width:200px">
+   <div style="width:200px;height:200px;border-radius:10px;overflow:hidden;image-rendering:pixelated" id="heroFace"></div>
+   <div style="width:160px;height:150px;margin:0 20px;background:#e36c76;border-radius:0 0 10px 10px"></div>
+   <div style="display:flex;justify-content:space-between;width:120px;margin:0 40px"><div style="width:42px;height:70px;background:#34344a"></div><div style="width:42px;height:70px;background:#34344a"></div></div>
+  </div>
+  <div class="abs" style="left:0;right:0;top:700px;text-align:center;color:var(--dim);font-size:24px">Joep · in the room</div>`;
+$('heroFace').innerHTML = $('ph-draw').querySelector('svg').outerHTML.replace('left:40px;top:160px', '').replace('width="340" height="340"', 'width="200" height="200"').replace('id="strokes"', '');
+const LIST = [['spaceracer', 'SpaceRacer', 'Now playing'], ['ballkickers', 'Ballkickers', ''], ['frog-fighter', 'Frog Fighter', ''], ['mineclonia', 'Mineclonia', ''], ['volley-trouble', 'Volley Trouble', '']];
+$('ph-list').innerHTML = `<div style="position:absolute;inset:0;background:#101019"></div>
+  <div class="abs" style="left:32px;top:84px;font-size:34px;font-weight:800">Playlist</div>
+  ${LIST.map((g, i) => `<div class="abs" id="pl${i}" style="left:24px;right:24px;top:${150 + i * 112}px;height:98px;border-radius:18px;background:rgba(255,255,255,.05);display:flex;align-items:center;gap:16px;padding:0 14px;border:2px solid transparent">
+    <img src="f/${g[0]}/075.jpg" style="width:112px;height:63px;object-fit:cover;border-radius:10px"><div><div style="font-size:25px;font-weight:800">${g[1]}</div><div class="plS" style="font-size:19px;color:${i ? 'var(--dim)' : 'var(--amber)'}">${g[2] || 'Queued'}</div></div></div>`).join('')}
+  <div class="abs" id="tap" style="width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,.25);border:3px solid rgba(255,255,255,.7)"></div>`;
+['Scan the code on the TV', 'Draw your own face', 'Pick the next game', 'Some games give you a private screen'].forEach((s, i) => { const d = el('div', { class: 'step', id: 'step' + i }, `<b>${i < 3 ? i + 1 : '+'}</b>${s}`); d.style.left = '860px'; d.style.top = (520 + i * 100) + 'px'; $('steps5').appendChild(d); });
+
+// scene 6 code
+const CODE = [
+  ['c', '// your game connects over a local socket'],
+  ['g', '<span class="k">→</span> {<span class="s2">"type"</span>: <span class="n">"hello"</span>, <span class="s2">"role"</span>: <span class="n">"game"</span>, <span class="s2">"game"</span>: <span class="n">"my-game"</span>}'],
+  ['d', '<span class="s2">←</span> {<span class="s2">"type"</span>: <span class="n">"welcome"</span>, <span class="s2">"protocol_version"</span>: <span class="n">1</span>}'],
+  ['d', '<span class="s2">←</span> {<span class="s2">"type"</span>: <span class="n">"prepare"</span>, <span class="s2">"seats"</span>: [<span class="c">Joep, Mango, Disco, Waffle</span>]}'],
+  ['g', '<span class="k">→</span> {<span class="s2">"type"</span>: <span class="n">"progress"</span>, <span class="s2">"percent"</span>: <span class="n">40</span>}'],
+  ['g', '<span class="k">→</span> {<span class="s2">"type"</span>: <span class="n">"ready"</span>}'],
+  ['c', '// …the night goes on'],
+  ['g', '<span class="k">→</span> {<span class="s2">"type"</span>: <span class="n">"finished"</span>}'],
+  ['d', '<span class="s2">←</span> <span class="c">next game is already warm</span>'],
+];
+CODE.forEach((l, i) => { const d = el('div', { class: 'line', id: 'cl' + i }, l[1]); d.style.top = (90 + i * 62) + 'px'; $('code6').appendChild(d); });
+['Godot', 'LÖVE', 'Rust', 'C', 'Your engine'].forEach((s, i) => { const d = el('div', { class: 'eng', id: 'eng' + i }, s); if (i === 4) { d.style.borderStyle = 'dashed'; d.style.color = 'var(--amber)'; } $('eng6').appendChild(d); });
+
+// scene 7 wall
+const W7 = [
+  ['clip:spaceracer', 'stills/bk-stadium', 'clip:frog-fighter', 'stills/god-plain', 'clip:neon-siege', 'stills/sr-ocean', 'clip:volley-trouble'],
+  ['stills/dh-race', 'clip:ballkickers', 'stills/sr-city', 'clip:mineclonia', 'stills/god-ride', 'clip:stack-together', 'stills/bk-scorer'],
+  ['clip:growing-guns', 'stills/sr-worm', 'clip:blast-party', 'stills/dh-alps', 'clip:ricochet-club', 'stills/bk-goalcam', 'clip:bubble-buddies'],
+  ['stills/god-ui', 'clip:neon-trails', 'stills/sr-city', 'clip:spaceracer', 'stills/bk-stadium', 'clip:frog-fighter', 'stills/dh-race'],
+];
+W7.forEach((row, r) => { const d = el('div', { class: 'wrow', id: 'wr' + r }); d.style.top = (r * 360) + 'px'; row.concat(row).forEach(s => { const f = el('div', { class: 'frame' }); const im = el('img'); im.dataset.src = s; if (!s.startsWith('clip:')) im.src = s + '.jpg'; f.appendChild(im); d.appendChild(f); }); $('wall').appendChild(d); });
+['MIT licensed', 'No account needed', 'Open source games'].forEach((s, i) => $('badges7').appendChild(el('div', { class: 'badge', id: 'b7' + i }, `<span class="dot" style="background:${['var(--violet)', 'var(--green)', 'var(--amber)'][i]}"></span>${s}`)));
+
+// scene 8
+const TERM = [
+  ['<span class="s2">$</span> gamenight-publish push --game my-game \\', 0],
+  ['    --version 1.0.0 --platform windows \\', 0],
+  ['    --file my-game.zip --entrypoint my-game.exe', 0],
+  ['<span class="c">Uploading build…</span>', 1],
+  ['<span class="s2">✓</span> Uploaded my-game 1.0.0', 2],
+  ['<span class="s2">✓</span> Submitted to the catalog', 2],
+];
+TERM.forEach((l, i) => { const d = el('div', { class: 'line', id: 'tl' + i }, l[0]); d.style.top = (90 + i * 56) + 'px'; $('term8').appendChild(d); });
+const CARDS = [['spaceracer', 'SpaceRacer'], ['ballkickers', 'Ballkickers'], ['frog-fighter', 'Frog Fighter'], ['growing-guns', 'Growing Guns'], ['mineclonia', 'Mineclonia']];
+const CPOS = [[1060, 330], [1330, 330], [1600, 330], [1060, 580], [1330, 580]];
+CARDS.forEach((c, i) => { const d = el('div', { class: 'card', id: 'cd' + i }, `<img src="f/${c[0]}/075.jpg"><div class="t">${c[1]}<small>Free · 2–8 players</small></div>`); d.style.left = CPOS[i][0] + 'px'; d.style.top = CPOS[i][1] + 'px'; $('cards8').appendChild(d); });
+const mine = el('div', { class: 'card', id: 'cdMine' }, `<div class="art" style="background:linear-gradient(135deg,#7c5cff,#3ddc97);display:grid;place-items:center;font-family:Pixel;font-size:34px;color:#0b0b12">MY GAME</div><div class="t">My Game<small>By you · New</small></div>`);
+mine.style.left = '1600px'; mine.style.top = '580px'; mine.style.borderColor = 'var(--green)'; $('cards8').appendChild(mine);
+
+/* ---------- render ---------- */
+const DUR = 58.5;
+async function render(t) {
+  pend.length = 0;
+  // scene 1 intro 0-4.6
+  const o1 = show($('s1'), t, -1, 4.6, .01, .45);
+  if (o1 > 0) {
+    $('bgwall').style.transform = `rotate(-8deg) translate(${-t * 30}px, ${-t * 12}px)`;
+    $('bgwall').style.opacity = .55;
+    const ip = back(prog(t, .15, .85)); $('icon1').style.transform = `scale(${ip}) rotate(${(1 - ip) * -30}deg)`; $('icon1').style.opacity = prog(t, .15, .4);
+    [...$('word1').children].forEach((s, i) => { const p = prog(t, .7 + i * .08, .95 + i * .08); s.style.opacity = p > 0 ? (p < 1 ? (Math.floor(p * 6) % 2 ? .3 : 1) : 1) : 0; s.style.transform = `translateY(${(1 - eo(p)) * 30}px)`; });
+    rise($('tag1'), eo(prog(t, 1.7, 2.4)), 30);
+    const z = eio(prog(t, 4.0, 4.6)); $('introBox').style.transform = `scale(${1 + z * .6})`;
+  }
+  // scene 2 lobby 4.3-11.2
+  const o2 = show($('s2'), t, 4.3, 11.2, .4, .3);
+  if (o2 > 0) {
+    const lt = t - 4.3; setSrc($('lobbyImg'), frame('lobby', lt * .95, 1));
+    const z = 1.12 - .08 * eo(prog(lt, 0, 6.9)); $('lobbyWrap').style.transform = `scale(${z})`;
+    $('s2').style.transform = `translateX(${-eio(prog(t, 10.9, 11.2)) * 300}px)`;
+    rise($('k2'), eo(prog(lt, .7, 1.2))); rise($('h2'), eo(prog(lt, .85, 1.45)), 70);
+  }
+  // scene 3 switching 11.0-21.0
+  const o3 = show($('s3'), t, 10.95, 21.0, .3, .35);
+  if (o3 > 0) {
+    const lt = t - 11.0; $('s3').style.transform = `translateX(${(1 - eo(prog(t, 10.95, 11.35))) * 300}px)`;
+    rise($('k3'), eo(prog(lt, .1, .5))); rise($('h3'), eo(prog(lt, .2, .7)));
+    rise($('ready3'), eo(prog(lt, 1.0, 1.5)), 20);
+    const SEG = 1.55, S0 = .25; const imgs = $('frame3').querySelectorAll('img');
+    const cur = clamp(Math.floor((lt - S0) / SEG), 0, 5);
+    GAMES3.forEach((g, i) => {
+      const segT = lt - S0 - i * SEG; const im = imgs[i];
+      const inP = i === 0 ? 1 : eio(prog(segT, -.22, 0)); const outP = i === 5 ? 0 : eio(prog(segT, SEG - .22, SEG));
+      const vis = inP > 0 && outP < 1;
+      im.style.opacity = vis ? 1 : 0;
+      if (vis) { setSrc(im, frame(g.id, Math.max(0, segT), g.start)); im.style.transform = `translateX(${(1 - inP) * 100 - outP * 100}%)`; im.style.filter = (inP < 1 || outP > 0) ? 'blur(6px) brightness(1.2)' : 'none'; }
+      const r = $('row' + i); const s = r.querySelector('.s'); const bar = r.querySelector('.bar i'); r.style.opacity = eo(prog(lt, .1 + i * .07, .4 + i * .07));
+      r.style.transform = `translateX(${(1 - eo(prog(lt, .1 + i * .07, .5 + i * .07))) * -60}px)`;
+      if (i === cur) { r.style.background = 'rgba(255,180,84,.14)'; r.style.borderColor = 'var(--amber)'; s.innerHTML = '<span class="dot" style="background:var(--amber)"></span>Now playing'; bar.parentElement.style.opacity = 0; }
+      else if (i === cur + 1) { const p = prog(lt - S0 - cur * SEG, 0, SEG * .6); r.style.background = 'rgba(61,220,151,.08)'; r.style.borderColor = 'transparent'; bar.parentElement.style.opacity = 1; bar.style.width = (p * 100) + '%'; s.innerHTML = p >= 1 ? '<span style="color:var(--green)">✓ Ready</span>' : 'Loading in background'; }
+      else { r.style.background = 'rgba(255,255,255,.04)'; r.style.borderColor = 'transparent'; bar.parentElement.style.opacity = 0; s.innerHTML = i < cur ? 'Played' : 'Up next'; }
+    });
+    $('title3').innerHTML = `<div class="pill" style="background:rgba(10,10,18,.75);font-size:26px;font-weight:800">${GAMES3[cur].title}</div>`;
+  }
+  // scene 4 friction 20.8-28.2
+  const o4 = show($('s4'), t, 20.75, 28.2, .35, .35);
+  if (o4 > 0) {
+    const lt = t - 20.8;
+    rise($('k4'), eo(prog(lt, .1, .5))); rise($('h4'), eo(prog(lt, .2, .7)));
+    PLAYERS.forEach((p, i) => {
+      const a = .5 + i * .18; rise($('pad' + i), back(prog(lt, a, a + .4)), 30);
+      const l = $('ln' + i); const lp = eo(prog(lt, a + .3, a + .8)); l.style.opacity = lp; l.setAttribute('stroke-dashoffset', -lt * 40);
+      l.style.clipPath = `inset(0 ${(1 - lp) * 100}% 0 0)`;
+      const cp = back(prog(lt, a + .6, a + 1)); $('chip' + i).style.opacity = prog(lt, a + .6, a + .8); $('chip' + i).style.transform = `scale(${.6 + .4 * cp})`;
+      const mp = back(prog(lt, 2.2 + i * .1, 2.6 + i * .1)); $('mini' + i).style.opacity = prog(lt, 2.2 + i * .1, 2.4 + i * .1); $('mini' + i).style.transform = `scale(${mp})`;
+      $('pad' + i).style.translate = `0 ${Math.sin(lt * 3 + i) * 4}px`;
+    });
+    const mon = $('mon4'); mon.style.opacity = eo(prog(lt, 1.2, 1.7)); mon.style.transform = `scale(${.94 + .06 * eo(prog(lt, 1.2, 1.8))})`;
+    const imgs = mon.querySelectorAll('img'); const seg = clamp(Math.floor((lt - 1.2) / 1.55), 0, 3);
+    imgs.forEach((im, i) => { im.style.opacity = i === seg ? 1 : 0; if (i === seg) setSrc(im, frame(MON[i], lt - 1.2 - i * 1.55, 20)); });
+    const flash = 1 - prog(((lt - 1.2) % 1.55), 0, .2); mon.style.boxShadow = `0 30px 80px rgba(0,0,0,.55), 0 0 0 ${2 + (lt > 2.6 ? flash * 6 : 0)}px rgba(124,92,255,${.3 + (lt > 2.6 ? flash * .7 : 0)})`;
+    [0, 1, 2].forEach(i => { const a = 3.2 + i * .9; const st = $('st' + i); rise(st, eo(prog(lt, a, a + .35)), 20); const w = st.offsetWidth; st.querySelector('i').style.width = (eo(prog(lt, a + .35, a + .7)) * (w + 12)) + 'px'; st.style.color = prog(lt, a + .35, a + .7) >= 1 ? '#5f5d72' : 'var(--dim)'; });
+  }
+  // scene 5 phone 28.0-36.4
+  const o5 = show($('s5'), t, 28.0, 36.4, .35, .35);
+  if (o5 > 0) {
+    const lt = t - 28.0;
+    const ph = $('phone'); const pp = eo(prog(lt, 0, .7)); ph.style.transform = `translateY(${(1 - pp) * 200}px) rotate(${(1 - pp) * -6 + Math.sin(lt * 1.2) * .6}deg)`;
+    rise($('k5'), eo(prog(lt, .2, .6))); rise($('h5'), eo(prog(lt, .3, .8)));
+    const W = [[.3, 2.4], [2.4, 5.0], [5.0, 6.3], [6.3, 8.6]];
+    ['ph-scan', 'ph-draw', 'ph-me', 'ph-list'].forEach((id, i) => { const p = Math.min(prog(lt, W[i][0], W[i][0] + .25), 1 - prog(lt, W[i][1] - .2, W[i][1])); $(id).style.opacity = i === 3 ? prog(lt, W[i][0], W[i][0] + .25) : p; $(id).style.transform = `translateX(${(1 - prog(lt, W[i][0], W[i][0] + .25)) * 60}px)`; });
+    $('scanline').style.top = (240 + (Math.sin(lt * 4) * .5 + .5) * 320) + 'px'; $('scanline').style.opacity = lt < 1.7 ? 1 : 0;
+    $('scanbox').style.transform = `scale(${1 - eo(prog(lt, 1.3, 1.7)) * .06})`;
+    rise($('joined'), back(prog(lt, 1.7, 2.1)), 30);
+    const strokes = $('strokes').children; const dl = lt - 2.6;
+    [...strokes].forEach((s, i) => { const len = s.getTotalLength(); const p = prog(dl, i * .38, i * .38 + .34); s.style.strokeDasharray = len; s.style.strokeDashoffset = len * (1 - p); s.style.fillOpacity = i === 0 ? prog(dl, .3, .45) : 0; s.style.opacity = p > 0 ? 1 : 0; });
+    const si = clamp(Math.floor(dl / .38), 0, 5); const sp = prog(dl - si * .38, 0, .34); const sv = strokes[si]; let pt = sv.getPointAtLength(sv.getTotalLength() * sp);
+    const pen = $('pen'); pen.style.left = (40 + pt.x / 48 * 340 - 17) + 'px'; pen.style.top = (160 + pt.y / 48 * 340 - 17) + 'px'; pen.style.opacity = dl > 0 && dl < 2.3 ? 1 : 0;
+    const hp = back(prog(lt, 5.1, 5.6)); $('hero5').style.transform = `scale(${hp}) translateY(${-Math.abs(Math.sin((lt - 5.1) * 6)) * 24}px)`;
+    const tp = prog(lt, 7.0, 7.3); const tap = $('tap'); tap.style.left = '160px'; tap.style.top = (260 + 112 - 45 + (1 - eo(prog(lt, 6.5, 7.0))) * 300) + 'px'; tap.style.transform = `scale(${1 - Math.sin(tp * Math.PI) * .3})`; tap.style.opacity = lt > 6.5 && lt < 8 ? 1 - prog(lt, 7.7, 8) : 0;
+    const chosen = lt > 7.15; const pl1 = $('pl1'); pl1.style.borderColor = chosen ? 'var(--green)' : 'transparent'; pl1.style.background = chosen ? 'rgba(61,220,151,.12)' : 'rgba(255,255,255,.05)'; pl1.querySelector('.plS').innerHTML = chosen ? '<span style="color:var(--green)">✓ Plays next</span>' : 'Queued';
+    const active = lt < 2.4 ? 0 : lt < 6.3 ? 1 : 2;
+    [0, 1, 2, 3].forEach(i => { const st = $('step' + i); const a = i < 3 ? [.6, 2.4, 6.3][i] : 7.6; rise(st, eo(prog(lt, a, a + .4)), 30); const on = i === active || i === 3; st.style.color = on ? 'var(--text)' : '#6f6d85'; st.querySelector('b').style.background = i === active ? 'var(--violet)' : (i === 3 ? 'rgba(255,180,84,.2)' : 'rgba(255,255,255,.08)'); st.querySelector('b').style.borderColor = i === active ? 'var(--violet)' : (i === 3 ? 'var(--amber)' : 'var(--line)'); if (i === 3) st.style.fontSize = '32px'; });
+  }
+  // scene 6 protocol 36.2-43.0
+  const o6 = show($('s6'), t, 36.2, 43.0, .35, .35);
+  if (o6 > 0) {
+    const lt = t - 36.2;
+    const cp = eo(prog(lt, 0, .6)); $('code6').style.opacity = cp; $('code6').style.transform = `translateX(${(1 - cp) * -80}px)`;
+    CODE.forEach((l, i) => { const a = .5 + i * .52; const d = $('cl' + i); const p = prog(lt, a, a + .3); d.style.opacity = p; d.style.transform = `translateX(${(1 - eo(p)) * (l[0] === 'd' ? 40 : -40)}px)`; d.style.background = (lt > a && lt < a + .6 && l[0] !== 'c') ? `rgba(${l[0] === 'g' ? '124,92,255' : '61,220,151'},${.15 * (1 - prog(lt, a + .2, a + .6))})` : 'none'; });
+    rise($('k6'), eo(prog(lt, .3, .7))); rise($('h6'), eo(prog(lt, .4, .9))); rise($('sub6'), eo(prog(lt, 1.0, 1.5)), 30);
+    [0, 1, 2, 3, 4].forEach(i => { const p = back(prog(lt, 1.8 + i * .22, 2.2 + i * .22)); const e = $('eng' + i); e.style.opacity = prog(lt, 1.8 + i * .22, 2.0 + i * .22); e.style.transform = `scale(${p}) translateY(${Math.sin(lt * 2 + i) * 4}px)`; });
+  }
+  // scene 7 open source 42.8-49.2
+  const o7 = show($('s7'), t, 42.8, 49.2, .45, .35);
+  if (o7 > 0) {
+    const lt = t - 42.8;
+    $('wall').style.transform = `perspective(1600px) rotateX(24deg) rotateZ(-7deg) scale(${1.15 - .1 * eo(prog(lt, 0, 6))})`;
+    [0, 1, 2, 3].forEach(r => { const d = $('wr' + r); d.style.transform = `translateX(${(r % 2 ? -1 : 1) * lt * 70 - (r % 2 ? 300 : 900)}px)`; d.querySelectorAll('img').forEach((im, k) => { const s = im.dataset.src; if (s.startsWith('clip:')) setSrc(im, loopFrame(s.slice(5), lt * .5, 1 + ((k * 37) % 120))); }); });
+    rise($('k7'), eo(prog(lt, .5, .9))); rise($('h7'), eo(prog(lt, .6, 1.2)), 60);
+    [0, 1, 2].forEach(i => { const p = back(prog(lt, 1.6 + i * .25, 2.0 + i * .25)); const b = $('b7' + i); b.style.opacity = prog(lt, 1.6 + i * .25, 1.8 + i * .25); b.style.transform = `scale(${p})`; });
+  }
+  // scene 8 publish 49.0-54.4
+  const o8 = show($('s8'), t, 49.0, 54.4, .35, .35);
+  if (o8 > 0) {
+    const lt = t - 49.0;
+    rise($('k8'), eo(prog(lt, .1, .5))); rise($('h8'), eo(prog(lt, .2, .7)));
+    const tp = eo(prog(lt, .3, .8)); $('term8').style.opacity = tp; $('term8').style.transform = `translateY(${(1 - tp) * 60}px)`;
+    const typed = TERM.slice(0, 3).map(l => l[0]).join('\n'); const total = typed.replace(/<[^>]+>/g, '').length; const shown = Math.floor(total * prog(lt, .8, 2.0));
+    let cnt = 0; TERM.forEach((l, i) => { const d = $('tl' + i); if (i < 3) { const plain = l[0].replace(/<[^>]+>/g, ''); const take = clamp(shown - cnt, 0, plain.length); cnt += plain.length; d.innerHTML = i === 0 ? (take > 0 ? '<span class="s2">$</span>' + plain.slice(1, take) : '') : plain.slice(0, take); d.style.opacity = 1; } else { const a = [2.2, 2.7, 3.0][i - 3]; d.style.opacity = prog(lt, a, a + .15); } });
+    CARDS.forEach((c, i) => { const p = eo(prog(lt, .4 + i * .08, .8 + i * .08)); const d = $('cd' + i); d.style.opacity = p; d.style.transform = `translateY(${(1 - p) * 40}px)`; });
+    const mp = back(prog(lt, 3.2, 3.75)); const m = $('cdMine'); m.style.opacity = prog(lt, 3.2, 3.4); m.style.transform = `translateY(${(1 - mp) * -260}px) scale(${.8 + .2 * mp})`; m.style.boxShadow = `0 0 ${40 + Math.sin(lt * 5) * 15}px rgba(61,220,151,${.5 * prog(lt, 3.5, 3.9)})`;
+    $('cards8').style.transform = `translateY(${-eio(prog(lt, 2.6, 3.4)) * 0}px)`;
+  }
+  // scene 9 outro 54.2-end
+  const o9 = show($('s9'), t, 54.2, DUR + 1, .5, .01);
+  if (o9 > 0) {
+    const lt = t - 54.2;
+    const ip = back(prog(lt, .1, .7)); $('icon9').style.transform = `scale(${ip})`; $('icon9').style.opacity = prog(lt, .1, .3);
+    const wp = eo(prog(lt, .3, .9)); $('word9').style.opacity = wp; $('word9').style.letterSpacing = (10 + (1 - wp) * 40) + 'px';
+    rise($('h9'), eo(prog(lt, .9, 1.4))); rise($('cta9'), eo(prog(lt, 1.4, 1.9)), 30);
+  }
+  await Promise.all(pend);
+}
+window.render = render; window.DUR = DUR;
+window.ready = document.fonts.ready.then(() => Promise.all([...document.images].map(i => i.decode().catch(() => {}))));
+</script>
+</body>
+</html>
