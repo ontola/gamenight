@@ -52,7 +52,7 @@ def worker(folder):
     assert window
     user.ShowWindow(window, 5)  # First normal show must obey the inherited SW_HIDE.
     first = bool(user.IsWindowVisible(window))
-    (folder / "initial.json").write_text(json.dumps({"visible": first,
+    (folder / "initial.json").write_text(json.dumps({"visible": first, "pid": os.getpid(),
         "args": sys.argv[3:], "marker": os.environ.get("GN_PRELOAD_TEST"), "cwd": os.getcwd()}))
     wait_for(lambda: (folder / "start").exists())
     user.ShowWindow(window, 5)  # An explicit lifecycle start must still be able to show.
@@ -112,9 +112,12 @@ def main(binary):
                     assert kernel.CreateProcessW(None, C.create_unicode_buffer(subprocess.list2cmdline(command)),
                         None, None, True, 0x08000000, None, str(folder), C.byref(startup), C.byref(process))
                     kernel.CloseHandle(process.thread)
+                    worker_process = None
                     try:
                         wait_for(lambda: (folder / "initial.json").exists())
                         initial = json.loads((folder / "initial.json").read_text())
+                        worker_process = kernel.OpenProcess(0x00100000, False, initial["pid"])
+                        assert worker_process
                         assert not initial["visible"], initial
                         assert initial["args"] == args, initial
                         assert initial["marker"] == "environment preserved"
@@ -142,6 +145,11 @@ def main(binary):
                         kernel.TerminateProcess(process.process, 1)
                         kernel.WaitForSingleObject(process.process, 5000)
                         kernel.CloseHandle(process.process)
+                        if worker_process:
+                            # Job termination is asynchronous: the helper may
+                            # exit before the worker releases inherited logs.
+                            assert kernel.WaitForSingleObject(worker_process, 5000) == 0
+                            kernel.CloseHandle(worker_process)
         print("PASS: hidden first show, explicit start, arguments/env/cwd/stdout, exit code and descendant cleanup")
     finally:
         user.CloseDesktop(desktop)
