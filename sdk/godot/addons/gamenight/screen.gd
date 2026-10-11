@@ -54,6 +54,7 @@ const OFF_SCREEN_DEADLINE_MS := 8000
 ## still-running "get off the screen" — the party would watch the game they
 ## just picked minimise itself. Whoever bumps this last wins.
 var _epoch: int = 0
+var _screen_owned := false
 
 ## The frame cap in force before we throttled — the player's own graphics
 ## setting, most likely, which is not ours to overwrite.
@@ -88,6 +89,11 @@ func _ready() -> void:
 ## loading, and loading is what those frames are for — see [method settle].
 func go_quiet(why: String = "warm") -> void:
 	print("[gamenight][%s] %s: muted and off-screen until start" % [GameNight.game_id, why])
+	# Grant before minimizing: afterwards this process can no longer hand the
+	# foreground to the lobby. Never grant from a preload or an unfocused game.
+	if not _headless and why == "pause" and _screen_owned and _owns_native_focus():
+		_allow_lobby_foreground()
+	_screen_owned = false
 	AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), true)
 	unthrottle()
 	_epoch += 1
@@ -104,6 +110,17 @@ func go_quiet(why: String = "warm") -> void:
 func _park_warm_window() -> void:
 	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
 	DisplayServer.window_set_position(Vector2i(-30000, -30000))
+
+
+func _owns_native_focus() -> bool:
+	return get_window().has_focus() and get_window().visible and get_window().mode != Window.MODE_MINIMIZED
+
+
+func _allow_lobby_foreground() -> void:
+	if OS.get_name() != "Windows": return
+	var helper := OS.get_environment("GAMENIGHT_FOREGROUND_HELPER")
+	if helper.is_empty() or not FileAccess.file_exists(helper): return
+	OS.execute(helper, ["--allow-foreground"])
 
 
 ## Loaded, and nobody watching yet: stop spending a core on it.
@@ -129,6 +146,7 @@ func take_the_screen(why: String = "start") -> void:
 	AudioServer.set_bus_mute(AudioServer.get_bus_index(&"Master"), false)
 	unthrottle()
 	_epoch += 1
+	_screen_owned = true
 	if not _headless:
 		_claim_the_screen(_epoch)
 

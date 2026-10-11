@@ -116,6 +116,16 @@ before any <code>--</code> separator for game arguments. This parks the initial 
 before the SDK runs. <code>GameNightScreen</code> also parks a warming Windows window and
 disables focus before minimizing, so the minimize animation stays off-screen.
 Start/Resume restores focus and fullscreen.</p>
+<p>On Windows, a focused game grants foreground permission through the host's
+<code>GAMENIGHT_FOREGROUND_HELPER</code> before minimizing on Pause. Warmup, disposal,
+repeated pauses and games behind another app never grant that permission.
+The Game Room retries a new host focus handoff for at most one second because
+the pause and focus messages arrive in different processes. Acquiring or losing
+native focus cancels the retry; Alt-Tab never starts another handoff. The same
+ordering applies when a game uses <code>automatic = false</code> and calls
+<code>take_the_screen()</code> / <code>go_quiet(&quot;pause&quot;)</code> itself. The Windows helper and native
+desktop focus policy still need real-device validation; headless tests cover
+the lifecycle ordering, not Windows foreground-lock behavior.</p>
 <p>While warming, a minimized window never draws, so never await
 <code>RenderingServer.frame_post_draw</code> before <code>notify_ready()</code>: it does not return
 and the lobby waits on &quot;preloading&quot; forever. Await <code>get_tree().process_frame</code>
@@ -123,7 +133,7 @@ instead whenever <code>DisplayServer.window_get_mode()</code> is <code>WINDOW_MO
 Leave the window itself to <code>GameNightScreen</code>. Godot refuses <code>hide()</code> on the main
 window, and on Windows setting <code>borderless</code> shows the window again.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="b8f1a5dbe660ee9aecd990e48c88ba0271a851ffbac51a8435b22b4f5d3b6ba7">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="f1a6f5109b44859ec257707a0063825de3f043ad6fb79c55597d960556b7fe15">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

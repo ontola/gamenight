@@ -130,6 +130,17 @@ before the SDK runs. `GameNightScreen` also parks a warming Windows window and
 disables focus before minimizing, so the minimize animation stays off-screen.
 Start/Resume restores focus and fullscreen.
 
+On Windows, a focused game grants foreground permission through the host's
+`GAMENIGHT_FOREGROUND_HELPER` before minimizing on Pause. Warmup, disposal,
+repeated pauses and games behind another app never grant that permission.
+The Game Room retries a new host focus handoff for at most one second because
+the pause and focus messages arrive in different processes. Acquiring or losing
+native focus cancels the retry; Alt-Tab never starts another handoff. The same
+ordering applies when a game uses `automatic = false` and calls
+`take_the_screen()` / `go_quiet("pause")` itself. The Windows helper and native
+desktop focus policy still need real-device validation; headless tests cover
+the lifecycle ordering, not Windows foreground-lock behavior.
+
 While warming, a minimized window never draws, so never await
 `RenderingServer.frame_post_draw` before `notify_ready()`: it does not return
 and the lobby waits on "preloading" forever. Await `get_tree().process_frame`

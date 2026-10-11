@@ -37,9 +37,28 @@ func run() -> void:
 	check(managed.calls.back() == "show" and not AudioServer.is_bus_mute(master) and Engine.max_fps == 144, "start shows, unmutes and restores the frame budget")
 	sdk.paused.emit("test")
 	check(managed.calls.back() == "minimize" and AudioServer.is_bus_mute(master), "pause gets out of the lobby's way")
+	check(managed.calls.slice(-2) == ["grant", "minimize"], "active game grants foreground before minimizing")
+	var grants: int = managed.calls.count("grant")
+	managed.go_quiet("pause")
+	check(managed.calls.count("grant") == grants, "repeated pause cannot grant again")
 	sdk.resumed.emit("test")
 	check(managed.calls.back() == "show" and not AudioServer.is_bus_mute(master), "resume restores the game")
+	managed.owns_focus = false
+	sdk.paused.emit("test")
+	check(managed.calls.count("grant") == grants, "a game behind another app cannot hand off foreground")
+	managed.owns_focus = true
+	sdk.disposed.emit("test")
+	check(managed.calls.count("grant") == grants, "dispose does not grant foreground")
 	managed.free()
+	var manual = ScreenProbe.new()
+	manual.automatic = false
+	manual._headless = false
+	root.add_child(manual)
+	check(manual.calls.is_empty(), "automatic false leaves lifecycle ownership to the game")
+	manual.take_the_screen()
+	manual.go_quiet("pause")
+	check(manual.calls.slice(-2) == ["grant", "minimize"], "manual screen lifecycle preserves foreground handoff")
+	manual.free()
 
 	var headless = ScreenProbe.new()
 	headless._headless = true
