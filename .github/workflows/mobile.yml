@@ -59,6 +59,38 @@ jobs:
               build/app/outputs/flutter-apk/app-release.apk | grep -E "certificate (DN|SHA-256)"
             [ -n "$GAMENIGHT_KEYSTORE_FILE" ] || echo "Debug key: set the GAMENIGHT_KEYSTORE_* secrets for a fixed one."
           } | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Verify hosted Android sign-in before publishing
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.GAMENIGHT_KEYSTORE_FILE != ''
+        run: |
+          signer="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          "$signer" verify --print-certs build/app/outputs/flutter-apk/app-release.apk > "$RUNNER_TEMP/apk-cert.txt"
+          python3 - <<'PY'
+          import json, os, re, time, urllib.request
+          from pathlib import Path
+          cert = re.search(r"certificate SHA-256 digest: ([0-9a-fA-F]+)",
+                           Path(os.environ["RUNNER_TEMP"], "apk-cert.txt").read_text()).group(1).upper()
+          origin = "https://gamenight.ontola.io"
+          for attempt in range(30):
+              try:
+                  with urllib.request.urlopen(origin + "/.well-known/assetlinks.json", timeout=15) as response:
+                      entries = json.load(response)
+                  matched = any(
+                      entry.get("target", {}).get("package_name") == "io.ontola.gamenight"
+                      and "delegate_permission/common.handle_all_urls" in entry.get("relation", [])
+                      and cert in [f.replace(":", "").upper() for f in entry["target"].get("sha256_cert_fingerprints", [])]
+                      for entry in entries)
+                  if not matched:
+                      raise RuntimeError("The website does not verify this APK's signing certificate")
+                  with urllib.request.urlopen(origin + "/auth/app", timeout=15) as response:
+                      if response.status != 200:
+                          raise RuntimeError("App sign-in page is not deployed")
+                  break
+              except Exception:
+                  if attempt == 29:
+                      raise
+                  print("Waiting for matching hosted Android sign-in deployment", flush=True)
+                  time.sleep(10)
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: gamenight-android
