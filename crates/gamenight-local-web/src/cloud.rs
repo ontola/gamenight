@@ -29,6 +29,7 @@ pub(crate) struct Bridge {
     waiting: Arc<Mutex<serde_json::Value>>,
     pairing: Arc<Mutex<HashMap<String, CachedPairing>>>,
     pairing_request: Arc<tokio::sync::Mutex<()>>,
+    refresh: Arc<tokio::sync::Notify>,
 }
 #[derive(Clone)]
 struct CachedPairing {
@@ -64,6 +65,7 @@ mod pairing_tests {
                 },
             )]))),
             pairing_request: Arc::default(),
+            refresh: Arc::default(),
         };
         let query = HashMap::from([("claim".into(), seat.player.clone())]);
         let first = bridge.pairing_url(&query).await.unwrap();
@@ -202,6 +204,7 @@ impl Bridge {
             seats: Arc::default(),
             pairing: Arc::default(),
             pairing_request: Arc::default(),
+            refresh: Arc::default(),
             waiting: Arc::new(Mutex::new(serde_json::json!({}))),
         })
     }
@@ -245,7 +248,14 @@ impl Bridge {
             .send()
             .await
         {
-            Ok(r) => r.status(),
+            Ok(r) => {
+                if r.status().is_success() {
+                    // The server has accepted the claim. Fetch its authoritative
+                    // account/revision now instead of waiting for the heartbeat.
+                    self.refresh.notify_one();
+                }
+                r.status()
+            }
             Err(_) => StatusCode::BAD_GATEWAY,
         }
     }
@@ -349,7 +359,10 @@ impl Bridge {
         let mut delivered_grants: Option<BTreeMap<String, String>> = None;
         let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
         loop {
-            tokio::time::sleep(Duration::from_secs(3)).await;
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(3)) => {},
+                _ = self.refresh.notified() => {},
+            }
             let Some((seats, party)) = self.snapshot(&state).await else {
                 continue;
             };
@@ -402,6 +415,76 @@ impl Bridge {
             let Ok(updates) = response.json::<Updates>().await else {
                 continue;
             };
+            *self.waiting.lock().unwrap() =
+                serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
+            // Apply confirmed profiles before lower-priority ticket requests.
+            {
+                let mut local = state.lock().unwrap();
+                let retired: Vec<_> = applied
+                    .keys()
+                    .filter(|account| !updates.updates.iter().any(|u| &u.account == *account))
+                    .cloned()
+                    .collect();
+                for account in retired {
+                    if let Some(player) = local.bindings.remove(&format!("cloud_{account}")) {
+                        *local.link_revisions.entry(player).or_default() += 1;
+                    }
+                }
+            }
+            applied.retain(|account, _| updates.updates.iter().any(|u| &u.account == account));
+            for u in &updates.updates {
+                if !seats.contains(&u.seat)
+                    || applied.get(&u.account) == Some(&(u.seat.clone(), u.profile_revision))
+                {
+                    continue;
+                }
+                let Ok(uuid) = uuid::Uuid::parse_str(&u.seat.player) else {
+                    continue;
+                };
+                let player = PlayerId(uuid);
+                let id = format!("cloud_{}", u.account);
+                {
+                    let mut local = state.lock().unwrap();
+                    if *local.link_revisions.get(&player).unwrap_or(&0) != u.seat.revision {
+                        continue;
+                    }
+                    if local
+                        .bindings
+                        .iter()
+                        .any(|(bound, p)| *p == player && bound != &id)
+                    {
+                        *local.link_revisions.entry(player).or_default() += 1;
+                        continue;
+                    }
+                    if local.bindings.get(&id).is_some_and(|old| *old != player) {
+                        local.bindings.remove(&id);
+                    }
+                    local.profiles.insert(
+                        id.clone(),
+                        Profile {
+                            id: id.clone(),
+                            username: u.profile.display_name.clone(),
+                            skin_color: u.profile.skin_color.clone(),
+                            avatar: u.profile.avatar.clone(),
+                        },
+                    );
+                }
+                let result = join_session(
+                    Path(id),
+                    State(state.clone()),
+                    Json(JoinSessionRequest {
+                        link_revision: u.seat.revision,
+                        claim: Some(player),
+                        seat: None,
+                    }),
+                )
+                .await;
+                if result.as_ref().is_ok_and(|response| {
+                    response.0["status"] == "claimed" || response.0["status"] == "joined"
+                }) {
+                    applied.insert(u.account.clone(), (u.seat.clone(), u.profile_revision));
+                }
+            }
             // Before applying a selection, so a newly granted game is already
             // eligible when the party picks it.
             if delivered_grants.as_ref() != Some(&updates.grants)
@@ -451,75 +534,14 @@ impl Bridge {
                 .retain(|_, p| seats.contains(&p.seat));
             for seat in &seats {
                 let query = HashMap::from([("claim".into(), seat.player.clone())]);
-                let _ = self.pairing_url(&query).await;
-            }
-            *self.waiting.lock().unwrap() =
-                serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
-            {
-                let mut local = state.lock().unwrap();
-                let retired: Vec<_> = applied
-                    .keys()
-                    .filter(|account| !updates.updates.iter().any(|u| &u.account == *account))
-                    .cloned()
-                    .collect();
-                for account in retired {
-                    if let Some(player) = local.bindings.remove(&format!("cloud_{account}")) {
-                        *local.link_revisions.entry(player).or_default() += 1;
-                    }
-                }
-            }
-            applied.retain(|account, _| updates.updates.iter().any(|u| &u.account == account));
-            for u in updates.updates {
-                if !seats.contains(&u.seat)
-                    || applied.get(&u.account) == Some(&(u.seat.clone(), u.profile_revision))
-                {
-                    continue;
-                }
-                let Ok(uuid) = uuid::Uuid::parse_str(&u.seat.player) else {
-                    continue;
-                };
-                let player = PlayerId(uuid);
-                let id = format!("cloud_{}", u.account);
-                {
-                    let mut local = state.lock().unwrap();
-                    if *local.link_revisions.get(&player).unwrap_or(&0) != u.seat.revision {
-                        continue;
-                    }
-                    if local
-                        .bindings
-                        .iter()
-                        .any(|(bound, p)| *p == player && bound != &id)
-                    {
-                        *local.link_revisions.entry(player).or_default() += 1;
-                        continue;
-                    }
-                    if local.bindings.get(&id).is_some_and(|old| *old != player) {
-                        local.bindings.remove(&id);
-                    }
-                    local.profiles.insert(
-                        id.clone(),
-                        Profile {
-                            id: id.clone(),
-                            username: u.profile.display_name,
-                            skin_color: u.profile.skin_color,
-                            avatar: u.profile.avatar,
-                        },
-                    );
-                }
-                let result = join_session(
-                    Path(id),
-                    State(state.clone()),
-                    Json(JoinSessionRequest {
-                        link_revision: u.seat.revision,
-                        claim: Some(player),
-                        seat: None,
-                    }),
-                )
-                .await;
-                if result.as_ref().is_ok_and(|response| {
-                    response.0["status"] == "claimed" || response.0["status"] == "joined"
-                }) {
-                    applied.insert(u.account, (u.seat, u.profile_revision));
+                tokio::select! {
+                    _ = self.pairing_url(&query) => {},
+                    _ = self.refresh.notified() => {
+                        // A slow ticket endpoint must not hold up a pickup.
+                        // Keep the wake permit for the next full poll.
+                        self.refresh.notify_one();
+                        break;
+                    },
                 }
             }
         }
@@ -570,5 +592,161 @@ mod grant_tests {
         )
         .unwrap();
         assert_eq!(playtest_key(&updates.playtests)[0].1["windows"], "0.3.1");
+    }
+}
+
+#[cfg(test)]
+mod pickup_tests {
+    use super::*;
+    use axum::{routing::post, Router};
+    use tokio::net::TcpListener;
+
+    async fn pickup_fixture(stale: bool) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let host = tokio::spawn(gamenight_daemon::run_with_library(listener, Vec::new()));
+        let state = Arc::new(Mutex::new(crate::ServerState::new(addr)));
+        let (mut ws, _) = daemon::connect(&state).await.unwrap();
+        for name in ["Guest", "Other"] {
+            ws.send(tokio_tungstenite::tungstenite::Message::Text(
+                ClientMessage::JoinParty {
+                    name: name.into(),
+                    seat: None,
+                    color: None,
+                    avatar: None,
+                    library: vec![],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        }
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let bridge = Bridge {
+            origin: format!("http://{}", listener.local_addr().unwrap()),
+            http: reqwest::Client::new(),
+            session: Arc::new(Mutex::new(Some("fixture".into()))),
+            seats: Arc::default(),
+            waiting: Arc::default(),
+            pairing: Arc::default(),
+            pairing_request: Arc::default(),
+            refresh: Arc::default(),
+        };
+        state.lock().unwrap().cloud = Some(bridge.clone());
+        let seats = tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let (seats, _) = bridge.snapshot(&state).await.unwrap();
+                if seats.len() == 2 {
+                    break seats;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let player = PlayerId(uuid::Uuid::parse_str(&seats[0].player).unwrap());
+        let claimed: Arc<Mutex<Option<serde_json::Value>>> = Arc::default();
+        let ticket_started = Arc::new(tokio::sync::Notify::new());
+        let confirmed = Arc::new(tokio::sync::Notify::new());
+        let app = Router::new()
+            .route("/v1/lobbies/pickup", post({
+                let claimed = claimed.clone(); let state = state.clone();
+                move |Json(body): Json<serde_json::Value>| {
+                    let claimed = claimed.clone(); let state = state.clone();
+                    async move {
+                        if body["pending"] == "rejected" { return axum::http::StatusCode::GONE; }
+                        *claimed.lock().unwrap() = Some(body["seat"].clone());
+                        if stale { *state.lock().unwrap().link_revisions.entry(player).or_default() += 1; }
+                        axum::http::StatusCode::NO_CONTENT
+                    }
+                }
+            }))
+            .route("/v1/lobbies/poll", post({
+                let claimed = claimed.clone(); let confirmed = confirmed.clone();
+                move |Json(body): Json<serde_json::Value>| {
+                    let claimed = claimed.clone(); let confirmed = confirmed.clone();
+                    async move {
+                        assert_eq!(body["seats"].as_array().unwrap().len(), 2);
+                        assert!(body["discovery"].is_object(), "pickup must preserve discovery");
+                        let updates = claimed.lock().unwrap().as_ref().map(|seat| {
+                            confirmed.notify_one();
+                            vec![serde_json::json!({"seat":seat,"account":"fixture-account","profile_revision":7,
+                                "profile":{"display_name":"Ada","skin_color":"#ff0000","avatar":"fixture-face"}})]
+                        }).unwrap_or_default();
+                        Json(serde_json::json!({"updates":updates,"room_code":"ABCDEF"}))
+                    }
+                }
+            }))
+            .route("/v1/lobbies/ticket", post({
+                let started = ticket_started.clone();
+                move || { let started = started.clone(); async move {
+                    started.notify_one();
+                    std::future::pending::<()>().await;
+                    Json(serde_json::json!({"ticket":"unused"}))
+                }}
+            }));
+        let cloud = tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+        // Rejected claims cannot trigger a profile refresh.
+        assert_eq!(
+            bridge.pickup(&state, "rejected", player).await,
+            axum::http::StatusCode::GONE
+        );
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), bridge.refresh.notified())
+                .await
+                .is_err()
+        );
+        let runner = tokio::spawn(bridge.clone().run(state.clone()));
+        bridge.refresh.notify_one();
+        tokio::time::timeout(Duration::from_secs(2), ticket_started.notified())
+            .await
+            .unwrap();
+        assert_eq!(
+            bridge.pickup(&state, "accepted", player).await,
+            axum::http::StatusCode::NO_CONTENT
+        );
+        // Both the 3s heartbeat and an indefinitely blocked ticket must be bypassed.
+        tokio::time::timeout(Duration::from_secs(2), confirmed.notified())
+            .await
+            .unwrap();
+        if stale {
+            tokio::time::timeout(Duration::from_secs(2), ticket_started.notified())
+                .await
+                .unwrap();
+            let (_, party) = bridge.snapshot(&state).await.unwrap();
+            assert_ne!(
+                party.players.iter().find(|p| p.id == player).unwrap().name,
+                "Ada"
+            );
+            assert!(state.lock().unwrap().bindings.is_empty());
+        } else {
+            tokio::time::timeout(Duration::from_secs(2), async {
+                loop {
+                    let (_, party) = bridge.snapshot(&state).await.unwrap();
+                    let p = party.players.iter().find(|p| p.id == player).unwrap();
+                    if p.name == "Ada" {
+                        assert_eq!(p.avatar.as_deref(), Some("fixture-face"));
+                        assert_eq!(party.players.len(), 2);
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+        runner.abort();
+        cloud.abort();
+        host.abort();
+        let _ = ws.close(None).await;
+    }
+
+    #[tokio::test]
+    async fn successful_pickup_interrupts_ticket_and_applies_profile_without_heartbeat_delay() {
+        pickup_fixture(false).await;
+    }
+    #[tokio::test]
+    async fn immediate_pickup_refresh_still_rejects_an_unlinked_seat() {
+        pickup_fixture(true).await;
     }
 }

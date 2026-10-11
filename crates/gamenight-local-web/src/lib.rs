@@ -271,7 +271,7 @@ async fn profile_session(
         let player = bound.and_then(|id| party.players.iter().find(|player| player.id == id));
         let seat = player.and_then(|player| party.seats.iter().find(|seat| seat.occupant.player_id() == Some(player.id))).map(|seat| seat.index);
         let title = |game: &gamenight_protocol::GameId| party.library.iter().find(|meta| &meta.id == game).map(|meta| meta.title.clone()).unwrap_or_else(|| game.0.clone());
-        let current = party.active_session.as_ref().map(|session| serde_json::json!({"title": title(&session.game), "phase": session.phase}));
+        let current = party.active_session.as_ref().map(|session| serde_json::json!({"game": session.game, "title": title(&session.game), "phase": session.phase}));
         let next = party.warm_session.as_ref().map(|session| title(&session.game)).or_else(|| party.warming.as_ref().map(|entry| entry.title.clone()));
         let local = state.lock().unwrap();
         Ok(Json(serde_json::json!({"linked": player.is_some(), "player_id":player.map(|p|p.id), "link_revision":player.and_then(|p|local.link_revisions.get(&p.id)).copied().unwrap_or(0), "waiting":local.local_room.waiting(&id), "remembered":local.memory.profiles.contains_key(&id), "main_player":local.memory.main_profile.as_ref()==Some(&id), "player_name": player.map(|player| &player.name), "seat": seat, "players": party.players.len(), "current": current, "next": next})))

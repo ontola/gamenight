@@ -51,8 +51,13 @@ profile and expiry). The native lobby reads these from `/api/player-links` under
 requires a loopback peer and `X-GameNight-Local-Pickup: 1`; it is deliberately not
 a phone API. The local bridge validates the player and unlinked state, then sends
 a capability-authenticated `/v1/lobbies/pickup` request with the full seat identity
-and link revision. The cloud consumes the pickup atomically; subsequent normal
-profile updates apply the account. No account token is delivered to the host.
+and link revision. The cloud consumes the pickup atomically. A successful pickup
+wakes a full authenticated poll immediately, preserving discovery and all seats;
+the confirmed profile is applied before QR-ticket requests. A slow ticket request
+is interrupted for pickup. The normal three-second heartbeat remains for other
+changes. Unlink/replacement revision checks still reject stale replies, and failed
+claims do not apply the cached pending profile. No account token is delivered to
+the host.
 
 Codes last for the host session (at most 24 hours, or until its heartbeat expires).
 Cloud restart requires a new code. The cloud limits code attempts to five/minute
