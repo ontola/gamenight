@@ -67,6 +67,7 @@
   <div class="site-menu-heading"><h2 id="site-menu-title">Menu</h2><button aria-label="Close menu" onclick={()=>menuDialog.close()}>×</button></div>
   <nav aria-label="More navigation">
     <a href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined} onclick={()=>menuDialog.close()}>Docs <span aria-hidden="true">↗</span></a>
+    <a href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/developers':'/developers'} aria-current={$route==='/developers' || $route.startsWith('/developers/')?'page':undefined} onclick={()=>menuDialog.close()}>Developer portal <span aria-hidden="true">→</span></a>
     <a href={document.body.dataset.local==='true'?'https://gamenight.ontola.io/host':'/host'} aria-current={$route==='/host'?'page':undefined} onclick={()=>menuDialog.close()}>Host a room <span aria-hidden="true">→</span></a>
     {#if $room===true}<button class="site-menu-leave" onclick={openLeave}>Leave room <span aria-hidden="true">→</span></button>{/if}
   </nav>
