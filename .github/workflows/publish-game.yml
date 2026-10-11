@@ -9,7 +9,8 @@
 #     upload:
 #       if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
 #       uses: ontola/gamenight/.github/workflows/publish-game.yml@main
-#       secrets: inherit
+#       secrets:
+#         GAMENIGHT_API_TOKEN: ${{ secrets.GAMENIGHT_API_TOKEN }}
 #       with:
 #         artifact: mygame-windows
 #         game: mygame
@@ -18,10 +19,14 @@
 #
 # Only successful main or v* builds from the repository itself are uploaded.
 # GAMENIGHT_API_TOKEN comes from the caller's `gamenight` environment, or from
-# its repository secrets through `secrets: inherit`.
+# its repository secrets. Pass this secret explicitly, including across owners.
 name: Publish to GameNight
 on:
   workflow_call:
+    secrets:
+      GAMENIGHT_API_TOKEN:
+        description: Game-scoped publishing key from the caller environment or repository
+        required: true
     inputs:
       artifact:
         description: Name of the build artifact uploaded by the triggering run

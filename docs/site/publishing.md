@@ -65,13 +65,16 @@ jobs:
   upload:
     if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
     uses: ontola/gamenight/.github/workflows/publish-game.yml@main
-    secrets: inherit
+    secrets:
+      GAMENIGHT_API_TOKEN: ${{ secrets.GAMENIGHT_API_TOKEN }}
     with:
       artifact: my-game-windows   # artifact uploaded by the build
       game: my-game
       file: my-game-windows.zip   # path inside that artifact
       entrypoint: Game.exe
 ```
+
+Pass the named secret explicitly when calling across repository owners. The reusable job selects your `gamenight` environment, where you can store the key.
 
 The shared first-party pack uses a `gamenight-<game-id>` GitHub environment per game, each holding its `GAMENIGHT_API_TOKEN`. Native repositories use a `gamenight` environment. Set the repository variable `GAMENIGHT_PUBLISH_ENABLED=true` after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.
 
