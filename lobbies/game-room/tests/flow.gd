@@ -23,32 +23,32 @@ func _run() -> void:
 	# Game shelf: Y plays the box on the stand next, RB browses, X queues.
 	var first := str(shelf[main.shelf_offset % shelf.size()].id)
 	_place(a, (Layout.GAME_SHELF.x + Layout.GAME_SHELF.y) / 2)
-	_press(a, World.BTN_Y)
+	await _press(a, World.BTN_Y)
 	if not await _until("Y at the shelf plays its game next", func(): return not main.upcoming().is_empty() and main.upcoming()[0].game == first): return
 	var start: int = main.shelf_offset
-	_press(a, main.BTN_RB)
+	await _press(a, main.BTN_RB)
 	if not await _until("RB browses the shelf", func(): return main.shelf_offset == (start + 1) % shelf.size()): return
-	_press(a, main.BTN_LB)
+	await _press(a, main.BTN_LB)
 	if not await _until("LB browses back", func(): return main.shelf_offset == start): return
-	_press(a, main.BTN_RB)
+	await _press(a, main.BTN_RB)
 	var second := str(shelf[(start + 1) % shelf.size()].id)
 	await get_tree().create_timer(0.5).timeout  # station cooldown
-	_press(a, World.BTN_X)
+	await _press(a, World.BTN_X)
 	if not await _until("X queues the browsed game", func(): return main.upcoming().back().game == second): return
 	if main.upcoming()[0].game != first: return _fail("X keeps the next game in front")
 	_place(a, 0.0)
-	_press(a, main.BTN_RB)
+	await _press(a, main.BTN_RB)
 	if main.shelf_offset != (start + 1) % shelf.size(): return _fail("RB away from the shelf does not browse")
 	var head := str(main.upcoming()[0].game)
 	await _capture("queue")
 	# TV: Y starts the head of the queue.
-	_press(a, World.BTN_Y)
+	await _press(a, World.BTN_Y)
 	if not await _until("Y at the TV launches the queue head", func(): return _phase(head) == "running"): return
 	main.client.open_lobby()
 	if not await _until("opening the lobby pauses the game", func(): return _phase(head) == "paused"): return
 	_place(a, 1.5)
 	if main.station_for(a).get("action") != "resume": return _fail("the TV offers Resume while a game is paused")
-	_press(a, World.BTN_Y)
+	await _press(a, World.BTN_Y)
 	if not await _until("Y on Resume resumes the game", func(): return _phase(head) == "running"): return
 	main.client.open_lobby()
 	if not await _until("lobby open again", func(): return _phase(head) == "paused"): return
@@ -57,13 +57,13 @@ func _run() -> void:
 	await _capture("door")
 	_place(b, Layout.PROFILE_DOORS[0])
 	if not main.station_for(b).get("enabled", false): return _fail("door offers pickup to an unlinked player")
-	_press(b, World.BTN_Y)
+	await _press(b, World.BTN_Y)
 	if not await _until("Y at the door links the profile", func(): return main.links.get("linked", []).has(b)): return
 	if not await _until("picked up profile name reaches the party", func(): return str(main.profiles.get(b, {}).get("name", "")) == "Sanne"): return
 	# Exit door: Y leaves the party.
 	var c: String = ids[2]
 	_place(c, Layout.EXIT_DOOR)
-	_press(c, World.BTN_Y)
+	await _press(c, World.BTN_Y)
 	if not await _until("Y at the exit door leaves", func(): return not main.profiles.has(c)): return
 	if not main.world.players.has(a) or main.world.players.has(c): return _fail("world players follow the party")
 	await _capture("live")
@@ -80,6 +80,10 @@ func _place(id: String, x: float) -> void:
 	p.x = x; p.y = 0.0; p.vx = 0.0; p.vy = 0.0; p.grounded = true; p.sleeping = false
 
 func _press(id: String, button: int) -> void:
+	if not await _until("lobby owns input", func(): return main.client.active): return
+	# A fresh press begins with a released controller, just like host polling.
+	# Focus handoff deliberately blocks held buttons until this neutral frame.
+	main.input(id, 0, Vector2.ZERO)
 	main.input(id, button, Vector2.ZERO)
 	main.input(id, 0, Vector2.ZERO)
 

@@ -415,7 +415,7 @@ impl GameNight {
         let mut fx = vec![Effect::StateChanged];
         // A shelf that was empty at boot has nothing warm; the arrival of the
         // first playable game is exactly when that should change.
-        self.maybe_warm(&mut fx);
+        self.rewarm_if_misfit(&mut fx);
         fx
     }
 
@@ -937,6 +937,11 @@ impl GameNight {
             playlist: self.playlist.snapshot(),
             active_session: self.active.as_ref().map(Session::info),
             warm_session: self.warm.as_ref().map(Session::info),
+            next_game_index: self
+                .warm
+                .as_ref()
+                .map(|w| w.playlist_index)
+                .or_else(|| self.warm_target()),
             // What we're heading for, so screens can say "starting" rather
             // than either lying about readiness or claiming an empty shelf.
             warming: self.warm.as_ref().map_or_else(
@@ -1138,7 +1143,7 @@ impl GameNight {
                     || self.active_players != self.players)
             {
                 let game = active.game.clone();
-                let fits = self.game_has_capacity(&active.game);
+                let fits = self.game_fits_party(&active.game);
                 self.dispose_warm(fx);
                 self.dispose_active(fx);
                 if fits {
@@ -1309,7 +1314,7 @@ impl GameNight {
     }
 
     fn select_next(&mut self, game: GameId, start_if_idle: bool, fx: &mut Vec<Effect>) {
-        if !self.game_has_capacity(&game) {
+        if !self.game_fits_party(&game) {
             fx.push(Effect::Reject {
                 reason: "this game cannot fit everyone in the party".into(),
             });
@@ -1362,7 +1367,7 @@ impl GameNight {
             });
             return;
         };
-        if self.lobby_game.as_ref() == Some(&game) || !self.game_has_capacity(&game) {
+        if self.lobby_game.as_ref() == Some(&game) || !self.game_fits_party(&game) {
             fx.push(Effect::Reject {
                 reason: "this game cannot fit everyone in the party".into(),
             });
@@ -1850,16 +1855,13 @@ impl GameNight {
     /// Whether `game`'s declared player range covers the current party.
     /// Games the shelf knows nothing about fit anything — see
     /// `GameMeta::fits_players`.
-    fn game_has_capacity(&self, game: &GameId) -> bool {
-        self.library
-            .iter()
-            .find(|m| &m.id == game)
-            .and_then(|m| m.max_players)
-            .is_none_or(|max| self.seated_count() <= max)
-    }
-
     fn game_fits_party(&self, game: &GameId) -> bool {
-        let players = self.seated_count();
+        let players = self
+            .seats
+            .iter()
+            .filter(|s| s.occupant.player_id().is_some())
+            .count()
+            .min(u8::MAX as usize) as u8;
         self.library
             .iter()
             .find(|m| &m.id == game)
@@ -1881,41 +1883,23 @@ impl GameNight {
     /// Which playlist entry should be (or is being) warmed — skipping the
     /// lobby game if rotation would otherwise land on it.
     fn warm_target(&self) -> Option<usize> {
-        if let Some(index) = self.next_up {
-            if self.is_playable(index)
+        let eligible = |index: usize| {
+            self.is_playable(index)
                 && self
                     .playlist
                     .get(index)
-                    .is_some_and(|e| self.game_has_capacity(&e.game))
-            {
-                return Some(index);
-            }
-            // An explicit pick somehow landed on the lobby game — fall
-            // through to normal rotation instead of warming it.
+                    .is_some_and(|e| self.game_fits_party(&e.game))
+        };
+        if let Some(index) = self.next_up.filter(|&index| eligible(index)) {
+            return Some(index);
         }
         let start = self.playlist.next_index()?;
         let len = self.playlist.entries().len();
-        let rotation: Vec<usize> = (0..len)
+        // Preserve playlist order, but never assume a missing human can be
+        // replaced by AI. Solo support is advertised by min_players = 1.
+        (0..len)
             .map(|offset| (start + offset) % len)
-            .filter(|&index| {
-                self.is_playable(index)
-                    && self
-                        .playlist
-                        .get(index)
-                        .is_some_and(|e| self.game_has_capacity(&e.game))
-            })
-            .collect();
-
-        // Respect the party's playlist order among playable games. A preferred
-        // player count is a recommendation, not permission to undo a reorder.
-        let fitting = rotation.iter().copied().find(|&index| {
-            self.playlist
-                .get(index)
-                .is_some_and(|e| self.game_fits_party(&e.game))
-        });
-        // Below the minimum, bots can fill missing seats. Above the maximum,
-        // entries were excluded: never leave a joined player out.
-        fitting.or_else(|| rotation.first().copied())
+            .find(|&index| eligible(index))
     }
 
     /// Called whenever the seating changes: re-prepare or replace the warm
@@ -1935,38 +1919,16 @@ impl GameNight {
             self.maybe_warm(fx);
             return;
         };
-        if !self.game_has_capacity(&warm.game) {
+        if !self.game_fits_party(&warm.game) {
             self.dispose_warm(fx);
             self.next_up = None;
             self.maybe_warm(fx);
             return;
         }
         if self.warm_seats != self.seats_for(&warm.game) || self.warm_players != self.players {
-            // Same game, new seating: warm it again rather than hunt for a
-            // better title. `maybe_warm` re-reads the seats.
             self.dispose_warm(fx);
             self.maybe_warm(fx);
-            return;
         }
-        if self.game_fits_party(&warm.game) {
-            return;
-        }
-        let game = warm.game.clone();
-        // Only worth swapping if something better is actually available.
-        let better = self.warm_target().and_then(|index| {
-            self.playlist
-                .get(index)
-                .map(|e| e.game.clone())
-                .filter(|g| g != &game && self.game_fits_party(g))
-        });
-        if better.is_none() {
-            return;
-        }
-        // No logging here: this crate is the pure state machine and has no
-        // tracing dependency. The daemon logs when it acts on the effects.
-        self.dispose_warm(fx);
-        self.next_up = None;
-        self.maybe_warm(fx);
     }
 
     /// Point the warm slot at `index`, replacing a mismatched warm session.
@@ -2031,35 +1993,30 @@ impl GameNight {
         self.warm = Some(session);
     }
 
-    /// The party's seats as `game` should see them: empty seats filled with
-    /// bots up to whatever the game says it needs to run.
-    ///
-    /// One person warming up before the others arrive is the everyday case,
-    /// not an error to refuse — and a game that needs two players has to get
-    /// two from somewhere. Deciding that here rather than in each game is the
-    /// point: the alternative is every title inventing its own silent
-    /// fallback, none of which the party can see, and half of which sit at a
-    /// "waiting for player 2" screen forever instead.
-    ///
-    /// Only ever fills; a seat somebody is sitting in is never touched.
+    /// Preserve explicit seats within capacity. A minimum is a human requirement,
+    /// not an AI capability: only the game knows whether it implements bots.
+    /// Games advertising solo support accept one human and manage their AI.
     fn seats_for(&self, game: &GameId) -> Vec<Seat> {
         let mut seats = self.seats.clone();
-        let Some(min) = self
+        if let Some(max) = self
             .library
             .iter()
             .find(|m| &m.id == game)
-            .and_then(|m| m.min_players)
-        else {
-            return seats;
-        };
-        let mut taken = self.seated_count();
-        for seat in seats.iter_mut() {
-            if taken >= min {
-                break;
-            }
-            if seat.occupant.is_empty() {
-                seat.occupant = SeatOccupant::Ai;
-                taken += 1;
+            .and_then(|m| m.max_players)
+        {
+            let humans = seats
+                .iter()
+                .filter(|s| s.occupant.player_id().is_some())
+                .count();
+            let mut available = usize::from(max).saturating_sub(humans);
+            for seat in &mut seats {
+                if seat.occupant == SeatOccupant::Ai {
+                    if available == 0 {
+                        seat.occupant = SeatOccupant::Empty;
+                    } else {
+                        available -= 1;
+                    }
+                }
             }
         }
         seats
@@ -2070,6 +2027,15 @@ impl GameNight {
     fn try_transition(&mut self, fx: &mut Vec<Effect>) {
         if !self.pending_transition {
             return;
+        }
+        // A leave can resolve a vote before its normal roster refresh runs.
+        // Recheck at the final boundary so a ready but stale session cannot start.
+        if self.warm.as_ref().is_some_and(|warm| {
+            !self.game_fits_party(&warm.game)
+                || self.warm_seats != self.seats_for(&warm.game)
+                || self.warm_players != self.players
+        }) {
+            self.rewarm_if_misfit(fx);
         }
         match &self.warm {
             Some(w) if w.phase == SessionPhase::Ready => {

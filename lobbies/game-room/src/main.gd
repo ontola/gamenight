@@ -227,11 +227,40 @@ func upcoming() -> Array:
 	var playlist: Dictionary = party.get("playlist", {})
 	var entries: Array = playlist.get("entries", [])
 	var start := 0 if playlist.get("current") == null else int(playlist.current) + 1
+	var next_index := int(party.get("next_game_index", -1)) if party.get("next_game_index") != null else -1
+	var authoritative := next_index >= 0 and next_index < entries.size() and _fits_party(game_meta(str(entries[next_index].game)))
+	if authoritative: start = next_index
+	# The host may skip an incompatible entry or honor an explicit next pick.
+	# Follow that prepared target instead of advertising the raw playlist head.
+	var target: Variant = party.get("warm_session")
+	if not target is Dictionary: target = party.get("warming", {})
+	if not authoritative and target is Dictionary:
+		var game := str(target.get("game", ""))
+		var active := current_game()
+		if not game.is_empty() and (active.is_empty() or str(active.id) != game):
+			for offset in entries.size():
+				var index := (start + offset) % entries.size()
+				if str(entries[index].game) == game and _fits_party(game_meta(game)):
+					start = index
+					break
+	if start >= entries.size(): start = 0 # Host playlists rotate after the last entry.
 	var result: Array = []
 	for index in range(start, entries.size()):
 		if str(entries[index].game) == client.lobby_id: continue
+		if not _fits_party(game_meta(str(entries[index].game))): continue
 		result.append({"index": index, "game": str(entries[index].game), "title": str(entries[index].get("title", "Game"))})
 	return result
+
+func _human_count() -> int:
+	var count := 0
+	for seat in party.get("seats", []):
+		if seat.get("occupant", {}).get("player_id") != null: count += 1
+	return count
+
+func _fits_party(game: Dictionary) -> bool:
+	var count := _human_count()
+	# Match host prewarming before anyone joins. Re-evaluate on every snapshot.
+	return count == 0 or ((game.get("min_players") == null or count >= int(game.min_players)) and (game.get("max_players") == null or count <= int(game.max_players)))
 
 func current_game() -> Dictionary:
 	var session: Variant = party.get("active_session")
@@ -373,15 +402,16 @@ func station_for(id: String) -> Dictionary:
 
 ## The TV: Y resumes the paused game, or starts the next one.
 func tv_station() -> Dictionary:
-	if not current_game().is_empty():
-		return {"label": "Resume %s" % current_game().get("title", "game"), "short": "Resume", "action": "resume", "enabled": true}
+	var active := current_game()
+	if not active.is_empty() and _fits_party(active):
+		return {"label": "Resume %s" % active.get("title", "game"), "short": "Resume", "action": "resume", "enabled": true}
 	var queue := upcoming()
-	if queue.is_empty(): return {"label": "Pick a game at the shelf first", "short": "Start", "action": "next", "enabled": false}
+	if queue.is_empty(): return {"label": "No queued games for this party", "short": "Start", "action": "next", "enabled": false}
 	return {"label": "Start %s" % queue[0].title, "short": "Start", "action": "next", "enabled": true}
 
 func _unavailable(game: Dictionary) -> String:
 	if not client.connected and demo == null: return "Waiting for GameNight"
-	var count: int = profiles.size()
+	var count := _human_count()
 	if game.get("max_players") != null and count > int(game.max_players): return "Too many players"
 	if game.get("min_players") != null and count < int(game.min_players): return "Needs %d players" % int(game.min_players)
 	return ""
@@ -686,6 +716,9 @@ func _draw_tv(canvas: Control) -> void:
 		kicker = "PAUSED" if game.get("phase") == "paused" else "NOW PLAYING"
 		kicker_color = GREEN
 		detail = "Press Y at the TV to resume"
+		if not _fits_party(game):
+			var action := tv_station()
+			detail = "Y at TV: %s" % action.label if action.enabled else "This game needs a different player count"
 	else:
 		var queue := upcoming()
 		if not queue.is_empty():
@@ -790,8 +823,9 @@ func _draw_queue_preview(canvas: Control) -> void:
 	var queue := upcoming()
 	_text(canvas, "UP NEXT", Vector2(24, 46), 34, GREEN)
 	if queue.is_empty():
-		_text(canvas, "Choose a game", Vector2(24, 206), 48, TEXT)
-		_text(canvas, "at the game shelf", Vector2(24, 256), 34, DIM)
+		var matching := shelf_games().any(func(g): return _fits_party(g))
+		_text(canvas, "Choose a game" if matching else "No matching games", Vector2(24, 206), 44, TEXT)
+		_text(canvas, "at the game shelf" if matching else "%d players in this party" % _human_count(), Vector2(24, 256), 32, DIM)
 		return
 	var game := game_meta(queue[0].game)
 	if game.is_empty(): game = {"id": queue[0].game, "title": queue[0].title}

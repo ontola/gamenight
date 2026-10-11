@@ -1380,7 +1380,21 @@ mod night_tests {
         });
         // B never votes and walks out: A's vote is now unanimous.
         let fx = night.handle(Command::LeaveParty { player_id: b });
-        assert_eq!(started_session(&fx), Some(s2));
+        assert_eq!(
+            started_session(&fx),
+            None,
+            "do not start the stale two-person session"
+        );
+        assert!(disposed_sessions(&fx).contains(&s2));
+        let (_, replacement) = prepared_session(&fx).expect("prepare the remaining player");
+        let fx = night.handle(Command::SessionReady {
+            session: replacement,
+        });
+        assert_eq!(
+            started_session(&fx),
+            Some(replacement),
+            "the unanimous vote still advances"
+        );
     }
 
     #[test]
@@ -2534,10 +2548,9 @@ mod player_count_fit_tests {
         assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { players, .. }, .. } if players.iter().any(|p| p.name == "Ada"))));
     }
 
-    /// Nothing fits: warm something anyway. A lobby that can't start a game
-    /// is worse than one offering an imperfect fit.
+    /// An unsupported party size must not fall back to an unplayable title.
     #[test]
-    fn warms_something_even_when_nothing_fits() {
+    fn nothing_warms_when_no_game_supports_the_party() {
         let mut night = GameNight::default();
         night.set_library(vec![game("five-plus", 5, 8, None)]);
         for n in ["a", "b"] {
@@ -2547,33 +2560,201 @@ mod player_count_fit_tests {
             game: GameId::new("five-plus"),
         });
         assert!(
-            night.snapshot().warm_session.is_some(),
-            "a bad fit still beats nothing warm at all"
+            night.snapshot().warm_session.is_none(),
+            "do not promise a game that requires more humans"
+        );
+        assert!(night.snapshot().warming.is_none());
+        assert_eq!(
+            night.snapshot().library.len(),
+            1,
+            "manual catalog remains available"
         );
     }
 
-    /// One person can start a two-player game: the missing seat arrives as a
-    /// bot, decided here rather than guessed at by every game separately.
+    /// Real solo support is advertised by the title's human minimum. A
+    /// two-player minimum alone does not advertise a bot implementation.
     #[test]
-    fn prepare_fills_empty_seats_with_bots_up_to_min_players() {
+    fn solo_capable_game_warms_without_inventing_ai_for_other_titles() {
         let mut night = GameNight::default();
-        night.set_library(vec![game("duo", 2, 4, None)]);
+        night.set_library(vec![
+            game("duo", 2, 4, None),
+            game("solo-with-bots", 1, 4, None),
+        ]);
         night.handle(join("Ada"));
         let fx = night.handle(Command::GameConnected {
-            game: GameId::new("duo"),
+            game: GameId::new("solo-with-bots"),
         });
         let seats = prepared_seats(&fx).expect("warms for the party of one");
         assert!(
             matches!(seats[0].occupant, SeatOccupant::Local { .. }),
             "the person keeps their seat"
         );
-        assert_eq!(seats[1].occupant, SeatOccupant::Ai, "the game gets a bot");
+        assert_eq!(
+            seats[1].occupant,
+            SeatOccupant::Empty,
+            "AI support belongs to the game"
+        );
         assert!(seats[2].occupant.is_empty(), "and not one seat more");
         assert!(seats[3].occupant.is_empty());
 
         // The party itself is untouched: seat 2 is still free for a person.
         assert_eq!(night.seated_count(), 1);
         assert!(night.snapshot().seats[1].occupant.is_empty());
+    }
+
+    #[test]
+    fn leaving_below_minimum_disposes_ready_session_even_without_alternative() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        night.set_library(vec![game("duo", 2, 2, None)]);
+        night.handle(join("Ada"));
+        night.handle(join("Bob"));
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("duo"),
+        });
+        let (_, old) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: old });
+        let leaver = night.snapshot().players[1].id;
+        let fx = night.handle(Command::LeaveParty { player_id: leaver });
+        assert_eq!(disposed_sessions(&fx), vec![old]);
+        assert!(night.snapshot().warm_session.is_none());
+        assert!(night.snapshot().warming.is_none());
+        let late = night.handle(Command::SessionReady { session: old });
+        assert!(!late.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Start,
+                ..
+            }
+        )));
+        let joined = night.handle(join("Carol"));
+        assert!(
+            prepared_session(&joined).is_some(),
+            "joining makes the retained catalog entry eligible again"
+        );
+    }
+
+    #[test]
+    fn explicit_ai_seat_cannot_satisfy_an_advertised_human_minimum() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("duo", 2, 4, None)]);
+        night.handle(join("Ada"));
+        night.handle(Command::AssignSeat {
+            seat: 1,
+            occupant: SeatOccupant::Ai,
+        });
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("duo"),
+        });
+        assert!(prepared_session(&fx).is_none());
+        assert!(night.snapshot().warming.is_none());
+    }
+
+    #[test]
+    fn prepare_limits_explicit_ai_to_capacity_without_dropping_humans() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("two-slots", 1, 2, None)]);
+        night.handle(join("Ada"));
+        for seat in [1, 2] {
+            night.handle(Command::AssignSeat {
+                seat,
+                occupant: SeatOccupant::Ai,
+            });
+        }
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("two-slots"),
+        });
+        let seats = prepared_seats(&fx).unwrap();
+        assert_eq!(
+            seats
+                .iter()
+                .filter(|s| s.occupant == SeatOccupant::Ai)
+                .count(),
+            1
+        );
+        assert_eq!(
+            night
+                .snapshot()
+                .seats
+                .iter()
+                .filter(|s| s.occupant == SeatOccupant::Ai)
+                .count(),
+            2,
+            "party preference stays intact"
+        );
+        let fx = night.handle(join("Bob"));
+        let seats = prepared_seats(&fx).unwrap();
+        assert_eq!(
+            seats
+                .iter()
+                .filter(|s| s.occupant.player_id().is_some())
+                .count(),
+            2
+        );
+        assert!(seats.iter().all(|s| s.occupant != SeatOccupant::Ai));
+    }
+
+    #[test]
+    fn snapshot_identifies_duplicate_next_occurrence_before_and_after_prepare() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("a", 1, 4, None), game("b", 1, 4, None)]);
+        night.handle(join("Ada"));
+        night.handle(Command::SetPlaylist {
+            entries: ["a", "b", "a"]
+                .iter()
+                .map(|id| PlaylistEntry {
+                    game: GameId::new(*id),
+                    title: (*id).into(),
+                })
+                .collect(),
+        });
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("a"),
+        });
+        let (_, a) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: a });
+        assert_eq!(
+            night.snapshot().next_game_index,
+            Some(1),
+            "target known before process connects"
+        );
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("b"),
+        });
+        let (_, b) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: b });
+        night.handle(Command::Next);
+        assert_eq!(
+            night.snapshot().next_game_index,
+            Some(2),
+            "normal rotation uses second A"
+        );
+        night.handle(Command::QueueNext {
+            game: GameId::new("a"),
+        });
+        assert_eq!(
+            night.snapshot().next_game_index,
+            Some(0),
+            "explicit pick identifies first A exactly"
+        );
+    }
+
+    #[test]
+    fn explicit_pick_and_catalog_update_cannot_keep_an_unsupported_warm_game() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("duo", 2, 4, None), game("solo", 1, 4, None)]);
+        night.handle(join("Ada"));
+        let rejected = night.handle(Command::QueueNext {
+            game: GameId::new("duo"),
+        });
+        assert!(rejected.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("solo"),
+        });
+        let (_, old) = prepared_session(&fx).unwrap();
+        let changed = night.add_to_library(game("solo", 2, 4, None));
+        assert_eq!(disposed_sessions(&changed), vec![old]);
+        assert!(night.snapshot().warm_session.is_none());
     }
 
     /// A game that never said how many players it needs gets the seats as

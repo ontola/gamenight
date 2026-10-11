@@ -194,12 +194,19 @@ hang it off — so it carries just the flag:</p>
 Preserve player ownership across games; do not map seats to engine device order.
 See <a href="#bundled-games-authoritative-controller-input">authoritative input</a>.
 Occupant kinds are <code>local</code>, <code>remote</code> (reserved for network play), <code>ai</code>, <code>empty</code>.</p>
-<p>If the party is smaller than the game's declared <code>min_players</code>, the daemon
-fills the empty seats with <code>ai</code> up to that minimum — one person warming up
-before the others arrive is the everyday case, not an error to refuse. So a
-game that needs two players and gets one seated human always sees a second
-seat with a bot in it, and never has to invent its own fallback. The party's
-own seating is untouched: those seats stay free for people to take.</p>
+<p><code>min_players</code> and <code>max_players</code> describe supported human participants. The
+daemon skips games outside that range when preparing the next game, and
+replaces an incompatible prepared session after someone joins or leaves.
+The full library remains available for browsing. Before anyone joins, the
+host may prewarm a game; the first join rechecks its eligibility.</p>
+<p>A title that supports one human against its own AI advertises
+<code>min_players: 1</code>. A higher minimum does not imply bot support: the daemon
+does not invent AI occupants to fill it. Explicitly assigned <code>ai</code> seats are
+preserved in <code>prepare</code> only within the game's maximum capacity, with humans
+taking priority. AI occupants do not count toward the human minimum.</p>
+<p>Party snapshots include optional <code>next_game_index</code>, the exact upcoming
+playlist occurrence even before its process connects. Use it for the Up Next
+preview: two queued entries can have the same game ID. Older hosts omit it.</p>
 <p>The seats are the whole player list. A game running under a daemon should
 <strong>not</strong> also run its own &quot;press X to join&quot; — the party decides who is
 playing, in the lobby, and a second route in makes the two disagree.</p>
@@ -843,7 +850,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="8b15703bff922c4af17d970bf3eb552a98239a0acafab8381afa33ed89d86354">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="dd7f27e98f6b4fbb8b0e2b11c983840715f33579df9d7cced87ccf6dcb089fee">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

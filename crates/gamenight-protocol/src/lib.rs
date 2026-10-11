@@ -452,7 +452,9 @@ pub struct GameMeta {
     /// picks games by `min_players`/`max_players`, never by parsing this.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub players: Option<String>,
-    /// Couch seats this game supports. The daemon uses these to warm
+    /// Human participants this game supports. Solo play with game-managed AI
+    /// is advertised with a minimum of one; a higher minimum does not imply
+    /// bot support. The daemon uses these bounds to warm
     /// something that actually fits the party, so a shelf entry without them
     /// is treated as "fits anything" rather than being skipped — an unknown
     /// range should not make a game unplayable.
@@ -664,6 +666,10 @@ pub struct PartySnapshot {
     pub active_session: Option<SessionInfo>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warm_session: Option<SessionInfo>,
+    /// Exact upcoming playlist occurrence, including while its process launches.
+    /// Older hosts omit this; game IDs alone cannot distinguish duplicate entries.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_game_index: Option<usize>,
     /// Games already played tonight, oldest first.
     pub history: Vec<GameId>,
     pub vote: VoteSnapshot,

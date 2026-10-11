@@ -131,12 +131,21 @@ Preserve player ownership across games; do not map seats to engine device order.
 See [authoritative input](#bundled-games-authoritative-controller-input).
 Occupant kinds are `local`, `remote` (reserved for network play), `ai`, `empty`.
 
-If the party is smaller than the game's declared `min_players`, the daemon
-fills the empty seats with `ai` up to that minimum — one person warming up
-before the others arrive is the everyday case, not an error to refuse. So a
-game that needs two players and gets one seated human always sees a second
-seat with a bot in it, and never has to invent its own fallback. The party's
-own seating is untouched: those seats stay free for people to take.
+`min_players` and `max_players` describe supported human participants. The
+daemon skips games outside that range when preparing the next game, and
+replaces an incompatible prepared session after someone joins or leaves.
+The full library remains available for browsing. Before anyone joins, the
+host may prewarm a game; the first join rechecks its eligibility.
+
+A title that supports one human against its own AI advertises
+`min_players: 1`. A higher minimum does not imply bot support: the daemon
+does not invent AI occupants to fill it. Explicitly assigned `ai` seats are
+preserved in `prepare` only within the game's maximum capacity, with humans
+taking priority. AI occupants do not count toward the human minimum.
+
+Party snapshots include optional `next_game_index`, the exact upcoming
+playlist occurrence even before its process connects. Use it for the Up Next
+preview: two queued entries can have the same game ID. Older hosts omit it.
 
 The seats are the whole player list. A game running under a daemon should
 **not** also run its own "press X to join" — the party decides who is
