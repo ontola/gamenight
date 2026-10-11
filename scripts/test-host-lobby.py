@@ -10,7 +10,8 @@ with tempfile.TemporaryDirectory(prefix='gamenight-host-ui-') as folder:
  shelf.write_text('[]')
  with socket.socket() as s:s.bind(('127.0.0.1',0));port=s.getsockname()[1]
  env={k:v for k,v in os.environ.items() if not k.startswith('GAMENIGHT')}
- env.update(GAMENIGHT_ADDR=f'127.0.0.1:{port}',GAMENIGHT_LIBRARY=str(shelf),GAMENIGHT_WEB='1',GAMENIGHT_NO_LOBBY_WATCH='1',GAMENIGHT_NO_PREWARM='1',GAMENIGHT_NO_MUSIC='1',GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(games))
+ # This fixture verifies local pairing without the production room registry.
+ env.update(GAMENIGHT_OFFLINE='1',GAMENIGHT_ADDR=f'127.0.0.1:{port}',GAMENIGHT_LIBRARY=str(shelf),GAMENIGHT_WEB='1',GAMENIGHT_NO_LOBBY_WATCH='1',GAMENIGHT_NO_PREWARM='1',GAMENIGHT_NO_MUSIC='1',GAMENIGHT_LOBBY_CONFIG=str(config),GAMENIGHT_LOCAL_GAMES=str(games))
  with (p/'server.log').open('w') as log:
   options={"creationflags":subprocess.CREATE_NEW_PROCESS_GROUP} if os.name=="nt" else {"start_new_session":True}
   proc=subprocess.Popen([os.environ.get("GAMENIGHT_TEST_DAEMON",str(target))],env=env,stdout=log,stderr=log,**options)
