@@ -9,6 +9,8 @@ mod lobby_input;
 #[cfg(target_os = "macos")]
 mod macos;
 mod nowplaying;
+#[cfg(windows)]
+pub mod windows_launch;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -581,6 +583,30 @@ impl Shared {
         };
         let token = uuid::Uuid::new_v4().to_string();
         let mut cmd = tokio::process::Command::new(&spec.command);
+        #[cfg(windows)]
+        {
+            // Console wrappers and native games must be quiet before hello.
+            // Preserve direct lobby launch: it is the window the user wants.
+            let batch = std::path::Path::new(&spec.command)
+                .extension()
+                .is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat")
+                });
+            if self.lobby_game.as_ref() != Some(game) && !batch {
+                if let Ok(exe) = std::env::current_exe() {
+                    // Library embedders (including test harnesses) do not
+                    // necessarily implement the daemon's helper entrypoint.
+                    if exe
+                        .file_stem()
+                        .is_some_and(|name| name.eq_ignore_ascii_case("gamenight-daemon"))
+                    {
+                        cmd = tokio::process::Command::new(exe);
+                        cmd.arg("--launch-hidden").arg(&spec.command);
+                    }
+                }
+            }
+            cmd.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+        }
         cmd.args(&spec.args)
             .envs(&spec.env)
             .env(ENV_GAMENIGHT, "1")

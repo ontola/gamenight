@@ -35,6 +35,9 @@ jobs:
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo test --workspace --locked
       - run: cargo build --workspace --locked
+      - if: runner.os == 'Windows'
+        name: Check hidden game launch and descendant cleanup
+        run: python scripts/test-windows-preload.py target/debug/gamenight-daemon.exe
       - if: runner.os == 'Linux'
         name: Test live settings in all shared games
         run: |

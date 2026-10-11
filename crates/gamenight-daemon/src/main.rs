@@ -1,14 +1,23 @@
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 
-#[tokio::main]
-async fn main() -> std::io::Result<()> {
+fn main() -> std::io::Result<()> {
     // Lobbies that cannot call user32 themselves (Godot) start us as a child
     // to hand the foreground to the game they are about to show.
     if std::env::args().nth(1).as_deref() == Some("--allow-foreground") {
         gamenight_daemon::allow_any_foreground();
         return Ok(());
     }
+    #[cfg(windows)]
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--launch-hidden")) {
+        let code = gamenight_daemon::windows_launch::run(std::env::args_os().skip(2).collect())?;
+        std::process::exit(code as i32);
+    }
+    run()
+}
+
+#[tokio::main]
+async fn run() -> std::io::Result<()> {
     // The desktop launcher attaches us to its Windows job before allowing any
     // descendants to spawn. EOF means the launcher failed before ownership was set.
     if std::env::var_os("GAMENIGHT_STARTUP_GATE").is_some() {

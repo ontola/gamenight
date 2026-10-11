@@ -130,6 +130,14 @@ before the SDK runs. `GameNightScreen` also parks a warming Windows window and
 disables focus before minimizing, so the minimize animation stays off-screen.
 Start/Resume restores focus and fullscreen.
 
+The Windows host also launches games with a hidden initial window and no
+console window, before the SDK connects. Console wrappers inherit the managed
+environment; the host owns their entire child process tree. This suppresses
+the first native show request, not later explicit requests made by the game.
+Keep the minimized/no-focus startup settings or off-screen engine arguments,
+and let `GameNightScreen` control visibility until Start/Resume. The persistent
+lobby itself launches normally.
+
 On Windows, a focused game grants foreground permission through the host's
 `GAMENIGHT_FOREGROUND_HELPER` before minimizing on Pause. Warmup, disposal,
 repeated pauses and games behind another app never grant that permission.

@@ -1734,6 +1734,43 @@ mod night_tests {
         assert!(night.snapshot().warm_session.is_some());
     }
 
+    #[test]
+    fn startup_preloads_the_first_game_before_play_next() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        let mut game = meta("first");
+        game.launch = Some(gamenight_protocol::LaunchSpec {
+            command: "first-game".into(),
+            args: vec![],
+            cwd: None,
+            env: Default::default(),
+        });
+        night.set_library(vec![meta("lobby"), game]);
+        let fx = night.ensure_warm();
+        assert!(fx.iter().any(
+            |effect| matches!(effect, Effect::Launch { game } if game == &GameId::new("first"))
+        ));
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("first"),
+        });
+        let (_, session) = prepared_session(&fx).expect("first game prepares without Play Next");
+        let fx = night.handle(Command::SessionReady { session });
+        assert!(
+            started_session(&fx).is_none(),
+            "preloading must not take the screen"
+        );
+        assert_eq!(
+            night.snapshot().warm_session.unwrap().phase,
+            SessionPhase::Ready
+        );
+        let fx = night.handle(Command::Next);
+        assert_eq!(
+            started_session(&fx),
+            Some(session),
+            "Play Next uses the already prepared session"
+        );
+    }
+
     /// With no lobby, the very first ready game auto-starts (see
     /// `full_night_flow`). With one, nothing has ever been `active` for as
     /// long as the lobby's running — that must not be mistaken for "the
