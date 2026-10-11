@@ -45,6 +45,12 @@ ThemeData gameNightTheme() {
     colorScheme: scheme,
     scaffoldBackgroundColor: GnColors.bg,
     useMaterial3: true,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: GnColors.bg,
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
+      systemOverlayStyle: gameNightSystemUi,
+    ),
     cardTheme: CardThemeData(
       color: GnColors.card,
       elevation: 0,

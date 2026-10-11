@@ -1,9 +1,13 @@
 import 'package:flutter/gestures.dart' show PointerDeviceKind;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../catalog.dart';
+import '../report_scope.dart';
+import 'feedback_screen.dart';
 import '../room_controls.dart';
 import '../theme.dart';
 import 'catalog_view.dart' show GameCover;
@@ -11,6 +15,7 @@ import 'catalog_view.dart' show GameCover;
 /// A game's page, with the same videos, screenshots and facts as the website.
 class GameDetailScreen extends StatefulWidget {
   final CatalogGame game;
+  final Future<ShareResult> Function(ShareParams)? share;
 
   /// The whole catalog, for "More like this".
   final List<CatalogGame> games;
@@ -22,7 +27,7 @@ class GameDetailScreen extends StatefulWidget {
   final Future<void> Function(CatalogGame game)? onAdd;
 
   const GameDetailScreen(
-      {super.key, required this.game, this.games = const [], this.host, this.onAdd});
+      {super.key, required this.game, this.games = const [], this.host, this.onAdd, this.share});
 
   @override
   State<GameDetailScreen> createState() => _GameDetailScreenState();
@@ -44,75 +49,130 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
 
   void _openOther(CatalogGame other) => Navigator.of(context).pushReplacement(MaterialPageRoute(
       builder: (_) => GameDetailScreen(
-          game: other, games: widget.games, host: widget.host, onAdd: widget.onAdd)));
+          game: other,
+          games: widget.games,
+          host: widget.host,
+          onAdd: widget.onAdd,
+          share: widget.share)));
+
+  Future<void> _share(BuildContext anchor) async {
+    final box = anchor.findRenderObject() as RenderBox?;
+    try {
+      final result = await (widget.share ?? SharePlus.instance.share)(ShareParams(
+        uri: game.page,
+        title: game.title,
+        subject: game.title,
+        sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      ));
+      if (result.status != ShareResultStatus.unavailable) return;
+    } catch (_) {/* Keep the website link usable even without a share target. */}
+    if (!mounted) return;
+    await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: Text('Share ${game.title}'),
+              content: SelectableText(game.page.toString()),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+                TextButton(
+                    onPressed: () async {
+                      try {
+                        await Clipboard.setData(ClipboardData(text: game.page.toString()));
+                        if (context.mounted) toast(context, 'Link copied');
+                      } catch (_) {
+                        if (context.mounted) toast(context, 'Select the link above to copy it.');
+                      }
+                    },
+                    child: const Text('Copy link')),
+              ],
+            ));
+  }
 
   @override
   Widget build(BuildContext context) {
     final similar = game.similar(widget.games);
     return Scaffold(
-      appBar: AppBar(title: Text(game.title)),
-      body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
-        MediaGallery(game: game),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Row(children: [
-              if (game.icon != null) ...[
-                ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox.square(dimension: 40, child: _image(game.icon!))),
-                const SizedBox(width: 12),
-              ],
-              Expanded(
-                child: Text(game.title,
-                    style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-              ),
-            ]),
-            if (game.tagline.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Text(game.tagline, style: const TextStyle(fontSize: 16, color: GnColors.muted)),
-            ],
-            const SizedBox(height: 14),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              if (game.players.isNotEmpty) _Fact(Icons.people_alt_outlined, game.players),
-              if (game.matchMinutes != null) _Fact(Icons.timer_outlined, '${game.matchMinutes} min'),
-              _Fact(Icons.sell_outlined, game.priceLabel),
-              _Fact(Icons.computer, game.platformLabel),
-            ]),
-            const SizedBox(height: 16),
-            _action(),
-            if (game.tags.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Wrap(spacing: 6, runSpacing: 6, children: [
-                for (final tag in game.tags)
-                  Chip(
-                    label: Text(tag),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-              ]),
-            ],
-            const SizedBox(height: 8),
-            _about(),
-            if (similar.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              const Text('More like this',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 170,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: similar.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
-                  itemBuilder: (context, i) => _SimilarTile(
-                      game: similar[i], onTap: () => _openOther(similar[i])),
-                ),
-              ),
-            ],
-          ]),
-        ),
+      appBar: AppBar(title: Text(game.title), actions: [
+        Builder(
+            builder: (context) => IconButton(
+                  tooltip: 'Share game',
+                  onPressed: () => _share(context),
+                  icon: const Icon(Icons.share_outlined),
+                )),
       ]),
+      body: SafeArea(
+          top: false,
+          child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+            MediaGallery(game: game),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Row(children: [
+                  if (game.icon != null) ...[
+                    ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox.square(dimension: 40, child: _image(game.icon!))),
+                    const SizedBox(width: 12),
+                  ],
+                  Expanded(
+                    child: Text(game.title,
+                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+                  ),
+                ]),
+                if (game.tagline.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(game.tagline, style: const TextStyle(fontSize: 16, color: GnColors.muted)),
+                ],
+                const SizedBox(height: 14),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  if (game.players.isNotEmpty) _Fact(Icons.people_alt_outlined, game.players),
+                  if (game.matchMinutes != null)
+                    _Fact(Icons.timer_outlined, '${game.matchMinutes} min'),
+                  _Fact(Icons.sell_outlined, game.priceLabel),
+                  _Fact(Icons.computer, game.platformLabel),
+                ]),
+                const SizedBox(height: 16),
+                _action(),
+                if (ReportScope.of(context) case final reports?)
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => FeedbackScreen(reports: reports, initialGame: game.id),
+                    )),
+                    icon: const Icon(Icons.mic_none, size: 20),
+                    label: const Text('Give feedback'),
+                  ),
+                if (game.tags.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Wrap(spacing: 6, runSpacing: 6, children: [
+                    for (final tag in game.tags)
+                      Chip(
+                        label: Text(tag),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                  ]),
+                ],
+                const SizedBox(height: 8),
+                _about(),
+                if (similar.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('More like this',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 170,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: similar.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) =>
+                          _SimilarTile(game: similar[i], onTap: () => _openOther(similar[i])),
+                    ),
+                  ),
+                ],
+              ]),
+            ),
+          ])),
     );
   }
 
@@ -126,7 +186,8 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(50)),
           onPressed: _adding ? null : _add,
           icon: _adding
-              ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              ? const SizedBox.square(
+                  dimension: 16, child: CircularProgressIndicator(strokeWidth: 2))
               : const Icon(Icons.playlist_add),
           label: const Text('Add to queue'),
         );
@@ -153,7 +214,10 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   Widget _about() {
-    final links = {...game.links, if (game.mediaSource != null) 'Gameplay source': game.mediaSource!};
+    final links = {
+      ...game.links,
+      if (game.mediaSource != null) 'Gameplay source': game.mediaSource!
+    };
     if (game.developer.isEmpty && links.isEmpty) return const SizedBox.shrink();
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -181,8 +245,12 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   static String _linkName(String key) =>
-      const {'homepage': 'Homepage', 'itch': 'itch.io', 'steam': 'Steam', 'source': 'Source code'}[
-          key] ??
+      const {
+        'homepage': 'Homepage',
+        'itch': 'itch.io',
+        'steam': 'Steam',
+        'source': 'Source code'
+      }[key] ??
       key;
 }
 

@@ -4,6 +4,7 @@
 // web/storage.js) uses, so it needs no host changes. The daemon's control
 // port is never contacted: it is loopback-only and trusts every client.
 import 'dart:convert';
+import 'diagnostics.dart';
 
 import 'package:http/http.dart' as http;
 
@@ -49,6 +50,7 @@ class SessionInfo {
   final int? seat;
   final int players;
   final String? currentTitle;
+  final String? currentGame;
   final String? currentPhase;
   final String? next;
 
@@ -63,6 +65,7 @@ class SessionInfo {
     this.seat,
     this.players = 0,
     this.currentTitle,
+    this.currentGame,
     this.currentPhase,
     this.next,
   });
@@ -80,6 +83,7 @@ class SessionInfo {
       seat: (j['seat'] as num?)?.toInt(),
       players: (j['players'] as num?)?.toInt() ?? 0,
       currentTitle: current?['title'] as String?,
+      currentGame: current?['game'] as String?,
       currentPhase: current?['phase']?.toString(),
       next: j['next'] as String?,
     );
@@ -197,8 +201,12 @@ class GameNightApi {
       response = await http.Response.fromStream(
           await _client.send(request).timeout(_timeout));
     } catch (_) {
+      Diagnostics.failure('Local host $method connection failed');
       throw const ApiError(
           'GameNight is unreachable. Join the same Wi-Fi as the GameNight PC.');
+    }
+    if (response.statusCode >= 500) {
+      Diagnostics.failure('Local host $method failed (HTTP ${response.statusCode})');
     }
     if (response.statusCode == 429) {
       throw const ApiError('Too many attempts. Wait a minute before trying again.', 429);

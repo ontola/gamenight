@@ -11,6 +11,7 @@ import 'package:http/http.dart' as http;
 
 import 'api.dart' show ApiError;
 import 'link.dart';
+import 'diagnostics.dart';
 
 class Account {
   final String id;
@@ -120,10 +121,17 @@ class CloudApi {
     });
     if (body != null) request.body = jsonEncode(body);
     try {
-      return await http.Response.fromStream(await _client.send(request).timeout(_timeout));
+      final response =
+          await http.Response.fromStream(await _client.send(request).timeout(_timeout));
+      if (response.statusCode >= 500) {
+        Diagnostics.failure('Cloud $method failed (HTTP ${response.statusCode})');
+      }
+      return response;
     } on TimeoutException {
+      Diagnostics.failure('Cloud $method timed out');
       throw const ApiError('GameNight online did not answer. Check your internet.');
     } catch (_) {
+      Diagnostics.failure('Cloud $method connection failed');
       throw const ApiError('Could not reach GameNight online. Check your internet.');
     }
   }
@@ -140,7 +148,9 @@ class CloudApi {
       return status == 204 || response.body.isEmpty ? null : jsonDecode(response.body);
     }
     if (errors.containsKey(status)) throw ApiError(errors[status]!);
-    if (status == 429) throw const ApiError('Too many attempts. Wait a minute and try again.');
+    if (status == 429) {
+      throw const ApiError('Too many attempts. Wait a minute and try again.');
+    }
     throw ApiError('GameNight online answered $status. Try again.');
   }
 
@@ -161,7 +171,9 @@ class CloudApi {
     switch (response.statusCode) {
       case 204:
         emailBinding = cookie(response, 'gn_email');
-        if (emailBinding == null) throw const ApiError('Sign-in is not available right now.');
+        if (emailBinding == null) {
+          throw const ApiError('Sign-in is not available right now.');
+        }
         return;
       case 400:
         throw const ApiError('That does not look like an email address.');

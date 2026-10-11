@@ -105,3 +105,43 @@ Check warm and cold app launches, expired codes, and joining a room after sign-i
 The domain should report `verified`. Existing installs can retain an earlier
 failed verification until Android checks again; installing the updated APK also
 requests verification. A browser chosen by the user can still override app links.
+
+## Feedback and automatic error reports
+
+The Feedback button is available from every main tab, even before sign-in.
+Tap the microphone, speak, review or edit the transcript, then send. Choose
+GameNight or the current game. Explicit game feedback appears in that game's
+owner-only developer inbox. GameNight staff can review both feedback and app
+errors in the central private inbox.
+
+Speech uses the phone's speech recognition service, which may process audio
+online. GameNight stores the submitted text, not the recording. Microphone access
+is requested only when recording starts. Keyboard input also works; interrupted
+recordings and drafts remain editable. The operating system can stop recognition
+on silence, so players can continue recording into the same draft.
+
+Reports carry a unique retry ID, app build, platform, current tab and game ID
+when available. Automatic reports include Flutter framework errors, uncaught
+Dart errors, and handled cloud/local HTTP 5xx and connection failures. Exception
+messages are excluded because they can contain profile data or sign-in links;
+stack traces are redacted. Credentials, room codes and HTTP bodies are excluded.
+A recent error can be linked to feedback for staff investigation. Developers do
+not receive general app errors, account details or private linked error traces.
+Native OS crashes and errors inside external games are not captured by these
+Flutter handlers.
+
+The app persists a bounded outbox before sending to `POST /v1/reports` on the
+central service. Offline reports retry on app startup, resume and every minute.
+The server must return the same ID before the client removes an item. Error
+bursts are deduplicated locally; unsent player feedback is never evicted to make
+room for automatic errors. The service implementation and staff/developer inbox
+are in the internal repository.
+
+Validate with `flutter test test/reports_test.dart test/voice_feedback_test.dart test/feedback_screen_test.dart`. Real microphone recognition still needs a phone
+check, including denied permission, backgrounding, network loss and Dutch/English
+speech. CI builds do not substitute for that check.
+
+Game pages respect the system navigation inset, including three-button Android
+navigation. The Share button opens the phone share sheet with the canonical
+`https://gamenight.ontola.io/games/<id>` page, not a local-room URL. If sharing is
+unavailable, it shows a selectable link and a copy action.

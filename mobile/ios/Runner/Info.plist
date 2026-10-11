@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Speak feedback, then review the text before sending. GameNight does not store audio.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turn your spoken feedback into editable text.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan the QR code in the GameNight lobby to join.</string>
 	<key>NSLocalNetworkUsageDescription</key>

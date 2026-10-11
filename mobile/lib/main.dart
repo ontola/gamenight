@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,10 @@ import 'api.dart' show ApiError;
 import 'app_update.dart';
 import 'app_state.dart';
 import 'link.dart';
+import 'reports.dart';
+import 'report_scope.dart';
+import 'diagnostics.dart';
+import 'screens/feedback_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/playlist_screen.dart';
@@ -20,23 +25,43 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(gameNightSystemUi);
   final prefs = await SharedPreferences.getInstance();
   final state = AppState(prefs);
+  final reports = ReportService(prefs,
+      context: () => {
+            if (state.hostedRoom?.current ?? state.session?.currentGame ?? state.companion?.game
+                case final String game)
+              'game': game,
+          });
+  Diagnostics.onFailure = reports.captureFailure;
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    reports.captureError(details.exception, details.stack ?? StackTrace.current, source: 'flutter');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    reports.captureError(error, stack);
+    return false;
+  };
+  reports.start();
   if (state.host != null || state.inHostedRoom) state.startPolling();
   state.loadAccount();
   final links = AppLinks();
   Uri? first;
   try {
     first = await links.getInitialLink();
-  } catch (_) {}
-  runApp(GameNightApp(state: state, links: links.uriLinkStream, initialLink: first));
+  } catch (_) {
+    Diagnostics.failure('Could not read the app launch link');
+  }
+  runApp(
+      GameNightApp(state: state, links: links.uriLinkStream, initialLink: first, reports: reports));
 }
 
 class GameNightApp extends StatelessWidget {
   final AppState state;
+  final ReportService? reports;
 
   /// Links that open the app, e.g. from the sign-in email.
   final Stream<Uri>? links;
   final Uri? initialLink;
-  const GameNightApp({super.key, required this.state, this.links, this.initialLink});
+  const GameNightApp({super.key, required this.state, this.links, this.initialLink, this.reports});
 
   @override
   Widget build(BuildContext context) {
@@ -46,24 +71,25 @@ class GameNightApp extends StatelessWidget {
       theme: gameNightTheme(),
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: gameNightSystemUi,
-        child: ColoredBox(color: GnColors.bg, child: child!),
+        child: ReportScope(reports: reports, child: ColoredBox(color: GnColors.bg, child: child!)),
       ),
-      home: HomeScreen(state: state, links: links, initialLink: initialLink),
+      home: HomeScreen(state: state, links: links, initialLink: initialLink, reports: reports),
     );
   }
 }
 
 class HomeScreen extends StatefulWidget {
   final AppState state;
+  final ReportService? reports;
   final Stream<Uri>? links;
   final Uri? initialLink;
-  const HomeScreen({super.key, required this.state, this.links, this.initialLink});
+  const HomeScreen({super.key, required this.state, this.links, this.initialLink, this.reports});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late int _tab = widget.state.host == null ? 0 : 2;
   String? _openedFor;
   final _roomKey = GlobalKey<RoomScreenState>();
@@ -72,17 +98,35 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.state.addListener(_followGame);
     _links = widget.links?.listen(_onLink);
     final first = widget.initialLink;
-    if (first != null) WidgetsBinding.instance.addPostFrameCallback((_) => _onLink(first));
+    if (first != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onLink(first));
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _links?.cancel();
     widget.state.removeListener(_followGame);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) unawaited(widget.reports?.flush());
+  }
+
+  void _feedback() {
+    final reports = widget.reports;
+    if (reports == null) return;
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'feedback'),
+      builder: (_) => FeedbackScreen(reports: reports),
+    ));
   }
 
   /// The link in the sign-in email opens the app and signs in here.
@@ -123,6 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListenableBuilder(
       listenable: widget.state,
       builder: (context, _) {
+        widget.reports?.screen = const ['room', 'games', 'you', 'playlist'][_tab];
         final linked = widget.state.session?.linked ?? false;
         final pages = [
           RoomScreen(key: _roomKey, state: widget.state),
@@ -134,6 +179,14 @@ class _HomeScreenState extends State<HomeScreen> {
           body: SafeArea(
             child: Column(children: [
               UpdateBanner(),
+              if (widget.reports != null)
+                Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _feedback,
+                      icon: const Icon(Icons.mic_none, size: 20),
+                      label: const Text('Feedback'),
+                    )),
               Expanded(child: IndexedStack(index: _tab, children: pages)),
             ]),
           ),
