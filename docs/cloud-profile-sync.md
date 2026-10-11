@@ -1,9 +1,11 @@
 # Optional managed profile synchronization
 
-The local editor remains independent. Set `GAMENIGHT_CLOUD_URL` to an HTTPS
-GameNight service origin to enable the outbound connector in the local web server.
-No inbound Internet port is required. Without this setting, no cloud registration
-or polling occurs and the local editor keeps its existing behavior.
+The local editor remains independent. The host registers with
+`https://gamenight.ontola.io` by default so the website can find the room.
+Set `GAMENIGHT_CLOUD_URL` to use another HTTPS GameNight service origin, or
+`GAMENIGHT_OFFLINE=1` to disable cloud registration and polling explicitly.
+No inbound Internet port is required. Local play remains available when the
+service cannot be reached.
 
 The host registers an ephemeral capability and reports occupied seats every three
 seconds. A scanned local sign-in URL with a seat or player claim redirects to a
