@@ -3,6 +3,7 @@ type View={node:HTMLElement;classes:string;title:string;styles:string[];scroll:n
 const views=new Map<string,View>();
 const loads=new Map<string,Promise<View>>();
 const scripts=new Set<string>();
+const failedViews=new Set<string>();
 let active='',sequence=0,started=false;
 const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html' || /^\/games\/[a-z0-9-]+$/.test(url.pathname)?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
 function capture(doc:Document,id:string):View {
@@ -55,11 +56,17 @@ async function load(url:URL,id:string):Promise<View>{
     return view;
   })();
   loads.set(id,promise);
-  try{return await promise;}catch(error){loads.delete(id);throw error;}
+  try{return await promise;}catch(error){
+    loads.delete(id);
+    // A partially executed module can retain references to this view. A fresh
+    // document on retry is safer than showing a cached, uninitialised page.
+    views.get(id)?.node.remove();views.delete(id);failedViews.add(id);
+    throw error;
+  }
 }
 export async function navigate(href:string,replace=false):Promise<void>{
   const url=new URL(href,location.href),id=key(url);
-  if(!started || !id || url.origin!==location.origin){location.assign(url);return;}
+  if(!started || !id || failedViews.has(id) || url.origin!==location.origin){location.assign(url);return;}
   const turn=++sequence;
   busy.set(true);
   try{
