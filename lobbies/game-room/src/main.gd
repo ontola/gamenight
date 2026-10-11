@@ -40,6 +40,7 @@ var party: Dictionary = {}
 var profiles: Dictionary = {}       # player id -> player
 var controllers: Dictionary = {}    # controller token -> player id
 var held: Dictionary = {}           # player id -> button bitmask
+var _input_blocked: Dictionary = {} # after a focus transition, wait for neutral input
 var menus: Dictionary = {}          # player id -> {index, confirm}
 var shelf_offset := 0
 var toasts: Array = []
@@ -63,9 +64,9 @@ var _capture_path := ""
 var _capture_at := 4.0
 var _captured := false
 var _fullscreen := false
+var _display_restore := 0
 var _last_input: Dictionary = {}
 var _last_queue: Array = []          # up next game ids at the last redraw
-var _pending_fly := ""               # game the shelf just sent up next
 
 func _ready() -> void:
 	room = Room.new()
@@ -92,7 +93,10 @@ func _ready() -> void:
 	# Fullscreen like the other lobbies; GAMENIGHT_LOBBY_FULLSCREEN=0 keeps a window.
 	_fullscreen = OS.get_environment("GAMENIGHT_LOBBY_FULLSCREEN") != "0"
 	if _fullscreen and DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
-		get_window().mode = Window.MODE_FULLSCREEN
+		get_window().min_size = Vector2i.ZERO
+		_fit_fullscreen()
+		get_window().focus_entered.connect(_window_restored)
+		get_window().focus_exited.connect(_window_focus_lost)
 	if args.has("--demo"):
 		demo = Demo.new()
 		demo.main = self
@@ -126,9 +130,7 @@ func _ready() -> void:
 	client.party_changed.connect(set_party)
 	client.focus_changed.connect(_focus_changed)
 	client.controllers_changed.connect(_controllers_changed)
-	client.connection_changed.connect(func(ok: bool):
-		if not ok: toast("Reconnecting… your party is still here.", AMBER)
-		hud.queue_redraw())
+	client.connection_changed.connect(_connection_changed)
 	client.rejected.connect(func(message: String): toast(message, PINK))
 	add_child(client)
 	get_tree().auto_accept_quit = false
@@ -138,15 +140,52 @@ func _notification(what: int) -> void:
 		if client.connected and demo == null: client.quit_party()
 		else: get_tree().quit()
 
+func _connection_changed(connected: bool) -> void:
+	if not connected:
+		_suspend_input()
+		toast("Reconnecting… your party is still here.", AMBER)
+	hud.queue_redraw()
+
 func _focus_changed(active: bool) -> void:
+	_suspend_input()
 	Engine.max_fps = 60 if active else 10
 	AudioServer.set_bus_mute(0, not active)
 	if DisplayServer.get_name() != "headless" and _capture_path.is_empty():
 		if active:
-			get_window().mode = Window.MODE_FULLSCREEN if _fullscreen else Window.MODE_WINDOWED
+			if _fullscreen: _fit_fullscreen()
+			else: get_window().mode = Window.MODE_WINDOWED
 			get_window().grab_focus()
 		else:
+			_display_restore += 1
+			get_window().always_on_top = false
 			get_window().mode = Window.MODE_MINIMIZED
+
+func _window_restored() -> void:
+	await get_tree().process_frame
+	if _fullscreen and client.active and get_window().has_focus(): _fit_fullscreen()
+
+func _window_focus_lost() -> void:
+	# Cover the taskbar only while the lobby owns focus; Alt-Tab must still work.
+	get_window().always_on_top = false
+
+func _fit_fullscreen() -> void:
+	# Windows may restore MODE_FULLSCREEN to the old windowed rectangle while
+	# retaining a larger render surface. Fit a borderless desktop window instead,
+	# using full monitor bounds (not the work area that excludes the taskbar).
+	var window := get_window()
+	var screen := window.current_screen
+	window.mode = Window.MODE_WINDOWED
+	window.borderless = true
+	window.position = DisplayServer.screen_get_position(screen)
+	window.size = DisplayServer.screen_get_size(screen)
+	_display_restore += 1
+	var revision := _display_restore
+	await get_tree().process_frame
+	if revision != _display_restore or window.mode == Window.MODE_MINIMIZED: return
+	# Reconcile native restore/resize messages, including a monitor's DPI change.
+	DisplayServer.window_set_position(DisplayServer.screen_get_position(screen), window.get_window_id())
+	DisplayServer.window_set_size(DisplayServer.screen_get_size(screen), window.get_window_id())
+	window.always_on_top = client.active and window.has_focus()
 
 # ---------------------------------------------------------------- party state
 
@@ -214,6 +253,26 @@ func _update_sleep() -> void:
 
 # ---------------------------------------------------------------- input
 
+func _accepts_input() -> bool:
+	# Host screen ownership is authoritative; native focus can briefly lag behind it.
+	return demo != null or (client.connected and client.active)
+
+func _clear_player_input(id: String) -> void:
+	var p: Dictionary = world.players[id]
+	p.held = 0
+	p.pressed = 0
+	p.stick = Vector2.ZERO
+	p.buffer = 0.0
+	p.vx = 0.0
+
+func _suspend_input() -> void:
+	menus.clear()
+	_accumulator = 0.0
+	for id in world.players:
+		_input_blocked[id] = true
+		_clear_player_input(id)
+	if hud != null: hud.queue_redraw()
+
 func _controllers_changed(frames: Array) -> void:
 	for frame in frames:
 		var token := str(frame.get("controller", ""))
@@ -227,6 +286,16 @@ func _controllers_changed(frames: Array) -> void:
 ## Routes one player's controller state; demo bots use the same path.
 func input(id: String, buttons: int, stick: Vector2) -> void:
 	if not world.players.has(id): return
+	if not _accepts_input():
+		held[id] = buttons
+		_input_blocked[id] = true
+		_clear_player_input(id)
+		return
+	if _input_blocked.has(id):
+		held[id] = buttons
+		_clear_player_input(id)
+		if buttons == 0 and stick.length() <= 0.25: _input_blocked.erase(id)
+		return
 	var before: int = held.get(id, 0)
 	var pressed := buttons & ~before
 	held[id] = buttons
@@ -248,6 +317,19 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 	if at_shelf and pressed & World.BTN_X: _use_station(id, true)
 	if at_shelf and pressed & (BTN_LB | BTN_RB):
 		_browse(-1 if pressed & BTN_LB else 1)
+	elif pressed & (BTN_LB | BTN_RB):
+		_skip_music(id, -1 if pressed & BTN_LB else 1)
+
+func _skip_music(id: String, direction: int) -> void:
+	if station_for(id).get("kind") != "music": return
+	var action := "previous_track" if direction < 0 else "next_track"
+	var station_id := "music0" if direction < 0 else "music2"
+	var key := "%s:%s" % [station_id, action]
+	var now := Time.get_ticks_msec() / 1000.0
+	if now < float(_station_cooldown.get(key, 0.0)): return
+	_station_cooldown[key] = now + 0.4
+	client.media_control(action)
+	_celebrate(id, station_id)
 
 func _browse(step: int) -> void:
 	var shelf := shelf_games()
@@ -274,12 +356,10 @@ func station_for(id: String) -> Dictionary:
 		tv["id"] = "tv"
 		tv["kind"] = "tv"
 		return tv
-	if not party.get("now_playing", {}).is_empty():
-		var labels := ["Previous track", "Play / pause music", "Next track"]
-		var actions := ["previous_track", "play_pause", "next_track"]
-		for i in 3:
-			if absf(p.x - Layout.MUSIC_PADS[i]) <= 0.3:
-				return {"id": "music%d" % i, "kind": "music", "label": labels[i], "action": actions[i], "enabled": true}
+	var track: Variant = party.get("now_playing")
+	if track is Dictionary and not track.is_empty() and absf(p.x - Layout.JUKEBOX) <= 0.85:
+		return {"id": "music1", "kind": "music", "label": "Pause music" if track.get("playing", false) else "Play music",
+			"action": "play_pause", "enabled": true, "extra": "LB previous RB next"}
 	if absf(p.x - Layout.EXIT_DOOR) <= 0.6:
 		return {"id": "exit", "kind": "exit", "label": "Leave", "enabled": true}
 	var pending := pending_profiles()
@@ -316,7 +396,6 @@ func _use_station(id: String, queue := false) -> void:
 	_station_cooldown[key] = now + 0.4
 	match station.kind:
 		"shelf":
-			_pending_fly = str(station.game)
 			if queue:
 				client.queue_game(str(station.game), false)
 				toast("%s added to the queue." % station.title, GREEN)
@@ -466,6 +545,9 @@ func _make_door(x: float, profile: Dictionary) -> Node3D:
 # ---------------------------------------------------------------- loop
 
 func _physics_process(delta: float) -> void:
+	if not _accepts_input():
+		_accumulator = 0.0
+		return
 	_accumulator = minf(_accumulator + delta, 0.1)
 	while _accumulator >= World.DT:
 		_accumulator -= World.DT
@@ -500,13 +582,21 @@ func _process(delta: float) -> void:
 func _update_prompts() -> void:
 	var occupied := {}
 	for id in world.players:
+		if menus.has(id): continue
 		var station := station_for(id)
-		if not station.is_empty(): occupied[station.id] = station
+		if not station.is_empty() and (not occupied.has(station.id) or station.enabled): occupied[station.id] = station
 	var tv := tv_station()
-	var flash := _time - float(_pressed_flash.get("tv", -10.0)) < 0.3
-	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv") or flash)
+	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv"))
 	var shelf_live := not shelf_games().is_empty()
-	room.set_prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], shelf_live, occupied.has("shelf"))
+	room.set_prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
+	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = occupied.has("shelf") and shelf_games().size() > 1
+	var playing: bool = party.get("now_playing", {}).get("playing", false) if party.get("now_playing") is Dictionary else false
+	room.set_prompt("music", [["LB", "Previous"], ["Y", "Pause" if playing else "Play"], ["RB", "Next"]], true, occupied.has("music1"))
+	room.set_prompt("exit", [["Y", "Leave"]], true, occupied.has("exit"))
+	for i in Layout.PROFILE_DOORS.size():
+		var key := "door%d" % i
+		var enabled: bool = occupied.get(key, {}).get("enabled", false)
+		room.set_prompt(key, [["Y", "Pick up" if enabled else "Unlink first"]], enabled, occupied.has(key))
 
 func toast(message: String, color: Color = TEXT) -> void:
 	toasts.append({"text": message, "color": color, "until": _time + 3.5})
@@ -522,10 +612,11 @@ func _hook_screens() -> void:
 	room.screens.plaque.canvas.painter = _draw_plaque
 	room.screens.jukebox.canvas.painter = _draw_jukebox
 	room.screens.box_front.canvas.painter = _draw_front_box
-	for i in 3: room.screens["queue%d" % i].canvas.painter = _draw_queue_box.bind(i)
+	room.screens.queue0.canvas.painter = _draw_queue_preview
+	room.screens.queue_titles.canvas.painter = _draw_queue_titles
 
 func _redraw_screens() -> void:
-	for name in ["tv", "plaque", "jukebox", "box_front", "queue0", "queue1", "queue2"]: room.redraw(name)
+	for name in ["tv", "plaque", "jukebox", "box_front", "queue0", "queue_titles"]: room.redraw(name)
 	var track: Variant = party.get("now_playing")
 	room.music_playing = track is Dictionary and bool(track.get("playing", false))
 	var shelf := shelf_games()
@@ -533,30 +624,17 @@ func _redraw_screens() -> void:
 	if shelf_key != _shelf_key:
 		_shelf_key = shelf_key
 		room.set_shelf(shelf, shelf_offset)
-	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = shelf.size() > 1
+	_update_prompts()
 	var queue := upcoming()
 	_animate_queue(queue.map(func(e): return e.game))
-	room.set_queue(mini(queue.size(), 3), maxi(queue.size() - 3, 0))
 
-## Shows how up next changed: the box from the stand flies into its slot,
-## and the row slides when the next game starts or one is pushed in front.
+## Promote the next preview and slide the title list when the queue advances.
 func _animate_queue(ids: Array) -> void:
 	var old := _last_queue
 	if ids == old: return
 	_last_queue = ids.duplicate()
-	var slot := -1
-	if not _pending_fly.is_empty():
-		for i in mini(ids.size(), 3):
-			if ids[i] == _pending_fly and (i >= old.size() or old[i] != _pending_fly or ids.size() > old.size()):
-				slot = i
-				break
-		_pending_fly = ""
-	if slot >= 0:
-		# Boxes after the new one were pushed one place along.
-		if ids.size() > old.size() and slot < mini(old.size(), 3): room.shift_queue(-1, slot)
-		room.fly_to_queue(slot)
-	elif old.size() > 0 and ids == old.slice(1):
-		room.shift_queue(1)
+	var next_changed: bool = ids.is_empty() or old.is_empty() or ids[0] != old[0]
+	room.animate_queue(next_changed, not old.is_empty() and ids == old.slice(1))
 
 func _short(value: String, length: int) -> String:
 	return value if value.length() <= length else value.left(length - 1) + "…"
@@ -706,12 +784,46 @@ func _draw_front_box(canvas: Control) -> void:
 		return
 	_draw_box(canvas, shelf[shelf_offset % shelf.size()])
 
-func _draw_queue_box(canvas: Control, index: int) -> void:
+func _draw_queue_preview(canvas: Control) -> void:
+	var size := canvas.size
+	canvas.draw_rect(Rect2(Vector2.ZERO, size), BG)
 	var queue := upcoming()
-	if index >= queue.size(): return
-	var game := game_meta(queue[index].game)
-	if game.is_empty(): game = {"id": queue[index].game, "title": queue[index].title}
-	_draw_box(canvas, game, str(index + 1))
+	_text(canvas, "UP NEXT", Vector2(24, 46), 34, GREEN)
+	if queue.is_empty():
+		_text(canvas, "Choose a game", Vector2(24, 206), 48, TEXT)
+		_text(canvas, "at the game shelf", Vector2(24, 256), 34, DIM)
+		return
+	var game := game_meta(queue[0].game)
+	if game.is_empty(): game = {"id": queue[0].game, "title": queue[0].title}
+	var rect := Rect2(0, 66, size.x, 272)
+	var art := _art(game, ["screenshot", "cover"])
+	if art != null: _cover(canvas, art, rect)
+	else: _title_card(canvas, game, rect, 48)
+	var title := _short(str(game.get("title", queue[0].title)), 32)
+	_text(canvas, title, Vector2(24, 390), _fit(title, 46, size.x - 48, 30), TEXT)
+
+## Pure title data keeps the rest of the playlist independent from artwork.
+func queue_title_rows() -> Array:
+	var result: Array = []
+	var queue := upcoming()
+	for i in range(1, mini(queue.size(), Room.QUEUE_TITLE_ROWS + 1)):
+		var meta := game_meta(queue[i].game)
+		result.append({"number": i + 1, "title": str(meta.get("title", queue[i].title))})
+	return result
+
+func _draw_queue_titles(canvas: Control) -> void:
+	var size := canvas.size
+	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("100f1b"))
+	var rows := queue_title_rows()
+	if rows.is_empty(): return
+	for i in rows.size():
+		var y := 53.0 + i * 55.0
+		_text(canvas, str(rows[i].number).pad_zeros(2), Vector2(22, y), 32, DIM)
+		var title := _short(str(rows[i].title), 32)
+		_text(canvas, title, Vector2(88, y), _fit(title, 40, size.x - 108, 28), TEXT)
+		canvas.draw_line(Vector2(88, y + 14), Vector2(size.x - 24, y + 14), Color(1, 1, 1, 0.08))
+	var more := maxi(0, upcoming().size() - 1 - rows.size())
+	if more > 0: _text(canvas, "+%d more in queue" % more, Vector2(88, 284), 30, GREEN)
 
 func _draw_jukebox(canvas: Control) -> void:
 	# Transparent strip on the glowing dome: dark lettering only, no panel.
@@ -756,7 +868,8 @@ func _draw_plaque(canvas: Control) -> void:
 func _draw_hud(canvas: Control) -> void:
 	var camera: Camera3D = room.camera
 	var scale := canvas.size.y / 1080.0
-	# Name tags and station hints follow the players.
+	_draw_item_hints(canvas, camera, scale)
+	# Only names and open menus follow players; action buttons stay at their objects.
 	for id in world.players:
 		var p: Dictionary = world.players[id]
 		var head := Vector3(p.x, p.y + 2.25, view.depth(id))
@@ -768,9 +881,6 @@ func _draw_hud(canvas: Control) -> void:
 		var width := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		canvas.draw_string_outline(font, at + Vector2(-width / 2, 0), name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, maxi(4, int(5 * scale)), Color(BG, 0.85))
 		_text(canvas, name, at + Vector2(-width / 2, 0), size, color.lightened(0.35))
-		var station := station_for(id)
-		if not station.is_empty() and not menus.has(id):
-			_hint(canvas, at + Vector2(0, -size - 10 * scale), station, int(19 * scale))
 		if menus.has(id): _draw_menu(canvas, id, at + Vector2(0, -size - 10 * scale), int(22 * scale))
 	# Toasts, bottom centre.
 	var y := canvas.size.y - 40 * scale
@@ -795,6 +905,32 @@ func _draw_hud(canvas: Control) -> void:
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, canvas.size.y * 0.42, w, size + 28), Color(0.03, 0.03, 0.06, 0.85))
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, canvas.size.y * 0.42 + size + 6), size, TEXT)
+
+## One badge per reachable item, even when several players stand beside it.
+func pickup_hint_items() -> Dictionary:
+	var targets := {}
+	for id in world.players:
+		if menus.has(id): continue
+		var item: Dictionary = world.pickup_target(world.players[id])
+		if not item.is_empty(): targets[item.id] = item
+	return targets
+
+func _draw_item_hints(canvas: Control, camera: Camera3D, scale: float) -> void:
+	var size := maxi(14, int(23 * scale))
+	var radius := size * 0.72
+	for item in pickup_hint_items().values():
+		# Use the prop's rendered position, including the hat box's gentle bob.
+		var node: Node3D = view.item_nodes.get(item.id)
+		if node == null or not node.visible: continue
+		var top := node.global_position + Vector3(0, 1.2 if item.kind == "hatbox" else 0.95, 0)
+		if camera.is_position_behind(top): continue
+		var at := camera.unproject_position(top) / canvas.get_global_transform().get_scale()
+		at.y -= radius + 6 * scale + sin(_time * 3.0 + item.id) * 3 * scale
+		at.x = clampf(at.x, radius + 4, canvas.size.x - radius - 4)
+		at.y = clampf(at.y, radius + 4, canvas.size.y - radius - 4)
+		canvas.draw_circle(at, radius + 4 * scale, Color(BG, 0.9))
+		canvas.draw_circle(at, radius, FACES.B)
+		canvas.draw_string(bold, at + Vector2(-radius, size * 0.36), "B", HORIZONTAL_ALIGNMENT_CENTER, radius * 2, size, BG)
 
 ## A black capsule with a yellow Y badge, like the platformer lobby.
 func _hint(canvas: Control, at: Vector2, station: Dictionary, size: int) -> void:

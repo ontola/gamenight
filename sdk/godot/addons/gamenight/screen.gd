@@ -92,7 +92,18 @@ func go_quiet(why: String = "warm") -> void:
 	unthrottle()
 	_epoch += 1
 	if not _headless:
+		# Windows animates minimisation. Park a newly warming game first so
+		# even that animation cannot flash a small window over the lobby.
+		# The launcher must also pass --position -30000,-30000: Godot creates
+		# its initial window before any autoload can run.
+		if why == "warm" and OS.get_name() == "Windows":
+			_park_warm_window()
 		_leave_the_screen(_epoch)
+
+
+func _park_warm_window() -> void:
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_NO_FOCUS, true)
+	DisplayServer.window_set_position(Vector2i(-30000, -30000))
 
 
 ## Loaded, and nobody watching yet: stop spending a core on it.

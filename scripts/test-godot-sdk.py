@@ -25,6 +25,10 @@ with tempfile.TemporaryDirectory(prefix='gamenight-godot-sdk-') as folder:
  print(result.stdout);print(result.stderr)
  assert result.returncode==0 and 'GAME_SDK_PASS' in result.stdout and 'SCRIPT ERROR' not in result.stderr
 
+ screen=subprocess.run([args.godot,'--headless','--path',str(p),'--script','res://tests/screen_lifecycle.gd'],env=env,capture_output=True,text=True,timeout=30)
+ print(screen.stdout);print(screen.stderr)
+ assert screen.returncode==0 and 'SCREEN_LIFECYCLE_RESULT 0 failures' in screen.stdout and 'SCRIPT ERROR' not in screen.stderr
+
  # A managed game with no host must exit instead of running unattended/reconnecting.
  env['GAMENIGHT']='1'
  lost=subprocess.run([args.godot,'--headless','--path',str(p),'--quit-after','600'],env=env,capture_output=True,text=True,timeout=5)

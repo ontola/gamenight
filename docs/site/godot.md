@@ -123,6 +123,13 @@ Minimizing in `_ready()` is too late to prevent the initial window appearing.
 Use `GameNightScreen` for Start/Resume and explicitly claim the screen in your
 standalone launch path. OS focus must never request gameplay.
 
+For a Windows game that keeps its normal standalone window settings, pass
+`--position -30000,-30000` as engine arguments in its managed launch entry,
+before any `--` separator for game arguments. This parks the initial window
+before the SDK runs. `GameNightScreen` also parks a warming Windows window and
+disables focus before minimizing, so the minimize animation stays off-screen.
+Start/Resume restores focus and fullscreen.
+
 While warming, a minimized window never draws, so never await
 `RenderingServer.frame_post_draw` before `notify_ready()`: it does not return
 and the lobby waits on "preloading" forever. Await `get_tree().process_frame`

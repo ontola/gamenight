@@ -33,12 +33,14 @@ var _camera_target := Vector3(0, 4.55, 0)
 var _time := 0.0
 var doors: Array = []              # profile door nodes, see set_doors
 var featured_box: Node3D
-var queue_boxes: Array = []
-var _queue_slots: Array = []        # [{pos, size, rot}] where each up next box rests
-var _flying: Dictionary = {}        # up next slots waiting for a flying box
+var queue_preview: Node3D
+var queue_titles: Node3D
+var _queue_tween: Tween
+const QUEUE_TITLE_ROWS := 4
+const NEXT_SIZE := Vector2(2.7, 1.77)
+const NEXT_POSITION := Vector3(-4.95, 2.38, Layout.BACK + 0.92)
+const TITLES_POSITION := Vector3(-4.95, 0.8, Layout.BACK + 0.96)
 var _prompts: Dictionary = {}       # floating button rows, see prompt()
-var queue_more: Label3D
-var queue_empty: Label3D
 var _spine_root: Node3D
 var _eq_bars: Array = []
 var music_playing := false
@@ -62,6 +64,10 @@ func _ready() -> void:
 	_couch_corner()
 	_jukebox()
 	_exit_door()
+	prompt("music", [["LB", "Previous"], ["Y", "Pause"], ["RB", "Next"]], Vector3(Layout.JUKEBOX, 3.35, Layout.BACK + 1.2))
+	prompt("exit", [["Y", "Leave"]], Vector3(Layout.EXIT_DOOR, 3.0, Layout.BACK + 0.4))
+	for i in Layout.PROFILE_DOORS.size():
+		prompt("door%d" % i, [["Y", "Pick up"]], Vector3(Layout.PROFILE_DOORS[i], 3.15, Layout.BACK + 0.4))
 	_plaque()
 	_ceiling_lights()
 	_foreground()
@@ -511,6 +517,7 @@ func _game_shelf() -> void:
 		m.disable_fog = true
 		var button := quad(Vector2(0.7, 0.35), Vector3(dx + side * 1.15, 1.9, z + 0.3), m)
 		button.name = "shelf_lb" if side < 0 else "shelf_rb"
+		button.visible = false
 	prompt("shelf", [["Y", "Play next"], ["X", "Queue"]], Vector3(dx, 3.3, z + 0.3))
 	var spot := SpotLight3D.new()
 	spot.light_color = Color("ffd7a0")
@@ -600,100 +607,34 @@ func pop_box(step: int) -> void:
 	tween.tween_property(featured_box, "rotation:y", 0.0, 0.35)
 	tween.tween_property(featured_box, "scale", Vector3.ONE, 0.35)
 
-## Up next: count of up to 3 boxes visible, more is the "+N" beyond.
-func set_queue(count: int, more: int) -> void:
-	for i in queue_boxes.size(): queue_boxes[i].visible = i < count and not _flying.has(i)
-	queue_more.text = "+%d" % more if more > 0 else ""
-	queue_empty.visible = count == 0
-
-## Up next sits right beside the stand: the chosen box visibly travels from
-## the stand into its slot, and the row slides along as games are played.
+## One substantial preview for the next game; every later entry is text only.
 func _up_next() -> void:
-	var wood := mat(Color("5b3b2a"), 0.55)
-	var z := Layout.BACK + 0.45
-	var x0 := Layout.UP_NEXT.x
-	var x1 := Layout.UP_NEXT.y
-	var cx := (x0 + x1) / 2
-	box(Vector3(x1 - x0, 0.7, 0.75), Vector3(cx, 0.35, z), wood)
-	box(Vector3(x1 - x0 + 0.05, 0.05, 0.8), Vector3(cx, 0.72, z), mat(Color("3a261c"), 0.6))
-	box(Vector3(x1 - x0 - 0.14, 0.42, 0.02), Vector3(cx, 0.35, z + 0.38), mat(Color("24170f"), 0.5))
-	label("UP NEXT", Vector3(cx, 0.38, z + 0.41), 30, Color(0.8, 3.0, 1.8), self, 8)
-	var sizes := [Vector2(0.9, 1.26), Vector2(0.68, 0.95), Vector2(0.68, 0.95)]
-	var xs := [x0 + 0.65, x0 + 1.5, x0 + 2.22]
-	for i in 3:
-		var texture := screen("queue%d" % i, Vector2i(200, 280), func(_canvas): pass)
-		var size: Vector2 = sizes[i]
-		var pos := Vector3(xs[i], 0.75 + size.y / 2, z + 0.05)
-		var node := game_box(size, pos, texture, 1.3 if i == 0 else 1.05)
-		node.rotation.z = [0.0, -0.03, 0.04][i]
-		queue_boxes.append(node)
-		_queue_slots.append({"pos": pos, "size": size, "rot": node.rotation.z})
-	queue_more = label("", Vector3(x1 - 0.35, 0.38, z + 0.41), 30, Color(0.8, 2.2, 1.4), self, 6)
-	queue_empty = label("Y on a box plays it next", Vector3(cx, 1.3, z + 0.2), 22, Color(0.9, 0.9, 1.1), self, 6)
-	var light := OmniLight3D.new()
-	light.light_color = Color("bff5dc")
-	light.light_energy = 2.0
-	light.omni_range = 3.0
-	light.position = Vector3(cx, 2.0, z + 1.2)
-	add_child(light)
+	var z := Layout.BACK + 0.5
+	var frame := mat(Color("211d32"), 0.5)
+	box(Vector3(2.88, 1.38, 0.65), Vector3(-4.95, 0.72, z), frame)
+	box(Vector3(2.88, 1.94, 0.16), NEXT_POSITION - Vector3(0, 0, 0.1), frame)
+	var texture := screen("queue0", Vector2i(640, 420), func(_canvas): pass)
+	queue_preview = quad(NEXT_SIZE, NEXT_POSITION, screen_material(texture, 1.05))
+	var titles := screen("queue_titles", Vector2i(640, 300), func(_canvas): pass)
+	queue_titles = quad(Vector2(2.7, 1.27), TITLES_POSITION, screen_material(titles, 1.05))
+	neon_line(NEXT_POSITION + Vector3(-1.35, 0.92, 0.02), NEXT_POSITION + Vector3(1.35, 0.92, 0.02), GREEN, 1.5, 0.025)
 
-## The chosen box flies from the stand into up next slot `slot`.
-func fly_to_queue(slot: int) -> void:
-	if slot >= _queue_slots.size() or featured_box == null: return
-	if DisplayServer.get_name() == "headless": return  # nothing to see
-	var image: Image = screens.box_front.viewport.get_texture().get_image()
-	if image == null or image.is_empty(): return  # headless: nothing to see
-	var cover := ImageTexture.create_from_image(image)
-	var start_size := Vector2(1.5, 2.1)
-	var flyer := game_box(start_size, featured_box.position, cover, 1.45)
-	var target: Dictionary = _queue_slots[slot]
-	var end_scale := Vector3(target.size.x / start_size.x, target.size.y / start_size.y, 1)
-	var from: Vector3 = featured_box.position
-	_flying[slot] = true
-	queue_boxes[slot].visible = false
-	var tween := create_tween()
-	tween.tween_method(func(t: float):
-		# A little arc over the stand, easing into the slot.
-		var e := ease(t, -2.2)
-		flyer.position = from.lerp(target.pos, e) + Vector3(0, sin(t * PI) * 0.9, 0.35 * sin(t * PI))
-		flyer.scale = Vector3.ONE.lerp(end_scale, e)
-		flyer.rotation.z = lerpf(0.0, target.rot, e) + sin(t * PI) * 0.25, 0.0, 1.0, 0.6)
-	tween.tween_callback(func():
-		flyer.queue_free()
-		_flying.erase(slot)
-		queue_boxes[slot].visible = true
-		pop_queue(slot))
-	pop_box(1)
-
-## Slide the row: every box comes from the slot `step` away (1: the queue
-## moved up because a game started, -1: a box was pushed in at the front).
-func shift_queue(step: int, skip := -1) -> void:
-	for i in queue_boxes.size():
-		var j := i + step
-		if i == skip or j < 0 or j >= _queue_slots.size(): continue
-		var node: Node3D = queue_boxes[i]
-		var slot: Dictionary = _queue_slots[i]
-		var from: Dictionary = _queue_slots[j]
-		node.position = from.pos
-		node.scale = Vector3(from.size.x / slot.size.x, from.size.y / slot.size.y, 1)
-		var tween := create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
-		tween.tween_property(node, "position", slot.pos, 0.45)
-		tween.tween_property(node, "scale", Vector3.ONE, 0.45)
-
-## A box landing in its slot gives a small bounce.
-func pop_queue(slot: int) -> void:
-	var node: Node3D = queue_boxes[slot]
-	node.scale = Vector3(1.12, 0.9, 1)
-	var tween := create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(node, "scale", Vector3.ONE, 0.3)
+## Both surfaces move gently as the queue changes; later entries never become
+## cover objects or fly across the room. Cancel a previous transition first.
+func animate_queue(next_changed: bool, advance: bool) -> void:
+	if _queue_tween != null: _queue_tween.kill()
+	queue_preview.position = NEXT_POSITION
+	queue_preview.scale = Vector3.ONE * (0.97 if next_changed else 1.0)
+	queue_titles.position = TITLES_POSITION + Vector3(0, -0.10 if advance else 0.10, 0)
+	_queue_tween = create_tween().set_parallel().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	_queue_tween.tween_property(queue_preview, "scale", Vector3.ONE, 0.32)
+	_queue_tween.tween_property(queue_titles, "position", TITLES_POSITION, 0.32)
 
 ## A floating row of controller buttons over a station, e.g. [["Y", "Play next"]].
-## Bright while someone can use it, calm otherwise.
+## Hidden until someone is in interaction range.
 func prompt(name: String, items: Array, pos: Vector3) -> void:
 	var state := {"items": items, "enabled": true}
-	var width := 0.0
-	for item in items: width += 96 + font.get_string_size(str(item[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x + 36
-	var px := Vector2i(int(width) + 40, 96)
+	var px := _prompt_size(items)
 	var texture := screen("prompt_" + name, px, func(canvas: Control): draw_prompt(canvas, state, bold))
 	screens["prompt_" + name].viewport.transparent_bg = true
 	var m := screen_material(texture, 1.0)
@@ -701,15 +642,27 @@ func prompt(name: String, items: Array, pos: Vector3) -> void:
 	m.disable_fog = true
 	var node := quad(Vector2(px.x, px.y) * 0.0042, pos, m)
 	node.name = "prompt_" + name
+	node.visible = false
 	_prompts[name] = {"node": node, "material": m, "base": pos, "state": state, "active": false}
+
+func _prompt_size(items: Array) -> Vector2i:
+	var width := 40.0
+	for item in items:
+		width += (150 if str(item[0]) in ["LB", "RB"] else 96) + bold.get_string_size(str(item[1]), HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x + 36
+	return Vector2i(ceili(width), 96)
 
 func set_prompt(name: String, items: Array, enabled: bool, active: bool) -> void:
 	var p: Dictionary = _prompts.get(name, {})
 	if p.is_empty(): return
 	p.active = active
+	p.node.visible = active
 	if JSON.stringify(p.state.items) != JSON.stringify(items) or p.state.enabled != enabled:
 		p.state.items = items
 		p.state.enabled = enabled
+		var px := _prompt_size(items)
+		screens["prompt_" + name].viewport.size = px
+		screens["prompt_" + name].canvas.size = px
+		p.node.mesh.size = Vector2(px) * 0.0042
 		redraw("prompt_" + name)
 
 ## Xbox face buttons in their colours, each followed by what it does.
@@ -720,17 +673,22 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
 	for item in state.items:
 		var key := str(item[0])
 		var text := str(item[1])
+		var bumper := key in ["LB", "RB"]
+		var badge_width := 150.0 if bumper else 96.0
 		var tw := f.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44).x
 		var pill := StyleBoxFlat.new()
 		pill.bg_color = Color(0.03, 0.03, 0.06, 0.82)
 		pill.set_corner_radius_all(int(h / 2) - 6)
 		pill.anti_aliasing = true
-		canvas.draw_style_box(pill, Rect2(x, 6, 96 + tw + 16, h - 12))
+		canvas.draw_style_box(pill, Rect2(x, 6, badge_width + tw + 16, h - 12))
 		var color: Color = colors.get(key, Color("f2f1f8")) if state.enabled else Color("55516a")
-		canvas.draw_circle(Vector2(x + h / 2 - 4, h / 2), h / 2 - 14, color)
-		canvas.draw_string(f, Vector2(x + 10, h / 2 + 17), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
-		canvas.draw_string(f, Vector2(x + 90, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
-		x += 96 + tw + 36
+		if bumper:
+			draw_bumper(canvas, Rect2(x + 12, 18, 122, 60), key, f)
+		else:
+			canvas.draw_circle(Vector2(x + h / 2 - 4, h / 2), h / 2 - 14, color)
+			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
+		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
+		x += badge_width + tw + 36
 
 func _shelves() -> void:
 	var wood := mat(Color("5b3b2a"), 0.55)

@@ -50,6 +50,9 @@ func _process(_delta: float) -> void:
 		_socket = null
 		_retry_at = Time.get_ticks_msec() + 1500
 		connected = false
+		# A welcome reconnects the socket, but only a fresh lobby_focus grants
+		# screen ownership. Never carry the previous connection's grant over.
+		active = false
 		connection_changed.emit(false)
 
 func _handle(message: Dictionary) -> void:

@@ -200,6 +200,12 @@ release the screen and reduce background work while keeping the connection
 alive. Only explicit player requests start or resume games; window focus is
 not such a request. The Godot example uses window minimisation and restoration.
 
+Accept controller input only while the SDK is both connected and active.
+On disconnect, clear held input and close controller menus. The SDK revokes
+its previous screen-ownership grant; a reconnecting `welcome` does not restore
+it. Wait for a fresh `lobby_focus: true`, then require neutral controls before
+accepting presses so actions held in the game cannot spill into the lobby.
+
 Player and controller state survives a replacement lobby disconnect. A socket
 failure can reconnect to the same process. A dead process gets up to three
 restart attempts before opening the local recovery page. The game is paused

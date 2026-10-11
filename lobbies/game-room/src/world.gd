@@ -194,24 +194,31 @@ func _actions(p: Dictionary, stunned: bool) -> void:
 		elif item.kind == "blaster": _fire(p, item)
 		elif item.kind == "bomb": _drop_item(p, true)
 
-func _grab(p: Dictionary) -> void:
+## The exact item B will use, shared with the floating pickup hint.
+func pickup_target(p: Dictionary) -> Dictionary:
+	if p.sleeping or p.stun > 0 or not _item(int(p.item)).is_empty(): return {}
 	for item in items:
-		if item.holder != "" : continue
+		if item.holder != "" or item.dead: continue
 		if absf(item.x - p.x) < 0.8 and item.y < p.y + HEIGHT and item.y + 0.6 > p.y:
-			if item.kind == "ball":
-				_kick(p, item, 1.6)
-				return
-			if item.kind == "hatbox":
-				p.hat = item.hat
-				p.cheer = 0.6
-				item.dead = true
-				events.append({"type": "hat", "x": item.x, "y": item.y, "player": p.id, "hat": item.hat})
-				return
-			item.holder = p.id
-			p.item = item.id
-			if item.kind == "bomb" and item.fuse < 0: item.fuse = 3.2
-			events.append({"type": "grab", "x": item.x, "y": item.y, "player": p.id})
-			return
+			return item
+	return {}
+
+func _grab(p: Dictionary) -> void:
+	var item := pickup_target(p)
+	if item.is_empty(): return
+	if item.kind == "ball":
+		_kick(p, item, 1.6)
+		return
+	if item.kind == "hatbox":
+		p.hat = item.hat
+		p.cheer = 0.6
+		item.dead = true
+		events.append({"type": "hat", "x": item.x, "y": item.y, "player": p.id, "hat": item.hat})
+		return
+	item.holder = p.id
+	p.item = item.id
+	if item.kind == "bomb" and item.fuse < 0: item.fuse = 3.2
+	events.append({"type": "grab", "x": item.x, "y": item.y, "player": p.id})
 
 func _drop_item(p: Dictionary, thrown: bool) -> void:
 	var item := _item(int(p.item))
