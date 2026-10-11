@@ -38,9 +38,9 @@ pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> 
             .iter()
             .find(|i| i.game == game.id)
             .filter(|i| !not_on_this_host(i));
-        // Minimum counts are recommendations for an explicit selection, just
-        // as in the daemon. Only capacity may exclude an already seated player.
-        let selectable = game.max_players.is_none_or(|max| count <= max)
+        // Mirror the daemon's human range; a minimum does not imply AI support.
+        // Keep every title in discovery, but don't offer an unsupported selection.
+        let selectable = game.fits_players(count)
             && (game.launch.is_some()
                 || party.connected_games.contains(&game.id)
                 || install.is_some());
@@ -234,10 +234,11 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
                 let Message::Text(text) = ws.next().await?.ok()? else {
                     continue;
                 };
-                if let Ok(ServerMessage::PartyState { party }) = serde_json::from_str(&text) {
-                    if up_next(&party) {
-                        break;
-                    }
+                match serde_json::from_str(&text) {
+                    Ok(ServerMessage::PartyState { party }) if up_next(&party) => break,
+                    // The roster can change after the snapshot was checked.
+                    Ok(ServerMessage::Error { .. }) => return None,
+                    _ => {}
                 }
             }
         }
@@ -270,6 +271,46 @@ pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn discovery_keeps_catalog_visible_but_requires_the_current_human_range() {
+        let mut night = gamenight_core::GameNight::default();
+        night.set_library(vec![
+            serde_json::from_value(json!({"id":"duo","title":"Duo","min_players":2,"max_players":2,"launch":{"command":"test","args":[]}})).unwrap(),
+            serde_json::from_value(json!({"id":"solo-ai","title":"Solo AI","min_players":1,"max_players":4,"launch":{"command":"test","args":[]}})).unwrap(),
+        ]);
+        for count in 1..=3 {
+            night.handle(gamenight_core::Command::JoinParty {
+                name: format!("Player {count}"),
+                seat: None,
+                color: None,
+                avatar: None,
+                library: vec![],
+            });
+            let view = snapshot(&night.snapshot(), &None);
+            assert_eq!(
+                view["games"].as_array().unwrap().len(),
+                2,
+                "browsing never hides titles"
+            );
+            assert_eq!(view["games"][0]["selectable"], count == 2);
+            assert_eq!(view["games"][1]["selectable"], true);
+        }
+        for player in night.snapshot().players.iter().skip(1) {
+            night.handle(gamenight_core::Command::LeaveParty {
+                player_id: player.id,
+            });
+        }
+        night.handle(gamenight_core::Command::AssignSeat {
+            seat: 1,
+            occupant: gamenight_protocol::SeatOccupant::Ai,
+        });
+        assert_eq!(
+            snapshot(&night.snapshot(), &None)["games"][0]["selectable"],
+            false,
+            "AI does not satisfy a human minimum after people leave"
+        );
+    }
+
     #[test]
     fn failed_installs_are_retryable_and_do_not_expose_host_paths() {
         let mut party = gamenight_core::GameNight::default().snapshot();
@@ -402,6 +443,26 @@ mod tests {
                 .as_secs()
                 + 60,
         };
+        assert!(
+            !apply(&state, &selection).await,
+            "one human cannot select a two-human game"
+        );
+        overlay
+            .send(Message::Text(
+                ClientMessage::JoinParty {
+                    name: "Second player".into(),
+                    seat: Some(1),
+                    color: None,
+                    avatar: None,
+                    library: vec![],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        daemon::wait_for_new_player(&mut overlay, &std::collections::HashSet::from([player]))
+            .await
+            .unwrap();
         assert!(apply(&state, &selection).await);
         // A repeated delivery observes the existing warm target; no restart.
         assert!(apply(&state, &selection).await);
