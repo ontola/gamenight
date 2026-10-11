@@ -47,7 +47,7 @@ func _run() -> void:
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1] == {"type": "close_overlay"}, "Y at TV still resumes the current game")
 	main.input("p0", 0, Vector2.ZERO)
-	p.x = -7.5
+	p.x = -9.6
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1].type == "queue_next", "Selector sets next without starting it")
 	check(main.station_for("p0").label.begins_with("Set "), "Selector label describes queue placement")

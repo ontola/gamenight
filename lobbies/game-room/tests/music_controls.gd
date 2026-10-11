@@ -73,7 +73,7 @@ func _run() -> void:
 	main._update_prompts()
 	for prompt in main.room._prompts.values(): check(not prompt.node.visible, "Inactive station stays invisible")
 	p.sleeping = false
-	for entry in [["shelf", -7.5], ["tv", 0.0], ["music", main.Layout.JUKEBOX], ["exit", main.Layout.EXIT_DOOR], ["door0", main.Layout.PROFILE_DOORS[0]]]:
+	for entry in [["shelf", -9.6], ["tv", 0.0], ["music", main.Layout.JUKEBOX], ["exit", main.Layout.EXIT_DOOR], ["door0", main.Layout.PROFILE_DOORS[0]]]:
 		p.x = entry[1]
 		main._update_prompts()
 		check(main.room._prompts[entry[0]].node.visible, "Station appears within range: " + entry[0])
@@ -88,9 +88,11 @@ func _run() -> void:
 		p.x = 7.0
 		main._update_prompts()
 		check(not main.room._prompts[entry[0]].node.visible, "Station disappears out of range: " + entry[0])
+	check(not main.room.featured_box.visible, "Selected cover hides when nobody browses the cupboard")
 	check(not main.room.get_node("shelf_lb").visible and not main.room.get_node("shelf_rb").visible, "Shelf bumpers disappear out of range")
-	p.x = -7.5
+	p.x = -9.6
 	main._update_prompts()
+	check(main.room.featured_box.visible, "Selected cover appears for a nearby player")
 	check(main.room.get_node("shelf_lb").visible and main.room.get_node("shelf_rb").visible, "Shelf bumpers appear within range")
 	var other: Dictionary = main.world.players.p1
 	other.x = main.Layout.JUKEBOX; other.y = 0.0; other.grounded = true; other.sleeping = false
@@ -113,7 +115,7 @@ func _run() -> void:
 	recorder.commands.clear()
 	var all_buttons: int = main.World.BTN_Y | main.BTN_LB | main.BTN_RB | main.BTN_START | main.World.BTN_X | main.World.BTN_B | main.World.BTN_A
 	var shelf_before: int = main.shelf_offset
-	for x in [main.Layout.JUKEBOX, -7.5, 0.0, main.Layout.EXIT_DOOR, main.Layout.PROFILE_DOORS[0]]:
+	for x in [main.Layout.JUKEBOX, -9.6, 0.0, main.Layout.EXIT_DOOR, main.Layout.PROFILE_DOORS[0]]:
 		p.x = x
 		main._controllers_changed([{"controller": "demo:0", "buttons": all_buttons, "axes": [32767, 0]}])
 		var position := Vector2(p.x, p.y)

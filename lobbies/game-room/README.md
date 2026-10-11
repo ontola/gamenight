@@ -39,11 +39,11 @@ The runtime joins controllers and handles Back, as for every lobby.
 
 ## Stations
 
-- **Game shelf**: a bookcase of game box spines and a stand with the selected
-  box face forward. LB/RB pick the previous or next box, Y (Set up next) makes it the next
+- **Game shelf**: a cupboard of game box spines. The selected cover appears on
+  top only while a player stands in front of the cupboard. LB/RB pick the previous or next box, Y (Set up next) makes it the next
   game without starting it (`queue_next`), X adds it to the end of the queue
-  (`queue_game`). Floating button prompts above the stand show both.
-- **Up next cabinet** beside the stand shows one large next-game preview and
+  (`queue_game`). Floating button prompts above the cupboard show both.
+- **Up next cabinet** shows one large next-game preview and
   ordered titles for the later games, with a count for overflow. The title
   list slides when the queue changes; later games never have cover images.
   Stand at the cabinet and press Y (Play next) to start the first queued game,

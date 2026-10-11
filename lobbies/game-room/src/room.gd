@@ -474,8 +474,7 @@ func _tv() -> void:
 		body.name = "speaker"
 
 func _game_shelf() -> void:
-	# Old-fashioned game boxes: a bookcase of spines and a display stand
-	# showing the selected box face forward.
+	# Game spines in the cupboard, with a selected cover on top while browsing.
 	var wood := mat(Color("5b3b2a"), 0.55)
 	var dark := mat(Color("3a261c"), 0.6)
 	var z := Layout.BACK + 0.4
@@ -503,7 +502,8 @@ func _game_shelf() -> void:
 	box(Vector3(dw + 0.05, 0.05, 0.85), Vector3(dx, 0.8, z + 0.05), dark)
 	platform_edge(Layout.DISPLAY.x, Layout.DISPLAY.y, 0.83, z + 0.48)
 	var front_texture := screen("box_front", Vector2i(300, 420), func(_canvas): pass)
-	featured_box = game_box(Vector2(1.5, 2.1), Vector3(dx, 1.9, z + 0.1), front_texture, 1.45)
+	featured_box = game_box(Vector2(1.25, 1.75), Vector3(bx, 3.56, z + 0.1), front_texture, 1.45)
+	featured_box.visible = false
 	featured_box.rotation.x = -0.06
 	for side in [-1, 1]:
 		# Xbox-style bumper buttons, drawn smooth like the Y badge in the hints.
@@ -515,19 +515,19 @@ func _game_shelf() -> void:
 		var m := screen_material(texture, 1.6)
 		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 		m.disable_fog = true
-		var button := quad(Vector2(0.7, 0.35), Vector3(dx + side * 1.15, 1.9, z + 0.3), m)
+		var button := quad(Vector2(0.7, 0.35), Vector3(bx + side * 0.98, 3.56, z + 0.3), m)
 		button.name = "shelf_lb" if side < 0 else "shelf_rb"
 		button.visible = false
-	prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], Vector3(dx, 3.3, z + 0.3))
+	prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], Vector3(bx, 5.0, z + 0.3))
 	var spot := SpotLight3D.new()
 	spot.light_color = Color("ffd7a0")
 	spot.light_energy = 9.0
 	spot.spot_range = 5.0
 	spot.spot_angle = 22
 	spot.light_volumetric_fog_energy = 0.6
-	spot.position = Vector3(dx, 4.2, z + 1.6)
+	spot.position = Vector3(bx, 5.4, z + 1.6)
 	add_child(spot)
-	spot.look_at(Vector3(dx, 1.9, z), Vector3.UP)
+	spot.look_at(Vector3(bx, 3.56, z), Vector3.UP)
 	var glow := OmniLight3D.new()
 	glow.light_color = Color("b9a6ff")
 	glow.light_energy = 3.0
@@ -570,7 +570,7 @@ func game_box(size: Vector2, pos: Vector3, cover: Texture2D, energy := 1.2, pare
 	quad(size, Vector3(0, 0, 0.051), face, root)
 	return root
 
-## Rebuilds the spines: games is [{title, color}], selected sits on the stand.
+## Rebuilds the spines: games is [{title, color}].
 func set_shelf(games: Array, selected: int) -> void:
 	for child in _spine_root.get_children(): child.queue_free()
 	var bw := Layout.BOOKCASE.y - Layout.BOOKCASE.x - 0.24
@@ -584,10 +584,6 @@ func set_shelf(games: Array, selected: int) -> void:
 		var row: float = Layout.SPINE_ROWS[n / per_row]
 		var x := Layout.BOOKCASE.x + 0.23 + (n % per_row) * 0.22
 		var color := Color.from_string(str(games[i].get("color", "")), VIOLET)
-		if i == selected:
-			# The box is out on the stand: leave a gap with a glowing marker.
-			box(Vector3(0.16, 0.03, 0.4), Vector3(x, row + 0.02, Layout.BACK + 0.45), mat(AMBER, 0.3, 0, AMBER, 3.0), _spine_root, false)
-			continue
 		var height := 0.7
 		box(Vector3(0.2, height, 0.5), Vector3(x, row + height / 2, Layout.BACK + 0.4), mat(color.darkened(0.25), 0.45, 0.1), _spine_root)
 		box(Vector3(0.205, 0.08, 0.505), Vector3(x, row + height - 0.06, Layout.BACK + 0.4), mat(Color("12141f"), 0.35), _spine_root, false)

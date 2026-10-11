@@ -651,6 +651,7 @@ func _update_prompts() -> void:
 	var queued := queue_station()
 	room.set_prompt("queue", [["Y", "Play next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
+	room.featured_box.visible = shelf_live and occupied.has("shelf")
 	room.set_prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
 	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = occupied.has("shelf") and shelf_games().size() > 1
 	var playing: bool = party.get("now_playing", {}).get("playing", false) if party.get("now_playing") is Dictionary else false
