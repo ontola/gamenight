@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 /// Colours from web/site.css, so the app and the phone studio match.
@@ -15,6 +16,15 @@ class GnColors {
   static const warn = Color(0xFFFBBF24);
   static const canvas = Color(0xFF0F172A);
 }
+
+// On edge-to-edge Android the bar is transparent, so the app paints the
+// dark surface behind it. Older versions also use the explicit bar color.
+const gameNightSystemUi = SystemUiOverlayStyle(
+  systemNavigationBarColor: GnColors.bg,
+  systemNavigationBarDividerColor: GnColors.bg,
+  systemNavigationBarIconBrightness: Brightness.light,
+  systemNavigationBarContrastEnforced: false,
+);
 
 Color hexColor(String hex) =>
     Color(int.parse(hex.substring(1, 7), radix: 16) | 0xFF000000);

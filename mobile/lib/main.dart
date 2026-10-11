@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api.dart' show ApiError;
@@ -16,6 +17,7 @@ import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(gameNightSystemUi);
   final prefs = await SharedPreferences.getInstance();
   final state = AppState(prefs);
   if (state.host != null || state.inHostedRoom) state.startPolling();
@@ -42,6 +44,10 @@ class GameNightApp extends StatelessWidget {
       title: 'GameNight',
       debugShowCheckedModeBanner: false,
       theme: gameNightTheme(),
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: gameNightSystemUi,
+        child: ColoredBox(color: GnColors.bg, child: child!),
+      ),
       home: HomeScreen(state: state, links: links, initialLink: initialLink),
     );
   }
