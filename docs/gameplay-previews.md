@@ -4,6 +4,11 @@ Every playable GameNight store entry needs an engaging five-second gameplay
 montage. Its job is to show how much fun the game contains before someone scrolls
 past. Technical validity alone is not acceptance.
 
+Upload the clip on the developer portal's Store page before publishing. Use MP4
+or WebM, up to 32 MiB. The server measures its length (4.9–5.1 seconds to allow
+frame rounding). Screenshots and YouTube links are optional. Private preview
+builds and drafts can be saved before the clip is ready.
+
 ## Plan the five seconds
 
 Before recording, write a short shot list with the action, players, weapon/item,

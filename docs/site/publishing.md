@@ -133,7 +133,38 @@ The first public release requires distribution approval. Subsequent updates can 
 
 Private repository access, AI-assisted code processing and game distribution each need agreement. Sharing a repository does not grant permission to distribute the game. Listing is free.
 
-## Supply the artwork
+## Required gameplay video
+
+Before publishing to players, upload a **five-second gameplay video** on the
+Store page and save. Use MP4 or WebM, up to 32 MiB. It appears first and loops
+silently; reduced-motion and data-saving preferences keep playback manual.
+Screenshots, cover art and YouTube links are optional extras. A YouTube link does
+not replace the gameplay clip. Drafts and private preview builds need no media.
+
+GameNight measures the uploaded file on the server. It accepts 4.9–5.1 seconds
+for frame and container rounding, and rejects unreadable or longer videos.
+A live game must keep a clip: use **Replace gameplay video**, then save.
+Show real gameplay and check the loop on a phone. Follow the
+[gameplay preview guide](../gameplay-previews.md); duration validation does not
+establish that the footage is good or representative.
+
+For an authenticated owner session, the same API backs the editor:
+
+1. `POST /v1/developer/games/{game}/uploads` with the raw video bytes. The response
+   contains `url` and `kind`. Invalid video returns `422` with an explanation.
+2. `PUT /v1/developer/games/{game}` with your listing fields and a `media` array.
+   Add `{"kind":"video","url":"URL_FROM_UPLOAD"}` and retain any optional items.
+   The server puts the video first and sets `preview: true` and `duration: 5`.
+3. `GET /v1/developer/games/{game}` includes `media.preview_ready` and
+   `media.required_duration`. A stable release returns `422` if no verified
+   gameplay clip is saved. Existing approved clips remain valid.
+
+Media editing requires an owner session, not a build-upload key. Send the usual
+CSRF header for cookie authentication. Pasting an external video URL or setting
+`duration: 5` yourself does not verify it, and a clip uploaded for another game
+cannot satisfy this game's requirement.
+
+## Optional artwork
 
 Use a portrait cover for the next-game display, a square icon for game spines and a gameplay screenshot for the TV. These are separate assets. If artwork is absent, the title remains readable; a random icon is not a substitute for a cover.
 
