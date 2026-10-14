@@ -161,7 +161,7 @@ pub fn create_router(state: SharedState) -> Router {
             get(|| async {
                 (
                     [(axum::http::header::CONTENT_TYPE, "text/javascript")],
-                    include_str!("../assets/jsQR.js"),
+                    include_str!("../../../web/jsQR.js"),
                 )
             }),
         )
