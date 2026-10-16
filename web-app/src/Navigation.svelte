@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { room, route, busy, signedIn, assistantUrl } from './state';
+  import { room, route, busy, signedIn, assistantUrl, guestRoom, guestToken } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
   let menuDialog: HTMLDialogElement;
@@ -20,6 +20,9 @@
         const player=localStorage.getItem('gamenight_bound_player');
         if(!player)throw Error('Open You to refresh your controller connection, then try again.');
         path='/api/player-links/'+encodeURIComponent(player)+'/unlink';
+      }else if(guestToken()){
+        path='/v1/rooms/guest/leave';
+        headers['X-GameNight-Room-Token']=guestToken()!;
       }else{
         const session=await fetch('/auth/session',{cache:'no-store'});
         if(!session.ok)throw Error('Please sign in again before leaving the room.');
@@ -27,11 +30,13 @@
       }
       const response=await fetch(path,{method:'POST',headers,body:'{}',signal:AbortSignal.timeout(10000)});
       if(!response.ok)throw Error('Could not leave the room. Please try again.');
+      const wasGuest=!!guestToken();
+      sessionStorage.removeItem('gamenight_guest_v1');guestRoom.set(false);
       localStorage.removeItem('gamenight_bound_player');
       window.dispatchEvent(new Event('gamenight-room-left'));
       window.updateRoomNavigation?.(false);
       leaveDialog.close();
-      window.showToast('You left the room. Your saved player is kept.');
+      window.showToast(wasGuest?'You left the room.':'You left the room. Your saved player is kept.');
     }catch(error){leaveError=error instanceof Error?error.message:'Could not leave the room.';}
     finally{leaving=false;}
   }
@@ -48,8 +53,8 @@
   <div class="site-links">
     <a href="/catalog" aria-current={($route.startsWith('/catalog') || $route.startsWith('/games/'))?'page':undefined}>Games</a>
     <a class="site-desktop-link" href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
-    <a href={$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$signedIn?'You':'Sign in'}</a>
-    <a href="/studio#session" hidden={$room!==true} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
+    <a href={$guestRoom?'/join':$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$guestRoom?'Your player':$signedIn?'You':'Sign in'}</a>
+    <a href="/studio#session" hidden={$room!==true || $guestRoom} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
     {#if $room===true && $assistantUrl}
       <a href={$assistantUrl} aria-current={$route==='/agent'?'page':undefined}>Assistant</a>
     {/if}
@@ -75,7 +80,7 @@
 <dialog class="leave-room-dialog" bind:this={leaveDialog} oncancel={(event)=>{if(leaving)event.preventDefault();}} onclick={(event)=>{if(event.target===leaveDialog && !leaving)leaveDialog.close();}}>
   <section>
     <h2>Leave this room?</h2>
-    <p>Your saved player and drawings will stay with you.</p>
+    <p>{$guestRoom?'You can scan the QR on the TV to join again.':'Your saved player and drawings will stay with you.'}</p>
     {#if leaveError}<p role="alert">{leaveError}</p>{/if}
     <div class="leave-room-dialog-actions">
       <button disabled={leaving} onclick={()=>leaveDialog.close()}>Stay</button>

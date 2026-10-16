@@ -1,5 +1,9 @@
 import { writable } from 'svelte/store';
 export const signedIn = writable(document.body.dataset.local==='true');
+export const guestRoom = writable(false);
+export function guestToken(): string | null {
+  try { const value=JSON.parse(sessionStorage.getItem('gamenight_guest_v1') || 'null'); return typeof value?.token==='string'?value.token:null; } catch { return null; }
+}
 export const assistantUrl = writable('');
 export const room = writable<boolean|null>(null);
 export const player = writable(sessionStorage.getItem('gamenight_nav_name') || localStorage.getItem('gamenight_player_name') || 'Your player');
