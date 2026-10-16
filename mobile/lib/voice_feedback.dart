@@ -9,7 +9,8 @@ abstract interface class SpeechInput {
     required void Function(String) onStatus,
     required void Function(String) onError,
   });
-  Future<void> listen(void Function(String, bool) onText);
+  Future<void> listen(void Function(String, bool) onText,
+      {void Function(double)? onSoundLevel});
   Future<void> stop();
   Future<void> cancel();
 }
@@ -29,9 +30,11 @@ class _DeviceSpeech implements SpeechInput {
       );
 
   @override
-  Future<void> listen(void Function(String, bool) onText) async {
+  Future<void> listen(void Function(String, bool) onText,
+      {void Function(double)? onSoundLevel}) async {
     await _speech.listen(
       onResult: (result) => onText(result.recognizedWords, result.finalResult),
+      onSoundLevelChange: onSoundLevel,
       listenOptions: stt.SpeechListenOptions(
         listenFor: const Duration(seconds: 60),
         pauseFor: const Duration(seconds: 5),
@@ -63,6 +66,41 @@ class VoiceFeedback extends ChangeNotifier {
   bool get busy => _operations > 0;
   String text = '';
   String? error;
+  String? errorCode;
+  double soundLevel = 0;
+  bool microphoneActive = false;
+  bool finishing = false;
+  bool _sessionOpen = false;
+  bool _hasWords = false;
+  Timer? _startupTimer;
+  Timer? _silenceTimer;
+  Timer? _endTimer;
+  Timer? _limitTimer;
+
+  void _clearTimers() {
+    _startupTimer?.cancel();
+    _silenceTimer?.cancel();
+    _endTimer?.cancel();
+    _limitTimer?.cancel();
+  }
+
+  void _completeSession() {
+    if (!_sessionOpen) return;
+    _sessionOpen = false;
+    _clearTimers();
+    listening = false;
+    microphoneActive = false;
+    finishing = false;
+    soundLevel = 0;
+    if (!_hasWords && error == null) {
+      errorCode = 'no_words';
+      error =
+          'No speech was recognised. Try again, check your phone’s speech language, or type below.';
+    }
+    _finishWords();
+    _changed();
+  }
+
   Completer<void>? _finalWords;
 
   void _finishWords() {
@@ -81,35 +119,73 @@ class VoiceFeedback extends ChangeNotifier {
     final prefix = draft.trimRight();
     text = draft;
     error = null;
+    errorCode = null;
+    soundLevel = 0;
+    microphoneActive = false;
+    finishing = false;
+    _hasWords = false;
+    _clearTimers();
     _operations++;
     _changed();
     try {
       if (!_initialized) {
-        _initialized = await _speech.initialize(
-          onStatus: _status,
-          onError: _error,
-        );
+        _initialized = await _speech
+            .initialize(
+              onStatus: _status,
+              onError: _error,
+            )
+            .timeout(const Duration(seconds: 20));
       }
       if (generation != _generation || _disposed) return;
       if (!_initialized) {
+        errorCode = 'unavailable';
         error =
             'Microphone or speech access is unavailable. Allow access in your '
             'phone settings, or type your feedback below.';
         return;
       }
       listening = true;
-      await _speech.listen((words, finalResult) {
-        if (_disposed || generation != _generation) return;
-        text =
-            [prefix, words.trim()].where((part) => part.isNotEmpty).join(' ');
-        if (finalResult) _finishWords();
-        _changed();
+      _sessionOpen = true;
+      _startupTimer = Timer(const Duration(seconds: 8), () {
+        if (_sessionOpen && !microphoneActive) _error('start_timeout');
       });
+      _silenceTimer = Timer(const Duration(seconds: 20), () {
+        if (_sessionOpen && !_hasWords) _error('no_words');
+      });
+      _limitTimer = Timer(const Duration(seconds: 65), () {
+        if (_sessionOpen) unawaited(stop());
+      });
+      await _speech.listen((words, finalResult) {
+        if (_disposed || generation != _generation || !_sessionOpen) return;
+        if (words.trim().isNotEmpty) {
+          _hasWords = true;
+          _startupTimer?.cancel();
+          _silenceTimer?.cancel();
+          microphoneActive = true;
+          text =
+              [prefix, words.trim()].where((part) => part.isNotEmpty).join(' ');
+        }
+        if (finalResult) _completeSession();
+        _changed();
+      }, onSoundLevel: (level) {
+        if (_disposed || generation != _generation || !_sessionOpen) return;
+        microphoneActive = true;
+        _startupTimer?.cancel();
+        soundLevel = ((level + 2) / 12).clamp(0.0, 1.0);
+        _changed();
+      }).timeout(const Duration(seconds: 10));
       // A permission dialog, navigation, or background event may have cancelled
       // while the platform was starting. Do not leave a late microphone running.
-      if (generation != _generation || _disposed) await _speech.cancel();
+      if (generation != _generation || _disposed) {
+        await _speech.cancel().timeout(const Duration(seconds: 2));
+      }
     } catch (_) {
       if (generation == _generation && !_disposed) {
+        errorCode = 'start_failed';
+        _sessionOpen = false;
+        _clearTimers();
+        microphoneActive = false;
+        finishing = false;
         error =
             'Recording could not start. Try again, or type your feedback below.';
         listening = false;
@@ -123,19 +199,35 @@ class VoiceFeedback extends ChangeNotifier {
   }
 
   void _status(String status) {
-    if (_disposed) return;
-    if (status == 'done' || status == 'notListening') {
-      listening = false;
-      if (status == 'done') _finishWords();
-      _changed();
+    if (_disposed || !_sessionOpen) return;
+    if (status == 'listening') {
+      microphoneActive = true;
+      _startupTimer?.cancel();
+    } else if (status == 'done') {
+      _completeSession();
+    } else if (status == 'notListening') {
+      finishing = true;
+      // Android ends audio capture before delivering its final transcript.
+      // Keep accepting that result, but never wait indefinitely for it.
+      microphoneActive = false;
+      soundLevel = 0;
+      _endTimer?.cancel();
+      _endTimer = Timer(const Duration(seconds: 2), _completeSession);
     }
+    _changed();
   }
 
   void _error(String code) {
-    if (_disposed) return;
+    if (_disposed || (!_sessionOpen && _initialized)) return;
     ++_generation;
+    _sessionOpen = false;
+    _clearTimers();
     _finishWords();
     listening = false;
+    microphoneActive = false;
+    finishing = false;
+    soundLevel = 0;
+    errorCode = code;
     error = switch (code) {
       'error_permission' ||
       'error_permission_denied' ||
@@ -144,9 +236,21 @@ class VoiceFeedback extends ChangeNotifier {
       'error_speech_permission' =>
         'Microphone or speech access is off. Allow access in your phone settings, '
             'or type your feedback below.',
-      'error_no_match' ||
-      'error_speech_timeout' =>
-        'Recording paused. Continue recording, or edit what you have below.',
+      'error_no_match' || 'error_speech_timeout' || 'no_words' => _hasWords
+          ? 'Recording paused. Your words are saved below.'
+          : 'No speech was recognised. Try again, check your phone’s speech language, or type below.',
+      'start_timeout' =>
+        'The microphone did not start. Check microphone access and your phone’s speech service, then try again.',
+      'error_network' ||
+      'error_network_timeout' ||
+      'error_server' ||
+      'error_server_disconnected' =>
+        'Speech recognition could not connect. Check your internet connection, then try again.',
+      'error_language_not_supported' ||
+      'error_language_unavailable' =>
+        'Your phone’s speech language is unavailable. Enable or download it in your phone settings, or type below.',
+      'error_audio_error' =>
+        'The microphone could not capture audio. Check microphone access, then try again.',
       'error_busy' =>
         'The microphone is busy. Close other recording apps, or type below.',
       _ => 'Recording stopped. Your draft is safe. Try again, or type below.',
@@ -158,7 +262,7 @@ class VoiceFeedback extends ChangeNotifier {
   Future<void> _cancelQuietly() async {
     _operations++;
     try {
-      await _speech.cancel();
+      await _speech.cancel().timeout(const Duration(seconds: 2));
     } catch (_) {/* Keep the draft available. */} finally {
       _operations--;
       _changed();
@@ -176,12 +280,13 @@ class VoiceFeedback extends ChangeNotifier {
       _operations++;
       _changed();
       try {
-        await _speech.stop();
+        await _speech.stop().timeout(const Duration(seconds: 3));
         await completion.future
             .timeout(const Duration(seconds: 1), onTimeout: () {});
       } catch (_) {
         await _cancelQuietly();
       } finally {
+        _completeSession();
         if (generation == _generation) ++_generation;
         if (identical(_finalWords, completion)) _finalWords = null;
         _operations--;
@@ -191,6 +296,11 @@ class VoiceFeedback extends ChangeNotifier {
   }
 
   Future<void> cancel() async {
+    _sessionOpen = false;
+    _clearTimers();
+    microphoneActive = false;
+    finishing = false;
+    soundLevel = 0;
     ++_generation;
     _finishWords();
     listening = false;
@@ -200,6 +310,8 @@ class VoiceFeedback extends ChangeNotifier {
 
   /// Editing an idle draft must not toggle the keyboard via native mic calls.
   void invalidateResults() {
+    _sessionOpen = false;
+    _clearTimers();
     ++_generation;
     _finishWords();
   }
@@ -207,6 +319,8 @@ class VoiceFeedback extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sessionOpen = false;
+    _clearTimers();
     ++_generation;
     _finishWords();
     unawaited(_cancelQuietly());

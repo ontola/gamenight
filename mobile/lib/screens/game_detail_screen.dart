@@ -17,7 +17,7 @@ class GameDetailScreen extends StatefulWidget {
   final CatalogGame game;
   final Future<ShareResult> Function(ShareParams)? share;
 
-  /// The whole catalog, for "More like this".
+  /// Games in the same order as the list this page was opened from.
   final List<CatalogGame> games;
 
   /// What the room's host has; null outside a room.
@@ -34,6 +34,96 @@ class GameDetailScreen extends StatefulWidget {
 }
 
 class _GameDetailScreenState extends State<GameDetailScreen> {
+  late final List<CatalogGame> _games;
+  late final PageController _pages;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    final byId = {for (final game in widget.games) game.id: game};
+    if (!byId.containsKey(widget.game.id)) {
+      _games = [widget.game, ...byId.values];
+    } else {
+      _games = byId.values.toList();
+    }
+    _index = _games.indexWhere((game) => game.id == widget.game.id);
+    _pages = PageController(initialPage: _index);
+  }
+
+  @override
+  void dispose() {
+    _pages.dispose();
+    super.dispose();
+  }
+
+  void _go(int index) {
+    if (index < 0 || index >= _games.length) return;
+    _pages.animateToPage(index,
+        duration: const Duration(milliseconds: 280), curve: Curves.easeOutCubic);
+  }
+
+  @override
+  Widget build(BuildContext context) => PageView.builder(
+        key: const ValueKey('game-pages'),
+        controller: _pages,
+        itemCount: _games.length,
+        onPageChanged: (index) => setState(() => _index = index),
+        itemBuilder: (context, index) => _GameDetailPage(
+          key: ValueKey(_games[index].id),
+          game: _games[index],
+          games: _games,
+          active: index == _index,
+          host: widget.host,
+          onAdd: widget.onAdd,
+          share: widget.share,
+          onOpen: (game) => _go(_games.indexWhere((entry) => entry.id == game.id)),
+          navigation: _games.length < 2
+              ? null
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                        tooltip: 'Previous game',
+                        onPressed: index > 0 ? () => _go(index - 1) : null,
+                        icon: const Icon(Icons.chevron_left)),
+                    Text('${index + 1} / ${_games.length}',
+                        semanticsLabel: 'Game ${index + 1} of ${_games.length}',
+                        style: const TextStyle(color: GnColors.muted, fontSize: 13)),
+                    IconButton(
+                        tooltip: 'Next game',
+                        onPressed: index + 1 < _games.length ? () => _go(index + 1) : null,
+                        icon: const Icon(Icons.chevron_right)),
+                  ],
+                ),
+        ),
+      );
+}
+
+class _GameDetailPage extends StatefulWidget {
+  const _GameDetailPage(
+      {super.key,
+      required this.game,
+      required this.games,
+      required this.active,
+      required this.onOpen,
+      this.navigation,
+      this.host,
+      this.onAdd,
+      this.share});
+  final CatalogGame game;
+  final List<CatalogGame> games;
+  final bool active;
+  final void Function(CatalogGame) onOpen;
+  final Widget? navigation;
+  final Map<String, HostGame>? host;
+  final Future<void> Function(CatalogGame)? onAdd;
+  final Future<ShareResult> Function(ShareParams)? share;
+  @override
+  State<_GameDetailPage> createState() => _GameDetailPageState();
+}
+
+class _GameDetailPageState extends State<_GameDetailPage> {
   bool _adding = false;
 
   CatalogGame get game => widget.game;
@@ -47,13 +137,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     }
   }
 
-  void _openOther(CatalogGame other) => Navigator.of(context).pushReplacement(MaterialPageRoute(
-      builder: (_) => GameDetailScreen(
-          game: other,
-          games: widget.games,
-          host: widget.host,
-          onAdd: widget.onAdd,
-          share: widget.share)));
+  void _openOther(CatalogGame other) => widget.onOpen(other);
 
   Future<void> _share(BuildContext anchor) async {
     final box = anchor.findRenderObject() as RenderBox?;
@@ -65,7 +149,9 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
         sharePositionOrigin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
       ));
       if (result.status != ShareResultStatus.unavailable) return;
-    } catch (_) {/* Keep the website link usable even without a share target. */}
+    } catch (_) {
+      /* Keep the website link usable even without a share target. */
+    }
     if (!mounted) return;
     await showDialog<void>(
         context: context,
@@ -80,7 +166,9 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                         await Clipboard.setData(ClipboardData(text: game.page.toString()));
                         if (context.mounted) toast(context, 'Link copied');
                       } catch (_) {
-                        if (context.mounted) toast(context, 'Select the link above to copy it.');
+                        if (context.mounted) {
+                          toast(context, 'Select the link above to copy it.');
+                        }
                       }
                     },
                     child: const Text('Copy link')),
@@ -92,87 +180,96 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   Widget build(BuildContext context) {
     final similar = game.similar(widget.games);
     return Scaffold(
-      appBar: AppBar(title: Text(game.title), actions: [
-        Builder(
-            builder: (context) => IconButton(
-                  tooltip: 'Share game',
-                  onPressed: () => _share(context),
-                  icon: const Icon(Icons.share_outlined),
-                )),
-      ]),
+      appBar: AppBar(
+          title: Text(game.title),
+          bottom: widget.navigation == null
+              ? null
+              : PreferredSize(preferredSize: const Size.fromHeight(44), child: widget.navigation!),
+          actions: [
+            Builder(
+                builder: (context) => IconButton(
+                      tooltip: 'Share game',
+                      onPressed: () => _share(context),
+                      icon: const Icon(Icons.share_outlined),
+                    )),
+          ]),
       body: SafeArea(
           top: false,
-          child: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
-            MediaGallery(game: game),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Row(children: [
-                  if (game.icon != null) ...[
-                    ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox.square(dimension: 40, child: _image(game.icon!))),
-                    const SizedBox(width: 12),
-                  ],
-                  Expanded(
-                    child: Text(game.title,
-                        style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
-                  ),
-                ]),
-                if (game.tagline.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(game.tagline, style: const TextStyle(fontSize: 16, color: GnColors.muted)),
-                ],
-                const SizedBox(height: 14),
-                Wrap(spacing: 8, runSpacing: 8, children: [
-                  if (game.players.isNotEmpty) _Fact(Icons.people_alt_outlined, game.players),
-                  if (game.matchMinutes != null)
-                    _Fact(Icons.timer_outlined, '${game.matchMinutes} min'),
-                  _Fact(Icons.sell_outlined, game.priceLabel),
-                  _Fact(Icons.computer, game.platformLabel),
-                ]),
-                const SizedBox(height: 16),
-                _action(),
-                if (ReportScope.of(context) case final reports?)
-                  TextButton.icon(
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => FeedbackScreen(reports: reports, initialGame: game.id),
-                    )),
-                    icon: const Icon(Icons.mic_none, size: 20),
-                    label: const Text('Give feedback'),
-                  ),
-                if (game.tags.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Wrap(spacing: 6, runSpacing: 6, children: [
-                    for (final tag in game.tags)
-                      Chip(
-                        label: Text(tag),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          child: ListView(
+              key: PageStorageKey('game-details-${game.id}'),
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                MediaGallery(game: game, active: widget.active),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Row(children: [
+                      if (game.icon != null) ...[
+                        ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: SizedBox.square(dimension: 40, child: _image(game.icon!))),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Text(game.title,
+                            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
                       ),
+                    ]),
+                    if (game.tagline.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(game.tagline,
+                          style: const TextStyle(fontSize: 16, color: GnColors.muted)),
+                    ],
+                    const SizedBox(height: 14),
+                    Wrap(spacing: 8, runSpacing: 8, children: [
+                      if (game.players.isNotEmpty) _Fact(Icons.people_alt_outlined, game.players),
+                      if (game.matchMinutes != null)
+                        _Fact(Icons.timer_outlined, '${game.matchMinutes} min'),
+                      _Fact(Icons.sell_outlined, game.priceLabel),
+                      _Fact(Icons.computer, game.platformLabel),
+                    ]),
+                    const SizedBox(height: 16),
+                    _action(),
+                    if (ReportScope.of(context) case final reports?)
+                      TextButton.icon(
+                        onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                          builder: (_) => FeedbackScreen(reports: reports, initialGame: game.id),
+                        )),
+                        icon: const Icon(Icons.mic_none, size: 20),
+                        label: const Text('Give feedback'),
+                      ),
+                    if (game.tags.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Wrap(spacing: 6, runSpacing: 6, children: [
+                        for (final tag in game.tags)
+                          Chip(
+                            label: Text(tag),
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                      ]),
+                    ],
+                    const SizedBox(height: 8),
+                    _about(),
+                    if (similar.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text('More like this',
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 170,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: similar.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 10),
+                          itemBuilder: (context, i) =>
+                              _SimilarTile(game: similar[i], onTap: () => _openOther(similar[i])),
+                        ),
+                      ),
+                    ],
                   ]),
-                ],
-                const SizedBox(height: 8),
-                _about(),
-                if (similar.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Text('More like this',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 170,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: similar.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 10),
-                      itemBuilder: (context, i) =>
-                          _SimilarTile(game: similar[i], onTap: () => _openOther(similar[i])),
-                    ),
-                  ),
-                ],
-              ]),
-            ),
-          ])),
+                ),
+              ])),
     );
   }
 
@@ -324,7 +421,8 @@ class _SimilarTile extends StatelessWidget {
 /// loads; looping previews play muted by themselves, others on a tap.
 class MediaGallery extends StatefulWidget {
   final CatalogGame game;
-  const MediaGallery({super.key, required this.game});
+  final bool active;
+  const MediaGallery({super.key, required this.game, this.active = true});
 
   @override
   State<MediaGallery> createState() => _MediaGalleryState();
@@ -364,7 +462,7 @@ class _MediaGalleryState extends State<MediaGallery> {
             }),
             itemCount: items.length,
             onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (context, i) => _slide(items[i], active: i == _page),
+            itemBuilder: (context, i) => _slide(items[i], active: widget.active && i == _page),
           ),
         ),
       ),
@@ -458,7 +556,9 @@ class _VideoSlideState extends State<_VideoSlide> {
   }
 
   void _onVideo() {
-    if (_video.value.hasError && !_failed && mounted) setState(() => _failed = true);
+    if (_video.value.hasError && !_failed && mounted) {
+      setState(() => _failed = true);
+    }
     if (mounted) setState(() {});
   }
 

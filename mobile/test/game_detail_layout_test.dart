@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/catalog.dart';
 import 'package:gamenight/screens/game_detail_screen.dart';
 import 'package:gamenight/theme.dart';
+import 'package:gamenight/room_controls.dart';
 import 'package:share_plus/share_plus.dart';
 
 final _preview = GlobalKey();
@@ -91,6 +92,11 @@ void main() {
           data['media'] = <String, dynamic>{};
           data['screenshot'] =
               'data:image/png;base64,${base64Encode(File('../catalog/art/$id/screenshot.png').readAsBytesSync())}';
+          data['media'] = {
+            'items': [
+              {'kind': 'image', 'url': data['screenshot'], 'label': 'Gameplay'}
+            ]
+          };
           return CatalogGame.fromJson(data)!;
         })()
     ];
@@ -100,7 +106,10 @@ void main() {
       (tester) async {
     await _open(tester);
     await _capture(tester, 'game-detail-top');
-    final outer = tester.state<ScrollableState>(find.byType(Scrollable).first);
+    final outer = tester.state<ScrollableState>(find
+        .descendant(
+            of: find.byType(ListView).first, matching: find.byType(Scrollable))
+        .first);
     outer.position.jumpTo(outer.position.maxScrollExtent);
     await tester.pumpAndSettle();
     expect(find.text('More like this').hitTestable(), findsOneWidget);
@@ -119,6 +128,98 @@ void main() {
         Brightness.light);
     await _capture(tester, 'game-detail-bottom-safe');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'swipe changes games in list order and share uses the visible game',
+      (tester) async {
+    ShareParams? shared;
+    await _open(tester, share: (params) async {
+      shared = params;
+      return const ShareResult('test', ShareResultStatus.success);
+    });
+    await tester.dragFrom(const Offset(300, 430), const Offset(-310, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 3').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('Share game').hitTestable());
+    await tester.pumpAndSettle();
+    expect(shared!.uri, _games[1].page);
+    await _capture(tester, 'game-swiped-next');
+    await tester.dragFrom(const Offset(70, 430), const Offset(310, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 3').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'media gestures stay inside the gallery and page arrows stop at ends',
+      (tester) async {
+    await _open(tester);
+    await tester.drag(
+        find.byType(MediaGallery).hitTestable(), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 3').hitTestable(), findsOneWidget);
+    expect(
+        tester
+            .widget<IconButton>(find
+                .byWidgetPredicate(
+                    (w) => w is IconButton && w.tooltip == 'Previous game')
+                .hitTestable())
+            .onPressed,
+        isNull);
+    for (var i = 0; i < 2; i++) {
+      await tester.tap(find.byTooltip('Next game').hitTestable());
+      await tester.pumpAndSettle();
+    }
+    expect(find.text('3 / 3').hitTestable(), findsOneWidget);
+    expect(
+        tester
+            .widget<IconButton>(find
+                .byWidgetPredicate(
+                    (w) => w is IconButton && w.tooltip == 'Next game')
+                .hitTestable())
+            .onPressed,
+        isNull);
+    await tester.dragFrom(const Offset(300, 430), const Offset(-310, 0));
+    await tester.pumpAndSettle();
+    expect(find.text('3 / 3').hitTestable(), findsOneWidget);
+  });
+
+  testWidgets(
+      'opening a middle game keeps list position and queues the swiped game',
+      (tester) async {
+    String? queued;
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => TextButton(
+                onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => GameDetailScreen(
+                            game: _games[1],
+                            games: _games,
+                            host: {
+                              for (final game in _games)
+                                game.id: HostGame(id: game.id, playable: true)
+                            },
+                            onAdd: (game) async {
+                              queued = game.id;
+                            }))),
+                child: const Text('Open list game')))));
+    await tester.tap(find.text('Open list game'));
+    await tester.pumpAndSettle();
+    expect(find.text('2 / 3').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('Next game').hitTestable());
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.descendant(
+        of: find.byKey(ValueKey(_games[2].id)),
+        matching: find.text('Add to queue')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Add to queue').hitTestable());
+    await tester.pumpAndSettle();
+    expect(queued, _games[2].id);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Open list game'), findsOneWidget);
   });
 
   testWidgets('share receives canonical game page and a real nonzero anchor',

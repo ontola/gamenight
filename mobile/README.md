@@ -8,7 +8,7 @@ browser does, as an installable app for Android and iOS:
   contains your room identity and device preferences. The same room connection
   drives all three views. You can reorder and remove queued games in local and
   hosted rooms.
-- **Games.** Browse the catalog and choose games for your room.
+- **Games.** Browse the catalog and choose games for your room. Swipe left or right on a game page to move through the same list, or use the arrows. A gallery with multiple images or videos keeps its own swipe controls.
 - **You.** Edit your name, skin colour and 48×48 face. Changes save automatically.
 
 GameNight branding and Feedback remain in the top bar across these tabs.
@@ -108,6 +108,8 @@ Tap the microphone, speak, review or edit the transcript, then send. Choose
 GameNight or the current game. Explicit game feedback appears in that game's
 owner-only developer inbox. GameNight staff can review both feedback and app
 errors in the central private inbox.
+
+Recording shows microphone activity and live text. Startup, silence and final-result timeouts prevent a stalled speech service from leaving the button stuck. Empty results, permissions, network and language failures show a message beside the recording controls; diagnostic codes go through the same error-reporting outbox without dictated text or audio.
 
 Speech uses the phone's speech recognition service, which may process audio
 online. GameNight stores the submitted text, not the recording. Microphone access

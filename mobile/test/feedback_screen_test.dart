@@ -90,6 +90,43 @@ void main() {
   });
 
   testWidgets(
+      'empty speech shows an error and a second attempt shows sound and text',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final reports = ReportService(await SharedPreferences.getInstance(),
+        client: MockClient((_) async => http.Response('{}', 503)));
+    final speech = FakeSpeech();
+    final voice = VoiceFeedback(speech: speech);
+    addTearDown(() {
+      reports.close();
+      voice.dispose();
+      tester.view.reset();
+    });
+    await _open(tester, reports, voice);
+    await _tap(tester, find.byKey(const ValueKey('feedback-record')));
+    speech.status!('done');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No speech was recognised'), findsOneWidget);
+    await _capture(tester, 'speech-empty-error');
+    await _tap(tester, find.byKey(const ValueKey('feedback-record')));
+    speech.sound!(7);
+    speech.result!('Het geluid staat te hard.');
+    await tester.pumpAndSettle();
+    expect(
+        tester
+            .widget<LinearProgressIndicator>(
+                find.byKey(const ValueKey('feedback-sound-level')))
+            .value,
+        greaterThan(0));
+    await _capture(tester, 'speech-level-and-text');
+    speech.finalResult!('Het geluid staat te hard.');
+    await tester.pumpAndSettle();
+    expect(find.textContaining('No speech was recognised'), findsNothing);
+    expect(find.text('Het geluid staat te hard.'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
       'catalog target defaults correctly and cannot silently retarget a saved draft',
       (tester) async {
     SharedPreferences.setMockInitialValues({});

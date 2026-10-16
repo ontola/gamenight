@@ -24,6 +24,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
   final _focus = FocusNode();
   String _lastVoiceText = '';
   String? _error;
+  String? _lastVoiceError;
   bool _sending = false;
   bool? _delivered;
   String? _game;
@@ -43,6 +44,13 @@ class _FeedbackScreenState extends State<FeedbackScreen>
 
   void _speechChanged() {
     if (!mounted) return;
+    if (_voice.errorCode != _lastVoiceError) {
+      _lastVoiceError = _voice.errorCode;
+      if (_lastVoiceError != null) {
+        // Diagnostic codes only: never capture the dictated words or raw audio.
+        widget.reports.captureFailure('feedback_speech: $_lastVoiceError');
+      }
+    }
     if (_voice.text != _lastVoiceText) {
       _lastVoiceText = _voice.text;
       final text = _voice.text.length > 6000
@@ -211,11 +219,26 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                               liveRegion: true,
                               child: Text(
                                   recording
-                                      ? 'Listening…'
+                                      ? (_voice.finishing
+                                          ? 'Finishing…'
+                                          : _voice.microphoneActive
+                                              ? 'Listening…'
+                                              : 'Starting microphone…')
                                       : 'Talk, then review your words',
                                   style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600))),
+                          if (recording) ...[
+                            const SizedBox(height: 12),
+                            LinearProgressIndicator(
+                              key: const ValueKey('feedback-sound-level'),
+                              value: _voice.soundLevel,
+                              minHeight: 5,
+                              semanticsLabel: 'Microphone sound level',
+                              color: GnColors.ok,
+                              backgroundColor: GnColors.border,
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           SizedBox(
                               width: double.infinity,

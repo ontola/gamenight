@@ -11,6 +11,8 @@ class FakeSpeech implements SpeechInput {
   String? wordsOnStop;
   bool available = true;
   bool failListen = false;
+  bool reportListening = true;
+  void Function(double)? sound;
   int initializations = 0;
   int listens = 0;
   int stops = 0;
@@ -28,9 +30,12 @@ class FakeSpeech implements SpeechInput {
   }
 
   @override
-  Future<void> listen(void Function(String, bool) onText) async {
+  Future<void> listen(void Function(String, bool) onText,
+      {void Function(double)? onSoundLevel}) async {
     listens++;
     if (failListen) throw StateError('native service unavailable');
+    sound = onSoundLevel;
+    if (reportListening) status?.call('listening');
     result = (words) => onText(words, false);
     finalResult = (words) => onText(words, true);
   }
@@ -49,6 +54,86 @@ class FakeSpeech implements SpeechInput {
 }
 
 void main() {
+  testWidgets(
+      'initialization timeout releases the button and retains the draft',
+      (tester) async {
+    final speech = FakeSpeech()..initialization = Completer<bool>();
+    final voice = VoiceFeedback(speech: speech);
+    final attempt = voice.start('Keep this draft');
+    await tester.pump(const Duration(seconds: 21));
+    await attempt;
+    expect(voice.busy, false);
+    expect(voice.errorCode, 'start_failed');
+    expect(voice.text, 'Keep this draft');
+    speech.initialization!.complete(true);
+    await tester.pump();
+    expect(speech.listens, 0);
+    voice.dispose();
+  });
+
+  testWidgets(
+      'a service that never starts cannot leave a fake recording running',
+      (tester) async {
+    final speech = FakeSpeech()..reportListening = false;
+    final voice = VoiceFeedback(speech: speech);
+    await voice.start('Saved draft');
+    await tester.pump(const Duration(seconds: 9));
+    expect(voice.listening, false);
+    expect(voice.busy, false);
+    expect(voice.error, contains('microphone did not start'));
+    expect(voice.text, 'Saved draft');
+    voice.dispose();
+  });
+
+  testWidgets('sound without words ends with an actionable error',
+      (tester) async {
+    final speech = FakeSpeech();
+    final voice = VoiceFeedback(speech: speech);
+    await voice.start('');
+    speech.sound!(7);
+    expect(voice.soundLevel, greaterThan(0));
+    await tester.pump(const Duration(seconds: 21));
+    expect(voice.error, contains('No speech was recognised'));
+    expect(voice.listening, false);
+    voice.dispose();
+  });
+
+  testWidgets(
+      'end of audio waits for final text and empty completion reports failure',
+      (tester) async {
+    final speech = FakeSpeech();
+    final voice = VoiceFeedback(speech: speech);
+    await voice.start('');
+    speech.status!('notListening');
+    await tester.pump(const Duration(milliseconds: 500));
+    speech.finalResult!('Het geluid is te hard');
+    expect(voice.text, 'Het geluid is te hard');
+    expect(voice.error, isNull);
+    expect(voice.listening, false);
+    await voice.start(voice.text);
+    speech.status!('done');
+    expect(voice.error, contains('No speech was recognised'));
+    expect(voice.text, 'Het geluid is te hard');
+    voice.dispose();
+  });
+
+  testWidgets('missing final callback releases recording and retry works',
+      (tester) async {
+    final speech = FakeSpeech();
+    final voice = VoiceFeedback(speech: speech);
+    await voice.start('');
+    speech.status!('notListening');
+    await tester.pump(const Duration(seconds: 3));
+    expect(voice.listening, false);
+    expect(voice.errorCode, 'no_words');
+    await voice.start('');
+    speech.result!('Retry works');
+    speech.status!('done');
+    expect(voice.text, 'Retry works');
+    expect(voice.error, isNull);
+    voice.dispose();
+  });
+
   test('stop keeps final words but ignores results from a stopped session',
       () async {
     final speech = FakeSpeech()..wordsOnStop = 'The cards look great';

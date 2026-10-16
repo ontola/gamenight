@@ -90,7 +90,7 @@ class _CatalogSectionState extends State<CatalogSection> {
   void _open(CatalogGame game) => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => GameDetailScreen(
             game: game,
-            games: _games ?? const [],
+            games: _sorted(_games ?? const []),
             host: _inRoom && _host.isNotEmpty ? _host : null,
             onAdd: _inRoom ? _add : null,
           )));
