@@ -7,7 +7,6 @@ import 'package:video_player/video_player.dart';
 
 import '../catalog.dart';
 import '../report_scope.dart';
-import 'feedback_screen.dart';
 import '../room_controls.dart';
 import '../theme.dart';
 import '../layout.dart';
@@ -16,6 +15,7 @@ import 'catalog_view.dart' show GameCover;
 /// A game's page, with the same videos, screenshots and facts as the website.
 class GameDetailScreen extends StatefulWidget {
   final CatalogGame game;
+  final ValueChanged<String>? onTagSelected;
   final Future<ShareResult> Function(ShareParams)? share;
 
   /// Games in the same order as the list this page was opened from.
@@ -32,6 +32,7 @@ class GameDetailScreen extends StatefulWidget {
       required this.game,
       this.games = const [],
       this.host,
+      this.onTagSelected,
       this.onAdd,
       this.share});
 
@@ -43,6 +44,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   late final List<CatalogGame> _games;
   late final PageController _pages;
   late int _index;
+  FeedbackGameContext? _feedbackGame;
 
   @override
   void initState() {
@@ -58,7 +60,18 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _feedbackGame?.unregister(this);
+    _feedbackGame = ReportScope.gameContextOf(context);
+    final route = ModalRoute.of(context);
+    _feedbackGame?.register(this,
+        () => mounted && route?.isCurrent == true ? _games[_index].id : null);
+  }
+
+  @override
   void dispose() {
+    _feedbackGame?.unregister(this);
     _pages.dispose();
     super.dispose();
   }
@@ -95,6 +108,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                   host: widget.host,
                   onAdd: widget.onAdd,
                   share: widget.share,
+                  onTagSelected: widget.onTagSelected,
                   onOpen: (game) =>
                       _go(_games.indexWhere((entry) => entry.id == game.id)),
                 ),
@@ -112,8 +126,10 @@ class _GameDetailPage extends StatefulWidget {
       this.onAdd,
       this.share,
       this.previous,
+      this.onTagSelected,
       this.next});
   final VoidCallback? previous, next;
+  final ValueChanged<String>? onTagSelected;
   final CatalogGame game;
   final List<CatalogGame> games;
   final bool active;
@@ -253,21 +269,14 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                             ]),
                             const SizedBox(height: 16),
                             _action(),
-                            if (ReportScope.of(context) case final reports?)
-                              TextButton.icon(
-                                onPressed: () => Navigator.of(context)
-                                    .push(MaterialPageRoute<void>(
-                                  builder: (_) => FeedbackScreen(
-                                      reports: reports, initialGame: game.id),
-                                )),
-                                icon: const Icon(Icons.mic_none, size: 20),
-                                label: const Text('Give feedback'),
-                              ),
                             if (game.tags.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               Wrap(spacing: 6, runSpacing: 6, children: [
                                 for (final tag in game.tags)
-                                  Chip(
+                                  ActionChip(
+                                    onPressed: widget.onTagSelected == null
+                                        ? null
+                                        : () => widget.onTagSelected!(tag),
                                     label: Text(tag),
                                     visualDensity: VisualDensity.compact,
                                     materialTapTargetSize:

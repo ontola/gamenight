@@ -12,6 +12,7 @@ import '../room_controls.dart';
 import '../theme.dart';
 import '../layout.dart';
 import 'catalog_view.dart';
+import 'sign_in_screen.dart';
 import 'settings_panel.dart';
 
 /// The Game tab. While the current game has its own phone screen or app,
@@ -52,6 +53,13 @@ class GameScreen extends StatelessWidget {
                     : session?.currentTitle);
         final catalog = CatalogSection(
             key: const ValueKey('catalog'),
+            cloud: state.cloud,
+            onSignIn: () async {
+              await Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => SignInScreen(
+                      state: state,
+                      reason: 'See your likes and play history.')));
+            },
             controls: controls,
             requestedGame: requestedGame,
             onRequestedGameOpened: onRequestedGameOpened);

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:url_launcher/url_launcher.dart';
+import '../app_update.dart';
 import 'package:flutter/services.dart';
 
 import '../app_state.dart';
@@ -81,6 +85,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
             builder: (context, box) => ListView(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
                   children: [
+                    if (kIsWeb &&
+                        defaultTargetPlatform == TargetPlatform.android)
+                      _androidApp(),
                     AccountCard(state: state),
                     if (box.maxWidth >= 900)
                       Row(
@@ -101,6 +108,41 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
   }
+
+  Widget _androidApp() => Section(children: [
+        const Row(children: [
+          Icon(Icons.android, color: GnColors.ok),
+          SizedBox(width: 10),
+          Expanded(
+              child: Text('Get the Android app',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)))
+        ]),
+        const SizedBox(height: 8),
+        const Hint('Keep GameNight a tap away on your phone.'),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+            onPressed: () async {
+              try {
+                if (await launchUrl(AppUpdate.apk,
+                    mode: LaunchMode.externalApplication)) {
+                  return;
+                }
+              } catch (_) {/* The selectable link remains usable. */}
+              if (!mounted) return;
+              await showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                          title: const Text('Download the Android app'),
+                          content: SelectableText(AppUpdate.apk.toString()),
+                          actions: [
+                            TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Close'))
+                          ]));
+            },
+            icon: const Icon(Icons.download),
+            label: const Text('Download APK')),
+      ]);
 
   Widget _identity() {
     final warn = state.sync == SyncState.warning;

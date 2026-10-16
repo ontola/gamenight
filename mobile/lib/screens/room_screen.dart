@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../link.dart';
 import '../theme.dart';
 import '../layout.dart';
+import '../widgets/room_code_field.dart';
 import 'scanner_screen.dart';
 import 'game_screen.dart';
 import 'playlist_screen.dart';
@@ -162,24 +162,15 @@ class RoomScreenState extends State<RoomScreen> {
         });
   }
 
-  Widget _codeField() => TextField(
+  Widget _codeField() => Semantics(
+      label: 'Room code, six characters',
+      child: RoomCodeField(
         controller: _code,
-        textCapitalization: TextCapitalization.characters,
-        autocorrect: false,
-        maxLength: 6,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontSize: 28, letterSpacing: 10, fontFamily: 'monospace'),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp('[A-Za-z2-9]')),
-          TextInputFormatter.withFunction(
-              (_, v) => v.copyWith(text: v.text.toUpperCase())),
-        ],
-        decoration: const InputDecoration(hintText: '······', counterText: ''),
-        onChanged: (v) {
-          if (v.length == 6) _joinCode();
+        enabled: !_busy,
+        onChanged: (value) {
+          if (value.length == 6) _joinCode();
         },
-      );
+      ));
 
   Widget _rememberBox() => CheckboxListTile(
         contentPadding: EdgeInsets.zero,

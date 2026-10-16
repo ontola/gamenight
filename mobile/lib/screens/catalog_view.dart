@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../api.dart';
+import '../account.dart';
+import 'catalog_filters.dart';
 import '../catalog.dart';
 import '../room_controls.dart';
 import '../theme.dart';
@@ -12,11 +14,15 @@ import 'game_detail_screen.dart';
 /// its videos and screenshots. In a room, games its host can play get an "Add to queue" button.
 class CatalogSection extends StatefulWidget {
   final RoomControls? controls;
+  final CloudApi? cloud;
+  final Future<void> Function()? onSignIn;
   final String? requestedGame;
   final VoidCallback? onRequestedGameOpened;
   const CatalogSection(
       {super.key,
       this.controls,
+      this.cloud,
+      this.onSignIn,
       this.requestedGame,
       this.onRequestedGameOpened});
 
@@ -32,6 +38,8 @@ class _CatalogSectionState extends State<CatalogSection> {
   Timer? _poll;
   String? _openedRequest;
   bool _hostLoaded = false;
+  CatalogFilter _filter = const CatalogFilter();
+  String? _filterAccount;
 
   bool get _inRoom => widget.controls != null;
 
@@ -47,6 +55,10 @@ class _CatalogSectionState extends State<CatalogSection> {
   void didUpdateWidget(CatalogSection old) {
     super.didUpdateWidget(old);
     if ((old.controls == null) != (widget.controls == null)) _loadHost();
+    if (_filterAccount != widget.cloud?.token) {
+      _filterAccount = widget.cloud?.token;
+      _filter = CatalogFilter(tags: _filter.tags);
+    }
     _openRequestedGame();
   }
 
@@ -128,7 +140,13 @@ class _CatalogSectionState extends State<CatalogSection> {
   void _open(CatalogGame game) => Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => GameDetailScreen(
             game: game,
-            games: _sorted(_games ?? const []),
+            games: _visible,
+            onTagSelected: (tag) {
+              setState(() => _filter = CatalogFilter(tags: {tag}));
+              Navigator.of(context).pop();
+              Scrollable.ensureVisible(context,
+                  duration: const Duration(milliseconds: 250));
+            },
             host: _inRoom && _host.isNotEmpty ? _host : null,
             onAdd: _inRoom ? _add : null,
           )));
@@ -137,16 +155,43 @@ class _CatalogSectionState extends State<CatalogSection> {
   Widget build(BuildContext context) {
     final games = _games;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      const Padding(
-        padding: EdgeInsets.fromLTRB(4, 16, 4, 4),
-        child: Text('Games',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-      ),
       Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-        child: Hint(_inRoom
-            ? 'Tap a game for videos and screenshots. Games this GameNight has can go into the queue.'
-            : 'Everything in the GameNight store. Tap a game for videos and screenshots.'),
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                  onPressed: games == null ? null : _showFilters,
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: const Text('Filter')),
+              if (_filter.liked)
+                InputChip(
+                    label: const Text('Liked'),
+                    onPressed: () => setState(
+                        () => _filter = _filter.copyWith(liked: false)),
+                    onDeleted: () => setState(
+                        () => _filter = _filter.copyWith(liked: false))),
+              if (_filter.unplayed)
+                InputChip(
+                    label: const Text('Not played'),
+                    onPressed: () => setState(
+                        () => _filter = _filter.copyWith(unplayed: false)),
+                    onDeleted: () => setState(
+                        () => _filter = _filter.copyWith(unplayed: false))),
+              for (final tag in _filter.tags)
+                InputChip(
+                    label: Text(tag),
+                    onPressed: () => setState(() => _filter =
+                        _filter.copyWith(tags: {..._filter.tags}..remove(tag))),
+                    onDeleted: () => setState(() => _filter = _filter.copyWith(
+                        tags: {..._filter.tags}..remove(tag)))),
+              if (_filter.active)
+                Text(
+                    '${_visible.length} ${_visible.length == 1 ? 'game' : 'games'}',
+                    style: const TextStyle(color: GnColors.muted)),
+            ]),
       ),
       if (games == null && _error == null)
         const Padding(
@@ -160,9 +205,38 @@ class _CatalogSectionState extends State<CatalogSection> {
           OutlinedButton(
               onPressed: _loadCatalog, child: const Text('Try again')),
         ])
+      else if (_visible.isEmpty)
+        Section(children: [
+          const Text('No games match these filters.'),
+          TextButton(
+              onPressed: () => setState(() => _filter = const CatalogFilter()),
+              child: const Text('Clear filters'))
+        ])
       else
-        _grid(_sorted(games)),
+        _grid(_visible),
     ]);
+  }
+
+  List<CatalogGame> get _visible =>
+      _sorted((_games ?? const []).where(_filter.matches).toList());
+
+  Future<void> _showFilters() async {
+    final filter = await showModalBottomSheet<CatalogFilter>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        constraints: const BoxConstraints(maxWidth: 560),
+        builder: (_) => CatalogFilters(
+            filter: _filter,
+            games: _games!,
+            cloud: widget.cloud,
+            onSignIn: widget.onSignIn));
+    if (mounted && filter != null) {
+      setState(() {
+        _filter = filter;
+        _filterAccount = widget.cloud?.token;
+      });
+    }
   }
 
   /// In a room, games the host can play first; otherwise store order.

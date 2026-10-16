@@ -368,6 +368,25 @@ class CloudApi {
 
   // ---- Saved player ----------------------------------------------------
 
+  Future<Map<String, int>> gameRatings() async {
+    final data = await _send('GET', '/v1/me/game-ratings') as Map;
+    return data
+        .map((key, value) => MapEntry(key as String, (value as num).toInt()));
+  }
+
+  Future<({Set<String> games, int days})> playHistory() async {
+    final data = await _send('GET', '/v1/me/play-profile') as Map;
+    return (
+      games: {
+        for (final entry in data['games'] as List)
+          if ((entry['active_ms'] as num) > 0 ||
+              (entry['rounds_reported'] as num) > 0)
+            entry['game'] as String
+      },
+      days: (data['window_days'] as num).toInt()
+    );
+  }
+
   Future<Account> me() async => Account.fromJson(await _send('GET', '/v1/me'));
 
   Future<StudioDocument> studio() async =>

@@ -97,6 +97,7 @@ class GameNightApp extends StatefulWidget {
 class _GameNightAppState extends State<GameNightApp> {
   final _navigator = GlobalKey<NavigatorState>();
   final _homeKey = GlobalKey<_HomeScreenState>();
+  final _feedbackGame = FeedbackGameContext();
   int _selectedTab = 0;
   BrowserNavigation? _history;
 
@@ -145,9 +146,10 @@ class _GameNightAppState extends State<GameNightApp> {
   void _feedback() {
     final reports = widget.reports;
     if (reports == null) return;
+    final game = _feedbackGame.game;
     _navigator.currentState?.push(MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'feedback'),
-      builder: (_) => FeedbackScreen(reports: reports),
+      builder: (_) => FeedbackScreen(reports: reports, initialGame: game),
     ));
   }
 
@@ -280,6 +282,7 @@ class _GameNightAppState extends State<GameNightApp> {
               value: gameNightSystemUi,
               child: ReportScope(
                 reports: widget.reports,
+                gameContext: _feedbackGame,
                 child: ColoredBox(
                   color: GnColors.bg,
                   child: SafeArea(
@@ -332,6 +335,7 @@ class _GameNightAppState extends State<GameNightApp> {
                                     if (widget.reports != null &&
                                         MediaQuery.sizeOf(context).width < 440)
                                       Semantics(
+                                          container: true,
                                           label: 'Feedback',
                                           button: true,
                                           excludeSemantics: true,
