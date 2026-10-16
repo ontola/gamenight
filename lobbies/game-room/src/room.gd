@@ -696,9 +696,13 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
 			draw_bumper(canvas, Rect2(x + 12, 18, 122, 60), key, f, 0, pressed)
 		else:
 			var center := Vector2(x + h / 2 - 4, h / 2)
-			if pressed > 0: canvas.draw_circle(center, h / 2 - 14, color.darkened(.5))
-			canvas.draw_circle(center + Vector2(0, pressed * 6), h / 2 - 14, color)
-			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17 + pressed * 6), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
+			# Depress the physical badge, keeping the label and pill stationary.
+			# A stronger travel + compressed face remains readable across the room.
+			canvas.draw_circle(center, h / 2 - 13, color.darkened(.65))
+			canvas.draw_set_transform(center + Vector2(0, pressed * 10), 0, Vector2(1.0, 1.0 - pressed * .18))
+			canvas.draw_circle(Vector2.ZERO, h / 2 - 14, color.darkened(pressed * .12))
+			canvas.draw_set_transform(Vector2.ZERO)
+			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17 + pressed * 10), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
 		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
 		x += badge_width + tw + 36
 
@@ -1026,11 +1030,11 @@ func _process(delta: float) -> void:
 	for name in _prompts:
 		var presses: Dictionary = _prompts[name].state.get("pressed", {})
 		for key in presses.keys():
-			presses[key] = maxf(0.0, presses[key] - delta / .2)
+			presses[key] = maxf(0.0, presses[key] - delta / .36)
 			if presses[key] == 0.0: presses.erase(key)
 			redraw("prompt_" + name)
 	for key in _bumper_presses.keys():
-		_bumper_presses[key] = maxf(0.0, _bumper_presses[key] - delta / .2)
+		_bumper_presses[key] = maxf(0.0, _bumper_presses[key] - delta / .36)
 		if _bumper_presses[key] == 0.0: _bumper_presses.erase(key)
 		redraw("bumper_" + key)
 	for n in _neon:

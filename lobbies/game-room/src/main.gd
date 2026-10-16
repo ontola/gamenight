@@ -366,11 +366,13 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 		if not item.is_empty():
 			var node: Node3D = view.item_nodes.get(item.id)
 			if node != null: _item_prompt_presses[item.id] = {"item": item.duplicate(), "position": node.global_position, "time": _time}
-	var at_shelf: bool = station_for(id).get("kind") == "shelf"
-	# At the shelf X queues the box instead of punching.
-	world.set_input(id, buttons & ~World.BTN_X if at_shelf else buttons, stick)
+	var station_kind: String = station_for(id).get("kind", "")
+	var at_shelf := station_kind == "shelf"
+	var station_x := station_kind in ["shelf", "queue"]
+	# X belongs to the station here, so it must not punch another player.
+	world.set_input(id, buttons & ~World.BTN_X if station_x else buttons, stick)
 	if pressed & World.BTN_Y: _use_station(id)
-	if at_shelf and pressed & World.BTN_X: _use_station(id, true)
+	if station_x and pressed & World.BTN_X: _use_station(id, true)
 	if at_shelf and pressed & (BTN_LB | BTN_RB):
 		room.press_prompt("shelf", "LB" if pressed & BTN_LB else "RB")
 		_browse(-1 if pressed & BTN_LB else 1)
@@ -463,7 +465,7 @@ func _use_station(id: String, queue := false) -> void:
 	var station := station_for(id)
 	if station.is_empty() or not station.enabled: return
 	var now := Time.get_ticks_msec() / 1000.0
-	var key := "%s:%s" % [station.id, station.get("action", "")]
+	var key := "%s:%s:%s" % [station.id, station.get("action", ""), "X" if queue else "Y"]
 	if now < float(_station_cooldown.get(key, 0.0)): return
 	_station_cooldown[key] = now + 0.4
 	room.press_prompt("music" if station.kind == "music" else str(station.id), "X" if queue else "Y")
@@ -476,7 +478,13 @@ func _use_station(id: String, queue := false) -> void:
 				# queue_next makes it next without starting it, unlike play_next.
 				client._command({"type": "queue_next", "game": str(station.game)})
 				toast("%s is up next." % station.title, GREEN)
-		"queue": client.start_next()
+		"queue":
+			if queue:
+				var entries := upcoming()
+				if entries.is_empty(): return
+				client._command({"type": "remove_playlist_entry", "expected": party.get("playlist", {}).duplicate(true), "index": int(entries[0].index)})
+				toast("Skipped %s." % entries[0].title, GREEN)
+			else: client.start_next()
 		"tv":
 			match station.action:
 				"resume": client.resume_game()
@@ -662,7 +670,7 @@ func _update_prompts() -> void:
 	var tv := tv_station()
 	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv"))
 	var queued := queue_station()
-	room.set_prompt("queue", [["Y", "Play next"]], queued.enabled, occupied.has("queue"))
+	room.set_prompt("queue", [["Y", "Play next"], ["X", "Skip next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
 	room.featured_box.visible = shelf_live and occupied.has("shelf")
 	room.set_prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))

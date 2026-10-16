@@ -30,7 +30,7 @@ from their files at runtime.
 | Stick / D-pad | Walk |
 | A | Jump; down + A drops through a shelf; jump off the side walls |
 | B | Grab an item, throw it; open a hat box |
-| X | Punch, fire the confetti blaster, throw a lit bomb; at the game shelf: queue the box |
+| X | Punch, fire the confetti blaster, throw a lit bomb; at the game shelf: queue the box; at the playlist: skip the next entry |
 | Y | Use the station you stand at (button at the station); at the game shelf: set the box up next |
 | LB / RB | At the game shelf: browse the boxes; at the jukebox: previous / next track |
 | Start | Your menu: leave, unlink, choose another lobby, quit |
@@ -51,7 +51,8 @@ The runtime joins controllers and handles Back, as for every lobby.
   ordered titles for the later games, with a count for overflow. The title
   list slides when the queue changes; later games never have cover images.
   Stand at the cabinet and press Y (Play next) to start the first queued game,
-  including when the TV offers Resume for a paused game.
+  including when the TV offers Resume for a paused game. X (Skip next) removes
+  only the upcoming entry and prepares its successor, keeping the current game.
 - **TV**: the floating prompt sits above the screen. Y works from the floor
   or the low console shelf beneath it. It resumes the paused game, or starts the queue head (`next`) when
   nothing runs. The TV shows the current or next game with loading progress
