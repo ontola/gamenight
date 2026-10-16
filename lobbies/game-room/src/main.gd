@@ -837,32 +837,12 @@ func _issue(game_id: String) -> String:
 				"failed_to_start": "Could not start game", "startup_timeout": "Game did not connect"}.get(str(issue.get("kind")), "Game stopped")
 	return ""
 
-## A box cover: art (or a title card), a GameNight band on top and the
-## player count at the bottom, like an old DVD case.
-func _draw_box(canvas: Control, game: Dictionary, badge := "") -> void:
-	var size := canvas.size
-	var color := Color.from_string(str(game.get("color", "")), VIOLET)
-	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("0c0a16"))
-	var band := roundf(size.y * 0.09)
-	var rect := Rect2(0, band, size.x, size.y - band * 2)
-	var art := _art(game, ["cover", "screenshot", "icon"])
+## The selected game is a plain cover. Games without artwork get a title card.
+func _draw_box(canvas: Control, game: Dictionary) -> void:
+	var rect := Rect2(Vector2.ZERO, canvas.size)
+	var art := _art(game, ["cover"])
 	if art != null: _cover(canvas, art, rect)
-	else: _title_card(canvas, game, rect, 32 if size.x > 220 else 16)
-	canvas.draw_rect(Rect2(0, 0, size.x, band), color)
-	_text(canvas, "GAMENIGHT", Vector2(0, band * 0.72), 16, BG, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	canvas.draw_rect(Rect2(0, size.y - band, size.x, band), Color("12141f"))
-	var players := str(game.get("players", "")) if game.get("players") != null else ""
-	if players.is_empty() and game.get("max_players") != null: players = "1-%d" % int(game.max_players)
-	if not players.is_empty():
-		_text(canvas, "%s PLAYERS" % players, Vector2(0, size.y - band * 0.28), 16, color.lightened(0.3), size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	if art != null and size.x > 220:
-		# Title over the art so the stand reads from the couch.
-		canvas.draw_rect(Rect2(0, size.y - band - 64, size.x, 64), Color(0.02, 0.02, 0.05, 0.72))
-		_text(canvas, _short(str(game.get("title", "Game")), 14), Vector2(0, size.y - band - 20), 32, TEXT, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	if not badge.is_empty():
-		var r := Rect2(8, band + 8, 44, 44)
-		canvas.draw_rect(r, AMBER if badge == "1" else TEXT)
-		_text(canvas, badge, Vector2(8, band + 44), 32, BG, 44, HORIZONTAL_ALIGNMENT_CENTER)
+	else: _title_card(canvas, game, rect, 32 if canvas.size.x > 220 else 16)
 
 func _draw_front_box(canvas: Control) -> void:
 	var shelf := shelf_games()
