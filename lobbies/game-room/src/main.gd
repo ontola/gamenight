@@ -793,7 +793,7 @@ func _draw_tv(canvas: Control) -> void:
 				else:
 					kicker = "LOADING %d%%" % int(warm.get("progress", 0)) if warm.get("progress") != null else "LOADING…"
 					kicker_color = AMBER
-			detail = "Press Y at the TV to start"
+			if issue.is_empty(): detail = "Press Y at the TV to start"
 	if game.is_empty():
 		_draw_idle_tv(canvas)
 		return
@@ -869,7 +869,18 @@ func _draw_queue_preview(canvas: Control) -> void:
 	if art != null: _cover(canvas, art, rect)
 	else: _title_card(canvas, game, rect, 48)
 	var title := _short(str(game.get("title", queue[0].title)), 32)
-	_text(canvas, title, Vector2(24, 390), _fit(title, 46, size.x - 48, 30), TEXT)
+	var status := _queue_status(str(game.id))
+	_text(canvas, title, Vector2(24, 375 if not status.is_empty() else 390), _fit(title, 46, size.x - 48, 30), TEXT)
+	if not status.is_empty(): _text(canvas, status, Vector2(24, 408), _fit(status, 24, size.x - 48, 17), PINK if not _issue(str(game.id)).is_empty() else AMBER)
+
+func _queue_status(game_id: String) -> String:
+	var issue := _issue(game_id)
+	if not issue.is_empty(): return issue + " · Press Y here to retry"
+	var warm: Variant = party.get("warm_session")
+	if warm is Dictionary and str(warm.get("game")) == game_id:
+		if warm.get("phase") == "ready": return "Ready to play"
+		return str(warm.get("progress_label", "Preparing game"))
+	return ""
 
 ## Pure title data keeps the rest of the playlist independent from artwork.
 func queue_title_rows() -> Array:
@@ -937,6 +948,14 @@ func _draw_plaque(canvas: Control) -> void:
 func _draw_hud(canvas: Control) -> void:
 	var camera: Camera3D = room.camera
 	var scale := canvas.size.y / 1080.0
+	var onboarding_error := str(party.get("onboarding_error", ""))
+	if not onboarding_error.is_empty():
+		var width := minf(canvas.size.x * 0.9, 1080 * scale)
+		var rect := Rect2((canvas.size.x - width) / 2, 24 * scale, width, 112 * scale)
+		canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.94))
+		canvas.draw_rect(Rect2(rect.position, Vector2(5 * scale, rect.size.y)), AMBER)
+		_text(canvas, "Could not prepare your game", rect.position + Vector2(22, 30) * scale, int(23 * scale), AMBER)
+		canvas.draw_multiline_string(font, rect.position + Vector2(22, 62) * scale, onboarding_error, HORIZONTAL_ALIGNMENT_LEFT, width - 44 * scale, int(21 * scale), 2, TEXT)
 	_draw_item_hints(canvas, camera)
 	# Only names and open menus follow players; action buttons stay at their objects.
 	for id in world.players:

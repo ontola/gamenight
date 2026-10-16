@@ -31,6 +31,18 @@ interrupted first download is selected again on the next launch; once it is
 installed, setup is marked complete. Existing installs with a shelf and no
 onboarding file do not open a new setup tab after updating.
 
+An explicit saved game choice never falls back to the browser picker when it
+fails. The host keeps the game ID for a later launch and shows the failure in
+the native lobby through `party.onboarding_error`. A missing catalog entry is
+not added as a fake playable game. Adding or updating the game and restarting
+retries the saved choice. A successful request clears the error; choosing a
+different game dismisses the banner for the current session. A genuinely fresh
+install without a game choice still opens the first-run picker.
+Trusted saved requests and the installed URL handler may also select a game
+already registered locally with a launch specification. The website capability
+endpoint remains restricted to downloadable catalog games. Neither accepts a
+launch command or executable path from a link.
+
 ## Returning players and recovery
 
 `gamenight://play/blast-party` opens the desktop app and queues a catalog game.

@@ -309,6 +309,12 @@ Every state change is broadcast as one snapshot — overlays are dumb renderers:
 } }
 ```
 
+The optional `onboarding_error` string is a host-owned failure of an explicitly
+requested first game. Lobbies should show it visibly without inventing a library
+or queue entry. It disappears when the request succeeds or another game is
+chosen. Games cannot submit this field. See [catalog onboarding](catalog-onboarding.md)
+for saved-choice recovery and local game registration.
+
 ## The host's music
 
 Somebody puts a record on before the first match, and for the rest of the

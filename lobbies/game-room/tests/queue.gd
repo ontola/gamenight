@@ -83,6 +83,18 @@ func _run() -> void:
 	check(main.room._prompts.queue.state.items == [["Y", "Play next"], ["X", "Skip next"]], "Queue shows separate Play next and Skip next actions")
 	check(main.room._prompts.shelf.state.items[0][1] == "Set up next", "Selector prompt does not promise immediate play")
 	await capture(main, "queue-hierarchy")
+	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved."
+	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}
+	main.set_party(party)
+	check(main._queue_status("ballkickers") == "World ready. Loading 2 player views", "Queue shows real game loading progress")
+	party.game_issues = [{"game": "ballkickers", "kind": "startup_timeout"}]
+	main.set_party(party)
+	check(main._queue_status("ballkickers").contains("retry"), "Startup failure overrides old loading progress even with another game paused")
+	await capture(main, "requested-game-unavailable")
+	party.erase("onboarding_error")
+	party.erase("game_issues")
+	party.erase("warm_session")
+	main.set_party(party)
 	main.room.set_process(false)
 	main.room.press_prompt("queue", "X")
 	await capture(main, "queue-skip-pressed")
@@ -121,6 +133,7 @@ func capture(main, name: String) -> void:
 	if directory.is_empty() or DisplayServer.get_name() == "headless": return
 	main.view.sync_profiles(main.profiles, main.world.players)
 	main.view.update(main.world, 0.0)
+	main.hud.queue_redraw()
 	await create_timer(0.6).timeout
 	await RenderingServer.frame_post_draw
 	DirAccess.make_dir_recursive_absolute(directory)

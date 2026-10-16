@@ -432,6 +432,11 @@ game starts running and everyone is dropped straight into it.</li>
                    &quot;playing&quot;: true, &quot;source&quot;: &quot;Spotify&quot; }
 } }
 </code></pre></div>
+<p>The optional <code>onboarding_error</code> string is a host-owned failure of an explicitly
+requested first game. Lobbies should show it visibly without inventing a library
+or queue entry. It disappears when the request succeeds or another game is
+chosen. Games cannot submit this field. See <a href="https://github.com/ontola/gamenight/blob/main/docs/catalog-onboarding.md">catalog onboarding</a>
+for saved-choice recovery and local game registration.</p>
 <h2 id="the-hosts-music">The host's music</h2>
 <p>Somebody puts a record on before the first match, and for the rest of the
 evening they're the only one who can reach it — it's their laptop, in another
@@ -868,7 +873,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="a9c75990630a14ba9bd9f0f64a80b23c1c71be76642556f702026f81df0d393b">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="f532a03978b3fc5478710b0889319046a59a8d5b729d8a5ccf622390bec69dc4">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

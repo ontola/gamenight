@@ -653,6 +653,10 @@ pub struct GameIssue {
 /// The one big object overlays render from. Sent whenever anything changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PartySnapshot {
+    /// Host-owned failure of a requested first game. Cleared when resolved or
+    /// another game is chosen; never creates a synthetic library entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub onboarding_error: Option<String>,
     /// Stopped processes awaiting an explicit retry. Takes precedence over
     /// warming/loading hints. Runtime-owned, including failures before hello.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

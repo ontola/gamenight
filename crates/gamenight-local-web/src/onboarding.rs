@@ -52,10 +52,8 @@ pub(crate) fn start(state: &SharedState, port: u16) {
     tokio::spawn(async move {
         // The daemon's socket starts just after the local web task.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        if let Some(game) = saved["game"].as_str() {
-            if complete(&state, &ticket, Some(game)).await.is_ok() {
-                return;
-            }
+        if resume_requested_game(&state, &ticket, &saved).await {
+            return;
         }
         let url = format!(
             "https://gamenight.ontola.io/play#desktop={ticket}&port={port}&platform={}",
@@ -65,6 +63,52 @@ pub(crate) fn start(state: &SharedState, port: u16) {
             tracing::warn!(%error, "Could not open catalog setup; local play is still available");
         }
     });
+}
+
+/// An explicit choice belongs to the lobby, even if it is not available yet.
+/// Only a fresh install without a choice should open the browser game picker.
+async fn resume_requested_game(state: &SharedState, ticket: &str, saved: &Value) -> bool {
+    let Some(game) = saved["game"].as_str() else {
+        return false;
+    };
+    // A saved request originates from the installed URL handler. It may name a
+    // locally registered game; the hosted capability endpoint stays catalog-only.
+    let result = if allowed(game) {
+        complete(state, ticket, Some(game)).await
+    } else {
+        let (addr, file) = {
+            let local = state.lock().unwrap();
+            (
+                local.daemon_addr.clone(),
+                local.onboarding.as_ref().unwrap().file.clone(),
+            )
+        };
+        match queue_local(&addr, game).await {
+            Ok(installed) => save(&file, json!({"complete":installed,"game":game}))
+                .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR),
+            Err(error) => Err(error),
+        }
+    };
+    if let Err(error) = result {
+        let message = requested_failure_message(game, error);
+        tracing::warn!(%game, %error, %message, "Requested game could not be queued");
+        if let Some(handoff) = &state.lock().unwrap().onboarding {
+            let _ = save(
+                &handoff.file,
+                json!({"complete":false,"game":game,"error":message}),
+            );
+        }
+    }
+    true
+}
+
+fn requested_failure_message(game: &str, error: StatusCode) -> String {
+    let game: String = game.chars().take(80).collect();
+    if error == StatusCode::UNPROCESSABLE_ENTITY {
+        format!("{game} is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved.")
+    } else {
+        format!("Could not prepare {game}. Your choice is saved; try again from the lobby or restart GameNight.")
+    }
 }
 
 fn listen_for_catalog_requests(state: SharedState, file: PathBuf) {
@@ -91,7 +135,7 @@ fn listen_for_catalog_requests(state: SharedState, file: PathBuf) {
             let Some(game) = value
                 .as_ref()
                 .and_then(|v| v["game"].as_str())
-                .filter(|g| allowed(g))
+                .filter(|g| valid_game_id(g))
             else {
                 continue;
             };
@@ -99,12 +143,21 @@ fn listen_for_catalog_requests(state: SharedState, file: PathBuf) {
             if save(&file, json!({"complete":false,"game":game})).is_err() {
                 continue;
             }
-            match queue(&addr, game).await {
+            let result = if allowed(game) {
+                queue(&addr, game).await
+            } else {
+                queue_local(&addr, game).await
+            };
+            match result {
                 Ok(installed) => {
                     let _ = save(&file, json!({"complete":installed,"game":game}));
                 }
                 Err(error) => {
-                    tracing::warn!(%game, %error, "Catalog selection could not reach the lobby; saved for next launch")
+                    let _ = save(
+                        &file,
+                        json!({"complete":false,"game":game,"error":requested_failure_message(game,error)}),
+                    );
+                    tracing::warn!(%game, %error, "Catalog selection could not reach the lobby; saved for next launch");
                 }
             }
         }
@@ -294,6 +347,26 @@ fn selected(party: &PartySnapshot, game: &GameId) -> bool {
 }
 
 async fn queue(addr: &str, game: &str) -> Result<bool, StatusCode> {
+    queue_checked(addr, game, false).await
+}
+
+async fn queue_local(addr: &str, game: &str) -> Result<bool, StatusCode> {
+    if !valid_game_id(game) {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    queue_checked(addr, game, true).await
+}
+
+fn valid_game_id(game: &str) -> bool {
+    !game.is_empty()
+        && game.len() <= 80
+        && game
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'-')
+        && !["lobby", "demo-game"].contains(&game)
+}
+
+async fn queue_checked(addr: &str, game: &str, require_local: bool) -> Result<bool, StatusCode> {
     tokio::time::timeout(Duration::from_secs(10), async {
         let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
             .await
@@ -308,9 +381,17 @@ async fn queue(addr: &str, game: &str) -> Result<bool, StatusCode> {
         ))
         .await
         .map_err(|_| StatusCode::BAD_GATEWAY)?;
-        daemon::read_welcome(&mut ws)
+        let party = daemon::read_welcome(&mut ws)
             .await
             .map_err(StatusCode::from)?;
+        if require_local
+            && !party
+                .library
+                .iter()
+                .any(|entry| entry.id.0 == game && entry.launch.is_some())
+        {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
         let id = GameId::new(game);
         ws.send(Message::Text(
             ClientMessage::QueueNext { game: id.clone() }.to_json(),
@@ -369,6 +450,84 @@ mod tests {
             accepted: None,
         });
         (Arc::new(Mutex::new(state)), file)
+    }
+
+    #[tokio::test]
+    async fn unavailable_explicit_game_stays_in_lobby_and_keeps_choice() {
+        let (state, file) = fixture();
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        state.lock().unwrap().daemon_addr = listener.local_addr().unwrap().to_string();
+        let host = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            ws.next().await.unwrap().unwrap();
+            ws.send(Message::Text(json!({"type":"welcome","protocol_version":gamenight_protocol::PROTOCOL_VERSION,"party":gamenight_core::GameNight::default().snapshot()}).to_string())).await.unwrap();
+            assert!(
+                ws.next().await.is_none_or(|message| message.is_err()),
+                "unknown game must not enter the queue"
+            );
+        });
+        let saved = json!({"complete":false,"game":"missing-local-game"});
+        assert!(
+            resume_requested_game(&state, "test-ticket", &saved).await,
+            "explicit failure must consume startup instead of falling through to browser"
+        );
+        let persisted: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        assert_eq!(persisted["complete"], false);
+        assert_eq!(persisted["game"], "missing-local-game");
+        assert!(persisted["error"]
+            .as_str()
+            .unwrap()
+            .contains("not available"));
+        assert!(!state.lock().unwrap().onboarding.as_ref().unwrap().busy);
+        std::fs::remove_file(file).unwrap();
+        host.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn trusted_local_request_can_queue_registered_game_without_catalog_entry() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let host = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.unwrap();
+            let mut ws = tokio_tungstenite::accept_async(stream).await.unwrap();
+            ws.next().await.unwrap().unwrap();
+            let mut night = gamenight_core::GameNight::default();
+            night.set_library(vec![serde_json::from_value(json!({"id":"hexstead","title":"Hexstead","launch":{"command":"already-registered-executable"}})).unwrap()]);
+            ws.send(Message::Text(json!({"type":"welcome","protocol_version":gamenight_protocol::PROTOCOL_VERSION,"party":night.snapshot()}).to_string())).await.unwrap();
+            let message = ws.next().await.unwrap().unwrap().into_text().unwrap();
+            assert!(
+                matches!(serde_json::from_str::<ClientMessage>(&message).unwrap(), ClientMessage::QueueNext{game} if game.0 == "hexstead")
+            );
+            night.handle(gamenight_core::Command::QueueNext {
+                game: GameId::new("hexstead"),
+            });
+            ws.send(Message::Text(
+                ServerMessage::PartyState {
+                    party: night.snapshot(),
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        });
+        assert!(queue_local(&addr, "hexstead").await.unwrap());
+        host.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn fresh_install_without_choice_keeps_browser_setup() {
+        let (state, file) = fixture();
+        assert!(!resume_requested_game(&state, "test-ticket", &json!({"complete":false})).await);
+        assert!(
+            !resume_requested_game(
+                &state,
+                "test-ticket",
+                &json!({"complete":false,"game":null})
+            )
+            .await
+        );
+        assert!(!file.exists());
     }
 
     #[tokio::test]

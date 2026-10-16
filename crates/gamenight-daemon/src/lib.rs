@@ -88,6 +88,8 @@ struct Shared {
     /// crash to report and not a quit to respect.
     retired: std::collections::HashSet<GameId>,
     game_issues: HashMap<GameId, gamenight_protocol::GameIssueKind>,
+    onboarding_error: Option<String>,
+    dismissed_onboarding_error: Option<String>,
     /// The background catalogue prewarm, if one is running — lets `launch`
     /// bump a game to the front of the download queue instead of silently
     /// no-oping when there's no launch spec for it yet.
@@ -136,6 +138,8 @@ impl Shared {
             quit_games: std::collections::HashSet::new(),
             retired: std::collections::HashSet::new(),
             game_issues: HashMap::new(),
+            onboarding_error: None,
+            dismissed_onboarding_error: None,
             prewarm,
             // A fresh night genuinely has nobody seated, so recording that up
             // front keeps the first real join the first signal ever sent.
@@ -155,6 +159,7 @@ impl Shared {
 
     fn snapshot(&self) -> gamenight_protocol::PartySnapshot {
         let mut party = self.night.snapshot();
+        party.onboarding_error = self.onboarding_error.clone();
         party.game_issues = self
             .game_issues
             .iter()
@@ -175,6 +180,28 @@ impl Shared {
         self.quitting = Some(game.clone());
         self.dispatch(Command::GameDisconnected { game }, None);
         self.quitting = None;
+    }
+
+    fn refresh_onboarding_error(&mut self, file: &std::path::Path) {
+        // Host-written file, never a report accepted from a game.
+        let error = std::fs::read(file)
+            .ok()
+            .filter(|bytes| bytes.len() <= 8192)
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .filter(|saved| saved["complete"] == false && saved["game"].is_string())
+            .and_then(|saved| {
+                saved["error"]
+                    .as_str()
+                    .map(|s| s.chars().take(300).collect::<String>())
+            });
+        if error.is_none() {
+            self.dismissed_onboarding_error = None;
+        }
+        let visible = error.filter(|error| Some(error) != self.dismissed_onboarding_error.as_ref());
+        if self.onboarding_error != visible {
+            self.onboarding_error = visible;
+            self.apply_effects(vec![Effect::StateChanged], None);
+        }
     }
 
     /// Check launches even when no UI command arrives. Lobby recovery has its
@@ -228,6 +255,19 @@ impl Shared {
     /// `origin` receives any `Reject` effects.
     fn dispatch(&mut self, command: Command, origin: Option<&Tx>) {
         debug!(?command, "dispatch");
+        if matches!(
+            &command,
+            Command::PlayNext { .. }
+                | Command::QueueNext { .. }
+                | Command::QueueGame { .. }
+                | Command::RequestStart { .. }
+                | Command::Next
+        ) {
+            if let Some(error) = self.onboarding_error.take() {
+                self.dismissed_onboarding_error = Some(error);
+                self.apply_effects(vec![Effect::StateChanged], None);
+            }
+        }
         let previous_music = self.night.now_playing().cloned();
         // `Effect::Launch` only ever fires for a library entry that already
         // has a launch spec (`gamenight_core::maybe_warm`'s guard) — a
@@ -1332,6 +1372,8 @@ async fn run_inner(
     }
     let mut presence_tick = tokio::time::interval(std::time::Duration::from_secs(1));
     let mut presence_at = std::time::Instant::now();
+    let onboarding_file =
+        std::env::var_os("GAMENIGHT_ONBOARDING_FILE").map(std::path::PathBuf::from);
     let mut lifetime_tick = tokio::time::interval(std::time::Duration::from_millis(200));
     loop {
         let accepted = tokio::select! {
@@ -1342,6 +1384,9 @@ async fn run_inner(
                 presence_at = now;
                 let mut s = shared.lock().await;
                 let fx = s.night.handle(Command::PresenceTick { elapsed });
+                if let Some(file) = &onboarding_file {
+                    s.refresh_onboarding_error(file);
+                }
                 s.apply_effects(fx, None);
                 continue;
             },
@@ -2104,6 +2149,32 @@ fn message_to_command(
 #[cfg(test)]
 mod replacement_lobby_tests {
     use super::*;
+    #[test]
+    fn onboarding_error_is_visible_without_a_phantom_game_and_clears() {
+        let file =
+            std::env::temp_dir().join(format!("onboarding-error-{}.json", uuid::Uuid::new_v4()));
+        let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        std::fs::write(&file, r#"{"game":"hexstead","complete":false,"error":"Hexstead is not available on this computer."}"#).unwrap();
+        s.refresh_onboarding_error(&file);
+        assert!(s
+            .snapshot()
+            .onboarding_error
+            .unwrap()
+            .contains("not available"));
+        assert!(s.snapshot().library.is_empty());
+        assert!(s.snapshot().playlist.entries.is_empty());
+        s.dispatch(Command::Next, None);
+        s.refresh_onboarding_error(&file);
+        assert!(
+            s.snapshot().onboarding_error.is_none(),
+            "choosing another game dismisses the banner"
+        );
+        std::fs::write(&file, r#"{"game":"hexstead","complete":true}"#).unwrap();
+        s.refresh_onboarding_error(&file);
+        assert!(s.snapshot().onboarding_error.is_none());
+        assert!(s.dismissed_onboarding_error.is_none());
+        std::fs::remove_file(file).unwrap();
+    }
     type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 
     fn test_game(launch: serde_json::Value) -> GameMeta {
