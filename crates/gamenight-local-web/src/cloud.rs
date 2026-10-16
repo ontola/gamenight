@@ -1,4 +1,5 @@
 //! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
+mod companion;
 pub(crate) mod discovery;
 pub(crate) mod settings;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
@@ -352,6 +353,7 @@ impl Bridge {
         ))
     }
     pub async fn run(self, state: SharedState) {
+        tokio::spawn(companion::run(self.clone(), state.clone()));
         let mut applied: HashMap<String, (Seat, u64)> = HashMap::new();
         let mut acknowledged: Option<String> = None;
         let mut receipt: Option<serde_json::Value> = None;

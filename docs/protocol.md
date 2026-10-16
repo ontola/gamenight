@@ -531,9 +531,30 @@ Declare it once after `welcome`, and again after every reconnect:
 { "type": "declare_companion", "root": "/abs/path/to/game/phone", "entry": "index.html" }
 ```
 
-`root` must be an absolute directory and `entry` a path inside it. Phones load
+`root` must be an absolute directory and `entry` a path inside it. LAN phones load
 `/play/<game>/<entry>?profile=…&game=<game>`, so relative links in the page
 resolve inside `root`, and nothing outside it is served.
+
+With hosted GameNight rooms, the host forwards the current game's phone bundle
+and messages through an outbound encrypted connection. Phones do not need access
+to the PC's LAN address. The signed-in app obtains its screen from
+`GET /v1/rooms/companion`; the returned URL is a short-lived capability for that
+account's seat and current game session, not an account login token. Treat this
+URL as private. Changing the seat binding or game session revokes access.
+
+Hosted bundles contain at most 128 files and 2 MiB of base64-encoded content;
+each encoded file must fit within 512 KiB. Supported files are HTML, JavaScript,
+CSS, JSON, SVG, PNG, JPEG, WebP and WOFF2. Use relative asset paths; symlinks and
+parent-directory paths are rejected. The host replaces `/assets/companion.js`
+with the hosted transport, so the same `GameNight.connect` API works in both
+flows. Hosted screens run in a browser sandbox: do not depend on cookies,
+local storage, external scripts, forms or navigating the parent application.
+Bundles and private game messages are held in memory, not saved to the catalog.
+
+Scanning and picking up a profile establishes identity. The phone must also
+open the game's companion screen before the game receives `companion_presence`.
+Games requiring private phone controls should wait for every human phone to
+connect and confirm readiness before dealing cards or starting a round.
 
 The page loads `/assets/companion.js` and exchanges plain JSON with the game:
 

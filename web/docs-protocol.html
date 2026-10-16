@@ -652,9 +652,27 @@ and the phone studio open it automatically.</p>
 <p>Declare it once after <code>welcome</code>, and again after every reconnect:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;declare_companion&quot;, &quot;root&quot;: &quot;/abs/path/to/game/phone&quot;, &quot;entry&quot;: &quot;index.html&quot; }
 </code></pre></div>
-<p><code>root</code> must be an absolute directory and <code>entry</code> a path inside it. Phones load
+<p><code>root</code> must be an absolute directory and <code>entry</code> a path inside it. LAN phones load
 <code>/play/&lt;game&gt;/&lt;entry&gt;?profile=…&amp;game=&lt;game&gt;</code>, so relative links in the page
 resolve inside <code>root</code>, and nothing outside it is served.</p>
+<p>With hosted GameNight rooms, the host forwards the current game's phone bundle
+and messages through an outbound encrypted connection. Phones do not need access
+to the PC's LAN address. The signed-in app obtains its screen from
+<code>GET /v1/rooms/companion</code>; the returned URL is a short-lived capability for that
+account's seat and current game session, not an account login token. Treat this
+URL as private. Changing the seat binding or game session revokes access.</p>
+<p>Hosted bundles contain at most 128 files and 2 MiB of base64-encoded content;
+each encoded file must fit within 512 KiB. Supported files are HTML, JavaScript,
+CSS, JSON, SVG, PNG, JPEG, WebP and WOFF2. Use relative asset paths; symlinks and
+parent-directory paths are rejected. The host replaces <code>/assets/companion.js</code>
+with the hosted transport, so the same <code>GameNight.connect</code> API works in both
+flows. Hosted screens run in a browser sandbox: do not depend on cookies,
+local storage, external scripts, forms or navigating the parent application.
+Bundles and private game messages are held in memory, not saved to the catalog.</p>
+<p>Scanning and picking up a profile establishes identity. The phone must also
+open the game's companion screen before the game receives <code>companion_presence</code>.
+Games requiring private phone controls should wait for every human phone to
+connect and confirm readiness before dealing cards or starting a round.</p>
 <p>The page loads <code>/assets/companion.js</code> and exchanges plain JSON with the game:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-js">const game = GameNight.connect((data) =&gt; render(data), (status) =&gt; showStatus(status));
 game.send({ action: &quot;roll&quot; });
@@ -850,7 +868,7 @@ only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="dd7f27e98f6b4fbb8b0e2b11c983840715f33579df9d7cced87ccf6dcb089fee">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="a9c75990630a14ba9bd9f0f64a80b23c1c71be76642556f702026f81df0d393b">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

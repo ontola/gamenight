@@ -79,7 +79,7 @@ impl Hub {
             .cloned()
     }
 
-    fn to_daemon(&self, message: ClientMessage) {
+    pub(crate) fn to_daemon(&self, message: ClientMessage) {
         if let Some(tx) = &self.0.lock().unwrap().daemon {
             let _ = tx.send(message.to_json());
         }
@@ -181,7 +181,11 @@ impl Hub {
         }
     }
 
-    fn add_phone(&self, game: GameId, player: PlayerId) -> (u64, mpsc::UnboundedReceiver<String>) {
+    pub(crate) fn add_phone(
+        &self,
+        game: GameId,
+        player: PlayerId,
+    ) -> (u64, mpsc::UnboundedReceiver<String>) {
         let (tx, rx) = mpsc::unbounded_channel();
         let id = {
             let mut inner = self.0.lock().unwrap();
@@ -205,7 +209,7 @@ impl Hub {
         (id, rx)
     }
 
-    fn remove_phone(&self, id: u64) {
+    pub(crate) fn remove_phone(&self, id: u64) {
         let phone = self.0.lock().unwrap().phones.remove(&id);
         if let Some(phone) = phone {
             self.to_daemon(ClientMessage::CompanionPresence {
@@ -214,6 +218,19 @@ impl Hub {
                 connected: false,
             });
         }
+    }
+}
+
+impl Hub {
+    pub(crate) fn active_session(&self) -> Option<String> {
+        self.0
+            .lock()
+            .unwrap()
+            .party
+            .as_ref()?
+            .active_session
+            .as_ref()
+            .map(|s| s.id.0.to_string())
     }
 }
 
