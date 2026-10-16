@@ -3,7 +3,8 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, LicenseRegistry, LicenseEntryWithLineBreaks;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -29,6 +30,10 @@ import 'theme.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(gameNightSystemUi);
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks(
+        ['Bungee'], await rootBundle.loadString('assets/fonts/OFL-Bungee.txt'));
+  });
   final prefs = await SharedPreferences.getInstance();
   if (kIsWeb) await migrateWebsiteRoom(prefs);
   final state = AppState(prefs);
@@ -91,6 +96,8 @@ class GameNightApp extends StatefulWidget {
 
 class _GameNightAppState extends State<GameNightApp> {
   final _navigator = GlobalKey<NavigatorState>();
+  final _homeKey = GlobalKey<_HomeScreenState>();
+  int _selectedTab = 0;
   BrowserNavigation? _history;
 
   @override
@@ -110,6 +117,7 @@ class _GameNightAppState extends State<GameNightApp> {
           fullscreen: () => widget.state.companionFullscreen,
           setFullscreen: widget.state.setCompanionFullscreen);
       widget.state.addListener(_fullscreenChanged);
+      _selectedTab = _history!.tab;
     }
   }
 
@@ -123,6 +131,10 @@ class _GameNightAppState extends State<GameNightApp> {
   }
 
   Widget _home() => HomeScreen(
+      key: _homeKey,
+      onTabChanged: (tab) {
+        if (mounted && _selectedTab != tab) setState(() => _selectedTab = tab);
+      },
       state: widget.state,
       links: widget.links,
       initialLink: widget.initialLink,
@@ -177,6 +189,82 @@ class _GameNightAppState extends State<GameNightApp> {
             ));
   }
 
+  void _selectDestination(int tab) {
+    _navigator.currentState?.popUntil((route) => route.isFirst);
+    _homeKey.currentState?._selectTab(tab);
+  }
+
+  Widget _sidebar() => Material(
+        color: GnColors.bg,
+        child: ListView(
+          key: const ValueKey('desktop-sidebar'),
+          padding: const EdgeInsets.fromLTRB(12, 24, 12, 20),
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 0, 8, 32),
+              child: Row(children: [
+                GameNightLogo(size: 28),
+                SizedBox(width: 9),
+                Expanded(
+                    child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: GameNightWordmark(
+                            key: ValueKey('app-brand'), size: 19)))
+              ]),
+            ),
+            for (final entry in [
+              (0, 'Room', const Icon(Icons.meeting_room_outlined)),
+              (1, 'Games', const Icon(Icons.sports_esports_outlined)),
+              (
+                2,
+                'You',
+                PlayerFaceIcon(
+                    face: widget.state.face, skin: widget.state.skinColor)
+              )
+            ])
+              ListTile(
+                key: ValueKey('desktop-tab-${entry.$1}'),
+                selected: _selectedTab == entry.$1,
+                selectedTileColor: GnColors.button.withValues(alpha: .35),
+                selectedColor: GnColors.text,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+                leading: entry.$3,
+                title: Text(entry.$2),
+                onTap: () => _selectDestination(entry.$1),
+              ),
+            const SizedBox(height: 20),
+            ListTile(
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('Assistant'),
+                onTap: _assistant),
+            if (widget.reports != null)
+              ListTile(
+                  leading: const Icon(Icons.mic_none),
+                  title: const Text('Feedback'),
+                  onTap: _feedback),
+            const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Divider(color: GnColors.border)),
+            for (final entry in const [
+              ('/developers', 'Developer portal', Icons.code),
+              ('/docs', 'Documentation', Icons.menu_book_outlined),
+              ('/host', 'Host a room', Icons.tv),
+            ])
+              ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  minLeadingWidth: 24,
+                  horizontalTitleGap: 12,
+                  leading: Icon(entry.$3, size: 21),
+                  title: Text(entry.$2),
+                  trailing: const Icon(Icons.open_in_new, size: 16),
+                  onTap: () =>
+                      launchUrl(Uri.parse('$hostedOrigin${entry.$1}'))),
+          ],
+        ),
+      );
+
   @override
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: kIsWeb ? null : _navigator,
@@ -185,20 +273,24 @@ class _GameNightAppState extends State<GameNightApp> {
         theme: gameNightTheme(),
         builder: (context, child) => ListenableBuilder(
           listenable: widget.state,
-          builder: (context, _) => AnnotatedRegion<SystemUiOverlayStyle>(
-            value: gameNightSystemUi,
-            child: ReportScope(
+          builder: (context, _) {
+            final desktop = MediaQuery.sizeOf(context).width >= 900;
+            final fullscreen = widget.state.companionFullscreen;
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: gameNightSystemUi,
+              child: ReportScope(
                 reports: widget.reports,
                 child: ColoredBox(
                   color: GnColors.bg,
                   child: SafeArea(
-                      bottom: false,
-                      // Route semantics must not hide the persistent header.
-                      // Place it after Navigator in paint/semantics order while
-                      // keeping it visually above the page.
-                      child: Column(
-                          verticalDirection: VerticalDirection.up,
-                          children: [
+                    bottom: false,
+                    // Navigator stays at the same tree position on resize. All pushed
+                    // pages live inside this shell, including face, sign-in and feedback.
+                    child: Row(textDirection: TextDirection.rtl, children: [
+                      Expanded(
+                          child: Column(
+                              verticalDirection: VerticalDirection.up,
+                              children: [
                             Expanded(
                                 child: _history == null
                                     ? child!
@@ -212,49 +304,70 @@ class _GameNightAppState extends State<GameNightApp> {
                                                 builder: (_) => _home()),
                                       )),
                             Visibility(
-                                visible: !widget.state.companionFullscreen,
-                                child: Material(
-                                    color: GnColors.bg,
-                                    child: Padding(
-                                        padding: const EdgeInsets.fromLTRB(
-                                            16, 4, 8, 4),
-                                        child: Row(children: [
-                                          const GameNightLogo(size: 28),
-                                          const SizedBox(width: 8),
-                                          const Expanded(
-                                              child: Text('GameNight',
-                                                  key: ValueKey('app-brand'),
-                                                  style: TextStyle(
-                                                      fontSize: 22,
-                                                      fontWeight:
-                                                          FontWeight.w800,
-                                                      color: GnColors.text))),
-                                          Semantics(
-                                              container: true,
-                                              excludeSemantics: true,
-                                              onTap: _menu,
-                                              label: 'Menu',
-                                              button: true,
-                                              child: IconButton(
-                                                  onPressed: _menu,
-                                                  icon:
-                                                      const Icon(Icons.menu))),
-                                          if (widget.reports != null)
-                                            TextButton.icon(
-                                                onPressed: _feedback,
-                                                icon: const Icon(Icons.mic_none,
-                                                    size: 20),
-                                                label: const Text('Feedback')),
-                                        ])))),
+                              visible: !desktop && !fullscreen,
+                              child: Material(
+                                color: GnColors.bg,
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                                  child: Row(children: [
+                                    const GameNightLogo(size: 28),
+                                    const SizedBox(width: 8),
+                                    const Expanded(
+                                        child: FittedBox(
+                                            fit: BoxFit.scaleDown,
+                                            alignment: Alignment.centerLeft,
+                                            child: GameNightWordmark(
+                                                key: ValueKey('app-brand'),
+                                                size: 21))),
+                                    Semantics(
+                                        container: true,
+                                        excludeSemantics: true,
+                                        onTap: _menu,
+                                        label: 'Menu',
+                                        button: true,
+                                        child: IconButton(
+                                            onPressed: _menu,
+                                            icon: const Icon(Icons.menu))),
+                                    if (widget.reports != null &&
+                                        MediaQuery.sizeOf(context).width < 440)
+                                      Semantics(
+                                          label: 'Feedback',
+                                          button: true,
+                                          excludeSemantics: true,
+                                          onTap: _feedback,
+                                          child: IconButton(
+                                              onPressed: _feedback,
+                                              icon:
+                                                  const Icon(Icons.mic_none))),
+                                    if (widget.reports != null &&
+                                        MediaQuery.sizeOf(context).width >= 440)
+                                      TextButton.icon(
+                                          onPressed: _feedback,
+                                          icon: const Icon(Icons.mic_none,
+                                              size: 20),
+                                          label: const Text('Feedback')),
+                                  ]),
+                                ),
+                              ),
+                            ),
                           ])),
-                )),
-          ),
+                      SizedBox(
+                          width: desktop && !fullscreen ? 248 : 0,
+                          child: desktop && !fullscreen ? _sidebar() : null),
+                    ]),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         home: kIsWeb ? null : _home(),
       );
 }
 
 class HomeScreen extends StatefulWidget {
+  final ValueChanged<int>? onTabChanged;
   final AppState state;
   final BrowserNavigation? history;
   final ReportService? reports;
@@ -264,6 +377,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen(
       {super.key,
       required this.state,
+      this.onTabChanged,
       this.history,
       this.links,
       this.initialLink,
@@ -314,6 +428,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _historyChanged() {
     if (mounted && _tab != widget.history?.tab) {
       setState(() => _tab = widget.history!.tab);
+      widget.onTabChanged?.call(_tab);
     }
   }
 
@@ -322,6 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       history.selectTab(tab);
     } else if (_tab != tab) {
       setState(() => _tab = tab);
+      widget.onTabChanged?.call(_tab);
     }
   }
 
@@ -423,42 +539,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(children: [
                 UpdateBanner(),
                 Expanded(
-                    child: Row(children: [
-                  // Keep the content at the same tree position across breakpoints;
-                  // embedded games must never reload when the window is resized.
-                  SizedBox(
-                      width: wide && !fullscreen ? 200 : 0,
-                      child: Offstage(
-                          offstage: !wide || fullscreen,
-                          child: NavigationRail(
-                            extended: true,
-                            minExtendedWidth: 200,
-                            selectedIndex: _tab,
-                            onDestinationSelected: _selectTab,
-                            destinations: [
-                              const NavigationRailDestination(
-                                  icon: Icon(Icons.meeting_room_outlined),
-                                  label: Text('Room')),
-                              const NavigationRailDestination(
-                                  icon: Icon(Icons.sports_esports_outlined),
-                                  label: Text('Games')),
-                              NavigationRailDestination(
-                                  icon: PlayerFaceIcon(
-                                      face: widget.state.face,
-                                      skin: widget.state.skinColor),
-                                  label: Text('You')),
-                            ],
-                          ))),
-                  SizedBox(
-                      width: wide && !fullscreen ? 1 : 0,
-                      child: Offstage(
-                          offstage: !wide || fullscreen,
-                          child: const VerticalDivider(width: 1))),
-                  Expanded(
-                      child: ContentWidth(
-                          maxWidth: fullscreen ? double.infinity : 1440,
-                          child: IndexedStack(index: _tab, children: pages))),
-                ])),
+                    child: ContentWidth(
+                        maxWidth: fullscreen ? double.infinity : 1440,
+                        child: IndexedStack(index: _tab, children: pages))),
               ]),
             ),
             bottomNavigationBar: fullscreen || wide

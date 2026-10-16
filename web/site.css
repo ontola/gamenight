@@ -257,3 +257,9 @@ body:has(.site-menu-dialog[open]){overflow:hidden}
 #site-shell .playtest-actions .playtest-skip{background:none;border-color:transparent;color:#b9bfd1}
 #site-shell .playtest-dialog button:disabled{opacity:.6;cursor:not-allowed}
 #site-shell .playtest-dialog :is(button,textarea):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* Shared with the Flutter app and homepage intro video. */
+@font-face{font-family:GameNightBrand;src:url(/web/fonts/Bungee-Regular.ttf) format("truetype");font-display:swap}
+.site-nav .site-logo,#site-shell .site-logo{font-family:GameNightBrand,system-ui;font-weight:400;font-size:20px}
+.site-logo .brand-game{color:#ffb454}.site-logo .brand-night{color:#a78bfa}
+@media(max-width:380px){#site-shell .site-logo{font-size:16px;gap:6px}#site-shell .site-logo img{width:24px;height:24px}}

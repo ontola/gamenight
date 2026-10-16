@@ -33,8 +33,41 @@
 
   <title>GameNight</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    @font-face{font-family:Bungee;src:url(assets/assets/fonts/Bungee-Regular.ttf) format('truetype');font-display:swap}
+    html,body{margin:0;width:100%;height:100%;background:#0d1020;color:#eef0fc;color-scheme:dark}
+    #app-loading{position:fixed;inset:0;z-index:10000;display:grid;place-content:center;justify-items:center;gap:22px;background:radial-gradient(ellipse at 50% 35%,#211b40 0,transparent 55%),#0d1020;font:16px system-ui;text-align:center;padding:24px}
+    .loading-brand{display:flex;align-items:center;gap:14px;font:clamp(25px,6vw,38px)/1.3 Bungee,system-ui;color:#ffb454}
+    .loading-brand span span{color:#a78bfa}.loading-brand img{width:48px;height:48px;animation:logo-bob 1.6s ease-in-out infinite}
+    #loading-status{color:#a8adc4;margin:0}.loading-track{height:3px;width:150px;overflow:hidden;border-radius:4px;background:#343b53}
+    .loading-track:after{content:'';display:block;height:100%;width:45%;background:#a78bfa;border-radius:4px;animation:loading-slide 1.4s ease-in-out infinite}
+    #loading-retry{color:#eef0fc;background:#5143ae;border:1px solid #7565ee;border-radius:10px;padding:12px 24px;font:inherit;cursor:pointer}
+    @keyframes logo-bob{50%{transform:translateY(-5px) rotate(-5deg)}}
+    @keyframes loading-slide{from{transform:translateX(-110%)}to{transform:translateX(330%)}}
+    @media(prefers-reduced-motion:reduce){.loading-brand img,.loading-track:after{animation:none}}
+  </style>
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <div id="app-loading" role="status" aria-live="polite">
+    <div class="loading-brand"><img src="assets/assets/icon.svg" alt=""><span>Game<span>Night</span></span></div>
+    <div class="loading-track" aria-hidden="true"></div>
+    <p id="loading-status">Getting ready…</p>
+    <button id="loading-retry" hidden onclick="location.reload()">Try again</button>
+  </div>
+  <script>
+    (() => {
+      const status = document.getElementById('loading-status');
+      const retry = document.getElementById('loading-retry');
+      const delayed = setTimeout(() => { status.textContent = 'Still loading. Check your connection or try again.'; retry.hidden = false; }, 20000);
+      window.addEventListener('flutter-first-frame', () => {
+        clearTimeout(delayed); document.getElementById('app-loading')?.remove();
+      }, {once: true});
+      window.gameNightLoadFailed = () => {
+        clearTimeout(delayed); status.textContent = 'GameNight could not load. Please try again.'; retry.hidden = false;
+      };
+    })();
+  </script>
+  <script src="flutter_bootstrap.js" async onerror="gameNightLoadFailed()"></script>
+  <noscript>Enable JavaScript to open GameNight.</noscript>
 </body>
 </html>

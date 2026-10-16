@@ -227,9 +227,11 @@ optional. A requested catalog game opens after joining; adding it to the queue
 still requires the player's action.
 
 Below 900 logical pixels, the app uses bottom navigation. Larger windows have a
-side navigation rail, a catalog with up to six columns, bounded forms, and a
+persistent sidebar with Assistant, Feedback and all menu links, a catalog with up to six columns, bounded forms, and a
 split profile editor. Game detail pages have previous/next buttons and Left/Right
 keyboard shortcuts on desktop; browser Back/Forward keeps its normal behavior.
+Detail pages, face editing, sign-in and feedback stay inside that sidebar.
+Only the explicit companion Full screen action hides it.
 Resizing and fullscreen preserve the embedded game frame and private connection.
 
 Run `flutter test --no-pub`, then build web and run
@@ -262,3 +264,8 @@ The provider, billing and authority checks remain in the private cloud service.
 `test/assistant_test.dart` covers quotes, retries, host failures, room changes,
 voice errors and configuration revisions. `test/browser/assistant.cjs` exercises
 the compiled UI with a synthetic room; it never contacts a paid model.
+
+The app and website wordmark use the intro video's Bungee font and amber/lilac
+colours, bundled locally with its OFL licence. The web bootstrap shows that logo
+on the app background until Flutter paints its first frame, respects reduced
+motion and offers retry on a failed or unusually slow load.

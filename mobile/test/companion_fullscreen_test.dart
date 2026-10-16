@@ -124,7 +124,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(NavigationBar),
           size.width >= 900 ? findsNothing : findsOneWidget);
-      expect(find.byType(NavigationRail),
+      expect(find.byKey(const ValueKey('desktop-sidebar')),
           size.width >= 900 ? findsOneWidget : findsNothing);
       expect(platform.loads, hasLength(1),
           reason: 'Resizing keeps the private game mounted');

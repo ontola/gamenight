@@ -74,12 +74,26 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
    await page.setViewportSize({width,height:900});await page.waitForTimeout(500);
    assert(await page.evaluate(()=>document.querySelector('iframe')===window.originalPhone),'resize keeps the private frame');
    if(width>=900){
+    await page.getByText('Developer portal',{exact:true}).waitFor();
+    await page.getByText('Feedback',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Menu',exact:true}).count(),0);
     if(output)await page.screenshot({path:path.join(output,'games-desktop-'+width+'.png')});
     await page.getByText('A synthetic navigation fixture').click();
+    await page.getByText('Developer portal',{exact:true}).waitFor();
+    if(output)await page.screenshot({path:path.join(output,'game-detail-desktop-'+width+'.png')});
     await page.getByRole('button',{name:'Next game (Right arrow)'}).click();
     await page.getByText('Rocket Rally',{exact:true}).first().waitFor();
     await page.keyboard.press('ArrowLeft');await page.waitForTimeout(400);
     await page.getByRole('button',{name:'Back',exact:true}).click();
+    await page.waitForURL(gamesURL);
+    await page.getByText('You',{exact:true}).click();
+    await page.getByRole('button',{name:'Edit face',exact:true}).first().click();
+    await page.getByText('Developer portal',{exact:true}).waitFor();
+    if(output)await page.screenshot({path:path.join(output,'face-editor-desktop-'+width+'.png')});
+    await page.getByText('Feedback',{exact:true}).click();
+    await page.getByText('Developer portal',{exact:true}).waitFor();
+    if(output)await page.screenshot({path:path.join(output,'feedback-desktop-'+width+'.png')});
+    await page.getByText('Games',{exact:true}).click();
     await page.waitForURL(gamesURL);
    }
   }

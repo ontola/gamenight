@@ -1,4 +1,5 @@
-// web/icon.svg is the sole editable logo. Run with Sharp installed to regenerate.
+// web/icon.svg is the icon source; web/fonts/Bungee-Regular.ttf is the wordmark font.
+// Run with Sharp installed to regenerate the shared app/site branding.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),source='web/icon.svg',manifest='web/branding.json';
 const digest=data=>crypto.createHash('sha256').update(data).digest('hex');
@@ -9,6 +10,10 @@ if(process.argv.includes('--check')){
 }else{(async()=>{
   const sharp=require('sharp'),svg=fs.readFileSync(path.join(root,source)),hashes={[source]:digest(svg)};
   function write(file,data){fs.writeFileSync(path.join(root,file),data);hashes[file]=digest(data);}
+  for(const name of ['Bungee-Regular.ttf','OFL-Bungee.txt']) {
+    const file='web/fonts/'+name,data=fs.readFileSync(path.join(root,file));
+    hashes[file]=digest(data);write('mobile/assets/fonts/'+name,data);
+  }
   const png=await sharp(svg).resize(512,512).png().toBuffer();
   // Explorer and the taskbar read the small sizes; keep those as classic 32-bit BMP
   // frames and only compress the 256px frame, as Windows' own icons do.

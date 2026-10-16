@@ -177,7 +177,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     ]);
   }
 
-  /// A preview of the current face. Drawing happens full screen.
+  /// A preview of the current face. Drawing opens inside the app shell.
   Widget _editor() {
     return Section(title: 'Draw your face', children: [
       const Hint(

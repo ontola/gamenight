@@ -28,15 +28,16 @@ const List<(int, int)> guideMarks = [
 ];
 const Color guideMarkColor = Color(0x591E1E28);
 
-/// The full-screen face editor, the app's version of the web studio's
+/// The face editor (inside the desktop sidebar), the app's version of the web studio's
 /// "Tap to edit" workspace: the 48x48 canvas as large as fits, with the
 /// palette and tools below it. Every stroke saves by itself.
 class FaceEditorScreen extends StatefulWidget {
   final AppState state;
   const FaceEditorScreen({super.key, required this.state});
 
-  static Future<void> open(BuildContext context, AppState state) => Navigator.of(context)
-      .push(MaterialPageRoute<void>(builder: (_) => FaceEditorScreen(state: state)));
+  static Future<void> open(BuildContext context, AppState state) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => FaceEditorScreen(state: state)));
 
   @override
   State<FaceEditorScreen> createState() => _FaceEditorScreenState();
@@ -78,7 +79,8 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
   }
 
   void _onState() {
-    _body.update(state.api?.characterSprite, state.clothingColor, state.skinColor);
+    _body.update(
+        state.api?.characterSprite, state.clothingColor, state.skinColor);
     // Restoring a backup can switch faces underneath the editor.
     if (_shownArtwork != state.currentArtworkId) {
       _shownArtwork = state.currentArtworkId;
@@ -211,27 +213,31 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
             ),
           );
           if (wide) {
-            return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Expanded(child: canvas),
-              SizedBox(
-                width: min(380, box.maxWidth * .45),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
-                  child: _controls(),
-                ),
-              ),
-            ]);
+            return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: canvas),
+                  SizedBox(
+                    width: min(380, box.maxWidth * .45),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+                      child: _controls(),
+                    ),
+                  ),
+                ]);
           }
-          return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            Expanded(child: canvas),
-            ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: box.maxHeight * .55),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: _controls(),
-              ),
-            ),
-          ]);
+          return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: canvas),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: box.maxHeight * .55),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: _controls(),
+                  ),
+                ),
+              ]);
         }),
       ),
     );
@@ -239,12 +245,14 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
 
   Widget _canvas(double side) {
     Offset local(Offset global) =>
-        (_canvasKey.currentContext!.findRenderObject() as RenderBox).globalToLocal(global);
+        (_canvasKey.currentContext!.findRenderObject() as RenderBox)
+            .globalToLocal(global);
     // Claims the pointer at once, so a stroke never turns into a back swipe.
     return RawGestureDetector(
       gestures: {
         ImmediateMultiDragGestureRecognizer:
-            GestureRecognizerFactoryWithHandlers<ImmediateMultiDragGestureRecognizer>(
+            GestureRecognizerFactoryWithHandlers<
+                ImmediateMultiDragGestureRecognizer>(
           ImmediateMultiDragGestureRecognizer.new,
           (r) => r.onStart = (position) {
             if (_stroking) return null;
@@ -295,45 +303,51 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
         }),
       ),
       const SizedBox(height: 10),
-      Wrap(spacing: 4, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-        const Padding(
-          padding: EdgeInsets.only(right: 2),
-          child: Text('Brush', style: TextStyle(color: GnColors.muted, fontSize: 13)),
-        ),
-        for (final size in [1, 2, 4, 8])
-          ChoiceChip(
-            visualDensity: dense,
-            showCheckmark: false,
-            tooltip: '$size px brush',
-            label: Text('$size'),
-            selected: _brush == size,
-            onSelected: (_) => setState(() => _brush = size),
-          ),
-        const SizedBox(width: 6),
-        FilterChip(
-          visualDensity: dense,
-          showCheckmark: false,
-          avatar: Icon(_guide ? Icons.visibility : Icons.visibility_off, size: 18),
-          label: const Text('Body guide'),
-          selected: _guide,
-          onSelected: _setGuide,
-        ),
-      ]),
+      Wrap(
+          spacing: 4,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(right: 2),
+              child: Text('Brush',
+                  style: TextStyle(color: GnColors.muted, fontSize: 13)),
+            ),
+            for (final size in [1, 2, 4, 8])
+              ChoiceChip(
+                visualDensity: dense,
+                showCheckmark: false,
+                tooltip: '$size px brush',
+                label: Text('$size'),
+                selected: _brush == size,
+                onSelected: (_) => setState(() => _brush = size),
+              ),
+            const SizedBox(width: 6),
+            FilterChip(
+              visualDensity: dense,
+              showCheckmark: false,
+              avatar: Icon(_guide ? Icons.visibility : Icons.visibility_off,
+                  size: 18),
+              label: const Text('Body guide'),
+              selected: _guide,
+              onSelected: _setGuide,
+            ),
+          ]),
       const SizedBox(height: 10),
       Row(children: [
-        for (final (tool, emoji, label) in [
-          (Tool.pencil, '✏️', 'Draw'),
-          (Tool.eraser, '🧹', 'Erase'),
-          (Tool.fill, '🪣', 'Fill'),
+        for (final (tool, icon, label) in [
+          (Tool.pencil, Icons.edit_outlined, 'Draw'),
+          (Tool.eraser, Icons.cleaning_services_outlined, 'Erase'),
+          (Tool.fill, Icons.format_color_fill, 'Fill'),
         ])
           _ToolTile(
-            emoji: emoji,
+            icon: icon,
             label: label,
             active: _tool == tool,
             onTap: () => setState(() => _tool = tool),
           ),
         _ToolTile(
-          emoji: '↩️',
+          icon: Icons.undo,
           label: 'Undo',
           onTap: _undo.isEmpty
               ? null
@@ -342,20 +356,30 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
                   _commit();
                 },
         ),
-        _ToolTile(emoji: '🗑️', label: 'Clear', onTap: () => _replace(emptyFace())),
-        _ToolTile(emoji: '🎲', label: 'Random', onTap: () => _replace(randomFace())),
+        _ToolTile(
+            icon: Icons.delete_outline,
+            label: 'Clear',
+            onTap: () => _replace(emptyFace())),
+        _ToolTile(
+            icon: Icons.casino_outlined,
+            label: 'Random',
+            onTap: () => _replace(randomFace())),
       ]),
     ]);
   }
 }
 
-/// One button of the toolbar under the canvas: an emoji over a short label.
+/// One button of the toolbar under the canvas: an icon over a short label.
 class _ToolTile extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String label;
   final bool active;
   final VoidCallback? onTap;
-  const _ToolTile({required this.emoji, required this.label, this.active = false, this.onTap});
+  const _ToolTile(
+      {required this.icon,
+      required this.label,
+      this.active = false,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -371,7 +395,8 @@ class _ToolTile extends StatelessWidget {
             color: active ? GnColors.button : GnColors.field,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(10),
-              side: BorderSide(color: active ? GnColors.accent : GnColors.border),
+              side:
+                  BorderSide(color: active ? GnColors.accent : GnColors.border),
             ),
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
@@ -381,12 +406,13 @@ class _ToolTile extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 6),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    ExcludeSemantics(child: Text(emoji, style: const TextStyle(fontSize: 18))),
+                    ExcludeSemantics(child: Icon(icon, size: 18)),
                     FittedBox(
                       fit: BoxFit.scaleDown,
                       child: Text(label,
                           maxLines: 1,
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600)),
                     ),
                   ]),
                 ),
@@ -479,13 +505,14 @@ class FaceCanvasPainter extends CustomPainter {
       if (body != null) {
         canvas.drawImageRect(
           body!,
-          Rect.fromLTWH(faceOrigin.dx, faceOrigin.dy, gridSize.toDouble(), gridSize.toDouble()),
+          Rect.fromLTWH(faceOrigin.dx, faceOrigin.dy, gridSize.toDouble(),
+              gridSize.toDouble()),
           Rect.fromLTWH(0, 0, gridSize.toDouble(), gridSize.toDouble()),
           Paint()..filterQuality = FilterQuality.none,
         );
       }
-      canvas.drawCircle(
-          const Offset(headX + .0, headY + .0), headRadius + .0, Paint()..color = skin);
+      canvas.drawCircle(const Offset(headX + .0, headY + .0), headRadius + .0,
+          Paint()..color = skin);
       final mark = Paint()
         ..color = guideMarkColor
         ..isAntiAlias = false;
@@ -510,7 +537,10 @@ class FaceCanvasPainter extends CustomPainter {
       final c = grid[i];
       if (c == null) continue;
       p.color = hexColor(c);
-      canvas.drawRect(Rect.fromLTWH((i % gridSize) - .02, (i ~/ gridSize) - .02, 1.04, 1.04), p);
+      canvas.drawRect(
+          Rect.fromLTWH(
+              (i % gridSize) - .02, (i ~/ gridSize) - .02, 1.04, 1.04),
+          p);
     }
     canvas.restore();
     final line = Paint()

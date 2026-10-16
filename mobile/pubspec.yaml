@@ -34,3 +34,8 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon.svg
+    - assets/fonts/OFL-Bungee.txt
+  fonts:
+    - family: Bungee
+      fonts:
+        - asset: assets/fonts/Bungee-Regular.ttf

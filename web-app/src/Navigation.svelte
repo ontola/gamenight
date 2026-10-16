@@ -49,7 +49,7 @@
   }
 </script>
 <nav class="site-nav" aria-label="Main navigation" aria-busy={$busy}>
-  <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32">GameNight</a>
+  <a class="site-logo" href="/"><img src="/web/icon.svg" alt="" width="32" height="32"><span><span class="brand-game">Game</span><span class="brand-night">Night</span></span></a>
   <div class="site-links">
     <a href="/catalog" aria-current={($route.startsWith('/catalog') || $route.startsWith('/games/'))?'page':undefined}>Games</a>
     <a class="site-desktop-link" href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>

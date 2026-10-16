@@ -7,6 +7,7 @@ import 'package:gamenight/app_state.dart';
 import 'package:gamenight/main.dart';
 import 'package:gamenight/reports.dart';
 import 'package:gamenight/screens/feedback_screen.dart';
+import 'package:gamenight/screens/face_editor_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -28,6 +29,65 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(FeedbackScreen), findsOneWidget);
     expect(find.byKey(const ValueKey('app-brand')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    state.dispose();
+  });
+
+  testWidgets(
+      'desktop shell survives detail, face, feedback and window resizing',
+      (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1280, 900);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final state = AppState(prefs);
+    await tester
+        .pumpWidget(GameNightApp(state: state, reports: ReportService(prefs)));
+    await tester.pumpAndSettle();
+    final sidebar = find.byKey(const ValueKey('desktop-sidebar'));
+    for (final label in [
+      'Developer portal',
+      'Documentation',
+      'Host a room',
+      'Assistant',
+      'Feedback'
+    ]) {
+      expect(find.descendant(of: sidebar, matching: find.text(label)),
+          findsOneWidget);
+    }
+    expect(find.byIcon(Icons.menu), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
+    final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
+    var builds = 0;
+    unawaited(nav.push(MaterialPageRoute<void>(builder: (_) {
+      builds++;
+      return const Scaffold(body: Center(child: Text('Detail route')));
+    })));
+    await tester.pumpAndSettle();
+    expect(sidebar.hitTestable(), findsOneWidget);
+    expect(find.text('Detail route'), findsOneWidget);
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    expect(find.text('Detail route'), findsOneWidget);
+    expect(sidebar, findsNothing);
+    tester.view.physicalSize = const Size(1280, 900);
+    await tester.pumpAndSettle();
+    expect(sidebar.hitTestable(), findsOneWidget);
+    expect(builds, 1, reason: 'Resizing must keep the existing route');
+    await tester.tap(find.byKey(const ValueKey('desktop-tab-2')));
+    await tester.pumpAndSettle();
+    expect(find.text('Detail route'), findsNothing);
+    await tester.tap(find.widgetWithText(FilledButton, 'Edit face'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FaceEditorScreen), findsOneWidget);
+    expect(sidebar.hitTestable(), findsOneWidget);
+    await tester.tap(find.widgetWithText(ListTile, 'Feedback'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FeedbackScreen), findsOneWidget);
+    expect(sidebar.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });
