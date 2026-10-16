@@ -11,6 +11,7 @@ import 'api.dart' show ApiError;
 import 'app_update.dart';
 import 'app_state.dart';
 import 'link.dart';
+import 'navigation/browser_history.dart';
 import 'reports.dart';
 import 'report_scope.dart';
 import 'diagnostics.dart';
@@ -84,6 +85,36 @@ class GameNightApp extends StatefulWidget {
 
 class _GameNightAppState extends State<GameNightApp> {
   final _navigator = GlobalKey<NavigatorState>();
+  BrowserNavigation? _history;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) {
+      _history = BrowserNavigation(
+          navigatorKey: _navigator,
+          fullscreen: () => widget.state.companionFullscreen,
+          setFullscreen: widget.state.setCompanionFullscreen);
+      widget.state.addListener(_fullscreenChanged);
+    }
+  }
+
+  void _fullscreenChanged() => _history?.fullscreenChanged();
+
+  @override
+  void dispose() {
+    widget.state.removeListener(_fullscreenChanged);
+    _history?.dispose();
+    super.dispose();
+  }
+
+  Widget _home() => HomeScreen(
+      state: widget.state,
+      links: widget.links,
+      initialLink: widget.initialLink,
+      accountLoading: widget.accountLoading,
+      reports: widget.reports,
+      history: _history);
 
   void _feedback() {
     final reports = widget.reports;
@@ -96,7 +127,7 @@ class _GameNightAppState extends State<GameNightApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        navigatorKey: _navigator,
+        navigatorKey: kIsWeb ? null : _navigator,
         title: 'GameNight',
         debugShowCheckedModeBanner: false,
         theme: gameNightTheme(),
@@ -135,22 +166,29 @@ class _GameNightAppState extends State<GameNightApp> {
                                                 size: 20),
                                             label: const Text('Feedback')),
                                     ])))),
-                        Expanded(child: child!),
+                        Expanded(
+                            child: _history == null
+                                ? child!
+                                : Navigator(
+                                    key: _navigator,
+                                    observers: [_history!.observer],
+                                    onGenerateRoute: (_) =>
+                                        MaterialPageRoute<void>(
+                                            settings:
+                                                const RouteSettings(name: '/'),
+                                            builder: (_) => _home()),
+                                  )),
                       ])),
                 )),
           ),
         ),
-        home: HomeScreen(
-            state: widget.state,
-            links: widget.links,
-            initialLink: widget.initialLink,
-            accountLoading: widget.accountLoading,
-            reports: widget.reports),
+        home: kIsWeb ? null : _home(),
       );
 }
 
 class HomeScreen extends StatefulWidget {
   final AppState state;
+  final BrowserNavigation? history;
   final ReportService? reports;
   final Stream<Uri>? links;
   final Uri? initialLink;
@@ -158,6 +196,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen(
       {super.key,
       required this.state,
+      this.history,
       this.links,
       this.initialLink,
       this.accountLoading,
@@ -176,6 +215,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    _tab = widget.history?.tab ?? 0;
+    widget.history?.addListener(_historyChanged);
     WidgetsBinding.instance.addObserver(this);
     widget.state.addListener(_followGame);
     _links = widget.links?.listen(_onLink);
@@ -187,10 +228,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    widget.history?.removeListener(_historyChanged);
     WidgetsBinding.instance.removeObserver(this);
     _links?.cancel();
     widget.state.removeListener(_followGame);
     super.dispose();
+  }
+
+  void _historyChanged() {
+    if (mounted && _tab != widget.history?.tab) {
+      setState(() => _tab = widget.history!.tab);
+    }
+  }
+
+  void _selectTab(int tab) {
+    if (widget.history case final history?) {
+      history.selectTab(tab);
+    } else if (_tab != tab) {
+      setState(() => _tab = tab);
+    }
   }
 
   @override
@@ -214,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       try {
         final room = parseHostLink(uri.toString());
         if (room.roomCode == null && room.pair == null) return;
-        if (mounted) setState(() => _tab = 0);
+        if (mounted) _selectTab(0);
         await _roomKey.currentState?.openLink(uri.toString());
       } on LinkError {
         // Not a room invitation.
@@ -235,7 +291,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void _followGame() {
     final game = widget.state.companion?.game;
     if (game != null && game != _openedFor) {
-      setState(() => _tab = 0);
+      _selectTab(0);
       _roomKey.currentState?.showCurrentGame();
     }
     _openedFor = game;
@@ -255,7 +311,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           GameScreen(
               catalogOnly: true,
               state: widget.state,
-              onJoin: () => setState(() => _tab = 0)),
+              onJoin: () => _selectTab(0)),
           PlayerScreen(state: widget.state),
         ];
         return PopScope(
@@ -283,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.only(top: 1),
                       child: NavigationBar(
                         selectedIndex: _tab,
-                        onDestinationSelected: (i) => setState(() => _tab = i),
+                        onDestinationSelected: _selectTab,
                         destinations: [
                           NavigationDestination(
                             icon: Badge(

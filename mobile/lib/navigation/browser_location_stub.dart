@@ -1,0 +1,2 @@
+void back() {}
+void cleanLaunchUrl() {}

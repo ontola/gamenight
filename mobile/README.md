@@ -190,3 +190,24 @@ the player/controller while revoking the guest capability. Leaving revokes the
 guest credential; a reload restores a still-active guest room without an account.
 Run `flutter test test/guest_room_test.dart test/sign_in_navigation_test.dart`
 for guest joining, choosing a seat, reload, expiry and optional profile sign-in.
+
+## Browser navigation
+
+The web app records tabs, detail pages, dialogs and phone fullscreen mode in
+browser history. Back and Forward restore the UI without reconnecting the room
+or recreating its phone iframe. Back closes fullscreen or a dialog first. A
+normal detail page is rebuilt from its retained builder on Forward; a disposed
+dialog or an unknown detail ID after a reload falls back safely to the known
+tab. Native Android keeps its existing Navigator and fullscreen Back handling.
+
+History contains only UI destinations and local numeric route IDs. The initial
+room/email invitation is captured once and removed from the address; room
+credentials and private companion URLs never enter browser history.
+
+Run `flutter test test/browser_history_test.dart test/companion_fullscreen_test.dart`
+for route restoration and native Back coverage. After
+`flutter build web --release --base-href /app/`, run
+`node test/browser/navigation.cjs` with Playwright installed for actual browser
+Back/Forward, unchanged iframe identity, and one guest join across navigation.
+These browser checks use synthetic room/catalog responses, not a physical TV.
+Set `GAMENIGHT_TEST_SCREENSHOTS` for phone and desktop captures.
