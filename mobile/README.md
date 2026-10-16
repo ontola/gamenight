@@ -8,7 +8,7 @@ browser does, as an installable app for Android and iOS:
   contains your room identity and device preferences. The same room connection
   drives all three views. You can reorder and remove queued games in local and
   hosted rooms.
-- **Games.** Browse the catalog and choose games for your room. Swipe left or right on a game page to move through the same list, or use the arrows. A gallery with multiple images or videos keeps its own swipe controls.
+- **Games.** Browse the catalog and choose games for your room. Swipe left or right on a game page to move through the same list, A gallery with multiple images or videos keeps its own swipe controls.
 - **You.** Edit your name, skin colour and 48×48 face. Changes save automatically.
 
 GameNight branding and Feedback remain in the top bar across these tabs.
@@ -21,7 +21,9 @@ The cloud and desktop host must both support hosted companions for this flow.
 Games can also declare a native phone app. On Android the app offers installation
 from the game's download; on iOS it links to the App Store.
 
-The app signs in to gamenight.ontola.io and joins centrally registered rooms.
+The app joins centrally registered rooms as a guest by default. No email or
+installation is needed: the hosted website provides the same private phone
+screens. Signing in is optional, from **You → Save your player**.
 Email sign-in uses an eight-digit, single-use code tied to the app that requested
 it. The email link opens the Android app; pasting the code into the app also
 works. Browser and app sessions are separate. A code requested in the browser
@@ -41,8 +43,9 @@ never talks directly to the daemon's control port.
 
 ## Run
 
-GameNight must have its phone studio on: start it with
-`python scripts/run-local.py --studio`, or set `GAMENIGHT_WEB=1`.
+For hosted rooms, start the GameNight lobby with its cloud connection enabled.
+The optional LAN fallback needs `python scripts/run-local.py --studio` or
+`GAMENIGHT_WEB=1`; it is not required for website/app guest play.
 
 ```sh
 cd mobile
@@ -164,3 +167,26 @@ player app even in a new tab. The app rejoins after validating the browser cooki
 and opens the room's current phone game when the player's seat is connected.
 Failed joins remain visible with retry; expired invitations require a fresh scan.
 Native email links keep the app's saved invitation and resume it after sign-in.
+
+## Guest room flow
+
+A QR for one player binds that exact available seat immediately. A room QR or
+code automatically binds the only free seat, or offers a player picker when
+several are available. No sign-in page appears in this flow. The current game's
+phone screen opens after binding. Occupied/stale seats are rejected, and an
+expired room connection asks for a fresh scan, never an email login.
+
+`POST /v1/rooms/guest` accepts a room `code` or seat `ticket`, plus the local
+`profile` (`display_name`, `skin_color`, compact `avatar`). Its separate room
+token is saved locally and sent as `X-GameNight-Room-Token` only to guest-aware
+room endpoints. It is never an account bearer token or part of an invitation URL.
+Room status includes available `seats`; `/guest/seat` claims one exact seat.
+Guests can use their private phone game and the shared queue. Cloud profile
+saving, main-player ownership and account/assistant controls remain account-only.
+Guest face edits stay on this phone until a later join or optional profile save.
+
+Optional sign-in calls `/v1/rooms/guest/upgrade` with both credentials, preserving
+the player/controller while revoking the guest capability. Leaving revokes the
+guest credential; a reload restores a still-active guest room without an account.
+Run `flutter test test/guest_room_test.dart test/sign_in_navigation_test.dart`
+for guest joining, choosing a seat, reload, expiry and optional profile sign-in.

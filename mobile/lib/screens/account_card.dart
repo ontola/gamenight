@@ -22,7 +22,9 @@ class _AccountCardState extends State<AccountCard> {
     setState(() => _busy = true);
     try {
       await state.signOut();
-      if (mounted) toast(context, 'Signed out. Your player stays on this phone.');
+      if (mounted) {
+        toast(context, 'Signed out. Your player stays on this phone.');
+      }
     } catch (e) {
       if (mounted) toast(context, e.toString());
     } finally {
@@ -41,15 +43,23 @@ class _AccountCardState extends State<AccountCard> {
             const Icon(Icons.account_circle, color: GnColors.ok, size: 32),
             const SizedBox(width: 12),
             Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(state.accountEmail ?? account?.displayName ?? 'Signed in',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                const Hint('Your name and faces are saved to your account.'),
-              ]),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                        state.accountEmail ??
+                            account?.displayName ??
+                            'Signed in',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const Hint(
+                        'Your name and faces are saved to your account.'),
+                  ]),
             ),
-            TextButton(onPressed: _busy ? null : _signOut, child: const Text('Sign out')),
+            TextButton(
+                onPressed: _busy ? null : _signOut,
+                child: const Text('Sign out')),
           ]),
         ),
       );
@@ -61,17 +71,19 @@ class _AccountCardState extends State<AccountCard> {
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Sign in to GameNight',
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          const Text('Save your player',
               style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
           const SizedBox(height: 6),
-          const Hint('Keep your name and faces on every phone, and join rooms with their '
-              'code from anywhere.'),
+          const Hint(
+              'Optional: keep your name and faces for next time. You can play without an account.'),
           const SizedBox(height: 14),
           FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => SignInScreen(state: state))),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => SignInScreen(state: state))),
             icon: const Icon(Icons.login, size: 18),
             label: const Text('Sign in with email'),
           ),

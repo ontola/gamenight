@@ -92,7 +92,13 @@ class HostedRoom {
 
   bool get connected => status == 'connected';
   bool get waiting => status == 'waiting';
-  bool get none => !connected && !waiting;
+  bool get choosingPlayer => status == 'choose_player';
+  bool get guest => raw['guest'] == true;
+  List<Map<String, dynamic>> get seats => (raw['seats'] as List? ?? [])
+      .whereType<Map>()
+      .map((v) => Map<String, dynamic>.from(v))
+      .toList();
+  bool get none => !connected && !waiting && !choosingPlayer;
 }
 
 /// `GET /v1/pairing/<ticket>`: what a hosted lobby QR would connect.
@@ -110,10 +116,18 @@ class SignedOut extends ApiError {
   const SignedOut() : super('Your sign-in expired. Sign in again.');
 }
 
+class GuestRoomExpired extends ApiError {
+  const GuestRoomExpired()
+      : super('Your room connection expired. Scan the QR on the TV again.');
+}
+
 class CloudApi {
   final Uri base;
   final http.Client _client;
   String? token;
+  String? guestToken;
+  bool get hasRoomSession => token != null || guestToken != null;
+  Object get roomIdentity => (token, guestToken);
   final bool browserCookies;
   String? _browserCsrf;
   // Local state only. HttpOnly cookies, never these markers, authenticate web.
@@ -144,7 +158,15 @@ class CloudApi {
 
   Future<http.Response> _raw(String method, String path,
       {Object? body, Map<String, String> headers = const {}}) async {
+    final guestPath = path == '/v1/rooms/guest' ||
+        path == '/v1/rooms/status' ||
+        path == '/v1/rooms/companion' ||
+        path == '/v1/rooms/next' ||
+        path.startsWith('/v1/rooms/guest/');
+    final usesGuest = guestToken != null && guestPath;
     final cookieMutation = browserCookies &&
+        !(usesGuest && path != '/v1/rooms/guest/upgrade') &&
+        path != '/v1/rooms/guest' &&
         !path.startsWith('/auth/email/') &&
         !const ['GET', 'HEAD', 'OPTIONS'].contains(method);
     if (cookieMutation && _browserCsrf == null) {
@@ -167,7 +189,11 @@ class CloudApi {
       'Accept': 'application/json',
       // Sign-in only answers requests from its own site.
       if (!browserCookies) 'Origin': origin,
-      if (!browserCookies && token != null) 'Authorization': 'Bearer $token',
+      if (!browserCookies &&
+          token != null &&
+          (!usesGuest || path == '/v1/rooms/guest/upgrade'))
+        'Authorization': 'Bearer $token',
+      if (usesGuest) 'X-GameNight-Room-Token': guestToken!,
       if (cookieMutation) 'X-GameNight-CSRF': _browserCsrf!,
       ...headers,
     });
@@ -199,6 +225,16 @@ class CloudApi {
       {Object? body, Map<int, String> errors = const {}}) async {
     final response = await _raw(method, path, body: body);
     final status = response.statusCode;
+    if (status == 401 &&
+        guestToken != null &&
+        (path == '/v1/rooms/status' ||
+            path == '/v1/rooms/companion' ||
+            path == '/v1/rooms/next' ||
+            path.startsWith('/v1/rooms/guest/')) &&
+        path != '/v1/rooms/guest/upgrade') {
+      guestToken = null;
+      throw const GuestRoomExpired();
+    }
     if (status == 401 && token != null) {
       token = null;
       throw const SignedOut();
@@ -371,6 +407,56 @@ class CloudApi {
   }
 
   // ---- Hosted rooms ----------------------------------------------------
+
+  Future<HostedRoom> joinGuest(
+      {String? code,
+      String? ticket,
+      required Map<String, dynamic> profile}) async {
+    final response = await _send('POST', '/v1/rooms/guest', body: {
+      if (code != null) 'code': code,
+      if (ticket != null) 'ticket': ticket,
+      'profile': profile,
+    }, errors: {
+      404: 'No room with that code. Check the code on the TV.',
+      410: 'This QR expired. Scan the QR on the TV again.',
+      409: 'That player is already connected. Scan another player’s QR.',
+    });
+    if (response is! Map ||
+        response['token'] is! String ||
+        (response['token'] as String).isEmpty ||
+        response['status'] is! Map) {
+      throw const ApiError('Could not join the room. Try scanning again.');
+    }
+    guestToken = response['token'] as String;
+    return HostedRoom(Map<String, dynamic>.from(response['status'] as Map));
+  }
+
+  Future<void> chooseGuestSeat(Map<String, dynamic> seat) async {
+    await _send('POST', '/v1/rooms/guest/seat', body: {
+      'index': seat['index'],
+      'player': seat['player'],
+      'revision': seat['revision'],
+    }, errors: {
+      409: 'That player was just taken. Choose another player.',
+      410: 'The players have changed. Choose your player again.'
+    });
+  }
+
+  Future<void> upgradeGuest() async {
+    if (guestToken == null) return;
+    await _send('POST', '/v1/rooms/guest/upgrade', body: {}, errors: {
+      409:
+          'Your account already has a player in this room. Your guest game is still connected.',
+      410: 'Your guest connection expired. Scan the QR on the TV again.',
+    });
+    guestToken = null;
+  }
+
+  Future<void> leaveGuest() async {
+    if (guestToken == null) return;
+    await _send('POST', '/v1/rooms/guest/leave', body: {});
+    guestToken = null;
+  }
 
   Future<void> joinRoom(String code, {bool remember = false}) =>
       _send('POST', '/v1/rooms/join', body: {

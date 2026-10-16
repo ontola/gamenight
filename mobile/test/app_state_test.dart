@@ -20,10 +20,15 @@ class FakeHost {
     final key = '${request.method} ${request.url.path}';
     calls.add(key);
     if (request.body.isNotEmpty) bodies[key] = jsonDecode(request.body);
-    if (request.url.path == '/api/player-links') return http.Response('{"linked":[]}', 200);
-    if (request.url.path == '/api/profiles') return http.Response(request.body, 200);
+    if (request.url.path == '/api/player-links') {
+      return http.Response('{"linked":[]}', 200);
+    }
+    if (request.url.path == '/api/profiles') {
+      return http.Response(request.body, 200);
+    }
     if (request.url.path.endsWith('/join')) {
-      return http.Response(jsonEncode({'status': 'claimed', 'player_id': 'p1'}), 200);
+      return http.Response(
+          jsonEncode({'status': 'claimed', 'player_id': 'p1'}), 200);
     }
     if (request.url.path.endsWith('/session')) {
       return http.Response(
@@ -38,7 +43,9 @@ class FakeHost {
           }),
           200);
     }
-    if (request.url.path == '/api/local-room/join') return http.Response('', 204);
+    if (request.url.path == '/api/local-room/join') {
+      return http.Response('', 204);
+    }
     if (request.url.path == '/api/companion' && companion) {
       final profile = request.url.queryParameters['profile'];
       return http.Response(
@@ -68,14 +75,24 @@ void main() {
 
   test('a room code saves the profile, then asks for a lobby pickup', () async {
     await state.connect(parseHostLink('http://10.0.0.2:7913/?r=ABC234'));
-    expect(host.calls, containsAllInOrder(['GET /api/player-links', 'POST /api/profiles', 'POST /api/local-room/join']));
+    expect(
+        host.calls,
+        containsAllInOrder([
+          'GET /api/player-links',
+          'POST /api/profiles',
+          'POST /api/local-room/join'
+        ]));
     expect(host.bodies['POST /api/local-room/join'],
         {'code': 'ABC234', 'profile': state.profileId});
-    expect(host.calls.where((c) => c.endsWith('/join') && c.contains('/profiles/')), isEmpty);
+    expect(
+        host.calls
+            .where((c) => c.endsWith('/join') && c.contains('/profiles/')),
+        isEmpty);
   });
 
   test('a character QR claims that character and keeps editing it', () async {
-    await state.connect(parseHostLink('http://10.0.0.2:7913/studio?claim=p1&link_revision=2'));
+    await state.connect(
+        parseHostLink('http://10.0.0.2:7913/studio?claim=p1&link_revision=2'));
     final join = host.bodies['POST /api/profiles/${state.profileId}/join'];
     expect(join, {'claim': 'p1', 'seat': null, 'link_revision': 2});
     expect(state.boundPlayer, 'p1');
@@ -90,7 +107,8 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(state.session!.linked, isTrue);
     expect(state.boundPlayer, 'p1');
-    expect(host.calls.skip(before), contains('POST /api/profiles/${state.profileId}/join'));
+    expect(host.calls.skip(before),
+        contains('POST /api/profiles/${state.profileId}/join'));
   });
 
   test('the first random name and face survive a restart', () async {
@@ -101,16 +119,12 @@ void main() {
     again.dispose();
   });
 
-  test('hosted room links ask to sign in first', () async {
-    expect(() => state.connect(parseHostLink('https://gamenight.ontola.io/studio#room=ABC234')),
-        throwsA(AppState.signInFirst));
-  });
-
   test('a game with a phone screen is offered while it is played', () async {
     await state.connect(parseHostLink('http://10.0.0.2:7913/?r=ABC234'));
     host.linked = true;
     await state.refreshSession();
-    expect(state.companion, isNull, reason: 'a host without phone screens answers 404');
+    expect(state.companion, isNull,
+        reason: 'a host without phone screens answers 404');
     host.companion = true;
     await state.refreshSession();
     expect(state.companion!.title, 'Hexstead');
@@ -121,7 +135,8 @@ void main() {
     expect(state.companion, isNull);
   });
 
-  test('saved faces survive a restart and round-trip through a backup', () async {
+  test('saved faces survive a restart and round-trip through a backup',
+      () async {
     final first = state.currentArtworkId;
     state.newArtwork(name: 'Second');
     expect(state.artworks.length, 2);
@@ -141,8 +156,10 @@ void main() {
     expect(fresh.importBackup(backup), 3);
     expect(fresh.name, state.name);
     expect(fresh.face, state.face);
-    expect(fresh.importBackup(backup), 0, reason: 'faces already here are skipped');
-    expect(() => fresh.importBackup('{"format":"nope"}'), throwsA(isA<BackupError>()));
+    expect(fresh.importBackup(backup), 0,
+        reason: 'faces already here are skipped');
+    expect(() => fresh.importBackup('{"format":"nope"}'),
+        throwsA(isA<BackupError>()));
     fresh.dispose();
   });
 }

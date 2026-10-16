@@ -37,12 +37,14 @@ class GameScreen extends StatelessWidget {
             : state.api!.resolve(url);
         final controls = roomControlsFor(state);
         final session = state.session;
-        final settings = SettingsSection(
-            key: const ValueKey('settings'),
-            controls: controls,
-            title: state.inHostedRoom
-                ? state.hostedRoom?.currentTitle
-                : session?.currentTitle);
+        final settings = state.isGuest
+            ? const SizedBox.shrink()
+            : SettingsSection(
+                key: const ValueKey('settings'),
+                controls: controls,
+                title: state.inHostedRoom
+                    ? state.hostedRoom?.currentTitle
+                    : session?.currentTitle);
         final catalog =
             CatalogSection(key: const ValueKey('catalog'), controls: controls);
         if (catalogOnly) {
@@ -72,7 +74,9 @@ class GameScreen extends StatelessWidget {
                           icon: const Icon(Icons.fullscreen),
                           onPressed: () => state.setCompanionFullscreen(true),
                         ),
-                      if (companion.url != null && controls != null)
+                      if (companion.url != null &&
+                          controls != null &&
+                          !state.isGuest)
                         IconButton(
                           tooltip: 'Game settings',
                           icon: const Icon(Icons.tune),

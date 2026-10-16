@@ -44,6 +44,10 @@ class AppState extends ChangeNotifier {
     final host = prefs.getString('host');
     if (host != null) _api = this.apiFactory(Uri.parse(host));
     this.cloud.token = prefs.getString('cloud_token');
+    this.cloud.guestToken = prefs.getString('guest_room_token');
+    if (this.cloud.guestToken != null) {
+      completedRoomInvitation = prefs.getString('guest_room_invitation');
+    }
     _restoreEmailBinding();
     accountEmail = prefs.getString('account_email');
     _studioRevision = prefs.getInt('studio_revision') ?? 0;
@@ -377,6 +381,7 @@ class AppState extends ChangeNotifier {
         ? await claimHostedSeat(link.pair!, remember: remember)
         : await joinHostedRoom(link.roomCode!, remember: remember);
     completedRoomInvitation = destination;
+    if (isGuest) await prefs.setString('guest_room_invitation', destination);
     // Do not erase a different invitation scanned while this request ran.
     if (prefs.getString('pending_room_destination') == destination) {
       await prefs.remove('pending_room_destination');
@@ -497,6 +502,7 @@ class AppState extends ChangeNotifier {
   bool _pushingAccount = false, _accountPending = false;
 
   bool get signedIn => cloud.signedIn;
+  bool get isGuest => cloud.guestToken != null;
   Future<String>? _signInOperation;
   bool get signingIn => _signInOperation != null;
 
@@ -558,6 +564,7 @@ class AppState extends ChangeNotifier {
       final doc = await cloud.studio();
       final adopted = _adoptStudio(doc);
       await _pushAccount();
+      await _upgradeGuestConnection();
       if (pendingRoomDestination != null) {
         try {
           await resumeRoomInvitation();
@@ -653,12 +660,14 @@ class AppState extends ChangeNotifier {
   Future<void> _forgetAccount() async {
     cloud.token = null;
     account = null;
-    hostedRoom = null;
-    companion = null;
-    companionError = null;
-    inHostedRoom = false;
+    if (!isGuest) {
+      hostedRoom = null;
+      companion = null;
+      companionError = null;
+      inHostedRoom = false;
+      await prefs.remove('hosted_room');
+    }
     await prefs.remove('cloud_token');
-    await prefs.remove('hosted_room');
     await prefs.remove('studio_revision');
     _studioRevision = 0;
   }
@@ -670,13 +679,18 @@ class AppState extends ChangeNotifier {
       if (cloud.browserCookies) {
         if (!await cloud.restoreBrowserSession()) {
           if (account != null || inHostedRoom) await _forgetAccount();
+          if (isGuest) await refreshHostedRoom();
           notifyListeners();
           return;
         }
         await prefs.setString('cloud_token', cloud.token!);
       }
-      if (!cloud.signedIn) return;
+      if (!cloud.signedIn) {
+        if (isGuest) await refreshHostedRoom();
+        return;
+      }
       account = await cloud.me();
+      await _upgradeGuestConnection();
       if (pendingRoomDestination != null) {
         _adoptStudio(await cloud.studio());
         try {
@@ -699,11 +713,68 @@ class AppState extends ChangeNotifier {
   bool inHostedRoom = false;
   HostedRoom? hostedRoom;
 
-  /// The phone needs an account for hosted rooms.
-  static const signInFirst = ApiError('Sign in to join a room with its code.');
+  /// Guest room credentials are deliberately separate from account sign-in.
+  Map<String, dynamic> get _guestProfile => {
+        'display_name': name,
+        'skin_color': skinColor,
+        'avatar': encodeAvatar(face),
+      };
+
+  Future<String> _joinAsGuest({String? code, String? ticket}) async {
+    if (isGuest &&
+        hostedRoom?.code == code &&
+        code != null &&
+        !hostedRoom!.none) {
+      return _guestJoinMessage;
+    }
+    hostedRoom = await cloud.joinGuest(
+        code: code, ticket: ticket, profile: _guestProfile);
+    await prefs.setString('guest_room_token', cloud.guestToken!);
+    await _enterHostedRoom();
+    return _guestJoinMessage;
+  }
+
+  String get _guestJoinMessage => hostedRoom?.choosingPlayer == true
+      ? 'Choose your player.'
+      : hostedRoom?.connected == true
+          ? 'Connected to the room.'
+          : 'Connect a controller to join the game.';
+
+  Future<void> chooseGuestSeat(Map<String, dynamic> seat) async {
+    try {
+      await cloud.chooseGuestSeat(seat);
+    } finally {
+      await refreshHostedRoom();
+    }
+  }
+
+  Future<void> _upgradeGuestConnection() async {
+    if (!isGuest || !signedIn) return;
+    try {
+      await cloud.upgradeGuest();
+      await prefs.remove('guest_room_token');
+      await prefs.remove('guest_room_invitation');
+      await refreshHostedRoom();
+    } on ApiError catch (e) {
+      sessionError = e.message;
+    }
+  }
+
+  Future<void> _forgetGuestRoom() async {
+    cloud.guestToken = null;
+    await prefs.remove('guest_room_token');
+    await prefs.remove('guest_room_invitation');
+    await prefs.remove('hosted_room');
+    inHostedRoom = false;
+    hostedRoom = null;
+    companion = null;
+    completedRoomInvitation = null;
+  }
 
   Future<String> joinHostedRoom(String code, {bool remember = false}) async {
-    if (!cloud.signedIn) throw signInFirst;
+    if (!cloud.signedIn || isGuest) {
+      return _joinAsGuest(code: code.toUpperCase());
+    }
     await _pushAccount();
     await cloud.joinRoom(code.toUpperCase(), remember: remember);
     await _enterHostedRoom();
@@ -714,7 +785,7 @@ class AppState extends ChangeNotifier {
 
   /// A hosted lobby's QR: connect straight to that seat.
   Future<String> claimHostedSeat(String ticket, {bool remember = false}) async {
-    if (!cloud.signedIn) throw signInFirst;
+    if (!cloud.signedIn || isGuest) return _joinAsGuest(ticket: ticket);
     await _pushAccount();
     await cloud.claim(ticket, remember: remember);
     await _enterHostedRoom();
@@ -729,11 +800,11 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> refreshHostedRoom() async {
-    if (!cloud.signedIn) return;
+    if (!cloud.hasRoomSession) return;
     try {
-      final token = cloud.token;
+      final token = cloud.roomIdentity;
       final room = await cloud.roomStatus();
-      if (!inHostedRoom || token != cloud.token || _disposed) return;
+      if (!inHostedRoom || token != cloud.roomIdentity || _disposed) return;
       hostedRoom = room;
       sessionError = null;
       companionError = null;
@@ -742,7 +813,7 @@ class AppState extends ChangeNotifier {
       } else {
         try {
           final response = await cloud.request('GET', '/v1/rooms/companion');
-          if (!inHostedRoom || token != cloud.token || _disposed) return;
+          if (!inHostedRoom || token != cloud.roomIdentity || _disposed) return;
           final next = response is Map<String, dynamic>
               ? Companion.fromJson(response)
               : null;
@@ -754,6 +825,9 @@ class AppState extends ChangeNotifier {
             }
           }
           companion = next;
+        } on GuestRoomExpired catch (e) {
+          await _forgetGuestRoom();
+          sessionError = e.message;
         } on SignedOut {
           rethrow;
         } on ApiError {
@@ -761,6 +835,9 @@ class AppState extends ChangeNotifier {
           companionError = 'Phone controls could not connect. Retrying…';
         }
       }
+    } on GuestRoomExpired catch (e) {
+      await _forgetGuestRoom();
+      sessionError = e.message;
     } on SignedOut {
       await _forgetAccount();
     } on ApiError catch (e) {
@@ -771,7 +848,12 @@ class AppState extends ChangeNotifier {
 
   Future<void> leaveHostedRoom() async {
     final room = hostedRoom;
-    if (room != null && room.waiting) {
+    if (isGuest) {
+      try {
+        await cloud.leaveGuest();
+      } on GuestRoomExpired {/* Already revoked. */}
+      await _forgetGuestRoom();
+    } else if (room != null && room.waiting) {
       await cloud.cancelPickup();
     } else {
       await cloud.leaveRoom();

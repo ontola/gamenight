@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../api.dart';
 import '../app_state.dart';
 import '../link.dart';
 import '../theme.dart';
 import 'scanner_screen.dart';
 import 'game_screen.dart';
 import 'playlist_screen.dart';
-import 'sign_in_screen.dart';
 
 /// Connect to a GameNight on this network and see where you stand in it.
 class RoomScreen extends StatefulWidget {
@@ -65,33 +63,16 @@ class RoomScreenState extends State<RoomScreen> {
           return;
         }
         await state.rememberRoomInvitation(link);
-        await _withAccount(state.resumeRoomInvitation);
+        await _joinAction(state.resumeRoomInvitation);
       } else {
-        await _withAccount(() => state.connect(link));
+        await _joinAction(() => state.connect(link));
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
   }
 
-  /// Runs [action]; when it needs an account, signs in first and retries.
-  Future<void> _withAccount(Future<String> Function() action) => _run(() async {
-        try {
-          return await action();
-        } on ApiError catch (e) {
-          if (e != AppState.signInFirst || !mounted) rethrow;
-          final ok = await _signIn(
-              reason:
-                  'Sign in to join this room. Your name and faces are saved '
-                  'to your account and follow you to every GameNight.');
-          if (ok != true) return null;
-          return action();
-        }
-      });
-
-  Future<bool?> _signIn({String? reason}) =>
-      Navigator.of(context).push<bool>(MaterialPageRoute(
-          builder: (_) => SignInScreen(state: state, reason: reason)));
+  Future<void> _joinAction(Future<String> Function() action) => _run(action);
 
   Future<void> _scan() async {
     final text = await Navigator.of(context).push<String>(
@@ -111,7 +92,7 @@ class RoomScreenState extends State<RoomScreen> {
       await state.rememberRoomInvitation(
           HostLink(Uri.parse(hostedOrigin), roomCode: code),
           remember: _rememberJoin);
-      await _withAccount(state.resumeRoomInvitation);
+      await _joinAction(state.resumeRoomInvitation);
     }
     _code.clear();
   }
@@ -210,6 +191,24 @@ class RoomScreenState extends State<RoomScreen> {
     final connected = room?.connected ?? false;
     final waiting = room?.waiting ?? false;
     return [
+      if (room?.choosingPlayer == true)
+        Section(title: 'Choose your player', children: [
+          const Hint('Pick the player you are using on the TV.'),
+          const SizedBox(height: 12),
+          for (final seat in room!.seats)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: FilledButton.tonal(
+                  onPressed: _busy || seat['available'] != true
+                      ? null
+                      : () => _run(() async {
+                            await state.chooseGuestSeat(seat);
+                            return 'Connected to the room.';
+                          }),
+                  child: Text(seat['name'] as String? ??
+                      'Player ${(seat['index'] as num? ?? 0).toInt() + 1}'),
+                )),
+        ]),
       Section(
           title: room?.code == null ? 'Your room' : 'Room ${room!.code}',
           children: [
@@ -233,9 +232,11 @@ class RoomScreenState extends State<RoomScreen> {
                           ? 'Checking your room…'
                           : connected
                               ? 'Connected as ${state.name}'
-                              : waiting
-                                  ? 'Waiting for pickup in the lobby'
-                                  : 'Not in a room any more'),
+                              : room.choosingPlayer
+                                  ? 'Choose your player above'
+                                  : waiting
+                                      ? 'Waiting for a controller'
+                                      : 'Not in a room any more'),
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.w600),
                 ),
@@ -244,9 +245,11 @@ class RoomScreenState extends State<RoomScreen> {
             const SizedBox(height: 8),
             Hint(connected
                 ? 'Your name and face follow you into every game.'
-                : waiting
-                    ? 'Walk your character to your door in the lobby and stand there to connect.'
-                    : 'The pickup expired or you left. Enter the room code again.'),
+                : room?.choosingPlayer == true
+                    ? 'No account needed.'
+                    : waiting
+                        ? 'Connect a controller on the TV. Your player will appear here.'
+                        : 'The pickup expired or you left. Enter the room code again.'),
             if (connected) ...[
               const SizedBox(height: 12),
               _Facts(rows: [
@@ -262,7 +265,7 @@ class RoomScreenState extends State<RoomScreen> {
                 ),
             ],
           ]),
-      if (room != null && (connected || waiting))
+      if (!state.isGuest && room != null && (connected || waiting))
         Section(children: [
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
@@ -314,16 +317,18 @@ class RoomScreenState extends State<RoomScreen> {
   }
 
   List<Widget> _connectCards() => [
-        if (state.pendingRoomDestination != null && state.sessionError != null)
+        if (state.sessionError != null)
           Section(title: 'Could not join this room', children: [
             Text(state.sessionError!,
                 style: const TextStyle(color: GnColors.warn)),
-            const SizedBox(height: 12),
-            FilledButton(
-                onPressed: _busy
-                    ? null
-                    : () => _withAccount(state.resumeRoomInvitation),
-                child: const Text('Try again')),
+            if (state.pendingRoomDestination != null) ...[
+              const SizedBox(height: 12),
+              FilledButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _joinAction(state.resumeRoomInvitation),
+                  child: const Text('Try again')),
+            ],
           ]),
         Section(title: 'Join a room', children: [
           FilledButton.icon(

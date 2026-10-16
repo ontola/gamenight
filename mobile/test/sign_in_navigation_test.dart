@@ -10,9 +10,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'account_test.dart' show FakeCloud;
 
 void main() {
-  for (final entry in ['code', 'link', 'cold link', 'web return']) {
-    final viaLink = entry != 'code';
-    testWidgets('sign in from a room $entry keeps the home route',
+  for (final entry in ['code', 'link']) {
+    final viaLink = entry == 'link';
+    testWidgets('optional profile sign-in by $entry keeps the home route',
         (tester) async {
       SharedPreferences.setMockInitialValues({});
       final cloud = FakeCloud();
@@ -20,21 +20,10 @@ void main() {
           cloud: CloudApi(client: cloud.client));
       final links = StreamController<Uri>();
       addTearDown(links.close);
-      await tester.pumpWidget(GameNightApp(
-          state: state,
-          links: links.stream,
-          initialLink: entry == 'web return'
-              ? Uri.parse('https://gamenight.ontola.io/app/?room=ABC234')
-              : entry == 'cold link'
-                  ? Uri.parse('https://gamenight.ontola.io/join#room=ABC234')
-                  : null));
-      if (entry == 'cold link' || entry == 'web return') {
-        await tester.pump();
-      } else if (viaLink) {
-        links.add(Uri.parse('https://gamenight.ontola.io/join#room=ABC234'));
-      } else {
-        await tester.enterText(find.byType(TextField).first, 'ABC234');
-      }
+      await tester.pumpWidget(GameNightApp(state: state, links: links.stream));
+      await tester.tap(find.text('You'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign in with email'));
       await tester.pumpAndSettle();
       expect(find.text('Email me a code'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, 'test@example.com');
@@ -51,14 +40,14 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(find.byType(NavigationBar), findsOneWidget);
-      expect(state.inHostedRoom, isTrue);
-      expect(
-          cloud.calls.where((c) => c == 'POST /v1/rooms/join'), hasLength(1));
+      expect(state.signedIn, isTrue);
+      expect(state.inHostedRoom, isFalse);
+      expect(cloud.calls.where((c) => c == 'POST /v1/rooms/join'), isEmpty);
       expect(cloud.calls.where((c) => c == 'POST /auth/email/verify'),
           hasLength(1));
       await tester.tap(find.text('Room'));
       await tester.pumpAndSettle();
-      expect(find.text('Waiting for pickup in the lobby'), findsOneWidget);
+      expect(find.text('Scan the QR on the TV'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       state.dispose();
     });

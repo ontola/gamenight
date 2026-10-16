@@ -256,7 +256,7 @@ class CloudRoomControls implements RoomControls {
   CloudRoomControls(this.cloud,
       {String? roomCode,
       this.confirmationTimeout = const Duration(seconds: 20)})
-      : target = (cloud, cloud.token, roomCode);
+      : target = (cloud, cloud.roomIdentity, roomCode);
 
   static String _requestId() {
     final r = Random.secure();
@@ -345,6 +345,7 @@ class CloudRoomControls implements RoomControls {
   /// Online rooms only report the settings of the game on screen.
   @override
   Future<GameSettings?> settings({String? game}) async {
+    if (cloud.guestToken != null) return null;
     final current = GameSettings.fromJson((await _discovery())?['controls']);
     return game == null || current?.game == game ? current : null;
   }

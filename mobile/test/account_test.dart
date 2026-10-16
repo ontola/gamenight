@@ -10,8 +10,10 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const browser = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0';
-const session = 'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
+const browser =
+    'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0';
+const session =
+    'c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1';
 
 /// gamenight.ontola.io as the app sees it: cookies for sign-in, then a
 /// bearer session for everything else.
@@ -34,30 +36,44 @@ class FakeCloud {
     switch (key) {
       case 'POST /auth/email/request':
         return http.Response('', 204, headers: {
-          'set-cookie': 'gn_email=$browser; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600'
+          'set-cookie':
+              'gn_email=$browser; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600'
         });
       case 'POST /auth/email/verify':
-        if (request.headers['Cookie'] != 'gn_email=$browser') return http.Response('', 401);
+        if (request.headers['Cookie'] != 'gn_email=$browser') {
+          return http.Response('', 401);
+        }
         if (bodies[key]['code'] != '12345678') return http.Response('', 401);
         return http.Response('', 204, headers: {
-          'set-cookie': 'gn_session=$session; Path=/; HttpOnly; Secure; SameSite=Lax; '
-              'Max-Age=86400,gn_email=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
+          'set-cookie':
+              'gn_session=$session; Path=/; HttpOnly; Secure; SameSite=Lax; '
+                  'Max-Age=86400,gn_email=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0'
         });
     }
-    if (request.headers['Authorization'] != 'Bearer $session') return http.Response('', 401);
+    if (request.headers['Authorization'] != 'Bearer $session') {
+      return http.Response('', 401);
+    }
     switch (key) {
       case 'GET /v1/me':
         return http.Response(
             jsonEncode({
               'id': 'acc1',
-              'profile': {'display_name': 'Joep', 'skin_color': '#c58c85', 'avatar': ''}
+              'profile': {
+                'display_name': 'Joep',
+                'skin_color': '#c58c85',
+                'avatar': ''
+              }
             }),
             200);
       case 'GET /v1/me/studio':
         return http.Response(
             jsonEncode({
               'revision': revision,
-              'profile': {'display_name': 'Joep', 'skin_color': '#c58c85', 'avatar': ''},
+              'profile': {
+                'display_name': 'Joep',
+                'skin_color': '#c58c85',
+                'avatar': ''
+              },
               'workspace': workspace,
             }),
             200);
@@ -105,12 +121,14 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     cloud = FakeCloud();
-    state = AppState(await SharedPreferences.getInstance(), cloud: CloudApi(client: cloud.client));
+    state = AppState(await SharedPreferences.getInstance(),
+        cloud: CloudApi(client: cloud.client));
   });
 
   tearDown(() => state.dispose());
 
-  test('signing in takes the saved player and keeps this phone’s faces', () async {
+  test('signing in takes the saved player and keeps this phone’s faces',
+      () async {
     final mine = state.currentArtwork.data;
     final saved = Artwork(id: 'web1', name: 'From the web', data: randomFace());
     cloud.workspace = jsonDecode(encodeBackup(Backup(
@@ -122,7 +140,8 @@ void main() {
     await state.requestSignInCode(' Joep@Example.com ');
     expect(state.accountEmail, 'joep@example.com');
     expect(cloud.bodies['POST /auth/email/request']['client'], 'app');
-    await expectLater(state.verifySignInCode('00000000'), throwsA(isA<Exception>()));
+    await expectLater(
+        state.verifySignInCode('00000000'), throwsA(isA<Exception>()));
     // A wrong code keeps the binding so the right one still works.
     await state.requestSignInCode('joep@example.com');
     final message = await state.verifySignInCode('12345678');
@@ -133,7 +152,9 @@ void main() {
     expect(state.name, 'Joep');
     expect(state.skinColor, '#c58c85');
     expect(state.artworks.map((a) => a.name), contains('From the web'));
-    expect(state.artworks.any((a) => encodeAvatar(a.data) == encodeAvatar(mine)), isTrue);
+    expect(
+        state.artworks.any((a) => encodeAvatar(a.data) == encodeAvatar(mine)),
+        isTrue);
     // Everything goes back up, so the account has this phone's faces too.
     final put = cloud.bodies['PUT /v1/me/studio'] as Map<String, dynamic>;
     expect(put['profile']['display_name'], 'Joep');
@@ -147,16 +168,19 @@ void main() {
     state.setName('Panda');
     await state.pushProfile();
     await Future<void>.delayed(const Duration(milliseconds: 10));
-    expect((cloud.bodies['PUT /v1/me/studio'] as Map)['profile']['display_name'], 'Panda');
-    expect(cloud.calls.where((c) => c == 'PUT /v1/me/studio').length, greaterThanOrEqualTo(2));
+    expect(
+        (cloud.bodies['PUT /v1/me/studio'] as Map)['profile']['display_name'],
+        'Panda');
+    expect(cloud.calls.where((c) => c == 'PUT /v1/me/studio').length,
+        greaterThanOrEqualTo(2));
   });
 
   test('a room code joins an online room after signing in', () async {
-    await expectLater(state.joinHostedRoom('ABC234'), throwsA(AppState.signInFirst));
     await state.requestSignInCode('joep@example.com');
     await state.verifySignInCode('12345678');
 
-    await expectLater(state.joinHostedRoom('ZZZ234'), throwsA(isA<Exception>()));
+    await expectLater(
+        state.joinHostedRoom('ZZZ234'), throwsA(isA<Exception>()));
     final message = await state.joinHostedRoom('ABC234');
     expect(message, contains('door'));
     expect(state.inHostedRoom, isTrue);
@@ -176,11 +200,15 @@ void main() {
     final pair = parseHostLink('https://gamenight.ontola.io/studio#pair=t1');
     expect(pair.hosted, isTrue);
     expect(pair.pair, 't1');
-    expect(parseHostLink('https://gamenight.ontola.io/join#room=abc234').roomCode, 'ABC234');
+    expect(
+        parseHostLink('https://gamenight.ontola.io/join#room=abc234').roomCode,
+        'ABC234');
   });
 
-  test('the link in the email finishes the sign-in, even after a restart', () async {
-    final link = SignInLink.parse(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'))!;
+  test('the link in the email finishes the sign-in, even after a restart',
+      () async {
+    final link = SignInLink.parse(
+        Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'))!;
     expect(link.code, '12345678');
     for (final other in [
       'https://gamenight.ontola.io/auth/login#code=12345678',
@@ -199,7 +227,8 @@ void main() {
     await state.requestSignInCode('joep@example.com');
     state.dispose();
     state = AppState(state.prefs, cloud: CloudApi(client: cloud.client));
-    expect(state.cloud.emailBinding, isNotNull, reason: 'the app was closed while checking email');
+    expect(state.cloud.emailBinding, isNotNull,
+        reason: 'the app was closed while checking email');
     final message = await state.signInWithLink(link);
     expect(message, startsWith('Signed in'));
     expect(state.signedIn, isTrue);
