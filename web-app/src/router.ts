@@ -5,7 +5,7 @@ const loads=new Map<string,Promise<View>>();
 const scripts=new Set<string>();
 const failedViews=new Set<string>();
 let active='',sequence=0,started=false;
-const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html' || /^\/games\/[a-z0-9-]+$/.test(url.pathname)?'games':url.pathname==='/studio'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
+const key=(url:URL)=>url.pathname==='/' || url.pathname==='/index.html'?'home':url.pathname==='/host'?'host':url.pathname==='/catalog' || url.pathname==='/catalog.html' || /^\/games\/[a-z0-9-]+$/.test(url.pathname)?'games':url.pathname==='/studio' && document.body.dataset.local==='true'?'studio':url.pathname==='/developers' || url.pathname==='/developers/submissions'?'developers':/^\/docs(?:\/[a-z-]+)?$/.test(url.pathname)?url.pathname:null;
 function capture(doc:Document,id:string):View {
   const node=document.createElement('div');node.dataset.appView=id;
   for(const child of [...doc.body.children]){

@@ -22,7 +22,7 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
   await page.route('**/auth/**',route=>{if(route.request().method()!=='GET')authMutations++;return route.fulfill({status:401,json:{}});});
   await page.route('**/v1/**',route=>{
    const p=new URL(route.request().url()).pathname;let data={};
-   if(p==='/v1/catalog') data=[{id:'moon-cards',title:'Moon Cards',tagline:'A synthetic navigation fixture',developer:'Test studio',players:{min:2,max:4},price:'free',color:'#336655'}];
+   if(p==='/v1/catalog') data=[{id:'moon-cards',title:'Moon Cards',tagline:'A synthetic navigation fixture',developer:'Test studio',players:{min:2,max:4},price:'free',color:'#336655'}, ...['Rocket Rally','Forest Friends','Pixel Party','Space Garden','Castle Clash','River Riders','Neon Nights','Tiny Towers','Ocean Quest','Cloud Club','Desert Dash'].map((title,i)=>({id:'fixture-'+i,title,tagline:'Play together',developer:'Test studio',players:{min:2,max:4},price:'free',color:['#51428a','#245b50','#734555','#325878'][i%4]}))];
    else if(p==='/v1/rooms/guest'){joins++;data={token,status:room,profile:{display_name:'Test guest'}};}
    else if(p==='/v1/rooms/status')data=room;
    else if(p==='/v1/rooms/companion')data={game:'moon-cards',title:'Moon Cards',url:'/v1/companion/fixture-navigation/index.html'};
@@ -69,7 +69,40 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
   if(output){fs.mkdirSync(output,{recursive:true});await page.screenshot({path:path.join(output,'browser-forward-fullscreen-phone.png')});}
   await page.goBack();await page.waitForURL(rootURL);
   await tab('Games').click();if(process.env.GAMENIGHT_DEBUG_SEMANTICS)console.log('Games click',page.url());await page.waitForURL(gamesURL);
-  if(output){await page.mouse.move(0,0);await page.waitForTimeout(400);await page.screenshot({path:path.join(output,'browser-back-games-phone.png')});await page.setViewportSize({width:1280,height:900});await page.waitForTimeout(400);await page.screenshot({path:path.join(output,'browser-back-games-desktop.png')});}
-  console.log('PASS browser Back/Forward across Room, Games, detail and fullscreen; app Back; no duplicate tab history; original iframe/session retained; no invitation replay or secrets in history.');
+  if(output){await page.mouse.move(0,0);await page.waitForTimeout(400);await page.screenshot({path:path.join(output,'games-phone.png')});}
+  for(const width of [1280,1920,390]) {
+   await page.setViewportSize({width,height:900});await page.waitForTimeout(500);
+   assert(await page.evaluate(()=>document.querySelector('iframe')===window.originalPhone),'resize keeps the private frame');
+   if(width>=900){
+    if(output)await page.screenshot({path:path.join(output,'games-desktop-'+width+'.png')});
+    await page.getByText('A synthetic navigation fixture').click();
+    await page.getByRole('button',{name:'Next game (Right arrow)'}).click();
+    await page.getByText('Rocket Rally',{exact:true}).first().waitFor();
+    await page.keyboard.press('ArrowLeft');await page.waitForTimeout(400);
+    await page.getByRole('button',{name:'Back',exact:true}).click();
+    await page.waitForURL(gamesURL);
+   }
+  }
+  await page.getByRole('button',{name:'Menu',exact:true}).click();
+  await page.getByText('Developer portal',{exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  assert.equal(joins,1);assert.deepEqual(errors,[]);
+  // Existing website guest migrates into Flutter without another pickup.
+  await page.evaluate(()=>{
+   localStorage.clear();sessionStorage.clear();
+   sessionStorage.setItem('gamenight_guest_v1',JSON.stringify({token:'synthetic-navigation-guest',room:'ABC234',profile:{display_name:'Returning guest'}}));
+  });
+  await page.goto('https://gamenight.ontola.io/app/?room=ABC234',{waitUntil:'networkidle'});
+  await page.frameLocator('iframe').getByText('Your private hand').waitFor();
+  assert.equal(joins,1,'Migrated website guest must not join again');
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('gamenight_guest_v1')),null);
+  assert(!page.url().includes(token));assert.deepEqual(errors,[]);
+  // Choosing a game on the website survives joining, but does not queue it.
+  await page.goto('https://gamenight.ontola.io/app/?room=ABC234&game=fixture-0',{waitUntil:'networkidle'});
+  await page.evaluate(()=>document.querySelector('flt-semantics-placeholder')?.click());
+  await page.getByRole('button',{name:'Share game'}).waitFor({timeout:30000});
+  await page.getByText('Rocket Rally',{exact:true}).first().waitFor();
+  assert.equal(joins,1);assert.deepEqual(errors,[]);
+  console.log('PASS desktop/phone resizing, keyboard browsing, menu, website guest migration; browser Back/Forward across Room, Games, detail and fullscreen; app Back; no duplicate tab history; original iframe/session retained; no invitation replay or secrets in history.');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

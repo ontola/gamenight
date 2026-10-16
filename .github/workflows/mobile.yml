@@ -115,3 +115,36 @@ jobs:
           # The APK first: an app that sees the new version.json must find its APK.
           gh release upload app-latest gamenight.apk --clobber
           gh release upload app-latest version.json --clobber
+
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          cache: true
+      - run: flutter pub get
+      - run: flutter build web --release --base-href /app/ --pwa-strategy none --no-web-resources-cdn
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify browser navigation, desktop layout and room continuity
+        run: |
+          npm install --prefix "$RUNNER_TEMP/player-browser" --no-save playwright@1.62.1
+          export NODE_PATH="$RUNNER_TEMP/player-browser/node_modules"
+          node "$NODE_PATH/playwright/cli.js" install --with-deps chromium
+          GAMENIGHT_TEST_SCREENSHOTS="$RUNNER_TEMP/player-previews" node test/browser/navigation.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamenight-player-web
+          path: mobile/build/web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-browser-previews
+          path: ${{ runner.temp }}/player-previews

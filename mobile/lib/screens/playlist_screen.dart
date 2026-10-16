@@ -7,6 +7,7 @@ import '../app_state.dart';
 import '../catalog.dart';
 import '../room_controls.dart';
 import '../theme.dart';
+import '../layout.dart';
 import 'game_detail_screen.dart';
 import 'settings_panel.dart';
 
@@ -107,7 +108,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
                   ? const CircularProgressIndicator()
                   : Hint(_error!));
         }
-        return _list(_view!);
+        return ContentWidth(maxWidth: 1040, child: _list(_view!));
       },
     );
   }

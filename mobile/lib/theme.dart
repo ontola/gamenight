@@ -91,6 +91,13 @@ ThemeData gameNightTheme() {
         borderSide: const BorderSide(color: GnColors.border),
       ),
     ),
+    navigationRailTheme: const NavigationRailThemeData(
+      backgroundColor: GnColors.bg,
+      indicatorColor: GnColors.button,
+      selectedLabelTextStyle:
+          TextStyle(color: GnColors.text, fontWeight: FontWeight.w700),
+      unselectedLabelTextStyle: TextStyle(color: GnColors.muted),
+    ),
     navigationBarTheme: const NavigationBarThemeData(
       backgroundColor: GnColors.card,
       indicatorColor: GnColors.button,
@@ -117,7 +124,8 @@ class Section extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Text(title!,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    style: const TextStyle(
+                        fontSize: 17, fontWeight: FontWeight.w700)),
               ),
             ...children,
           ],

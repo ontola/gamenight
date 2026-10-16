@@ -12,7 +12,13 @@ import 'game_detail_screen.dart';
 /// its videos and screenshots. In a room, games its host can play get an "Add to queue" button.
 class CatalogSection extends StatefulWidget {
   final RoomControls? controls;
-  const CatalogSection({super.key, this.controls});
+  final String? requestedGame;
+  final VoidCallback? onRequestedGameOpened;
+  const CatalogSection(
+      {super.key,
+      this.controls,
+      this.requestedGame,
+      this.onRequestedGameOpened});
 
   @override
   State<CatalogSection> createState() => _CatalogSectionState();
@@ -24,6 +30,8 @@ class _CatalogSectionState extends State<CatalogSection> {
   Map<String, HostGame> _host = const {};
   final Set<String> _adding = {};
   Timer? _poll;
+  String? _openedRequest;
+  bool _hostLoaded = false;
 
   bool get _inRoom => widget.controls != null;
 
@@ -39,6 +47,7 @@ class _CatalogSectionState extends State<CatalogSection> {
   void didUpdateWidget(CatalogSection old) {
     super.didUpdateWidget(old);
     if ((old.controls == null) != (widget.controls == null)) _loadHost();
+    _openRequestedGame();
   }
 
   @override
@@ -51,7 +60,10 @@ class _CatalogSectionState extends State<CatalogSection> {
     setState(() => _error = null);
     try {
       final games = await Catalog.instance.games();
-      if (mounted) setState(() => _games = games);
+      if (mounted) {
+        setState(() => _games = games);
+        _openRequestedGame();
+      }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
@@ -66,11 +78,37 @@ class _CatalogSectionState extends State<CatalogSection> {
     try {
       final games = await controls.games();
       if (mounted && widget.controls != null) {
-        setState(() => _host = {for (final g in games) g.id: g});
+        setState(() {
+          _host = {for (final g in games) g.id: g};
+          _hostLoaded = true;
+        });
+        _openRequestedGame();
       }
     } on ApiError {
       // Keep what we knew; the next poll tries again.
     }
+  }
+
+  void _openRequestedGame() {
+    final wanted = widget.requestedGame;
+    if (wanted == null ||
+        wanted == _openedRequest ||
+        _games == null ||
+        !_inRoom ||
+        !_hostLoaded) {
+      return;
+    }
+    _openedRequest = wanted;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onRequestedGameOpened?.call();
+      final matches = _games!.where((game) => game.id == wanted);
+      if (matches.isEmpty) {
+        toast(context, 'This game is no longer in the catalog.');
+        return;
+      }
+      _open(matches.first);
+    });
   }
 
   Future<void> _add(CatalogGame game) async {
@@ -101,7 +139,8 @@ class _CatalogSectionState extends State<CatalogSection> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Padding(
         padding: EdgeInsets.fromLTRB(4, 16, 4, 4),
-        child: Text('Games', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        child: Text('Games',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
@@ -118,7 +157,8 @@ class _CatalogSectionState extends State<CatalogSection> {
         Section(children: [
           Hint(_error!),
           const SizedBox(height: 12),
-          OutlinedButton(onPressed: _loadCatalog, child: const Text('Try again')),
+          OutlinedButton(
+              onPressed: _loadCatalog, child: const Text('Try again')),
         ])
       else
         _grid(_sorted(games)),
@@ -142,7 +182,13 @@ class _CatalogSectionState extends State<CatalogSection> {
   Widget _grid(List<CatalogGame> games) {
     return LayoutBuilder(builder: (context, box) {
       const gap = 12.0;
-      final columns = box.maxWidth >= 720 ? 4 : (box.maxWidth >= 480 ? 3 : 2);
+      final columns = box.maxWidth >= 1200
+          ? 6
+          : box.maxWidth >= 960
+              ? 5
+              : box.maxWidth >= 720
+                  ? 4
+                  : (box.maxWidth >= 480 ? 3 : 2);
       final width = (box.maxWidth - gap * (columns - 1)) / columns;
       // Until the host says which games it has, cards are for browsing only.
       final queueable = _inRoom && _host.isNotEmpty;
@@ -201,54 +247,68 @@ class GameCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        child:
+            Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           AspectRatio(aspectRatio: 3 / 4, child: GameCover(game: game)),
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(game.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(game.tagline,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12.5, color: GnColors.muted, height: 1.25)),
-                const Spacer(),
-                if (game.players.isNotEmpty)
-                  Row(children: [
-                    const Icon(Icons.people_alt_outlined, size: 14, color: GnColors.muted),
-                    const SizedBox(width: 4),
-                    Text(game.players, style: const TextStyle(fontSize: 12, color: GnColors.muted)),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(game.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 15, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(game.tagline,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 12.5,
+                            color: GnColors.muted,
+                            height: 1.25)),
+                    const Spacer(),
+                    if (game.players.isNotEmpty)
+                      Row(children: [
+                        const Icon(Icons.people_alt_outlined,
+                            size: 14, color: GnColors.muted),
+                        const SizedBox(width: 4),
+                        Text(game.players,
+                            style: const TextStyle(
+                                fontSize: 12, color: GnColors.muted)),
+                      ]),
+                    if (inRoom) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 36,
+                        width: double.infinity,
+                        child: playable
+                            ? FilledButton.icon(
+                                style: FilledButton.styleFrom(
+                                    minimumSize: const Size(0, 36),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8)),
+                                onPressed: adding ? null : onAdd,
+                                icon: adding
+                                    ? const SizedBox.square(
+                                        dimension: 14,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
+                                    : const Icon(Icons.playlist_add, size: 18),
+                                label: const Text('Add to queue', maxLines: 1),
+                              )
+                            : const Center(
+                                child: Text('Not on this GameNight',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 12, color: GnColors.muted)),
+                              ),
+                      ),
+                    ],
                   ]),
-                if (inRoom) ...[
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 36,
-                    width: double.infinity,
-                    child: playable
-                        ? FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                                minimumSize: const Size(0, 36),
-                                padding: const EdgeInsets.symmetric(horizontal: 8)),
-                            onPressed: adding ? null : onAdd,
-                            icon: adding
-                                ? const SizedBox.square(
-                                    dimension: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                                : const Icon(Icons.playlist_add, size: 18),
-                            label: const Text('Add to queue', maxLines: 1),
-                          )
-                        : const Center(
-                            child: Text('Not on this GameNight',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(fontSize: 12, color: GnColors.muted)),
-                          ),
-                  ),
-                ],
-              ]),
             ),
           ),
         ]),
@@ -264,7 +324,8 @@ class GameCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget tile(BuildContext context, [Object? _, StackTrace? __]) => ColoredBox(
+    Widget tile(BuildContext context, [Object? _, StackTrace? __]) =>
+        ColoredBox(
           color: game.color ?? GnColors.field,
           child: Center(
             child: Padding(
@@ -282,7 +343,10 @@ class GameCover extends StatelessWidget {
     final bytes = game.coverBytes, url = game.coverUrl;
     if (bytes != null) {
       return Image.memory(bytes,
-          fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: tile, semanticLabel: game.title);
+          fit: BoxFit.cover,
+          gaplessPlayback: true,
+          errorBuilder: tile,
+          semanticLabel: game.title);
     }
     if (url != null) {
       return Image.network(url.toString(),

@@ -660,6 +660,7 @@ class AppState extends ChangeNotifier {
   Future<void> _forgetAccount() async {
     cloud.token = null;
     account = null;
+    _accountProfileLoaded = false;
     if (!isGuest) {
       hostedRoom = null;
       companion = null;
@@ -690,6 +691,10 @@ class AppState extends ChangeNotifier {
         return;
       }
       account = await cloud.me();
+      if (!_accountProfileLoaded && !isGuest) {
+        _adoptStudio(await cloud.studio());
+        _accountProfileLoaded = true;
+      }
       await _upgradeGuestConnection();
       if (pendingRoomDestination != null) {
         _adoptStudio(await cloud.studio());
@@ -711,6 +716,7 @@ class AppState extends ChangeNotifier {
   // ---- Hosted rooms (joined by room code over the internet) ------------
 
   bool inHostedRoom = false;
+  bool _accountProfileLoaded = false;
   HostedRoom? hostedRoom;
 
   /// Guest room credentials are deliberately separate from account sign-in.

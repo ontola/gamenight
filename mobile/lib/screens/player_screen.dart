@@ -6,12 +6,23 @@ import '../avatar.dart';
 import '../character.dart';
 import '../faces.dart';
 import '../theme.dart';
+import '../layout.dart';
 import 'account_card.dart';
 import 'face_editor_screen.dart';
 
 const List<String> clothingColors = [
-  '#ff5555', '#ff8f3f', '#ffc94a', '#7ddf64', '#3fd0c9', '#55a0ff',
-  '#8b7bff', '#c792ea', '#ff7ab8', '#b0764a', '#9aa5b1', '#4a5568',
+  '#ff5555',
+  '#ff8f3f',
+  '#ffc94a',
+  '#7ddf64',
+  '#3fd0c9',
+  '#55a0ff',
+  '#8b7bff',
+  '#c792ea',
+  '#ff7ab8',
+  '#b0764a',
+  '#9aa5b1',
+  '#4a5568',
 ];
 
 /// Name, colours and the face editor. Every change saves by itself.
@@ -50,7 +61,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
   }
 
   void _onState() {
-    _body.update(state.api?.characterSprite, state.clothingColor, state.skinColor);
+    _body.update(
+        state.api?.characterSprite, state.clothingColor, state.skinColor);
     if (_name.text != state.name) _name.text = state.name;
   }
 
@@ -63,15 +75,29 @@ class _PlayerScreenState extends State<PlayerScreen> {
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: state,
-      builder: (context, _) => ListView(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        children: [
-          AccountCard(state: state),
-          _identity(),
-          _editor(),
-          _gallery(),
-          _backup(),
-        ],
+      builder: (context, _) => ContentWidth(
+        maxWidth: 1120,
+        child: LayoutBuilder(
+            builder: (context, box) => ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+                  children: [
+                    AccountCard(state: state),
+                    if (box.maxWidth >= 900)
+                      Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _identity()),
+                            const SizedBox(width: 20),
+                            Expanded(
+                                child: Column(children: [
+                              _editor(),
+                              _gallery(),
+                              _backup()
+                            ])),
+                          ])
+                    else ...[_identity(), _editor(), _gallery(), _backup()],
+                  ],
+                )),
       ),
     );
   }
@@ -125,27 +151,34 @@ class _PlayerScreenState extends State<PlayerScreen> {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            state.syncMessage.isEmpty ? 'Saved on your phone' : state.syncMessage,
-            style: TextStyle(color: warn ? GnColors.warn : GnColors.muted, fontSize: 13),
+            state.syncMessage.isEmpty
+                ? 'Saved on this device'
+                : state.syncMessage,
+            style: TextStyle(
+                color: warn ? GnColors.warn : GnColors.muted, fontSize: 13),
           ),
         ),
       ]),
       const SizedBox(height: 14),
       const Hint('Skin colour'),
       const SizedBox(height: 6),
-      ColorSwatches(colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
+      ColorSwatches(
+          colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
       const SizedBox(height: 12),
       const Hint('Clothing colour (preview only, games pick their own)'),
       const SizedBox(height: 6),
       ColorSwatches(
-          colors: clothingColors, selected: state.clothingColor, onTap: state.setClothing),
+          colors: clothingColors,
+          selected: state.clothingColor,
+          onTap: state.setClothing),
     ]);
   }
 
   /// A preview of the current face. Drawing happens full screen.
   Widget _editor() {
     return Section(title: 'Draw your face', children: [
-      const Hint('Draw anywhere on the head, hats included. Tap the canvas to start.'),
+      const Hint(
+          'Draw anywhere on the head, hats included. Tap the canvas to start.'),
       const SizedBox(height: 12),
       Center(
         child: Semantics(
@@ -210,9 +243,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       color: GnColors.bg,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: active ? GnColors.accent : GnColors.border, width: active ? 3 : 1),
+                          color: active ? GnColors.accent : GnColors.border,
+                          width: active ? 3 : 1),
                     ),
-                    child: CustomPaint(painter: _FaceThumb(data, state.skinColor)),
+                    child:
+                        CustomPaint(painter: _FaceThumb(data, state.skinColor)),
                   ),
                   const SizedBox(height: 4),
                   SizedBox(
@@ -222,7 +257,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 12, color: active ? Colors.white : GnColors.muted)),
+                            fontSize: 12,
+                            color: active ? Colors.white : GnColors.muted)),
                   ),
                 ]),
               ),
@@ -254,10 +290,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete ${art.name}?'),
-        content: const Text('This face is removed from this phone.'),
+        content: const Text('This face is removed from this device.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete')),
         ],
       ),
     );
@@ -266,14 +306,17 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Widget _backup() {
     return Section(title: 'Backup', children: [
-      const Hint('Copy your faces, name and skin as text and keep it in a note. '
-          'Paste it back here or in the browser studio to restore.'),
+      const Hint(
+          'Copy your faces, name and skin as text and keep it in a note. '
+          'Paste it back here on another device to restore.'),
       const SizedBox(height: 10),
       Wrap(spacing: 8, runSpacing: 8, children: [
         FilledButton.tonalIcon(
           onPressed: () async {
             await Clipboard.setData(ClipboardData(text: state.exportBackup()));
-            if (mounted) toast(context, 'Backup copied. Paste it into a note to keep it.');
+            if (mounted) {
+              toast(context, 'Backup copied. Paste it into a note to keep it.');
+            }
           },
           icon: const Icon(Icons.content_copy, size: 18),
           label: const Text('Copy backup'),
@@ -299,9 +342,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           decoration: const InputDecoration(hintText: 'Paste your backup here'),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           FilledButton(
-              onPressed: () => Navigator.pop(context, field.text), child: const Text('Restore')),
+              onPressed: () => Navigator.pop(context, field.text),
+              child: const Text('Restore')),
         ],
       ),
     );
@@ -309,7 +355,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (text == null || text.trim().isEmpty || !mounted) return;
     try {
       final added = state.importBackup(text);
-      toast(context, 'Imported $added face${added == 1 ? '' : 's'}. Existing faces were kept.');
+      toast(context,
+          'Imported $added face${added == 1 ? '' : 's'}. Existing faces were kept.');
     } on BackupError catch (e) {
       toast(context, e.message);
     }
@@ -325,15 +372,17 @@ class _FaceThumb extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final cell = size.width / gridSize;
-    canvas.drawCircle(Offset((headX + .5) * cell, (headY + .5) * cell), headRadius * cell,
-        Paint()..color = hexColor(skin));
+    canvas.drawCircle(Offset((headX + .5) * cell, (headY + .5) * cell),
+        headRadius * cell, Paint()..color = hexColor(skin));
     final paint = Paint();
     for (var i = 0; i < face.length; i++) {
       final c = face[i];
       if (c == null) continue;
       paint.color = hexColor(c);
       canvas.drawRect(
-          Rect.fromLTWH((i % gridSize) * cell, (i ~/ gridSize) * cell, cell + .3, cell + .3), paint);
+          Rect.fromLTWH((i % gridSize) * cell, (i ~/ gridSize) * cell,
+              cell + .3, cell + .3),
+          paint);
     }
   }
 

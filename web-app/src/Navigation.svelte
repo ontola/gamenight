@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { room, route, busy, signedIn, assistantUrl, guestRoom, guestToken } from './state';
+  import { room, route, busy, assistantUrl, guestRoom, guestToken } from './state';
   import { navigate } from './router';
   let leaveDialog: HTMLDialogElement;
   let menuDialog: HTMLDialogElement;
@@ -41,7 +41,7 @@
     finally{leaving=false;}
   }
   async function join() {
-    if(document.body.dataset.local!=='true'){window.location.assign('/join');return;}
+    if(document.body.dataset.local!=='true'){window.location.assign('/app/');return;}
     await navigate('/studio#join');
     const button=document.getElementById('qr-open');
     const dialog=document.getElementById('qr-scanner') as HTMLDialogElement;
@@ -53,8 +53,8 @@
   <div class="site-links">
     <a href="/catalog" aria-current={($route.startsWith('/catalog') || $route.startsWith('/games/'))?'page':undefined}>Games</a>
     <a class="site-desktop-link" href="/docs" aria-current={$route==='/docs' || $route.startsWith('/docs/')?'page':undefined}>Docs</a>
-    <a href={$guestRoom?'/join':$signedIn?'/studio':'/auth/login'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>{$guestRoom?'Your player':$signedIn?'You':'Sign in'}</a>
-    <a href="/studio#session" hidden={$room!==true || $guestRoom} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
+    <a href={document.body.dataset.local==='true'?'/studio':'/app/#/you'} aria-current={$route.startsWith('/studio') && !$route.includes('#session')?'page':undefined}>You</a>
+    <a href="/app/#/room?section=playlist" hidden={$room!==true || $guestRoom} aria-current={$route==='/studio#session'?'page':undefined}>Playlist</a>
     {#if $room===true && $assistantUrl}
       <a href={$assistantUrl} aria-current={$route==='/agent'?'page':undefined}>Assistant</a>
     {/if}

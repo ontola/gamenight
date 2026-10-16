@@ -211,3 +211,30 @@ for route restoration and native Back coverage. After
 Back/Forward, unchanged iframe identity, and one guest join across navigation.
 These browser checks use synthetic room/catalog responses, not a physical TV.
 Set `GAMENIGHT_TEST_SCREENSHOTS` for phone and desktop captures.
+## Default player interface and larger screens
+
+Flutter is the shared player UI on Android, iOS and web (`/app/`). Public game
+pages, documentation and downloads remain indexable website content. Developer
+and admin workspaces are still website pages; the app Menu links to the developer
+portal, docs and hosting instructions. Those workspaces have not been ported.
+
+The hosted service forwards legacy `/join`, `/studio` and QR invitations into
+Flutter. Room/pair and requested-game intent survive the handoff. An existing
+website guest room is imported from same-origin session storage before startup,
+without creating another player or putting a room capability in the URL. A saved
+account uses the same-origin HttpOnly session. Sign-in and installation remain
+optional. A requested catalog game opens after joining; adding it to the queue
+still requires the player's action.
+
+Below 900 logical pixels, the app uses bottom navigation. Larger windows have a
+side navigation rail, a catalog with up to six columns, bounded forms, and a
+split profile editor. Game detail pages have previous/next buttons and Left/Right
+keyboard shortcuts on desktop; browser Back/Forward keeps its normal behavior.
+Resizing and fullscreen preserve the embedded game frame and private connection.
+
+Run `flutter test --no-pub`, then build web and run
+`node test/browser/navigation.cjs` with Playwright available through `NODE_PATH`.
+The browser test uses synthetic rooms, checks navigation and resizing on the
+compiled app, and writes phone/desktop screenshots when
+`GAMENIGHT_TEST_SCREENSHOTS` is set. Native desktop packaging is not added by this
+change; desktop users use the web app.

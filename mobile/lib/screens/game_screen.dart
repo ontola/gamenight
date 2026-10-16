@@ -10,6 +10,7 @@ import '../apps.dart';
 import '../companion/view.dart';
 import '../room_controls.dart';
 import '../theme.dart';
+import '../layout.dart';
 import 'catalog_view.dart';
 import 'settings_panel.dart';
 
@@ -19,12 +20,16 @@ import 'settings_panel.dart';
 class GameScreen extends StatelessWidget {
   final AppState state;
   final bool catalogOnly;
+  final String? requestedGame;
+  final VoidCallback? onRequestedGameOpened;
   final VoidCallback onJoin;
   const GameScreen(
       {super.key,
       required this.state,
       required this.onJoin,
-      this.catalogOnly = false});
+      this.catalogOnly = false,
+      this.requestedGame,
+      this.onRequestedGameOpened});
 
   @override
   Widget build(BuildContext context) {
@@ -45,8 +50,11 @@ class GameScreen extends StatelessWidget {
                 title: state.inHostedRoom
                     ? state.hostedRoom?.currentTitle
                     : session?.currentTitle);
-        final catalog =
-            CatalogSection(key: const ValueKey('catalog'), controls: controls);
+        final catalog = CatalogSection(
+            key: const ValueKey('catalog'),
+            controls: controls,
+            requestedGame: requestedGame,
+            onRequestedGameOpened: onRequestedGameOpened);
         if (catalogOnly) {
           return ListView(
               padding: const EdgeInsets.all(16), children: [catalog]);
@@ -133,9 +141,10 @@ class GameScreen extends StatelessWidget {
         final waiting =
             (session?.waiting ?? false) || (hosted?.waiting ?? false);
         final playing = hosted?.currentTitle ?? session?.currentTitle;
-        return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
+        return ContentWidth(
+            child: ListView(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                children: [
               Section(title: playing ?? 'Current game', children: [
                 if (waiting)
                   const Hint(
@@ -166,7 +175,7 @@ class GameScreen extends StatelessWidget {
               ]),
               if (state.companionError case final String error) Hint(error),
               settings,
-            ]);
+            ]));
       },
     );
   }

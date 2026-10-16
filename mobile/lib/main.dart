@@ -11,7 +11,11 @@ import 'api.dart' show ApiError;
 import 'app_update.dart';
 import 'app_state.dart';
 import 'link.dart';
+import 'layout.dart';
+import 'player_face.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'navigation/browser_history.dart';
+import 'navigation/website_session.dart';
 import 'reports.dart';
 import 'report_scope.dart';
 import 'diagnostics.dart';
@@ -25,6 +29,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setSystemUIOverlayStyle(gameNightSystemUi);
   final prefs = await SharedPreferences.getInstance();
+  if (kIsWeb) await migrateWebsiteRoom(prefs);
   final state = AppState(prefs);
   final reports = ReportService(prefs,
       requestHeaders: state.cloud.browserMutationHeaders,
@@ -125,6 +130,30 @@ class _GameNightAppState extends State<GameNightApp> {
     ));
   }
 
+  void _menu() {
+    final context = _navigator.currentState?.overlay?.context;
+    if (context == null) return;
+    showModalBottomSheet<void>(
+        context: context,
+        builder: (context) => SafeArea(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                for (final entry in const [
+                  ('/agent', 'Assistant'),
+                  ('/developers', 'Developer portal'),
+                  ('/docs', 'Documentation'),
+                  ('/host', 'Host a room')
+                ])
+                  ListTile(
+                      title: Text(entry.$2),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: () {
+                        Navigator.pop(context);
+                        launchUrl(Uri.parse('$hostedOrigin${entry.$1}'));
+                      }),
+              ]),
+            ));
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: kIsWeb ? null : _navigator,
@@ -141,44 +170,60 @@ class _GameNightAppState extends State<GameNightApp> {
                   color: GnColors.bg,
                   child: SafeArea(
                       bottom: false,
-                      child: Column(children: [
-                        Visibility(
-                            visible: !widget.state.companionFullscreen,
-                            child: Material(
-                                color: GnColors.bg,
-                                child: Padding(
-                                    padding:
-                                        const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                                    child: Row(children: [
-                                      const GameNightLogo(size: 28),
-                                      const SizedBox(width: 8),
-                                      const Expanded(
-                                          child: Text('GameNight',
-                                              key: ValueKey('app-brand'),
-                                              style: TextStyle(
-                                                  fontSize: 22,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: GnColors.text))),
-                                      if (widget.reports != null)
-                                        TextButton.icon(
-                                            onPressed: _feedback,
-                                            icon: const Icon(Icons.mic_none,
-                                                size: 20),
-                                            label: const Text('Feedback')),
-                                    ])))),
-                        Expanded(
-                            child: _history == null
-                                ? child!
-                                : Navigator(
-                                    key: _navigator,
-                                    observers: [_history!.observer],
-                                    onGenerateRoute: (_) =>
-                                        MaterialPageRoute<void>(
-                                            settings:
-                                                const RouteSettings(name: '/'),
-                                            builder: (_) => _home()),
-                                  )),
-                      ])),
+                      // Route semantics must not hide the persistent header.
+                      // Place it after Navigator in paint/semantics order while
+                      // keeping it visually above the page.
+                      child: Column(
+                          verticalDirection: VerticalDirection.up,
+                          children: [
+                            Expanded(
+                                child: _history == null
+                                    ? child!
+                                    : Navigator(
+                                        key: _navigator,
+                                        observers: [_history!.observer],
+                                        onGenerateRoute: (_) =>
+                                            MaterialPageRoute<void>(
+                                                settings: const RouteSettings(
+                                                    name: '/'),
+                                                builder: (_) => _home()),
+                                      )),
+                            Visibility(
+                                visible: !widget.state.companionFullscreen,
+                                child: Material(
+                                    color: GnColors.bg,
+                                    child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            16, 4, 8, 4),
+                                        child: Row(children: [
+                                          const GameNightLogo(size: 28),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                              child: Text('GameNight',
+                                                  key: ValueKey('app-brand'),
+                                                  style: TextStyle(
+                                                      fontSize: 22,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                      color: GnColors.text))),
+                                          Semantics(
+                                              container: true,
+                                              excludeSemantics: true,
+                                              onTap: _menu,
+                                              label: 'Menu',
+                                              button: true,
+                                              child: IconButton(
+                                                  onPressed: _menu,
+                                                  icon:
+                                                      const Icon(Icons.menu))),
+                                          if (widget.reports != null)
+                                            TextButton.icon(
+                                                onPressed: _feedback,
+                                                icon: const Icon(Icons.mic_none,
+                                                    size: 20),
+                                                label: const Text('Feedback')),
+                                        ])))),
+                          ])),
                 )),
           ),
         ),
@@ -209,6 +254,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _tab = 0;
   String? _openedFor;
+  String? _requestedGame;
   final _roomKey = GlobalKey<RoomScreenState>();
   StreamSubscription<Uri>? _links;
 
@@ -216,6 +262,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     _tab = widget.history?.tab ?? 0;
+    final requested = widget.initialLink?.queryParameters['game'] ??
+        widget.state.prefs.getString('requested_game');
+    if (requested != null &&
+        RegExp(r'^[a-z0-9][a-z0-9-]{0,79}$').hasMatch(requested)) {
+      _requestedGame = requested;
+      widget.state.prefs.setString('requested_game', requested);
+    }
     widget.history?.addListener(_historyChanged);
     WidgetsBinding.instance.addObserver(this);
     widget.state.addListener(_followGame);
@@ -289,6 +342,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Bring up a game's phone screen the moment that game starts, once per
   /// game, so players never have to go looking for it.
   void _followGame() {
+    if (_requestedGame != null &&
+        (widget.state.hostedRoom?.connected == true ||
+            widget.state.session?.linked == true)) {
+      _openedFor = widget.state.companion?.game;
+      _selectTab(1);
+      return;
+    }
     final game = widget.state.companion?.game;
     if (game != null && game != _openedFor) {
       _selectTab(0);
@@ -303,13 +363,27 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       listenable: widget.state,
       builder: (context, _) {
         widget.reports?.screen = const ['room', 'games', 'you'][_tab];
+        final wide = MediaQuery.sizeOf(context).width >= 900;
+        final fullscreen = widget.state.companionFullscreen;
         final linked = widget.state.inHostedRoom
             ? widget.state.hostedRoom?.connected ?? false
             : widget.state.session?.linked ?? false;
         final pages = [
-          RoomScreen(key: _roomKey, state: widget.state),
+          RoomScreen(
+              key: _roomKey,
+              state: widget.state,
+              initialSection: Uri.tryParse(widget.initialLink?.fragment ?? '')
+                          ?.queryParameters['section'] ==
+                      'playlist'
+                  ? 1
+                  : 0),
           GameScreen(
               catalogOnly: true,
+              requestedGame: _tab == 1 ? _requestedGame : null,
+              onRequestedGameOpened: () {
+                _requestedGame = null;
+                widget.state.prefs.remove('requested_game');
+              },
               state: widget.state,
               onJoin: () => _selectTab(0)),
           PlayerScreen(state: widget.state),
@@ -325,10 +399,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             body: SafeArea(
               child: Column(children: [
                 UpdateBanner(),
-                Expanded(child: IndexedStack(index: _tab, children: pages)),
+                Expanded(
+                    child: Row(children: [
+                  // Keep the content at the same tree position across breakpoints;
+                  // embedded games must never reload when the window is resized.
+                  SizedBox(
+                      width: wide && !fullscreen ? 200 : 0,
+                      child: Offstage(
+                          offstage: !wide || fullscreen,
+                          child: NavigationRail(
+                            extended: true,
+                            minExtendedWidth: 200,
+                            selectedIndex: _tab,
+                            onDestinationSelected: _selectTab,
+                            destinations: [
+                              const NavigationRailDestination(
+                                  icon: Icon(Icons.meeting_room_outlined),
+                                  label: Text('Room')),
+                              const NavigationRailDestination(
+                                  icon: Icon(Icons.sports_esports_outlined),
+                                  label: Text('Games')),
+                              NavigationRailDestination(
+                                  icon: PlayerFaceIcon(
+                                      face: widget.state.face,
+                                      skin: widget.state.skinColor),
+                                  label: Text('You')),
+                            ],
+                          ))),
+                  SizedBox(
+                      width: wide && !fullscreen ? 1 : 0,
+                      child: const VerticalDivider(width: 1)),
+                  Expanded(
+                      child: ContentWidth(
+                          maxWidth: fullscreen ? double.infinity : 1440,
+                          child: IndexedStack(index: _tab, children: pages))),
+                ])),
               ]),
             ),
-            bottomNavigationBar: widget.state.companionFullscreen
+            bottomNavigationBar: fullscreen || wide
                 ? null
                 : DecoratedBox(
                     decoration: const BoxDecoration(
@@ -359,8 +467,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             ),
                             label: 'Games',
                           ),
-                          const NavigationDestination(
-                              icon: Icon(Icons.face_retouching_natural),
+                          NavigationDestination(
+                              icon: PlayerFaceIcon(
+                                  face: widget.state.face,
+                                  skin: widget.state.skinColor),
                               label: 'You'),
                         ],
                       ),

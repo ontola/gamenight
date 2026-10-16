@@ -10,6 +10,7 @@ import '../report_scope.dart';
 import 'feedback_screen.dart';
 import '../room_controls.dart';
 import '../theme.dart';
+import '../layout.dart';
 import 'catalog_view.dart' show GameCover;
 
 /// A game's page, with the same videos, screenshots and facts as the website.
@@ -70,23 +71,34 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => PageView.builder(
-        key: const ValueKey('game-pages'),
-        controller: _pages,
-        itemCount: _games.length,
-        onPageChanged: (index) => setState(() => _index = index),
-        itemBuilder: (context, index) => _GameDetailPage(
-          key: ValueKey(_games[index].id),
-          game: _games[index],
-          games: _games,
-          active: index == _index,
-          host: widget.host,
-          onAdd: widget.onAdd,
-          share: widget.share,
-          onOpen: (game) =>
-              _go(_games.indexWhere((entry) => entry.id == game.id)),
-        ),
-      );
+  Widget build(BuildContext context) => CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+                _go(_index - 1),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                _go(_index + 1),
+          },
+          child: Focus(
+              autofocus: MediaQuery.sizeOf(context).width >= 900,
+              child: PageView.builder(
+                key: const ValueKey('game-pages'),
+                controller: _pages,
+                itemCount: _games.length,
+                onPageChanged: (index) => setState(() => _index = index),
+                itemBuilder: (context, index) => _GameDetailPage(
+                  key: ValueKey(_games[index].id),
+                  previous: index > 0 ? () => _go(index - 1) : null,
+                  next: index + 1 < _games.length ? () => _go(index + 1) : null,
+                  game: _games[index],
+                  games: _games,
+                  active: index == _index,
+                  host: widget.host,
+                  onAdd: widget.onAdd,
+                  share: widget.share,
+                  onOpen: (game) =>
+                      _go(_games.indexWhere((entry) => entry.id == game.id)),
+                ),
+              )));
 }
 
 class _GameDetailPage extends StatefulWidget {
@@ -98,7 +110,10 @@ class _GameDetailPage extends StatefulWidget {
       required this.onOpen,
       this.host,
       this.onAdd,
-      this.share});
+      this.share,
+      this.previous,
+      this.next});
+  final VoidCallback? previous, next;
   final CatalogGame game;
   final List<CatalogGame> games;
   final bool active;
@@ -173,6 +188,16 @@ class _GameDetailPageState extends State<_GameDetailPage> {
     final similar = game.similar(widget.games);
     return Scaffold(
       appBar: AppBar(title: Text(game.title), actions: [
+        if (MediaQuery.sizeOf(context).width >= 900) ...[
+          IconButton(
+              tooltip: 'Previous game (Left arrow)',
+              onPressed: widget.previous,
+              icon: const Icon(Icons.chevron_left)),
+          IconButton(
+              tooltip: 'Next game (Right arrow)',
+              onPressed: widget.next,
+              icon: const Icon(Icons.chevron_right)),
+        ],
         Builder(
             builder: (context) => IconButton(
                   tooltip: 'Share game',
@@ -182,94 +207,99 @@ class _GameDetailPageState extends State<_GameDetailPage> {
       ]),
       body: SafeArea(
           top: false,
-          child: ListView(
-              key: PageStorageKey('game-details-${game.id}'),
-              padding: const EdgeInsets.only(bottom: 24),
-              children: [
-                MediaGallery(game: game, active: widget.active),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(children: [
-                          if (game.icon != null) ...[
-                            ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: SizedBox.square(
-                                    dimension: 40, child: _image(game.icon!))),
-                            const SizedBox(width: 12),
-                          ],
-                          Expanded(
-                            child: Text(game.title,
-                                style: const TextStyle(
-                                    fontSize: 26, fontWeight: FontWeight.w800)),
-                          ),
-                        ]),
-                        if (game.tagline.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Text(game.tagline,
-                              style: const TextStyle(
-                                  fontSize: 16, color: GnColors.muted)),
-                        ],
-                        const SizedBox(height: 14),
-                        Wrap(spacing: 8, runSpacing: 8, children: [
-                          if (game.players.isNotEmpty)
-                            _Fact(Icons.people_alt_outlined, game.players),
-                          if (game.matchMinutes != null)
-                            _Fact(Icons.timer_outlined,
-                                '${game.matchMinutes} min'),
-                          _Fact(Icons.sell_outlined, game.priceLabel),
-                          _Fact(Icons.computer, game.platformLabel),
-                        ]),
-                        const SizedBox(height: 16),
-                        _action(),
-                        if (ReportScope.of(context) case final reports?)
-                          TextButton.icon(
-                            onPressed: () => Navigator.of(context)
-                                .push(MaterialPageRoute<void>(
-                              builder: (_) => FeedbackScreen(
-                                  reports: reports, initialGame: game.id),
-                            )),
-                            icon: const Icon(Icons.mic_none, size: 20),
-                            label: const Text('Give feedback'),
-                          ),
-                        if (game.tags.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Wrap(spacing: 6, runSpacing: 6, children: [
-                            for (final tag in game.tags)
-                              Chip(
-                                label: Text(tag),
-                                visualDensity: VisualDensity.compact,
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+          child: ContentWidth(
+              maxWidth: 1040,
+              child: ListView(
+                  key: PageStorageKey('game-details-${game.id}'),
+                  padding: const EdgeInsets.only(bottom: 24),
+                  children: [
+                    MediaGallery(game: game, active: widget.active),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Row(children: [
+                              if (game.icon != null) ...[
+                                ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: SizedBox.square(
+                                        dimension: 40,
+                                        child: _image(game.icon!))),
+                                const SizedBox(width: 12),
+                              ],
+                              Expanded(
+                                child: Text(game.title,
+                                    style: const TextStyle(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800)),
                               ),
+                            ]),
+                            if (game.tagline.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Text(game.tagline,
+                                  style: const TextStyle(
+                                      fontSize: 16, color: GnColors.muted)),
+                            ],
+                            const SizedBox(height: 14),
+                            Wrap(spacing: 8, runSpacing: 8, children: [
+                              if (game.players.isNotEmpty)
+                                _Fact(Icons.people_alt_outlined, game.players),
+                              if (game.matchMinutes != null)
+                                _Fact(Icons.timer_outlined,
+                                    '${game.matchMinutes} min'),
+                              _Fact(Icons.sell_outlined, game.priceLabel),
+                              _Fact(Icons.computer, game.platformLabel),
+                            ]),
+                            const SizedBox(height: 16),
+                            _action(),
+                            if (ReportScope.of(context) case final reports?)
+                              TextButton.icon(
+                                onPressed: () => Navigator.of(context)
+                                    .push(MaterialPageRoute<void>(
+                                  builder: (_) => FeedbackScreen(
+                                      reports: reports, initialGame: game.id),
+                                )),
+                                icon: const Icon(Icons.mic_none, size: 20),
+                                label: const Text('Give feedback'),
+                              ),
+                            if (game.tags.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Wrap(spacing: 6, runSpacing: 6, children: [
+                                for (final tag in game.tags)
+                                  Chip(
+                                    label: Text(tag),
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                              ]),
+                            ],
+                            const SizedBox(height: 8),
+                            _about(),
+                            if (similar.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              const Text('More like this',
+                                  style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 10),
+                              SizedBox(
+                                height: 170,
+                                child: ListView.separated(
+                                  scrollDirection: Axis.horizontal,
+                                  itemCount: similar.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(width: 10),
+                                  itemBuilder: (context, i) => _SimilarTile(
+                                      game: similar[i],
+                                      onTap: () => _openOther(similar[i])),
+                                ),
+                              ),
+                            ],
                           ]),
-                        ],
-                        const SizedBox(height: 8),
-                        _about(),
-                        if (similar.isNotEmpty) ...[
-                          const SizedBox(height: 12),
-                          const Text('More like this',
-                              style: TextStyle(
-                                  fontSize: 18, fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            height: 170,
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: similar.length,
-                              separatorBuilder: (_, __) =>
-                                  const SizedBox(width: 10),
-                              itemBuilder: (context, i) => _SimilarTile(
-                                  game: similar[i],
-                                  onTap: () => _openOther(similar[i])),
-                            ),
-                          ),
-                        ],
-                      ]),
-                ),
-              ])),
+                    ),
+                  ]))),
     );
   }
 

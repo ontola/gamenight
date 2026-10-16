@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../link.dart';
 import '../theme.dart';
+import '../layout.dart';
 import 'scanner_screen.dart';
 import 'game_screen.dart';
 import 'playlist_screen.dart';
@@ -11,7 +12,8 @@ import 'playlist_screen.dart';
 /// Connect to a GameNight on this network and see where you stand in it.
 class RoomScreen extends StatefulWidget {
   final AppState state;
-  const RoomScreen({super.key, required this.state});
+  final int initialSection;
+  const RoomScreen({super.key, required this.state, this.initialSection = 0});
 
   @override
   State<RoomScreen> createState() => RoomScreenState();
@@ -20,7 +22,7 @@ class RoomScreen extends StatefulWidget {
 class RoomScreenState extends State<RoomScreen> {
   final _address = TextEditingController();
   final _code = TextEditingController();
-  int _section = 0;
+  late int _section = widget.initialSection;
   void showCurrentGame() {
     if (mounted) setState(() => _section = 0);
   }
@@ -103,7 +105,8 @@ class RoomScreenState extends State<RoomScreen> {
     return ListenableBuilder(
         listenable: state,
         builder: (context, _) {
-          final details = ListView(
+          final details = ContentWidth(
+              child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
               if (_error != null)
@@ -119,7 +122,7 @@ class RoomScreenState extends State<RoomScreen> {
               else
                 ..._roomCards(),
             ],
-          );
+          ));
           final linked = state.inHostedRoom
               ? state.hostedRoom?.connected ?? false
               : state.session?.linked ?? false;

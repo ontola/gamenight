@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../theme.dart';
+import '../layout.dart';
 
 /// Sign in with a GameNight account: GameNight emails an 8-digit code.
 /// Pops with true once signed in.
@@ -91,10 +92,11 @@ class _SignInScreenState extends State<SignInScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Sign in')),
-      body: ListView(padding: const EdgeInsets.all(16), children: [
+      body: ContentWidth(
+          child: ListView(padding: const EdgeInsets.all(16), children: [
         Section(title: 'Your GameNight account', children: [
           Hint(widget.reason ??
-              'Keep your name and faces on every phone, and join rooms with their code.'),
+              'Keep your name and faces on every device, and join rooms with their code.'),
           if (kIsWeb) ...[
             const SizedBox(height: 8),
             const Hint(
@@ -118,7 +120,7 @@ class _SignInScreenState extends State<SignInScreen> {
             )
           else ...[
             Hint('We sent an 8-digit code to ${_email.text.trim()}. '
-                'Open the email link on this phone, or paste the code here. It expires in 10 minutes.'),
+                'Open the email link on this device, or paste the code here. It expires in 10 minutes.'),
             const SizedBox(height: 12),
             TextField(
               controller: _code,
@@ -155,7 +157,7 @@ class _SignInScreenState extends State<SignInScreen> {
             Text(_error!, style: const TextStyle(color: GnColors.warn)),
           ],
         ]),
-      ]),
+      ])),
     );
   }
 }
