@@ -76,6 +76,15 @@ class AppState extends ChangeNotifier {
 
   /// The current game's phone screen, while there is one.
   Companion? companion;
+  String? _fullscreenCompanion;
+  bool get companionFullscreen =>
+      _fullscreenCompanion != null && _fullscreenCompanion == companion?.url;
+
+  void setCompanionFullscreen(bool enabled) {
+    _fullscreenCompanion = enabled ? companion?.url : null;
+    notifyListeners();
+  }
+
   String? companionError;
 
   SyncState sync = SyncState.idle;
@@ -599,8 +608,16 @@ class AppState extends ChangeNotifier {
   /// Loads the account on startup, so the name shows and the token is known
   /// to still work.
   Future<void> loadAccount() async {
-    if (!cloud.signedIn) return;
     try {
+      if (cloud.browserCookies) {
+        if (!await cloud.restoreBrowserSession()) {
+          if (account != null || inHostedRoom) await _forgetAccount();
+          notifyListeners();
+          return;
+        }
+        await prefs.setString('cloud_token', cloud.token!);
+      }
+      if (!cloud.signedIn) return;
       account = await cloud.me();
       if (inHostedRoom) startPolling();
     } on SignedOut {
@@ -720,6 +737,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void notifyListeners() {
+    if (_fullscreenCompanion != companion?.url) _fullscreenCompanion = null;
     if (!_disposed) super.notifyListeners();
   }
 

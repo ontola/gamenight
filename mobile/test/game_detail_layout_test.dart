@@ -140,55 +140,49 @@ void main() {
     });
     await tester.dragFrom(const Offset(300, 430), const Offset(-310, 0));
     await tester.pumpAndSettle();
-    expect(find.text('2 / 3').hitTestable(), findsOneWidget);
+    expect(find.widgetWithText(AppBar, _games[1].title).hitTestable(),
+        findsOneWidget);
     await tester.tap(find.byTooltip('Share game').hitTestable());
     await tester.pumpAndSettle();
     expect(shared!.uri, _games[1].page);
     await _capture(tester, 'game-swiped-next');
     await tester.dragFrom(const Offset(70, 430), const Offset(310, 0));
     await tester.pumpAndSettle();
-    expect(find.text('1 / 3').hitTestable(), findsOneWidget);
+    expect(find.widgetWithText(AppBar, _games[0].title).hitTestable(),
+        findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
   testWidgets(
-      'media gestures stay inside the gallery and page arrows stop at ends',
+      'media gestures stay inside gallery and game swipes stop at list ends',
       (tester) async {
     await _open(tester);
     await tester.drag(
         find.byType(MediaGallery).hitTestable(), const Offset(-300, 0));
     await tester.pumpAndSettle();
-    expect(find.text('1 / 3').hitTestable(), findsOneWidget);
-    expect(
-        tester
-            .widget<IconButton>(find
-                .byWidgetPredicate(
-                    (w) => w is IconButton && w.tooltip == 'Previous game')
-                .hitTestable())
-            .onPressed,
-        isNull);
+    expect(find.widgetWithText(AppBar, _games[0].title).hitTestable(),
+        findsOneWidget);
+    expect(find.byTooltip('Previous game'), findsNothing);
+    expect(find.byTooltip('Next game'), findsNothing);
     for (var i = 0; i < 2; i++) {
-      await tester.tap(find.byTooltip('Next game').hitTestable());
+      await tester.dragFrom(const Offset(300, 430), const Offset(-700, 0));
       await tester.pumpAndSettle();
     }
-    expect(find.text('3 / 3').hitTestable(), findsOneWidget);
-    expect(
-        tester
-            .widget<IconButton>(find
-                .byWidgetPredicate(
-                    (w) => w is IconButton && w.tooltip == 'Next game')
-                .hitTestable())
-            .onPressed,
-        isNull);
+    expect(find.widgetWithText(AppBar, _games[2].title).hitTestable(),
+        findsOneWidget);
     await tester.dragFrom(const Offset(300, 430), const Offset(-310, 0));
     await tester.pumpAndSettle();
-    expect(find.text('3 / 3').hitTestable(), findsOneWidget);
+    expect(find.widgetWithText(AppBar, _games[2].title).hitTestable(),
+        findsOneWidget);
   });
 
   testWidgets(
       'opening a middle game keeps list position and queues the swiped game',
       (tester) async {
     String? queued;
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(MaterialApp(
         home: Builder(
             builder: (context) => TextButton(
@@ -207,8 +201,9 @@ void main() {
                 child: const Text('Open list game')))));
     await tester.tap(find.text('Open list game'));
     await tester.pumpAndSettle();
-    expect(find.text('2 / 3').hitTestable(), findsOneWidget);
-    await tester.tap(find.byTooltip('Next game').hitTestable());
+    expect(find.widgetWithText(AppBar, _games[1].title).hitTestable(),
+        findsOneWidget);
+    await tester.dragFrom(const Offset(300, 430), const Offset(-700, 0));
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.descendant(
         of: find.byKey(ValueKey(_games[2].id)),

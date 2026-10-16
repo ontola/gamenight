@@ -25,6 +25,7 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
   final state = AppState(prefs);
   final reports = ReportService(prefs,
+      requestHeaders: state.cloud.browserMutationHeaders,
       context: () => {
             if (state.hostedRoom?.current ??
                     state.session?.currentGame ??
@@ -95,39 +96,45 @@ class _GameNightAppState extends State<GameNightApp> {
         title: 'GameNight',
         debugShowCheckedModeBanner: false,
         theme: gameNightTheme(),
-        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-          value: gameNightSystemUi,
-          child: ReportScope(
-              reports: widget.reports,
-              child: ColoredBox(
-                color: GnColors.bg,
-                child: SafeArea(
-                    bottom: false,
-                    child: Column(children: [
-                      Material(
-                          color: GnColors.bg,
-                          child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                              child: Row(children: [
-                                const GameNightLogo(size: 28),
-                                const SizedBox(width: 8),
-                                const Expanded(
-                                    child: Text('GameNight',
-                                        key: ValueKey('app-brand'),
-                                        style: TextStyle(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.w800,
-                                            color: GnColors.text))),
-                                if (widget.reports != null)
-                                  TextButton.icon(
-                                      onPressed: _feedback,
-                                      icon:
-                                          const Icon(Icons.mic_none, size: 20),
-                                      label: const Text('Feedback')),
-                              ]))),
-                      Expanded(child: child!),
-                    ])),
-              )),
+        builder: (context, child) => ListenableBuilder(
+          listenable: widget.state,
+          builder: (context, _) => AnnotatedRegion<SystemUiOverlayStyle>(
+            value: gameNightSystemUi,
+            child: ReportScope(
+                reports: widget.reports,
+                child: ColoredBox(
+                  color: GnColors.bg,
+                  child: SafeArea(
+                      bottom: false,
+                      child: Column(children: [
+                        Visibility(
+                            visible: !widget.state.companionFullscreen,
+                            child: Material(
+                                color: GnColors.bg,
+                                child: Padding(
+                                    padding:
+                                        const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                                    child: Row(children: [
+                                      const GameNightLogo(size: 28),
+                                      const SizedBox(width: 8),
+                                      const Expanded(
+                                          child: Text('GameNight',
+                                              key: ValueKey('app-brand'),
+                                              style: TextStyle(
+                                                  fontSize: 22,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: GnColors.text))),
+                                      if (widget.reports != null)
+                                        TextButton.icon(
+                                            onPressed: _feedback,
+                                            icon: const Icon(Icons.mic_none,
+                                                size: 20),
+                                            label: const Text('Feedback')),
+                                    ])))),
+                        Expanded(child: child!),
+                      ])),
+                )),
+          ),
         ),
         home: HomeScreen(
             state: widget.state,
@@ -181,7 +188,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(widget.reports?.flush());
+    if (state == AppLifecycleState.resumed) {
+      unawaited(widget.reports?.flush());
+      if (widget.state.cloud.browserCookies) {
+        unawaited(widget.state.loadAccount());
+      }
+    }
   }
 
   /// The link in the sign-in email opens the app and signs in here.
@@ -237,46 +249,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onJoin: () => setState(() => _tab = 0)),
           PlayerScreen(state: widget.state),
         ];
-        return Scaffold(
-          body: SafeArea(
-            child: Column(children: [
-              UpdateBanner(),
-              Expanded(child: IndexedStack(index: _tab, children: pages)),
-            ]),
-          ),
-          bottomNavigationBar: DecoratedBox(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: GnColors.border, width: 1)),
+        return PopScope(
+          canPop: !widget.state.companionFullscreen,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop && widget.state.companionFullscreen) {
+              widget.state.setCompanionFullscreen(false);
+            }
+          },
+          child: Scaffold(
+            body: SafeArea(
+              child: Column(children: [
+                UpdateBanner(),
+                Expanded(child: IndexedStack(index: _tab, children: pages)),
+              ]),
             ),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 1),
-              child: NavigationBar(
-                selectedIndex: _tab,
-                onDestinationSelected: (i) => setState(() => _tab = i),
-                destinations: [
-                  NavigationDestination(
-                    icon: Badge(
-                      isLabelVisible: linked,
-                      backgroundColor: GnColors.ok,
-                      smallSize: 8,
-                      child: const Icon(Icons.qr_code_scanner),
+            bottomNavigationBar: widget.state.companionFullscreen
+                ? null
+                : DecoratedBox(
+                    decoration: const BoxDecoration(
+                      border: Border(
+                          top: BorderSide(color: GnColors.border, width: 1)),
                     ),
-                    label: 'Room',
-                  ),
-                  NavigationDestination(
-                    icon: Badge(
-                      isLabelVisible: widget.state.companion != null,
-                      backgroundColor: GnColors.ok,
-                      smallSize: 8,
-                      child: const Icon(Icons.sports_esports),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 1),
+                      child: NavigationBar(
+                        selectedIndex: _tab,
+                        onDestinationSelected: (i) => setState(() => _tab = i),
+                        destinations: [
+                          NavigationDestination(
+                            icon: Badge(
+                              isLabelVisible: linked,
+                              backgroundColor: GnColors.ok,
+                              smallSize: 8,
+                              child: const Icon(Icons.qr_code_scanner),
+                            ),
+                            label: 'Room',
+                          ),
+                          NavigationDestination(
+                            icon: Badge(
+                              isLabelVisible: widget.state.companion != null,
+                              backgroundColor: GnColors.ok,
+                              smallSize: 8,
+                              child: const Icon(Icons.sports_esports),
+                            ),
+                            label: 'Games',
+                          ),
+                          const NavigationDestination(
+                              icon: Icon(Icons.face_retouching_natural),
+                              label: 'You'),
+                        ],
+                      ),
                     ),
-                    label: 'Games',
                   ),
-                  const NavigationDestination(
-                      icon: Icon(Icons.face_retouching_natural), label: 'You'),
-                ],
-              ),
-            ),
           ),
         );
       },

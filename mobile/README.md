@@ -57,9 +57,23 @@ Android allows plain HTTP for this app (`usesCleartextTraffic`), and iOS
 allows local networking (`NSAllowsLocalNetworking`), because the GameNight PC
 serves plain HTTP on the LAN.
 
-`flutter build web` also works for quick UI checks. Serve the build from the
-same origin as the GameNight web server (or through a proxy): the local web
-server sends no CORS headers.
+The web app can also run in Safari and be added to the iPhone home screen.
+Build it for the hosted `/app/` path:
+
+```sh
+flutter build web --release --base-href /app/ --pwa-strategy none --no-web-resources-cdn
+```
+
+Serve `build/web` at `/app/` on the same HTTPS origin as the GameNight cloud API.
+Browser sign-in uses the site's secure cookies and CSRF protection; native apps
+continue to use bearer tokens. A separate static origin cannot authenticate or
+open private phone controls. Enter the emailed code in the web app, or return
+to it after following the sign-in link. There is no service worker cache, so a
+reload fetches the current app. This web build does not produce a signed iOS IPA.
+
+Phone controls have a full-screen button. It hides the app navigation without
+reloading the game's phone page; the exit button or Back restores navigation.
+Catalog game pages support sideways swipes without an extra counter bar.
 
 ## Not yet
 

@@ -19,7 +19,8 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
-  late final _email = TextEditingController(text: widget.state.accountEmail ?? '');
+  late final _email =
+      TextEditingController(text: widget.state.accountEmail ?? '');
   final _code = TextEditingController();
   bool _sent = false;
   bool _busy = false;
@@ -96,8 +97,8 @@ class _SignInScreenState extends State<SignInScreen> {
               'Keep your name and faces on every phone, and join rooms with their code.'),
           if (kIsWeb) ...[
             const SizedBox(height: 8),
-            const Hint('Signing in works in the Android and iPhone app. '
-                'In a browser, use gamenight.ontola.io.'),
+            const Hint(
+                'Enter the code from your email here to keep playing in this tab.'),
           ],
           const SizedBox(height: 16),
           TextField(
@@ -125,9 +126,11 @@ class _SignInScreenState extends State<SignInScreen> {
               keyboardType: TextInputType.number,
               maxLength: 8,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 26, letterSpacing: 8, fontFamily: 'monospace'),
+              style: const TextStyle(
+                  fontSize: 26, letterSpacing: 8, fontFamily: 'monospace'),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(hintText: '········', counterText: ''),
+              decoration:
+                  const InputDecoration(hintText: '········', counterText: ''),
               onChanged: (v) {
                 if (v.length == 8) _verify();
               },

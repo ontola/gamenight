@@ -1,11 +1,11 @@
 {
-    "name": "gamenight",
-    "short_name": "gamenight",
+    "name": "GameNight",
+    "short_name": "GameNight",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0D1020",
     "theme_color": "#0D1020",
-    "description": "A new Flutter project.",
+    "description": "Join your GameNight room, play on your phone and choose what comes next.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

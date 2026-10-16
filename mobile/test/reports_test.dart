@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gamenight/reports.dart';
+import 'package:gamenight/account.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -13,7 +14,36 @@ void main() {
     prefs = await SharedPreferences.getInstance();
   });
 
-  test('feedback persists offline and retries exactly the same id after restart', () async {
+  test(
+      'browser feedback refreshes cookie CSRF and keeps credentials out of report data',
+      () async {
+    var csrf = 'first';
+    final cloud = CloudApi(
+        browserCookies: true,
+        client: MockClient((request) async {
+          expect(request.url.path, '/auth/session');
+          expect(request.headers.containsKey('Authorization'), false);
+          return http.Response(jsonEncode({'csrf': csrf}), 200);
+        }));
+    final reports =
+        ReportService(prefs, requestHeaders: cloud.browserMutationHeaders,
+            client: MockClient((request) async {
+      expect(request.headers['X-GameNight-CSRF'], csrf);
+      expect(request.headers.containsKey('Authorization'), false);
+      final body = jsonDecode(request.body) as Map;
+      expect(body.containsKey('csrf'), false);
+      return http.Response(jsonEncode({'id': body['id']}), 200);
+    }));
+    expect(await reports.submitFeedback('First report'), true);
+    csrf = 'another-tab-signed-in';
+    expect(await reports.submitFeedback('Second report'), true);
+    reports.close();
+    cloud.close();
+  });
+
+  test(
+      'feedback persists offline and retries exactly the same id after restart',
+      () async {
     final sent = <Map>[];
     final first = ReportService(prefs, client: MockClient((r) async {
       sent.add(jsonDecode(r.body) as Map);
@@ -35,7 +65,9 @@ void main() {
     second.close();
   });
 
-  test('automatic errors exclude exception data, deduplicate and link to feedback', () async {
+  test(
+      'automatic errors exclude exception data, deduplicate and link to feedback',
+      () async {
     final sent = <Map>[];
     final reports = ReportService(prefs,
         context: () => {'game': 'ballkickers'},
@@ -47,7 +79,9 @@ void main() {
         }));
     final error = Exception('Private name token=secret');
     reports.captureError(
-        error, StackTrace.fromString('https://example.com/auth#code=secret test@example.com'));
+        error,
+        StackTrace.fromString(
+            'https://example.com/auth#code=secret test@example.com'));
     reports.captureError(error, StackTrace.current);
     await reports.flush();
     expect(sent.length, 1);
@@ -61,24 +95,29 @@ void main() {
   });
 
   test('success without matching receipt never discards a report', () async {
-    final reports =
-        ReportService(prefs, client: MockClient((r) async => http.Response('{"id":"wrong"}', 200)));
+    final reports = ReportService(prefs,
+        client: MockClient((r) async => http.Response('{"id":"wrong"}', 200)));
     expect(await reports.submitFeedback('Nothing happened'), false);
     expect(jsonDecode(prefs.getString('report_outbox')!), hasLength(1));
     reports.close();
   });
 
-  test('queue bounds errors without evicting feedback and rejects empty feedback', () async {
-    final reports = ReportService(prefs, client: MockClient((r) async => http.Response('', 503)));
+  test(
+      'queue bounds errors without evicting feedback and rejects empty feedback',
+      () async {
+    final reports = ReportService(prefs,
+        client: MockClient((r) async => http.Response('', 503)));
     await expectLater(reports.submitFeedback('   '), throwsArgumentError);
     for (var i = 0; i < 60; i++) {
       await reports.submitFeedback('feedback $i');
     }
-    await expectLater(reports.submitFeedback('keep my draft'), throwsStateError);
+    await expectLater(
+        reports.submitFeedback('keep my draft'), throwsStateError);
     expect(jsonDecode(prefs.getString('report_outbox')!), hasLength(60));
     reports.close();
   });
-  test('game recipient is explicit and independent from playing game context', () async {
+  test('game recipient is explicit and independent from playing game context',
+      () async {
     final sent = <Map>[];
     final reports = ReportService(prefs,
         context: () => {'game': 'ballkickers'},

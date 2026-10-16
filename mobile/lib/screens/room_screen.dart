@@ -143,19 +143,20 @@ class RoomScreenState extends State<RoomScreen> {
                   state: state, onJoin: () => setState(() => _section = 2)),
               details,
             ])),
-            Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SegmentedButton<int>(
-                  segments: const [
-                    ButtonSegment(value: 0, label: Text('Game')),
-                    ButtonSegment(value: 1, label: Text('Playlist')),
-                    ButtonSegment(value: 2, label: Text('Room')),
-                  ],
-                  selected: {_section},
-                  onSelectionChanged: (value) =>
-                      setState(() => _section = value.first),
-                )),
+            if (!state.companionFullscreen)
+              Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: SegmentedButton<int>(
+                    segments: const [
+                      ButtonSegment(value: 0, label: Text('Game')),
+                      ButtonSegment(value: 1, label: Text('Playlist')),
+                      ButtonSegment(value: 2, label: Text('Room')),
+                    ],
+                    selected: {_section},
+                    onSelectionChanged: (value) =>
+                        setState(() => _section = value.first),
+                  )),
           ]);
         });
   }

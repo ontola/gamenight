@@ -50,51 +50,74 @@ class GameScreen extends StatelessWidget {
               padding: const EdgeInsets.all(16), children: [catalog]);
         }
         if (companion != null && (state.inHostedRoom || state.api != null)) {
-          return Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-              child: Row(children: [
-                const Icon(Icons.sports_esports, color: GnColors.ok, size: 20),
-                const SizedBox(width: 8),
+          final fullscreen = state.companionFullscreen;
+          return Stack(children: [
+            Column(children: [
+              Visibility(
+                  visible: !fullscreen,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                    child: Row(children: [
+                      const Icon(Icons.sports_esports,
+                          color: GnColors.ok, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(companion.title,
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700)),
+                      ),
+                      if (companion.url != null)
+                        IconButton(
+                          tooltip: 'Full screen',
+                          icon: const Icon(Icons.fullscreen),
+                          onPressed: () => state.setCompanionFullscreen(true),
+                        ),
+                      if (companion.url != null && controls != null)
+                        IconButton(
+                          tooltip: 'Game settings',
+                          icon: const Icon(Icons.tune),
+                          onPressed: () =>
+                              _showSettings(context, controls, companion.title),
+                        ),
+                    ]),
+                  )),
+              if (companion.app != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: AppCard(
+                      key: ValueKey('app-${companion.game}'),
+                      app: companion.app!,
+                      download: companion.app!.download == null
+                          ? null
+                          : resolve(companion.app!.download!)),
+                ),
+              if (companion.url != null)
                 Expanded(
-                  child: Text(companion.title,
-                      style: const TextStyle(
-                          fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
-                Text('on your phone',
-                    style:
-                        const TextStyle(color: GnColors.muted, fontSize: 13)),
-                if (companion.url != null && controls != null)
-                  IconButton(
-                    tooltip: 'Game settings',
-                    icon: const Icon(Icons.tune),
-                    onPressed: () =>
-                        _showSettings(context, controls, companion.title),
+                  child: CompanionView(
+                    key: ValueKey('${companion.game}:${companion.url}'),
+                    url: resolve(companion.url!),
                   ),
-              ]),
-            ),
-            if (companion.app != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-                child: AppCard(
-                    key: ValueKey('app-${companion.game}'),
-                    app: companion.app!,
-                    download: companion.app!.download == null
-                        ? null
-                        : resolve(companion.app!.download!)),
-              ),
-            if (companion.url != null)
-              Expanded(
-                child: CompanionView(
-                  key: ValueKey('${companion.game}:${companion.url}'),
-                  url: resolve(companion.url!),
+                )
+              else
+                Expanded(
+                  child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      children: [settings]),
                 ),
-              )
-            else
-              Expanded(
-                child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    children: [settings]),
+            ]),
+            if (fullscreen)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Material(
+                  color: GnColors.card,
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: 'Exit full screen',
+                    icon: const Icon(Icons.fullscreen_exit),
+                    onPressed: () => state.setCompanionFullscreen(false),
+                  ),
+                ),
               ),
           ]);
         }

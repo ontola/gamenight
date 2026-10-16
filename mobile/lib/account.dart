@@ -7,6 +7,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import 'api.dart' show ApiError;
@@ -113,6 +114,11 @@ class CloudApi {
   final Uri base;
   final http.Client _client;
   String? token;
+  final bool browserCookies;
+  String? _browserCsrf;
+  // Local state only. HttpOnly cookies, never these markers, authenticate web.
+  static const _browserSession = 'browser-cookie-session';
+  static const _browserBinding = 'browser-cookie-binding';
 
   /// Ties an emailed code to this phone, like the website's browser cookie.
   String? emailBinding;
@@ -120,7 +126,12 @@ class CloudApi {
   /// The site sign-in requests must come from; only differs in tests.
   final String origin;
 
-  CloudApi({Uri? base, http.Client? client, this.token, String? origin})
+  CloudApi(
+      {Uri? base,
+      http.Client? client,
+      this.token,
+      String? origin,
+      this.browserCookies = kIsWeb})
       : base = base ?? Uri.parse(hostedOrigin),
         origin = origin ?? (base ?? Uri.parse(hostedOrigin)).origin,
         _client = client ?? http.Client();
@@ -133,19 +144,41 @@ class CloudApi {
 
   Future<http.Response> _raw(String method, String path,
       {Object? body, Map<String, String> headers = const {}}) async {
+    final cookieMutation = browserCookies &&
+        !path.startsWith('/auth/email/') &&
+        !const ['GET', 'HEAD', 'OPTIONS'].contains(method);
+    if (cookieMutation && _browserCsrf == null) {
+      final session = await _raw('GET', '/auth/session');
+      if (session.statusCode == 401) {
+        token = null;
+        throw const SignedOut();
+      }
+      final data = session.statusCode == 200 ? jsonDecode(session.body) : null;
+      if (data is! Map ||
+          data['csrf'] is! String ||
+          (data['csrf'] as String).isEmpty) {
+        throw const ApiError('Could not confirm your sign-in. Try again.');
+      }
+      _browserCsrf = data['csrf'] as String;
+    }
     final request = http.Request(method, base.replace(path: path));
     request.headers.addAll({
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       // Sign-in only answers requests from its own site.
-      'Origin': origin,
-      if (token != null) 'Authorization': 'Bearer $token',
+      if (!browserCookies) 'Origin': origin,
+      if (!browserCookies && token != null) 'Authorization': 'Bearer $token',
+      if (cookieMutation) 'X-GameNight-CSRF': _browserCsrf!,
       ...headers,
     });
     if (body != null) request.body = jsonEncode(body);
     try {
       final response = await http.Response.fromStream(
           await _client.send(request).timeout(_timeout));
+      if (browserCookies &&
+          (response.statusCode == 401 || response.statusCode == 403)) {
+        _browserCsrf = null;
+      }
       if (response.statusCode >= 500) {
         Diagnostics.failure(
             'Cloud $method failed (HTTP ${response.statusCode})');
@@ -192,13 +225,54 @@ class CloudApi {
 
   // ---- Sign-in ---------------------------------------------------------
 
+  /// Cookie-authenticated requests made outside CloudApi (such as feedback).
+  /// Refresh on every call so another tab's sign-in cannot leave a stale CSRF.
+  Future<Map<String, String>> browserMutationHeaders() async {
+    if (!browserCookies) return {};
+    final response = await _raw('GET', '/auth/session');
+    if (response.statusCode == 401) return {};
+    final data = response.statusCode == 200 ? jsonDecode(response.body) : null;
+    if (data is! Map ||
+        data['csrf'] is! String ||
+        (data['csrf'] as String).isEmpty) {
+      throw const ApiError('Could not confirm your sign-in. Try again.');
+    }
+    _browserCsrf = data['csrf'] as String;
+    return {'X-GameNight-CSRF': _browserCsrf!};
+  }
+
+  /// Recognize email-link sign-in and existing sessions in this browser.
+  /// A local marker is never proof of a session; the server checks its cookie.
+  Future<bool> restoreBrowserSession() async {
+    if (!browserCookies) return signedIn;
+    final response = await _raw('GET', '/auth/session');
+    if (response.statusCode == 401) {
+      token = null;
+      _browserCsrf = null;
+      return false;
+    }
+    final data = response.statusCode == 200 ? jsonDecode(response.body) : null;
+    if (data is! Map ||
+        data['csrf'] is! String ||
+        (data['csrf'] as String).isEmpty) {
+      throw const ApiError('Could not confirm your sign-in. Try again.');
+    }
+    token = _browserSession;
+    _browserCsrf = data['csrf'] as String;
+    emailBinding = null;
+    return true;
+  }
+
   /// Emails an 8-digit code (and a link) to [email].
   Future<void> requestCode(String email) async {
-    final response = await _raw('POST', '/auth/email/request',
-        body: {'email': email.trim(), 'client': 'app'});
+    final response = await _raw('POST', '/auth/email/request', body: {
+      'email': email.trim(),
+      'client': browserCookies ? 'browser' : 'app'
+    });
     switch (response.statusCode) {
       case 204:
-        emailBinding = cookie(response, 'gn_email');
+        emailBinding =
+            browserCookies ? _browserBinding : cookie(response, 'gn_email');
         if (emailBinding == null) {
           throw const ApiError('Sign-in is not available right now.');
         }
@@ -221,12 +295,15 @@ class CloudApi {
     final binding = emailBinding;
     if (binding == null) throw const ApiError('Ask for a new code first.');
     final response = await _raw('POST', '/auth/email/verify',
-        body: {'code': code.trim()}, headers: {'Cookie': 'gn_email=$binding'});
+        body: {'code': code.trim()},
+        headers: {if (!browserCookies) 'Cookie': 'gn_email=$binding'});
     switch (response.statusCode) {
       case 204:
-        final session = cookie(response, 'gn_session');
+        final session =
+            browserCookies ? _browserSession : cookie(response, 'gn_session');
         if (session == null) throw const ApiError('Sign-in failed. Try again.');
         token = session;
+        _browserCsrf = null;
         emailBinding = null;
         return;
       case 400:
@@ -246,6 +323,7 @@ class CloudApi {
       // Forgetting the token signs this phone out either way.
     }
     token = null;
+    _browserCsrf = null;
   }
 
   // ---- Saved player ----------------------------------------------------

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 // What a player in a room can do from the Game and Playlist tabs: queue a
 // game the room's host can play, play or start one next, and change the
@@ -135,6 +136,9 @@ class GameSettings {
 enum SettingsAction { set, undo, keep }
 
 abstract class RoomControls {
+  /// Stable identity across screen rebuilds; changing rooms invalidates edits.
+  Object get target;
+
   /// The games this room's host has. Empty when it cannot say.
   Future<List<HostGame>> games();
   Future<PlaylistView> playlist();
@@ -165,6 +169,9 @@ class LocalRoomControls implements RoomControls {
   final GameNightApi api;
   final String profile;
   LocalRoomControls(this.api, this.profile);
+
+  @override
+  Object get target => (api, profile);
 
   String get _query => 'profile=${Uri.encodeQueryComponent(profile)}';
 
@@ -243,7 +250,13 @@ class LocalRoomControls implements RoomControls {
 /// computer, which reports its games and settings every few seconds.
 class CloudRoomControls implements RoomControls {
   final CloudApi cloud;
-  CloudRoomControls(this.cloud);
+  final Duration confirmationTimeout;
+  @override
+  final Object target;
+  CloudRoomControls(this.cloud,
+      {String? roomCode,
+      this.confirmationTimeout = const Duration(seconds: 20)})
+      : target = (cloud, cloud.token, roomCode);
 
   static String _requestId() {
     final r = Random.secure();
@@ -340,8 +353,25 @@ class CloudRoomControls implements RoomControls {
   Future<GameSettings?> applySettings(GameSettings current,
       {Map<String, Object> values = const {},
       SettingsAction action = SettingsAction.set}) async {
-    await cloud.request('POST', '/v1/rooms/agent/control', body: {
-      'request_id': _requestId(),
+    final elapsed = Stopwatch()..start();
+    const unconfirmed = ApiError(
+        'The host has not confirmed this change yet. It may still arrive. Check the settings before retrying.');
+    Future<dynamic> request(String method, String path,
+        {Object? body, Map<int, String> errors = const {}}) async {
+      final remaining = confirmationTimeout - elapsed.elapsed;
+      if (remaining <= Duration.zero) throw unconfirmed;
+      try {
+        return await cloud
+            .request(method, path, body: body, errors: errors)
+            .timeout(remaining);
+      } on TimeoutException {
+        throw unconfirmed;
+      }
+    }
+
+    final id = _requestId();
+    await request('POST', '/v1/rooms/agent/control', body: {
+      'request_id': id,
       'game': current.game,
       'command': {
         'action': action.name,
@@ -354,20 +384,52 @@ class CloudRoomControls implements RoomControls {
       409: 'The game changed meanwhile. Look again and retry.',
       400: 'The game does not take that change.',
     });
-    // The host picks the change up on its next check-in.
-    for (var i = 0; i < 8; i++) {
-      await Future<void>.delayed(const Duration(seconds: 1));
-      final next = await settings();
-      if (next == null || next.revision != current.revision) return next;
+    // A revision change can belong to another phone. Confirm this request's
+    // receipt, including rejection, instead of treating any change as success.
+    for (var i = 0; i < 17; i++) {
+      if (i > 0) {
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+      final status = await request('GET', '/v1/rooms/agent');
+      final next =
+          GameSettings.fromJson(status is Map ? status['controls'] : null);
+      if (next == null ||
+          next.game != current.game ||
+          next.instance != current.instance) {
+        throw const ApiError(
+            'The game changed. These settings were not carried over.', 409);
+      }
+      final requests = status is Map && status['requests'] is List
+          ? status['requests'] as List
+          : const [];
+      for (final receipt in requests) {
+        if (receipt is! Map || receipt['id'] != id) continue;
+        if (receipt['state'] == 'failed' ||
+            receipt['state'] == 'reconciliation_needed') {
+          throw ApiError(receipt['result'] is String
+              ? receipt['result'] as String
+              : 'The game did not accept that change.');
+        }
+        if (receipt['state'] == 'complete') {
+          if (action == SettingsAction.set &&
+              values.entries.any((entry) => !next.settings
+                  .any((s) => s.key == entry.key && s.value == entry.value))) {
+            throw const ApiError(
+                'Settings changed on another device. Review them before retrying.',
+                409);
+          }
+          return next;
+        }
+      }
     }
-    return settings();
+    throw unconfirmed;
   }
 }
 
 /// The controls for the room this phone is playing in, if it is in one.
 RoomControls? roomControlsFor(AppState state) {
   if (state.inHostedRoom && (state.hostedRoom?.connected ?? false)) {
-    return CloudRoomControls(state.cloud);
+    return CloudRoomControls(state.cloud, roomCode: state.hostedRoom?.code);
   }
   final api = state.api;
   if (api == null || !(state.session?.linked ?? false)) return null;
