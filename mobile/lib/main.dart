@@ -451,7 +451,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ))),
                   SizedBox(
                       width: wide && !fullscreen ? 1 : 0,
-                      child: const VerticalDivider(width: 1)),
+                      child: Offstage(
+                          offstage: !wide || fullscreen,
+                          child: const VerticalDivider(width: 1))),
                   Expanded(
                       child: ContentWidth(
                           maxWidth: fullscreen ? double.infinity : 1440,

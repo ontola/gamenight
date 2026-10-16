@@ -647,7 +647,7 @@ func _process(delta: float) -> void:
 		var queue := upcoming()
 		if not queue.is_empty(): next = game_meta(queue[0].game)
 	room.set_mood(Color.from_string(str(next.get("color", "")), VIOLET) if not next.is_empty() else VIOLET)
-	var key := JSON.stringify([party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset])
+	var key := JSON.stringify([party.get("active_session"), party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset])
 	if key != _screen_key:
 		_screen_key = key
 		_redraw_screens()
@@ -771,7 +771,12 @@ func _draw_tv(canvas: Control) -> void:
 		kicker = "PAUSED" if game.get("phase") == "paused" else "NOW PLAYING"
 		kicker_color = GREEN
 		detail = "Press Y at the TV to resume"
-		if not _fits_party(game):
+		var loading := _loading_session(str(game.id))
+		if not loading.is_empty():
+			kicker = "LOADING %d%%" % int(loading.progress) if loading.get("progress") != null else "LOADING…"
+			kicker_color = AMBER
+			detail = str(loading.get("progress_label", "Preparing game"))
+		elif not _fits_party(game):
 			var action := tv_station()
 			detail = "Y at TV: %s" % action.label if action.enabled else "This game needs a different player count"
 	else:
@@ -814,6 +819,7 @@ func _draw_tv(canvas: Control) -> void:
 		var c := Color.from_string(str(profiles[id].get("color", "")), VIOLET)
 		canvas.draw_circle(Vector2(x, size.y - 60), 14, c)
 		x -= 36
+	_draw_loading_bar(canvas, Rect2(28, 88, size.x - 56, 12), str(game.id))
 	_scanlines(canvas, size)
 
 func _draw_idle_tv(canvas: Control) -> void:
@@ -868,18 +874,39 @@ func _draw_queue_preview(canvas: Control) -> void:
 	var art := _art(game, ["screenshot", "cover"])
 	if art != null: _cover(canvas, art, rect)
 	else: _title_card(canvas, game, rect, 48)
+	_draw_loading_bar(canvas, Rect2(0, 326, size.x, 12), str(game.id))
 	var title := _short(str(game.get("title", queue[0].title)), 32)
 	var status := _queue_status(str(game.id))
 	_text(canvas, title, Vector2(24, 375 if not status.is_empty() else 390), _fit(title, 46, size.x - 48, 30), TEXT)
 	if not status.is_empty(): _text(canvas, status, Vector2(24, 408), _fit(status, 24, size.x - 48, 17), PINK if not _issue(str(game.id)).is_empty() else AMBER)
 
+## Loading can move from the warm slot to the active slot after Play next.
+func _loading_session(game_id: String) -> Dictionary:
+	for key in ["active_session", "warm_session", "warming"]:
+		var session: Variant = party.get(key)
+		if session is Dictionary and str(session.get("game")) == game_id and str(session.get("phase")) in ["created", "preparing"]:
+			return session
+	return {}
+
+func _draw_loading_bar(canvas: Control, rect: Rect2, game_id: String) -> void:
+	var loading := _loading_session(game_id)
+	if loading.is_empty(): return
+	canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.92))
+	if loading.get("progress") != null:
+		canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(float(loading.progress) / 100.0, 0.0, 1.0), rect.size.y)), AMBER)
+	else:
+		# No invented percentage for games that only report a loading phase.
+		canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 3)), AMBER)
+
 func _queue_status(game_id: String) -> String:
 	var issue := _issue(game_id)
 	if not issue.is_empty(): return issue + " · Press Y here to retry"
+	var loading := _loading_session(game_id)
+	if not loading.is_empty():
+		var label := str(loading.get("progress_label", "Preparing game"))
+		return "%d%% · %s" % [int(loading.progress), label] if loading.get("progress") != null else label
 	var warm: Variant = party.get("warm_session")
-	if warm is Dictionary and str(warm.get("game")) == game_id:
-		if warm.get("phase") == "ready": return "Ready to play"
-		return str(warm.get("progress_label", "Preparing game"))
+	if warm is Dictionary and str(warm.get("game")) == game_id and warm.get("phase") == "ready": return "Ready to play"
 	return ""
 
 ## Pure title data keeps the rest of the playlist independent from artwork.

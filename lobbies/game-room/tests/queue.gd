@@ -87,6 +87,22 @@ func _run() -> void:
 	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}
 	main.set_party(party)
 	check(main._queue_status("ballkickers") == "World ready. Loading 2 player views", "Queue shows real game loading progress")
+	party.warm_session.progress = 50
+	main.set_party(party)
+	check(main._queue_status("ballkickers").begins_with("50%"), "Queue shows the actual loading percentage")
+	party.erase("onboarding_error")
+	main.set_party(party)
+	main.toasts.clear()
+	await capture(main, "queue-loading")
+	var previous_active: Dictionary = party.active_session.duplicate(true)
+	party.active_session = party.warm_session.duplicate(true)
+	party.erase("warm_session")
+	main.set_party(party)
+	check(main._loading_session("ballkickers").get("progress") == 50, "Loading stays visible after Play next moves it to the active slot")
+	party.active_session.phase = "running"
+	main.set_party(party)
+	check(main._loading_session("ballkickers").is_empty(), "Completed games do not keep stale loading progress")
+	party.active_session = previous_active
 	party.game_issues = [{"game": "ballkickers", "kind": "startup_timeout"}]
 	main.set_party(party)
 	check(main._queue_status("ballkickers").contains("retry"), "Startup failure overrides old loading progress even with another game paused")
