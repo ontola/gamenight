@@ -245,3 +245,20 @@ account and room guest profile. Host allocation resolves duplicate preferences
 in party join order. Guest edits update their existing capability and profile
 revision, without creating another player. This needs a host build with preferred
 colour allocation; older hosts continue using their automatic colours.
+
+## In-app Assistant
+
+Menu → Assistant opens a native Flutter screen on Android and web. It uses the
+current account and room through the existing `/v1/rooms/agent` APIs; it never
+opens a browser or embeds the old website. `/app/#/assistant` opens it directly.
+Text and speech drafts are reviewed before sending. Paid requests show a credit
+estimate first; local-model requests use zero credits. Host receipts distinguish
+thinking, waiting for the game, completion and failure. Undo/keep, launch, mod
+undo and saved configuration actions use the current game instance and revision.
+Account/room changes discard the previous context. Guests can play without an
+account, but the existing hosted Assistant requires sign-in and a live room.
+The provider, billing and authority checks remain in the private cloud service.
+
+`test/assistant_test.dart` covers quotes, retries, host failures, room changes,
+voice errors and configuration revisions. `test/browser/assistant.cjs` exercises
+the compiled UI with a synthetic room; it never contacts a paid model.

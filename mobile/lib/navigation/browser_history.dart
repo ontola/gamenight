@@ -138,7 +138,9 @@ class BrowserNavigation extends ChangeNotifier with WidgetsBindingObserver {
 
   RouteInformation _information(_Destination target) => RouteInformation(
           uri: Uri(
-              path: const ['/room', '/games', '/you'][target.tab],
+              path: _routes.lastOrNull?.settings.name == 'assistant'
+                  ? '/assistant'
+                  : const ['/room', '/games', '/you'][target.tab],
               queryParameters: {
                 if (target.routes.isNotEmpty)
                   'screen': target.routes.last.toString(),

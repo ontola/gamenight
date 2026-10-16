@@ -139,6 +139,7 @@ jobs:
           export NODE_PATH="$RUNNER_TEMP/player-browser/node_modules"
           node "$NODE_PATH/playwright/cli.js" install --with-deps chromium
           GAMENIGHT_TEST_SCREENSHOTS="$RUNNER_TEMP/player-previews" node test/browser/navigation.cjs
+          GAMENIGHT_TEST_SCREENSHOTS="$RUNNER_TEMP/player-previews" node test/browser/assistant.cjs
       - uses: actions/upload-artifact@v4
         with:
           name: gamenight-player-web

@@ -20,6 +20,7 @@ import 'reports.dart';
 import 'report_scope.dart';
 import 'diagnostics.dart';
 import 'screens/feedback_screen.dart';
+import 'screens/assistant_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/room_screen.dart';
@@ -95,6 +96,14 @@ class _GameNightAppState extends State<GameNightApp> {
   @override
   void initState() {
     super.initState();
+    final initial = widget.initialLink;
+    if (initial != null &&
+        Uri.tryParse(initial.fragment)?.path == '/assistant') {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await widget.accountLoading;
+        if (mounted) _assistant();
+      });
+    }
     if (kIsWeb) {
       _history = BrowserNavigation(
           navigatorKey: _navigator,
@@ -130,6 +139,13 @@ class _GameNightAppState extends State<GameNightApp> {
     ));
   }
 
+  void _assistant() {
+    _navigator.currentState?.push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'assistant'),
+      builder: (_) => AssistantScreen(state: widget.state),
+    ));
+  }
+
   void _menu() {
     final context = _navigator.currentState?.overlay?.context;
     if (context == null) return;
@@ -137,8 +153,15 @@ class _GameNightAppState extends State<GameNightApp> {
         context: context,
         builder: (context) => SafeArea(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
+                ListTile(
+                    leading: const Icon(Icons.auto_awesome),
+                    title: const Text('Assistant'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(context);
+                      _assistant();
+                    }),
                 for (final entry in const [
-                  ('/agent', 'Assistant'),
                   ('/developers', 'Developer portal'),
                   ('/docs', 'Documentation'),
                   ('/host', 'Host a room')
