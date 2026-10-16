@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:gamenight/main.dart';
+import 'package:gamenight/reports.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/account.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/room_controls.dart';
-import 'package:gamenight/screens/room_screen.dart';
-import 'package:gamenight/theme.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,6 +36,22 @@ Map<String, dynamic> roomFixture() => {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() async {
+    final fonts = Platform.environment['ROOM_PREVIEW_FONTS'];
+    if (fonts == null) return;
+    for (final family in ['Roboto', 'Ahem']) {
+      final loader = FontLoader(family);
+      for (final weight in ['Regular', 'Bold']) {
+        loader.addFont(File('$fonts/Roboto-$weight.ttf')
+            .readAsBytes()
+            .then((bytes) => ByteData.sublistView(bytes)));
+      }
+      await loader.load();
+    }
+    await (FontLoader('MaterialIcons')
+          ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf')))
+        .load();
+  });
   test('hosted companion uses bearer discovery and clears when unlinked',
       () async {
     SharedPreferences.setMockInitialValues(
@@ -107,9 +127,16 @@ void main() {
             client:
                 MockClient((_) async => http.Response(jsonEncode(room), 200))));
     state.hostedRoom = HostedRoom(room);
-    await tester.pumpWidget(MaterialApp(
-        theme: gameNightTheme(),
-        home: Scaffold(body: RoomScreen(state: state))));
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final preview = GlobalKey();
+    final reports = ReportService(await SharedPreferences.getInstance(),
+        client: MockClient((_) async => http.Response('{}', 200)));
+    addTearDown(reports.close);
+    await tester.pumpWidget(RepaintBoundary(
+        key: preview, child: GameNightApp(state: state, reports: reports)));
     await tester.pump();
     await tester.tap(find.text('Playlist').first);
     await tester.pump();
@@ -117,6 +144,24 @@ void main() {
     expect(find.text('Tonight’s playlist'), findsOneWidget);
     expect(find.text('Neon Siege'), findsOneWidget);
     expect(find.text('Join a room'), findsNothing);
+    expect(find.text('Game'), findsOneWidget);
+    final tabY = tester.getCenter(find.text('Playlist').first).dy;
+    expect(tabY, greaterThan(650));
+    expect(tabY, lessThan(tester.getCenter(find.text('Room').last).dy));
+    final directory = Platform.environment['ROOM_PREVIEW_DIR'];
+    if (directory != null) {
+      await tester.pump(const Duration(seconds: 1));
+      await tester.runAsync(() async {
+        final boundary = preview.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+        final image = await boundary.toImage(pixelRatio: 2);
+        final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+        await Directory(directory).create(recursive: true);
+        await File('$directory/room-bottom-tabs.png')
+            .writeAsBytes(bytes!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });

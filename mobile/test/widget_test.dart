@@ -73,7 +73,7 @@ void main() {
     state.sessionError =
         'GameNight is unreachable. Join the same Wi-Fi as the GameNight PC.';
     await tester.pumpWidget(GameNightApp(state: state));
-    await tester.tap(find.text('Room'));
+    await tester.tap(find.widgetWithText(NavigationDestination, 'Room'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.textContaining('unreachable'), findsOneWidget);
     expect(find.byIcon(Icons.wifi_off), findsOneWidget);

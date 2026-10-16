@@ -244,31 +244,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Expanded(child: IndexedStack(index: _tab, children: pages)),
             ]),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _tab,
-            onDestinationSelected: (i) => setState(() => _tab = i),
-            destinations: [
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: linked,
-                  backgroundColor: GnColors.ok,
-                  smallSize: 8,
-                  child: const Icon(Icons.qr_code_scanner),
-                ),
-                label: 'Room',
+          bottomNavigationBar: DecoratedBox(
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: GnColors.border, width: 1)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (i) => setState(() => _tab = i),
+                destinations: [
+                  NavigationDestination(
+                    icon: Badge(
+                      isLabelVisible: linked,
+                      backgroundColor: GnColors.ok,
+                      smallSize: 8,
+                      child: const Icon(Icons.qr_code_scanner),
+                    ),
+                    label: 'Room',
+                  ),
+                  NavigationDestination(
+                    icon: Badge(
+                      isLabelVisible: widget.state.companion != null,
+                      backgroundColor: GnColors.ok,
+                      smallSize: 8,
+                      child: const Icon(Icons.sports_esports),
+                    ),
+                    label: 'Games',
+                  ),
+                  const NavigationDestination(
+                      icon: Icon(Icons.face_retouching_natural), label: 'You'),
+                ],
               ),
-              NavigationDestination(
-                icon: Badge(
-                  isLabelVisible: widget.state.companion != null,
-                  backgroundColor: GnColors.ok,
-                  smallSize: 8,
-                  child: const Icon(Icons.sports_esports),
-                ),
-                label: 'Games',
-              ),
-              const NavigationDestination(
-                  icon: Icon(Icons.face_retouching_natural), label: 'You'),
-            ],
+            ),
           ),
         );
       },

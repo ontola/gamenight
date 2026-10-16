@@ -3,8 +3,8 @@
 A Flutter app for players on the couch. It does what the phone studio in the
 browser does, as an installable app for Android and iOS:
 
-- **Room.** Join by QR or room code. Once connected, Playing opens the current
-  game's phone screen and settings, Playlist shows the shared queue, and Players
+- **Room.** Join by QR or room code. Once connected, Game opens the current
+  game's phone screen and settings, Playlist shows the shared queue, and Room
   contains your room identity and device preferences. The same room connection
   drives all three views. You can reorder and remove queued games in local and
   hosted rooms.
