@@ -132,6 +132,11 @@ request IDs or individual success acknowledgements. Do not blindly replay
 commands after a lost connection. Reconnect with the launch token and rebuild
 from the new snapshot. The SDK never queues disconnected writes.
 
+Use `remove_from_queue(index)` or `move_in_queue(from, to)` to edit the queue.
+The Godot SDK serializes the snapshot cursor as an integer, including after
+receiving JSON (which Godot parses as floating-point numbers). Custom clients
+must also send integer indices and an integer or null `expected.current`.
+
 The Godot client lives in `addons/gamenight/lobby.gd`. Instantiate it directly;
 do not enable the game plugin's `GameNight` or `GameNightScreen` autoloads in a
 lobby. Its signals supply snapshots, controller frames, connection status,

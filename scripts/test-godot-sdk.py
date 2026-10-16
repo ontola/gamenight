@@ -29,6 +29,23 @@ with tempfile.TemporaryDirectory(prefix='gamenight-godot-sdk-') as folder:
  print(screen.stdout);print(screen.stderr)
  assert screen.returncode==0 and 'SCREEN_LIFECYCLE_RESULT 0 failures' in screen.stdout and 'SCRIPT ERROR' not in screen.stderr
 
+ # Decode the actual Godot output with a parser that distinguishes 3 from 3.0.
+ queue=subprocess.run([args.godot,'--headless','--path',str(p),'--script','res://tests/lobby_queue_wire.gd'],env=env,capture_output=True,text=True,timeout=15)
+ import json
+ assert queue.returncode==0 and 'SCRIPT ERROR' not in queue.stderr, queue.stderr
+ wires=[json.loads(line.removeprefix('QUEUE_WIRE ')) for line in queue.stdout.splitlines() if line.startswith('QUEUE_WIRE ')]
+ assert len(wires)==13, queue.stdout
+ for index,message in enumerate(wires[:-1]):
+  expected=message['expected']
+  if index<6:
+   assert type(expected['current']) is int and expected['current']==(3 if index<3 else 0), message
+  elif index<9: assert expected['current'] is None, message
+  else: assert 'current' not in expected, message
+  for key in ('index','from','to'):
+   if key in message: assert type(message[key]) is int, message
+ assert wires[-1]['value']==1.25, wires[-1]
+ print('PASS queue remove/move serialize integer cursors; nullable cursors and fractional settings preserved')
+
  # A managed game with no host must exit instead of running unattended/reconnecting.
  env['GAMENIGHT']='1'
  lost=subprocess.run([args.godot,'--headless','--path',str(p),'--quit-after','600'],env=env,capture_output=True,text=True,timeout=5)
