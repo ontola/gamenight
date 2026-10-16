@@ -38,7 +38,12 @@ func run() -> void:
 	check_fit("startup")
 	for i in 3:
 		room.client.active = false
+		var grants: int = room.foreground_grants
 		room._focus_changed(false)
+		room._focus_changed(false)
+		if room.foreground_grants != grants + 1 or not room.grant_before_minimize:
+			failed = true
+			push_error("DISPLAY_TEST: Back must grant foreground once, before hiding")
 		await settle()
 		if root.always_on_top:
 			failed = true

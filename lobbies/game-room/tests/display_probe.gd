@@ -14,3 +14,10 @@ func _request_window_focus() -> void:
 			reported_focus = true
 			get_window().focus_entered.emit()
 		else: super._request_window_focus()
+
+var foreground_grants := 0
+var grant_before_minimize := true
+
+func _release_game_focus() -> void:
+	foreground_grants += 1
+	grant_before_minimize = grant_before_minimize and get_window().mode != Window.MODE_MINIMIZED

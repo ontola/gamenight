@@ -167,7 +167,13 @@ func _focus_changed(active: bool) -> void:
 			else: get_window().mode = Window.MODE_WINDOWED
 			_claim_lobby_focus(_focus_handoff)
 		else:
+			# Back is handled by the host, bypassing the lobby's Y command.
+			# Grant foreground rights while we still own focus, before hiding.
+			_release_game_focus()
 			get_window().mode = Window.MODE_MINIMIZED
+
+func _release_game_focus() -> void:
+	client._allow_game_foreground()
 
 func _cancel_focus_handoff() -> void:
 	_focus_handoff += 1
