@@ -20,21 +20,29 @@ class Profile {
   final String id;
   final String username;
   final String skinColor;
+  final String? preferredColor;
   final String avatar;
 
   const Profile(
       {required this.id,
       required this.username,
       required this.skinColor,
+      this.preferredColor,
       required this.avatar});
 
-  Map<String, dynamic> toJson() =>
-      {'id': id, 'username': username, 'skin_color': skinColor, 'avatar': avatar};
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'username': username,
+        'skin_color': skinColor,
+        if (preferredColor != null) 'preferred_color': preferredColor,
+        'avatar': avatar
+      };
 
   factory Profile.fromJson(Map<String, dynamic> j) => Profile(
       id: j['id'] as String,
       username: j['username'] as String? ?? '',
       skinColor: j['skin_color'] as String? ?? '#f5e9be',
+      preferredColor: j['preferred_color'] as String?,
       avatar: j['avatar'] as String? ?? '');
 }
 
@@ -107,7 +115,9 @@ class CompanionApp {
     final name = j['name'];
     if (name is! String) return null;
     return CompanionApp(
-        name: name, android: j['android'] as String?, download: j['download'] as String?);
+        name: name,
+        android: j['android'] as String?,
+        download: j['download'] as String?);
   }
 }
 
@@ -118,14 +128,16 @@ class Companion {
   /// The phone page, when the game has one.
   final String? url;
   final CompanionApp? app;
-  const Companion({required this.game, required this.title, this.url, this.app});
+  const Companion(
+      {required this.game, required this.title, this.url, this.app});
 
   static Companion? fromJson(Map<String, dynamic> j) {
     final game = j['game'] as String?;
     final url = j['url'] as String?;
     final app = CompanionApp.fromJson(j['app']);
     if (game == null || (url == null && app == null)) return null;
-    return Companion(game: game, title: j['title'] as String? ?? game, url: url, app: app);
+    return Companion(
+        game: game, title: j['title'] as String? ?? game, url: url, app: app);
   }
 }
 
@@ -180,7 +192,8 @@ class GameNightApi {
 
   Uri _u(String path) {
     final relative = Uri.parse(path);
-    return base.replace(path: relative.path, query: relative.hasQuery ? relative.query : null);
+    return base.replace(
+        path: relative.path, query: relative.hasQuery ? relative.query : null);
   }
 
   /// Absolute address of a page the host serves, such as a phone screen.
@@ -206,13 +219,16 @@ class GameNightApi {
           'GameNight is unreachable. Join the same Wi-Fi as the GameNight PC.');
     }
     if (response.statusCode >= 500) {
-      Diagnostics.failure('Local host $method failed (HTTP ${response.statusCode})');
+      Diagnostics.failure(
+          'Local host $method failed (HTTP ${response.statusCode})');
     }
     if (response.statusCode == 429) {
-      throw const ApiError('Too many attempts. Wait a minute before trying again.', 429);
+      throw const ApiError(
+          'Too many attempts. Wait a minute before trying again.', 429);
     }
     if (response.statusCode >= 300) {
-      throw ApiError(failure ?? 'GameNight refused the request.', response.statusCode);
+      throw ApiError(
+          failure ?? 'GameNight refused the request.', response.statusCode);
     }
     if (response.statusCode == 204 || response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
@@ -220,7 +236,8 @@ class GameNightApi {
 
   /// A JSON request to this host, for features that keep their calls in their
   /// own file (see room_controls.dart).
-  Future<dynamic> request(String method, String path, {Object? body, String? failure}) =>
+  Future<dynamic> request(String method, String path,
+          {Object? body, String? failure}) =>
       _send(method, path, body: body, failure: failure);
 
   /// Cheap reachability check used by the connect screen.
@@ -237,8 +254,8 @@ class GameNightApi {
     }
   }
 
-  Future<void> saveProfile(Profile p) =>
-      _send('POST', '/api/profiles', body: p.toJson(), failure: 'Could not save your player.');
+  Future<void> saveProfile(Profile p) => _send('POST', '/api/profiles',
+      body: p.toJson(), failure: 'Could not save your player.');
 
   Future<SessionInfo> session(String id) async => SessionInfo.fromJson(
       await _send('GET', '/api/profiles/${Uri.encodeComponent(id)}/session')
@@ -250,7 +267,8 @@ class GameNightApi {
   /// before phone screens answer 404, which reads as "none".
   Future<Companion?> companion(String profile) async {
     try {
-      final j = await _send('GET', '/api/companion?profile=${Uri.encodeQueryComponent(profile)}');
+      final j = await _send(
+          'GET', '/api/companion?profile=${Uri.encodeQueryComponent(profile)}');
       return j is Map<String, dynamic> ? Companion.fromJson(j) : null;
     } on ApiError catch (e) {
       if (e.status == 404) return null;
@@ -260,48 +278,62 @@ class GameNightApi {
 
   Future<JoinResult> join(String id,
           {String? claim, int? seat, int linkRevision = 0}) async =>
-      JoinResult(await _send('POST', '/api/profiles/${Uri.encodeComponent(id)}/join',
-          body: {'claim': claim, 'seat': seat, 'link_revision': linkRevision},
-          failure: 'Saved on your phone. Is GameNight still running?') as Map<String, dynamic>);
+      JoinResult(
+          await _send('POST', '/api/profiles/${Uri.encodeComponent(id)}/join',
+                  body: {
+                    'claim': claim,
+                    'seat': seat,
+                    'link_revision': linkRevision
+                  },
+                  failure: 'Saved on your phone. Is GameNight still running?')
+              as Map<String, dynamic>);
 
   /// Asks to be picked up in the lobby: walk your character to your door.
   Future<void> joinRoom(String code, String profile, {bool remember = false}) =>
       _send('POST', '/api/local-room/join',
-          body: {'code': code, 'profile': profile, if (remember) 'remember': true},
+          body: {
+            'code': code,
+            'profile': profile,
+            if (remember) 'remember': true
+          },
           failure:
               'Could not join this room. Check the code and that you are not already connected.');
 
   /// Hand a character back: the controller stays in the game as a fresh,
   /// unnamed player, and this phone is no longer bound to it.
-  Future<void> unlink(String player) => _send(
-      'POST', '/api/player-links/${Uri.encodeComponent(player)}/unlink',
-      failure: 'Could not leave this character. Try again.');
+  Future<void> unlink(String player) =>
+      _send('POST', '/api/player-links/${Uri.encodeComponent(player)}/unlink',
+          failure: 'Could not leave this character. Try again.');
 
-  Future<void> cancelPickup(String profile) => _send(
-      'POST', '/api/local-room/cancel/${Uri.encodeComponent(profile)}',
-      body: {});
+  Future<void> cancelPickup(String profile) =>
+      _send('POST', '/api/local-room/cancel/${Uri.encodeComponent(profile)}',
+          body: {});
 
-  Future<void> remember(String profile, bool remember) => _send(
-      'POST', '/api/profiles/${Uri.encodeComponent(profile)}/remember',
-      body: {'remember': remember});
+  Future<void> remember(String profile, bool remember) =>
+      _send('POST', '/api/profiles/${Uri.encodeComponent(profile)}/remember',
+          body: {'remember': remember});
 
-  Future<void> mainPlayer(String profile, bool enabled) => _send(
-      'POST', '/api/profiles/${Uri.encodeComponent(profile)}/main-player',
-      body: {'enabled': enabled});
+  Future<void> mainPlayer(String profile, bool enabled) =>
+      _send('POST', '/api/profiles/${Uri.encodeComponent(profile)}/main-player',
+          body: {'enabled': enabled});
 
   Future<PlaylistView> playlist() async => PlaylistView(
       await _send('GET', '/api/playlist', failure: 'Playlist unavailable.')
           as Map<String, dynamic>);
 
-  Future<PlaylistView> movePlaylistEntry(PlaylistView view, int from, int to) async =>
+  Future<PlaylistView> movePlaylistEntry(
+          PlaylistView view, int from, int to) async =>
       PlaylistView(await _send('POST', '/api/playlist',
-          body: {'expected': view.snapshot, 'from': from, 'to': to},
-          failure: 'Playlist changed. Refresh and try again.') as Map<String, dynamic>);
+              body: {'expected': view.snapshot, 'from': from, 'to': to},
+              failure: 'Playlist changed. Refresh and try again.')
+          as Map<String, dynamic>);
 
-  Future<PlaylistView> removePlaylistEntry(PlaylistView view, int index) async =>
+  Future<PlaylistView> removePlaylistEntry(
+          PlaylistView view, int index) async =>
       PlaylistView(await _send('POST', '/api/playlist',
-          body: {'expected': view.snapshot, 'from': index, 'remove': true},
-          failure: 'Playlist changed. Refresh and try again.') as Map<String, dynamic>);
+              body: {'expected': view.snapshot, 'from': index, 'remove': true},
+              failure: 'Playlist changed. Refresh and try again.')
+          as Map<String, dynamic>);
 
   /// Body sprite the lobby uses, for the character preview.
   Uri get characterSprite => _u('/assets/characters/living-room');

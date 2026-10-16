@@ -238,3 +238,10 @@ The browser test uses synthetic rooms, checks navigation and resizing on the
 compiled app, and writes phone/desktop screenshots when
 `GAMENIGHT_TEST_SCREENSHOTS` is set. Native desktop packaging is not added by this
 change; desktop users use the web app.
+
+The You destination displays the player's current face and skin, including hats.
+The clothing picker saves a preferred player colour to the local profile,
+account and room guest profile. Host allocation resolves duplicate preferences
+in party join order. Guest edits update their existing capability and profile
+revision, without creating another player. This needs a host build with preferred
+colour allocation; older hosts continue using their automatic colours.

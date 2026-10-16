@@ -33,6 +33,10 @@ Future<void> migrateWebsiteRoom(SharedPreferences prefs,
             RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(profile['skin_color'])) {
           await prefs.setString('skin_color', profile['skin_color']);
         }
+        if (profile['preferred_color'] is String &&
+            RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(profile['preferred_color'])) {
+          await prefs.setString('clothing_color', profile['preferred_color']);
+        }
         if (profile['avatar'] is String) {
           await prefs.setString('face', profile['avatar']);
         }

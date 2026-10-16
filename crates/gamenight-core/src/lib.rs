@@ -76,10 +76,9 @@ mod night_tests {
             snapshot.players[1].avatar.as_deref(),
             Some("saved profile artwork")
         );
-        assert!(snapshot
-            .players
-            .iter()
-            .all(|p| p.color.as_deref() == Some("#123456") && p.skin_color.is_none()));
+        assert_eq!(snapshot.players[0].color.as_deref(), Some("#123456"));
+        assert_ne!(snapshot.players[1].color, snapshot.players[0].color);
+        assert!(snapshot.players.iter().all(|p| p.skin_color.is_none()));
     }
 
     fn entry(id: &str) -> PlaylistEntry {
@@ -2535,6 +2534,39 @@ mod player_count_fit_tests {
         assert!(unknown
             .iter()
             .any(|effect| matches!(effect, Effect::Reject { .. })));
+    }
+
+    #[test]
+    fn preferred_colours_respect_join_order_not_update_or_seat_order() {
+        let mut night = GameNight::default();
+        night.handle(join("first"));
+        night.handle(join("second"));
+        let a = night.snapshot().players[0].id;
+        let b = night.snapshot().players[1].id;
+        night.handle(Command::SetPlayerColor {
+            player_id: b,
+            color: "#55A0FF".into(),
+        });
+        night.handle(Command::SetPlayerColor {
+            player_id: a,
+            color: "#55a0ff".into(),
+        });
+        let players = night.snapshot().players;
+        assert_eq!(players[0].color.as_deref(), Some("#55a0ff"));
+        assert_ne!(players[1].color, players[0].color);
+        night.handle(Command::SetPlayerColor {
+            player_id: b,
+            color: "#55a0ff".into(),
+        });
+        assert_eq!(
+            night.snapshot().players[0].color.as_deref(),
+            Some("#55a0ff")
+        );
+        night.handle(Command::LeaveParty { player_id: a });
+        assert_eq!(
+            night.snapshot().players[0].color.as_deref(),
+            Some("#55a0ff")
+        );
     }
 
     #[test]

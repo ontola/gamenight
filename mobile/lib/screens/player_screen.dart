@@ -165,12 +165,15 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ColorSwatches(
           colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
       const SizedBox(height: 12),
-      const Hint('Clothing colour (preview only, games pick their own)'),
+      const Hint('Preferred player colour'),
       const SizedBox(height: 6),
       ColorSwatches(
           colors: clothingColors,
           selected: state.clothingColor,
           onTap: state.setClothing),
+      const SizedBox(height: 8),
+      const Hint(
+          'First to join gets first choice. Taken colours get a fallback.'),
     ]);
   }
 

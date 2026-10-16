@@ -53,7 +53,7 @@ impl Room {
             .sort_by_key(|(profile, _)| (self.main_profile.as_ref() != Some(*profile), *profile));
         let pending:Vec<_>=entries.into_iter().filter_map(|(profile,(id,expires))| {
             let p=profiles.get(profile)?;
-            (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"profile":{"display_name":p.username,"skin_color":p.skin_color,"avatar":p.avatar}}))
+            (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"profile":{"display_name":p.username,"skin_color":p.skin_color,"preferred_color":p.preferred_color,"avatar":p.avatar}}))
         }).collect();
         serde_json::json!({"room_code":self.code,"pending":pending})
     }
@@ -166,6 +166,7 @@ mod tests {
                 id: "phone".into(),
                 username: "Test".into(),
                 skin_color: "#abcdef".into(),
+                preferred_color: None,
                 avatar: "drawing".into(),
             },
         );
@@ -302,6 +303,7 @@ mod memory_access_tests {
                 id: "phone".into(),
                 username: "Joep".into(),
                 skin_color: "#abcdef".into(),
+                preferred_color: None,
                 avatar: "hat".into(),
             },
         );

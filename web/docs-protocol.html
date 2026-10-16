@@ -872,8 +872,18 @@ is no automatic sampler for them yet.</p>
 only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.</p>
+<h2 id="preferred-player-colours">Preferred player colours</h2>
+<p>Player profiles may carry an optional <code>preferred_color</code> (<code>#RRGGBB</code>). It is
+separate from <code>skin_color</code>. The host applies this through <code>set_player_color</code>
+and publishes the assigned colour in <code>Player.color</code>, which games should use for
+clothing and player indicators. A preference is not a guarantee: when colours
+conflict, the first player to join the party wins, regardless of seat order or
+which phone's profile update arrives first. Other players receive distinct
+fallback colours. When a colour becomes available, a player waiting for that
+preference receives it. Games can still use team colours when required by their
+rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="f532a03978b3fc5478710b0889319046a59a8d5b729d8a5ccf622390bec69dc4">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="66643474d6fa7f9c8a38fd93d92557c7ba9183eed902a699776f4ef8f7629acd">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

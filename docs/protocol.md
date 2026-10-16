@@ -817,3 +817,15 @@ These are factual diagnostics available to any host. The public runtime keeps
 only the current session counters. It contains no behavioral database, account
 profiling, recommendation model or training pipeline. An optional configured
 cloud room relay includes session diagnostics in its discovery snapshot.
+
+## Preferred player colours
+
+Player profiles may carry an optional `preferred_color` (`#RRGGBB`). It is
+separate from `skin_color`. The host applies this through `set_player_color`
+and publishes the assigned colour in `Player.color`, which games should use for
+clothing and player indicators. A preference is not a guarantee: when colours
+conflict, the first player to join the party wins, regardless of seat order or
+which phone's profile update arrives first. Other players receive distinct
+fallback colours. When a colour becomes available, a player waiting for that
+preference receives it. Games can still use team colours when required by their
+rules. Older profiles without this field retain automatic colour selection.

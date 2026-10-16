@@ -254,6 +254,7 @@ pub enum Effect {
 #[derive(Debug)]
 pub struct GameNight {
     players: Vec<Player>,
+    preferred_colors: HashMap<PlayerId, String>,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
     participation: HashMap<SessionId, bool>,
     seats: Vec<Seat>,
@@ -317,6 +318,7 @@ impl GameNight {
     pub fn new(seat_count: u8) -> Self {
         Self {
             players: Vec::new(),
+            preferred_colors: HashMap::new(),
             presence: HashMap::new(),
             participation: HashMap::new(),
             seats: (0..seat_count)
@@ -1038,6 +1040,7 @@ impl GameNight {
     ) {
         let id = PlayerId::new();
         let guest = avatar.is_none();
+        let preference = color.clone();
         let color = color.or_else(|| {
             gamenight_protocol::guest_face::COLORS
                 .iter()
@@ -1078,6 +1081,10 @@ impl GameNight {
             };
         }
         self.players.push(player);
+        if let Some(color) = preference {
+            self.preferred_colors.insert(id, color.to_ascii_lowercase());
+        }
+        self.assign_player_colors();
         fx.push(Effect::StateChanged);
         // A new seat may make the warm game a bad fit — or be the very first
         // thing that lets us warm anything at all.
@@ -1220,6 +1227,8 @@ impl GameNight {
 
     fn on_leave(&mut self, player_id: PlayerId, fx: &mut Vec<Effect>) {
         self.players.retain(|p| p.id != player_id);
+        self.preferred_colors.remove(&player_id);
+        self.assign_player_colors();
         for seat in &mut self.seats {
             if seat.occupant.player_id() == Some(player_id) {
                 seat.occupant = SeatOccupant::Empty;
@@ -1249,16 +1258,68 @@ impl GameNight {
     }
 
     fn on_set_player_color(&mut self, player_id: PlayerId, color: String, fx: &mut Vec<Effect>) {
-        match self.players.iter_mut().find(|p| p.id == player_id) {
-            Some(p) => {
-                p.color = Some(color);
-                fx.push(Effect::StateChanged);
-            }
-            None => fx.push(Effect::Reject {
-                reason: "unknown player".into(),
-            }),
+        if color.len() != 7
+            || !color.starts_with('#')
+            || !color[1..].bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            fx.push(Effect::Reject {
+                reason: "invalid player colour".into(),
+            });
+            return;
         }
+        if !self.players.iter().any(|p| p.id == player_id) {
+            fx.push(Effect::Reject {
+                reason: "unknown player".into(),
+            });
+            return;
+        }
+        self.preferred_colors
+            .insert(player_id, color.to_ascii_lowercase());
+        self.assign_player_colors();
+        fx.push(Effect::StateChanged);
         self.rewarm_if_misfit(fx);
+    }
+
+    /// Vec order is join order, independent of controller seat or relay arrival.
+    /// Reserve preferences first so an automatic fallback cannot steal one.
+    fn assign_player_colors(&mut self) {
+        let mut used = HashSet::new();
+        let mut assigned = HashMap::new();
+        for player in &self.players {
+            if let Some(color) = self.preferred_colors.get(&player.id) {
+                if used.insert(color.clone()) {
+                    assigned.insert(player.id, color.clone());
+                }
+            }
+        }
+        for (index, player) in self.players.iter_mut().enumerate() {
+            if let Some(color) = assigned.get(&player.id) {
+                player.color = Some(color.clone());
+                continue;
+            }
+            let current = player.color.as_ref().map(|c| c.to_ascii_lowercase());
+            let color = current
+                .filter(|c| !used.contains(c))
+                .or_else(|| {
+                    gamenight_protocol::guest_face::COLORS
+                        .iter()
+                        .find(|c| !used.contains(**c))
+                        .map(|c| (*c).to_owned())
+                })
+                .unwrap_or_else(|| {
+                    // More players than the standard palette: remain deterministic.
+                    let mut n = index as u32;
+                    loop {
+                        let color = format!("#{:06x}", n.wrapping_mul(0x9e3779) & 0xffffff);
+                        if !used.contains(&color) {
+                            break color;
+                        }
+                        n = n.wrapping_add(1);
+                    }
+                });
+            used.insert(color.clone());
+            player.color = Some(color);
+        }
     }
 
     fn on_assign_seat(&mut self, seat: u8, occupant: SeatOccupant, fx: &mut Vec<Effect>) {
@@ -1834,6 +1895,7 @@ impl GameNight {
         // otherwise silently fills up and locks new joins out forever.
         if self.lobby_game.as_ref() == Some(&game) && !self.preserve_lobby_party {
             self.players.clear();
+            self.preferred_colors.clear();
             for seat in &mut self.seats {
                 seat.occupant = SeatOccupant::Empty;
             }

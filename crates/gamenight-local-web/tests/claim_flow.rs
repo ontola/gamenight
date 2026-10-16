@@ -128,6 +128,7 @@ fn profile_json(id: &str, username: &str, color: &str, avatar: &str) -> String {
         id: id.into(),
         username: username.into(),
         skin_color: color.into(),
+        preferred_color: None,
         avatar: avatar.into(),
     })
     .unwrap()
@@ -1256,4 +1257,50 @@ async fn large_profile_claim_is_acknowledged_before_success() {
         assert_eq!(player.avatar.as_deref(), Some(avatar.as_str()));
         assert_eq!(player.color.as_deref(), Some("#336699"));
     }
+}
+
+#[tokio::test]
+async fn colour_preference_reaches_host_and_first_joined_keeps_it() {
+    let daemon = start_daemon().await;
+    let server = start_server(&daemon).await;
+    let mut watcher = Watcher::connect(&daemon).await;
+    for (id, name) in [("first", "First"), ("second", "Second")] {
+        let profile = serde_json::json!({"id":id,"username":name,"skin_color":"#abcdef","avatar":"","preferred_color":"#55a0ff"});
+        assert_eq!(
+            post(&server, "/api/profiles", &profile.to_string()).await.0,
+            200
+        );
+        assert_eq!(
+            post(&server, &format!("/api/profiles/{id}/join"), "{}")
+                .await
+                .0,
+            200
+        );
+    }
+    let party = watcher
+        .wait_for(|p| p.players.len() == 2 && p.players[1].skin_color.is_some())
+        .await;
+    assert_eq!(party.players[0].color.as_deref(), Some("#55a0ff"));
+    assert_ne!(party.players[1].color, party.players[0].color);
+    let first = party.players[0].id;
+    let profile = serde_json::json!({"id":"first","username":"First","skin_color":"#abcdef","avatar":"","preferred_color":"#ff5555"});
+    assert_eq!(
+        post(&server, "/api/profiles", &profile.to_string()).await.0,
+        200
+    );
+    assert_eq!(
+        post(
+            &server,
+            "/api/profiles/first/join",
+            &serde_json::json!({"claim":first}).to_string()
+        )
+        .await
+        .0,
+        200
+    );
+    let party = watcher
+        .wait_for(|p| p.players[0].color.as_deref() == Some("#ff5555"))
+        .await;
+    assert_eq!(party.players.len(), 2);
+    assert_eq!(party.players[1].color.as_deref(), Some("#55a0ff"));
 }

@@ -111,6 +111,7 @@ mod tests {
             id: id.into(),
             username: id.into(),
             skin_color: "#abcdef".into(),
+            preferred_color: None,
             avatar: "face-and-hat".into(),
         };
         let mut memory = Memory::load(path.clone()).unwrap();
@@ -136,6 +137,7 @@ mod tests {
             id: "phone".into(),
             username: "Player".into(),
             skin_color: "#abcdef".into(),
+            preferred_color: None,
             avatar: String::new(),
         };
         let mut memory = Memory::default();
@@ -159,6 +161,7 @@ mod tests {
             id: "phone".into(),
             username: "Joep".into(),
             skin_color: "#abcdef".into(),
+            preferred_color: None,
             avatar: "face-and-hat".into(),
         };
         assert!(Memory::load(path.clone()).unwrap().profiles.is_empty());

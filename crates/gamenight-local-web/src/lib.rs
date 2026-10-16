@@ -33,6 +33,8 @@ pub struct Profile {
     pub username: String,
     #[serde(default = "default_skin_color")]
     pub skin_color: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preferred_color: Option<String>,
     pub avatar: String, // 16x16 pixel matrix serialized or data URI
 }
 
@@ -629,7 +631,7 @@ async fn join_session_inner(
             }
 
             // Claiming an existing character vs. adding a new party member.
-            let messages = match target {
+            let mut messages = match target {
                 Some(player_id) => vec![
                     ClientMessage::RenamePlayer {
                         player_id,
@@ -643,11 +645,15 @@ async fn join_session_inner(
                 None => vec![ClientMessage::JoinParty {
                     name: profile.username.clone(),
                     seat: None,
-                    color: None,
+                    color: profile.preferred_color.clone(),
                     avatar: Some(profile.avatar.clone()),
                     library: Vec::new(),
                 }],
             };
+            if let (Some(player_id), Some(color)) = (target, profile.preferred_color.clone()) {
+                // Apply before profile acknowledgement, even for colour-only edits.
+                messages.insert(0, ClientMessage::SetPlayerColor { player_id, color });
+            }
             for msg in &messages {
                 ws_stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(msg.to_json()))

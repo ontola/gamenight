@@ -11,7 +11,8 @@ class Artwork {
   Pixels data;
   Artwork({required this.id, required this.name, required this.data});
 
-  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'face': encodeAvatar(data)};
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'face': encodeAvatar(data)};
 
   static Artwork? fromJson(Object? j) {
     if (j is! Map) return null;
@@ -38,11 +39,13 @@ class BackupError implements Exception {
 class Backup {
   final String username;
   final String skinColor;
+  final String? preferredColor;
   final String? activeArtworkId;
   final List<Artwork> artworks;
   const Backup(
       {required this.username,
       required this.skinColor,
+      this.preferredColor,
       required this.activeArtworkId,
       required this.artworks});
 }
@@ -87,6 +90,7 @@ String encodeBackup(Backup backup) {
     'gridSize': gridSize,
     'username': backup.username,
     'skinColor': backup.skinColor,
+    if (backup.preferredColor != null) 'preferredColor': backup.preferredColor,
     'activeArtworkId': backup.activeArtworkId,
     'version': 2,
     'palette': palette,
@@ -101,7 +105,8 @@ Backup decodeBackup(String text) {
   try {
     value = jsonDecode(text.trim());
   } on FormatException {
-    throw const BackupError('This is not a GameNight backup. Nothing was imported.');
+    throw const BackupError(
+        'This is not a GameNight backup. Nothing was imported.');
   }
   const cells = gridSize * gridSize;
   if (value is! Map ||
@@ -115,11 +120,15 @@ Backup decodeBackup(String text) {
       value['username'] is! String ||
       (value['username'] as String).length > 100 ||
       value['skinColor'] is! String ||
-      !_hex.hasMatch(value['skinColor'] as String)) {
+      !_hex.hasMatch(value['skinColor'] as String) ||
+      (value['preferredColor'] != null &&
+          (value['preferredColor'] is! String ||
+              !_hex.hasMatch(value['preferredColor'] as String)))) {
     throw const BackupError('Please import a current GameNight backup.');
   }
   final palette = value['palette'] as List;
-  if (palette.length > 200 * cells || !palette.every((c) => c is String && _hex.hasMatch(c))) {
+  if (palette.length > 200 * cells ||
+      !palette.every((c) => c is String && _hex.hasMatch(c))) {
     throw const BackupError('Please import a current GameNight backup.');
   }
   final ids = <String>{};
@@ -155,13 +164,19 @@ Backup decodeBackup(String text) {
         data.add(pixel);
       }
     }
-    if (data.length != cells) throw const BackupError('Incomplete face. Nothing was imported.');
-    artworks.add(Artwork(id: art['id'] as String, name: art['name'] as String, data: data));
+    if (data.length != cells) {
+      throw const BackupError('Incomplete face. Nothing was imported.');
+    }
+    artworks.add(Artwork(
+        id: art['id'] as String, name: art['name'] as String, data: data));
   }
   return Backup(
     username: value['username'] as String,
     skinColor: value['skinColor'] as String,
-    activeArtworkId: value['activeArtworkId'] is String ? value['activeArtworkId'] as String : null,
+    preferredColor: value['preferredColor'] as String?,
+    activeArtworkId: value['activeArtworkId'] is String
+        ? value['activeArtworkId'] as String
+        : null,
     artworks: artworks,
   );
 }

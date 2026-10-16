@@ -135,6 +135,8 @@ struct Update {
 }
 #[derive(Deserialize)]
 struct CloudProfile {
+    #[serde(default)]
+    preferred_color: Option<String>,
     display_name: String,
     skin_color: String,
     avatar: String,
@@ -467,6 +469,7 @@ impl Bridge {
                             id: id.clone(),
                             username: u.profile.display_name.clone(),
                             skin_color: u.profile.skin_color.clone(),
+                            preferred_color: u.profile.preferred_color.clone(),
                             avatar: u.profile.avatar.clone(),
                         },
                     );

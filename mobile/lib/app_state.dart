@@ -175,6 +175,7 @@ class AppState extends ChangeNotifier {
   String exportBackup() => encodeBackup(Backup(
       username: name,
       skinColor: skinColor,
+      preferredColor: clothingColor,
       activeArtworkId: currentArtworkId,
       artworks: artworks));
 
@@ -199,6 +200,10 @@ class AppState extends ChangeNotifier {
     }
     name = backup.username;
     prefs.setString('player_name', name);
+    if (backup.preferredColor case final color?) {
+      clothingColor = color;
+      prefs.setString('clothing_color', color);
+    }
     skinColor = backup.skinColor;
     prefs.setString('skin_color', skinColor);
     _saveArtworks();
@@ -221,6 +226,7 @@ class AppState extends ChangeNotifier {
       id: profileId,
       username: name,
       skinColor: skinColor,
+      preferredColor: clothingColor,
       avatar: encodeAvatar(face));
 
   // ---- Editing ---------------------------------------------------------
@@ -237,11 +243,11 @@ class AppState extends ChangeNotifier {
     scheduleSave();
   }
 
-  /// Clothing is chosen by each game; this only tints the preview.
+  /// Preferred party colour; the host resolves conflicts in join order.
   void setClothing(String color) {
     clothingColor = color;
     prefs.setString('clothing_color', color);
-    notifyListeners();
+    scheduleSave();
   }
 
   void setFace(Pixels pixels) {
@@ -585,6 +591,10 @@ class AppState extends ChangeNotifier {
   /// Takes the account's name, skin and faces. False for a new account.
   bool _adoptStudio(StudioDocument doc) {
     _setStudioRevision(doc.revision);
+    if (doc.preferredColor case final color?) {
+      clothingColor = color;
+      prefs.setString('clothing_color', color);
+    }
     final workspace = doc.workspace;
     // A new account only has a placeholder name; this phone's player wins.
     if (workspace == null) return false;
@@ -592,6 +602,7 @@ class AppState extends ChangeNotifier {
       importBackup(jsonEncode({
         'username': doc.displayName ?? name,
         'skinColor': doc.skinColor ?? skinColor,
+        'preferredColor': doc.preferredColor ?? clothingColor,
         ...workspace,
       }));
       if (doc.displayName != null && doc.displayName!.trim().isNotEmpty) {
@@ -615,17 +626,20 @@ class AppState extends ChangeNotifier {
 
   /// Saves the player and every face to the account.
   Future<void> _pushAccount() async {
-    if (!cloud.signedIn) return;
+    if (!cloud.signedIn && !isGuest) return;
     if (_pushingAccount) {
       _accountPending = true;
       return;
     }
     _pushingAccount = true;
     try {
+      if (isGuest) await cloud.updateGuestProfile(_guestProfile);
+      if (!cloud.signedIn) return;
       Future<StudioDocument?> save() => cloud.saveStudio(
           revision: _studioRevision,
           displayName: name.trim().isEmpty ? 'Player' : name.trim(),
           skinColor: skinColor,
+          preferredColor: clothingColor,
           avatar: encodeAvatar(face),
           workspace: jsonDecode(exportBackup()) as Map<String, dynamic>);
       var saved = await save();
@@ -723,6 +737,7 @@ class AppState extends ChangeNotifier {
   Map<String, dynamic> get _guestProfile => {
         'display_name': name,
         'skin_color': skinColor,
+        'preferred_color': clothingColor,
         'avatar': encodeAvatar(face),
       };
 

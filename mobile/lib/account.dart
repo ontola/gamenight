@@ -30,11 +30,13 @@ class StudioDocument {
   final int revision;
   final String? displayName;
   final String? skinColor;
+  final String? preferredColor;
   final Map<String, dynamic>? workspace;
   const StudioDocument(
       {required this.revision,
       this.displayName,
       this.skinColor,
+      this.preferredColor,
       this.workspace});
 
   static StudioDocument fromJson(Map<String, dynamic> j) {
@@ -43,6 +45,7 @@ class StudioDocument {
         revision: (j['revision'] as num?)?.toInt() ?? 0,
         displayName: profile?['display_name'] as String?,
         skinColor: profile?['skin_color'] as String?,
+        preferredColor: profile?['preferred_color'] as String?,
         workspace: j['workspace'] as Map<String, dynamic>?);
   }
 }
@@ -376,6 +379,7 @@ class CloudApi {
       {required int revision,
       required String displayName,
       required String skinColor,
+      String? preferredColor,
       required String avatar,
       required Map<String, dynamic> workspace}) async {
     final response = await _raw('PUT', '/v1/me/studio', body: {
@@ -383,6 +387,7 @@ class CloudApi {
       'profile': {
         'display_name': displayName,
         'skin_color': skinColor,
+        if (preferredColor != null) 'preferred_color': preferredColor,
         'avatar': avatar
       },
       'workspace': workspace,
@@ -429,6 +434,10 @@ class CloudApi {
     }
     guestToken = response['token'] as String;
     return HostedRoom(Map<String, dynamic>.from(response['status'] as Map));
+  }
+
+  Future<void> updateGuestProfile(Map<String, dynamic> profile) async {
+    await _send('PUT', '/v1/rooms/guest/profile', body: profile);
   }
 
   Future<void> chooseGuestSeat(Map<String, dynamic> seat) async {
