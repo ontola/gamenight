@@ -3,6 +3,7 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,11 +46,11 @@ Future<void> main() async {
   };
   reports.start();
   if (state.host != null || state.inHostedRoom) state.startPolling();
-  state.loadAccount();
+  final accountLoading = state.loadAccount();
   final links = AppLinks();
   Uri? first;
   try {
-    first = await links.getInitialLink();
+    first = kIsWeb ? Uri.base : await links.getInitialLink();
   } catch (_) {
     Diagnostics.failure('Could not read the app launch link');
   }
@@ -57,6 +58,7 @@ Future<void> main() async {
       state: state,
       links: links.uriLinkStream,
       initialLink: first,
+      accountLoading: accountLoading,
       reports: reports));
 }
 
@@ -67,11 +69,13 @@ class GameNightApp extends StatefulWidget {
   /// Links that open the app, e.g. from the sign-in email.
   final Stream<Uri>? links;
   final Uri? initialLink;
+  final Future<void>? accountLoading;
   const GameNightApp(
       {super.key,
       required this.state,
       this.links,
       this.initialLink,
+      this.accountLoading,
       this.reports});
 
   @override
@@ -140,6 +144,7 @@ class _GameNightAppState extends State<GameNightApp> {
             state: widget.state,
             links: widget.links,
             initialLink: widget.initialLink,
+            accountLoading: widget.accountLoading,
             reports: widget.reports),
       );
 }
@@ -149,11 +154,13 @@ class HomeScreen extends StatefulWidget {
   final ReportService? reports;
   final Stream<Uri>? links;
   final Uri? initialLink;
+  final Future<void>? accountLoading;
   const HomeScreen(
       {super.key,
       required this.state,
       this.links,
       this.initialLink,
+      this.accountLoading,
       this.reports});
 
   @override
@@ -198,6 +205,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// The link in the sign-in email opens the app and signs in here.
   Future<void> _onLink(Uri uri) async {
+    await widget.accountLoading;
+    if (!mounted) return;
     final link = SignInLink.parse(uri);
     if (link == null) {
       // Only trusted GameNight links can ask the app to join a room.

@@ -264,10 +264,11 @@ class CloudApi {
   }
 
   /// Emails an 8-digit code (and a link) to [email].
-  Future<void> requestCode(String email) async {
+  Future<void> requestCode(String email, {String? returnTo}) async {
     final response = await _raw('POST', '/auth/email/request', body: {
       'email': email.trim(),
-      'client': browserCookies ? 'browser' : 'app'
+      'client': browserCookies ? 'browser' : 'app',
+      if (browserCookies) 'return_to': returnTo ?? '/app/'
     });
     switch (response.statusCode) {
       case 204:

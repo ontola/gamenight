@@ -335,6 +335,57 @@ class AppState extends ChangeNotifier {
     prefs.remove('bound_player');
   }
 
+  /// The scanned destination must survive the email opening a new tab/process.
+  String? get pendingRoomDestination {
+    final destination = prefs.getString('pending_room_destination');
+    final at = prefs.getInt('pending_room_at') ?? 0;
+    final age = DateTime.now().millisecondsSinceEpoch - at;
+    if (destination == null || age < 0 || age > emailCodeLife.inMilliseconds) {
+      return null;
+    }
+    try {
+      return parseHostLink('$hostedOrigin$destination').appDestination;
+    } on LinkError {
+      return null;
+    }
+  }
+
+  Future<void> rememberRoomInvitation(HostLink link,
+      {bool remember = false}) async {
+    final destination = link.appDestination;
+    if (destination == null) return;
+    await prefs.setString('pending_room_destination', destination);
+    await prefs.setInt(
+        'pending_room_at', DateTime.now().millisecondsSinceEpoch);
+    await prefs.setBool('pending_room_remember', remember);
+  }
+
+  String? completedRoomInvitation;
+  Future<String>? _joiningInvitation;
+  Future<String> resumeRoomInvitation() {
+    return _joiningInvitation ??= _resumeRoomInvitation().whenComplete(() {
+      _joiningInvitation = null;
+    });
+  }
+
+  Future<String> _resumeRoomInvitation() async {
+    final destination = pendingRoomDestination;
+    if (destination == null) return 'Signed in.';
+    final link = parseHostLink('$hostedOrigin$destination');
+    final remember = prefs.getBool('pending_room_remember') ?? false;
+    final message = link.pair != null
+        ? await claimHostedSeat(link.pair!, remember: remember)
+        : await joinHostedRoom(link.roomCode!, remember: remember);
+    completedRoomInvitation = destination;
+    // Do not erase a different invitation scanned while this request ran.
+    if (prefs.getString('pending_room_destination') == destination) {
+      await prefs.remove('pending_room_destination');
+      await prefs.remove('pending_room_at');
+      await prefs.remove('pending_room_remember');
+    }
+    return message;
+  }
+
   // ---- Connecting -------------------------------------------------------
 
   /// Opens a scanned or typed lobby link. Returns a message for the user.
@@ -451,7 +502,7 @@ class AppState extends ChangeNotifier {
 
   /// Step 1 of signing in: GameNight emails a code to [email].
   Future<void> requestSignInCode(String email) async {
-    await cloud.requestCode(email);
+    await cloud.requestCode(email, returnTo: pendingRoomDestination);
     accountEmail = email.trim().toLowerCase();
     await prefs.setString('account_email', accountEmail!);
     // The emailed link may open the app after it was closed: keep what ties
@@ -507,6 +558,13 @@ class AppState extends ChangeNotifier {
       final doc = await cloud.studio();
       final adopted = _adoptStudio(doc);
       await _pushAccount();
+      if (pendingRoomDestination != null) {
+        try {
+          await resumeRoomInvitation();
+        } on ApiError catch (e) {
+          sessionError = e.message;
+        }
+      }
       notifyListeners();
       return adopted
           ? 'Signed in. Your saved player is on this phone now.'
@@ -619,6 +677,14 @@ class AppState extends ChangeNotifier {
       }
       if (!cloud.signedIn) return;
       account = await cloud.me();
+      if (pendingRoomDestination != null) {
+        _adoptStudio(await cloud.studio());
+        try {
+          await resumeRoomInvitation();
+        } on ApiError catch (e) {
+          sessionError = e.message;
+        }
+      }
       if (inHostedRoom) startPolling();
     } on SignedOut {
       await _forgetAccount();

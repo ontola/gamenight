@@ -30,6 +30,19 @@ class HostLink {
       {this.roomCode, this.claim, this.seat, this.linkRevision = 0, this.pair});
 
   bool get hosted => base.origin == hostedOrigin;
+
+  /// Only the room/seat invitation survives sign-in, never arbitrary URLs.
+  String? get appDestination {
+    if (!hosted) return null;
+    if (pair != null) {
+      return Uri(path: '/app/', queryParameters: {'pair': pair!}).toString();
+    }
+    if (roomCode != null) {
+      return Uri(path: '/app/', queryParameters: {'room': roomCode!})
+          .toString();
+    }
+    return null;
+  }
 }
 
 class LinkError implements Exception {
@@ -42,7 +55,9 @@ class LinkError implements Exception {
 /// Accepts a full lobby link, `host:port`, or a bare IP address.
 HostLink parseHostLink(String input) {
   var text = input.trim();
-  if (text.isEmpty) throw const LinkError('Enter the address shown in the lobby.');
+  if (text.isEmpty) {
+    throw const LinkError('Enter the address shown in the lobby.');
+  }
   if (!text.contains('://')) text = 'http://$text';
   final Uri url;
   try {
@@ -50,7 +65,9 @@ HostLink parseHostLink(String input) {
   } on FormatException {
     throw const LinkError('That is not a GameNight address.');
   }
-  if (!['http', 'https'].contains(url.scheme) || url.host.isEmpty || url.userInfo.isNotEmpty) {
+  if (!['http', 'https'].contains(url.scheme) ||
+      url.host.isEmpty ||
+      url.userInfo.isNotEmpty) {
     throw const LinkError('That is not a GameNight address.');
   }
   final port = url.hasPort
@@ -60,9 +77,11 @@ HostLink parseHostLink(String input) {
           : (input.contains('://') ? 80 : defaultWebPort);
   final base = Uri(scheme: url.scheme, host: url.host, port: port);
   final path = url.path.isEmpty ? '/' : url.path;
-  final known = path == '/' || RegExp(r'^/(session(/[^/]+)?|studio|mobile|join)/?$').hasMatch(path);
+  final known = path == '/' ||
+      RegExp(r'^/(session(/[^/]+)?|studio|mobile|join|app)/?$').hasMatch(path);
   if (!known) {
-    throw const LinkError('This is not a GameNight sign-in QR. Try the code in the lobby.');
+    throw const LinkError(
+        'This is not a GameNight sign-in QR. Try the code in the lobby.');
   }
   final q = url.queryParameters;
   final Map<String, String> fragment;
@@ -71,15 +90,16 @@ HostLink parseHostLink(String input) {
   } on FormatException {
     throw const LinkError('That is not a GameNight address.');
   }
-  final room = (q['r'] ?? fragment['room'])?.toUpperCase();
-  final pair = fragment['pair'];
+  final room = (q['room'] ?? q['r'] ?? fragment['room'])?.toUpperCase();
+  final pair = q['pair'] ?? fragment['pair'];
   final seat = int.tryParse(q['seat'] ?? '');
   return HostLink(base,
       roomCode: room != null && isRoomCode(room) ? room : null,
       claim: q['claim'],
       seat: seat,
       linkRevision: int.tryParse(q['link_revision'] ?? '') ?? 0,
-      pair: pair != null && pair.isNotEmpty && pair.length <= 200 ? pair : null);
+      pair:
+          pair != null && pair.isNotEmpty && pair.length <= 200 ? pair : null);
 }
 
 /// The link in the sign-in email: `https://gamenight.ontola.io/auth/app#code=12345678`.

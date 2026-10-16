@@ -56,8 +56,23 @@ class RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  Future<void> openLink(String text) =>
-      _withAccount(() => state.connect(parseHostLink(text)));
+  Future<void> openLink(String text) async {
+    try {
+      final link = parseHostLink(text);
+      if (link.appDestination != null) {
+        if (state.inHostedRoom &&
+            state.completedRoomInvitation == link.appDestination) {
+          return;
+        }
+        await state.rememberRoomInvitation(link);
+        await _withAccount(state.resumeRoomInvitation);
+      } else {
+        await _withAccount(() => state.connect(link));
+      }
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    }
+  }
 
   /// Runs [action]; when it needs an account, signs in first and retries.
   Future<void> _withAccount(Future<String> Function() action) => _run(() async {
@@ -93,8 +108,10 @@ class RoomScreenState extends State<RoomScreen> {
     if (state.host != null) {
       await _run(() => state.joinRoom(code, remember: _rememberJoin));
     } else {
-      await _withAccount(
-          () => state.joinHostedRoom(code, remember: _rememberJoin));
+      await state.rememberRoomInvitation(
+          HostLink(Uri.parse(hostedOrigin), roomCode: code),
+          remember: _rememberJoin);
+      await _withAccount(state.resumeRoomInvitation);
     }
     _code.clear();
   }
@@ -297,6 +314,17 @@ class RoomScreenState extends State<RoomScreen> {
   }
 
   List<Widget> _connectCards() => [
+        if (state.pendingRoomDestination != null && state.sessionError != null)
+          Section(title: 'Could not join this room', children: [
+            Text(state.sessionError!,
+                style: const TextStyle(color: GnColors.warn)),
+            const SizedBox(height: 12),
+            FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => _withAccount(state.resumeRoomInvitation),
+                child: const Text('Try again')),
+          ]),
         Section(title: 'Join a room', children: [
           FilledButton.icon(
             style:

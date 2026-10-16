@@ -156,3 +156,11 @@ Game pages respect the system navigation inset, including three-button Android
 navigation. The Share button opens the phone share sheet with the canonical
 `https://gamenight.ontola.io/games/<id>` page, not a local-room URL. If sharing is
 unavailable, it shows a selectable link and a copy action.
+
+Room invitations survive sign-in: scanned QR/typed room destinations are kept
+for ten minutes. Browser email requests carry an allowlisted `return_to` such as
+`/app/?room=ABC234` (or a seat's `pair` ticket), so the magic link returns to the
+player app even in a new tab. The app rejoins after validating the browser cookie
+and opens the room's current phone game when the player's seat is connected.
+Failed joins remain visible with retry; expired invitations require a fresh scan.
+Native email links keep the app's saved invitation and resume it after sign-in.

@@ -10,22 +10,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'account_test.dart' show FakeCloud;
 
 void main() {
-  for (final entry in ['code', 'link', 'cold link']) {
+  for (final entry in ['code', 'link', 'cold link', 'web return']) {
     final viaLink = entry != 'code';
-    testWidgets('sign in from a room $entry keeps the home route', (tester) async {
+    testWidgets('sign in from a room $entry keeps the home route',
+        (tester) async {
       SharedPreferences.setMockInitialValues({});
       final cloud = FakeCloud();
-      final state =
-          AppState(await SharedPreferences.getInstance(), cloud: CloudApi(client: cloud.client));
+      final state = AppState(await SharedPreferences.getInstance(),
+          cloud: CloudApi(client: cloud.client));
       final links = StreamController<Uri>();
       addTearDown(links.close);
       await tester.pumpWidget(GameNightApp(
           state: state,
           links: links.stream,
-          initialLink: entry == 'cold link'
-              ? Uri.parse('https://gamenight.ontola.io/join#room=ABC234')
-              : null));
-      if (entry == 'cold link') {
+          initialLink: entry == 'web return'
+              ? Uri.parse('https://gamenight.ontola.io/app/?room=ABC234')
+              : entry == 'cold link'
+                  ? Uri.parse('https://gamenight.ontola.io/join#room=ABC234')
+                  : null));
+      if (entry == 'cold link' || entry == 'web return') {
         await tester.pump();
       } else if (viaLink) {
         links.add(Uri.parse('https://gamenight.ontola.io/join#room=ABC234'));
@@ -38,8 +41,10 @@ void main() {
       await tester.tap(find.text('Email me a code'));
       await tester.pumpAndSettle();
       if (viaLink) {
-        links.add(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
-        links.add(Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
+        links.add(
+            Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
+        links.add(
+            Uri.parse('https://gamenight.ontola.io/auth/app#code=12345678'));
       } else {
         await tester.enterText(find.byType(TextField).last, '12345678');
       }
@@ -47,7 +52,10 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(state.inHostedRoom, isTrue);
-      expect(cloud.calls.where((c) => c == 'POST /auth/email/verify'), hasLength(1));
+      expect(
+          cloud.calls.where((c) => c == 'POST /v1/rooms/join'), hasLength(1));
+      expect(cloud.calls.where((c) => c == 'POST /auth/email/verify'),
+          hasLength(1));
       await tester.tap(find.text('Room'));
       await tester.pumpAndSettle();
       expect(find.text('Waiting for pickup in the lobby'), findsOneWidget);
