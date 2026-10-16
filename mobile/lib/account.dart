@@ -19,7 +19,8 @@ class Account {
   const Account({required this.id, this.displayName});
 
   static Account fromJson(Map<String, dynamic> j) => Account(
-      id: j['id'] as String, displayName: (j['profile'] as Map?)?['display_name'] as String?);
+      id: j['id'] as String,
+      displayName: (j['profile'] as Map?)?['display_name'] as String?);
 }
 
 /// `GET /v1/me/studio`: the saved player and every face, in the studio's
@@ -29,7 +30,11 @@ class StudioDocument {
   final String? displayName;
   final String? skinColor;
   final Map<String, dynamic>? workspace;
-  const StudioDocument({required this.revision, this.displayName, this.skinColor, this.workspace});
+  const StudioDocument(
+      {required this.revision,
+      this.displayName,
+      this.skinColor,
+      this.workspace});
 
   static StudioDocument fromJson(Map<String, dynamic> j) {
     final profile = j['profile'] as Map?;
@@ -65,6 +70,24 @@ class HostedRoom {
         current = (raw['discovery'] as Map?)?['current'] as String?,
         next = (raw['discovery'] as Map?)?['next'] as String?,
         expires = (raw['expires'] as num?)?.toInt();
+
+  String? get currentTitle {
+    if (current == null) return null;
+    final discovery = raw['discovery'];
+    if (discovery is Map) {
+      final entries = (discovery['playlist'] as Map?)?['entries'];
+      if (entries is List) {
+        for (final entry in entries) {
+          if (entry is Map &&
+              entry['game'] == current &&
+              entry['title'] is String) {
+            return entry['title'] as String;
+          }
+        }
+      }
+    }
+    return current;
+  }
 
   bool get connected => status == 'connected';
   bool get waiting => status == 'waiting';
@@ -121,18 +144,21 @@ class CloudApi {
     });
     if (body != null) request.body = jsonEncode(body);
     try {
-      final response =
-          await http.Response.fromStream(await _client.send(request).timeout(_timeout));
+      final response = await http.Response.fromStream(
+          await _client.send(request).timeout(_timeout));
       if (response.statusCode >= 500) {
-        Diagnostics.failure('Cloud $method failed (HTTP ${response.statusCode})');
+        Diagnostics.failure(
+            'Cloud $method failed (HTTP ${response.statusCode})');
       }
       return response;
     } on TimeoutException {
       Diagnostics.failure('Cloud $method timed out');
-      throw const ApiError('GameNight online did not answer. Check your internet.');
+      throw const ApiError(
+          'GameNight online did not answer. Check your internet.');
     } catch (_) {
       Diagnostics.failure('Cloud $method connection failed');
-      throw const ApiError('Could not reach GameNight online. Check your internet.');
+      throw const ApiError(
+          'Could not reach GameNight online. Check your internet.');
     }
   }
 
@@ -145,7 +171,9 @@ class CloudApi {
       throw const SignedOut();
     }
     if (status >= 200 && status < 300) {
-      return status == 204 || response.body.isEmpty ? null : jsonDecode(response.body);
+      return status == 204 || response.body.isEmpty
+          ? null
+          : jsonDecode(response.body);
     }
     if (errors.containsKey(status)) throw ApiError(errors[status]!);
     if (status == 429) {
@@ -166,8 +194,8 @@ class CloudApi {
 
   /// Emails an 8-digit code (and a link) to [email].
   Future<void> requestCode(String email) async {
-    final response =
-        await _raw('POST', '/auth/email/request', body: {'email': email.trim(), 'client': 'app'});
+    final response = await _raw('POST', '/auth/email/request',
+        body: {'email': email.trim(), 'client': 'app'});
     switch (response.statusCode) {
       case 204:
         emailBinding = cookie(response, 'gn_email');
@@ -178,7 +206,8 @@ class CloudApi {
       case 400:
         throw const ApiError('That does not look like an email address.');
       case 429:
-        throw const ApiError('Too many codes asked for. Wait a minute and try again.');
+        throw const ApiError(
+            'Too many codes asked for. Wait a minute and try again.');
       case 404:
       case 405:
         throw const ApiError('Email sign-in is not available right now.');
@@ -203,7 +232,8 @@ class CloudApi {
       case 400:
         throw const ApiError('The code has 8 digits.');
       case 401:
-        throw const ApiError('That code is wrong or expired. Check it, or ask for a new one.');
+        throw const ApiError(
+            'That code is wrong or expired. Check it, or ask for a new one.');
       default:
         throw const ApiError('Sign-in failed. Try again.');
     }
@@ -235,12 +265,17 @@ class CloudApi {
       required Map<String, dynamic> workspace}) async {
     final response = await _raw('PUT', '/v1/me/studio', body: {
       'revision': revision,
-      'profile': {'display_name': displayName, 'skin_color': skinColor, 'avatar': avatar},
+      'profile': {
+        'display_name': displayName,
+        'skin_color': skinColor,
+        'avatar': avatar
+      },
       'workspace': workspace,
     });
     switch (response.statusCode) {
       case 200:
-        return StudioDocument.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+        return StudioDocument.fromJson(
+            jsonDecode(response.body) as Map<String, dynamic>);
       case 409:
         return null;
       case 401:
@@ -248,9 +283,11 @@ class CloudApi {
         throw const SignedOut();
       case 422:
       case 400:
-        throw const ApiError('GameNight online did not accept this player. Check the name.');
+        throw const ApiError(
+            'GameNight online did not accept this player. Check the name.');
       default:
-        throw const ApiError('Not synced to your account. Your player is kept on this phone.');
+        throw const ApiError(
+            'Not synced to your account. Your player is kept on this phone.');
     }
   }
 
@@ -265,26 +302,28 @@ class CloudApi {
         409: 'You are already in this room.',
       });
 
-  Future<HostedRoom> roomStatus() async =>
-      HostedRoom(await _send('GET', '/v1/rooms/status') as Map<String, dynamic>);
+  Future<HostedRoom> roomStatus() async => HostedRoom(
+      await _send('GET', '/v1/rooms/status') as Map<String, dynamic>);
 
   Future<void> cancelPickup() => _send('POST', '/v1/rooms/cancel', body: {});
 
   Future<void> leaveRoom() => _send('POST', '/v1/pairing/unlink', body: {});
 
   Future<void> remember(String code, bool remember) =>
-      _send('POST', '/v1/rooms/remember', body: {'code': code, 'remember': remember});
+      _send('POST', '/v1/rooms/remember',
+          body: {'code': code, 'remember': remember});
 
   Future<void> mainPlayer(String code, bool enabled) =>
-      _send('POST', '/v1/rooms/main-player', body: {'code': code, 'enabled': enabled});
+      _send('POST', '/v1/rooms/main-player',
+          body: {'code': code, 'enabled': enabled});
 
   /// Other room calls, for the Game tab's controls.
   Future<dynamic> request(String method, String path,
           {Object? body, Map<int, String> errors = const {}}) =>
       _send(method, path, body: body, errors: errors);
 
-  Future<PairingPreview> pairing(String ticket) async =>
-      PairingPreview(await _send('GET', '/v1/pairing/${Uri.encodeComponent(ticket)}',
+  Future<PairingPreview> pairing(String ticket) async => PairingPreview(
+      await _send('GET', '/v1/pairing/${Uri.encodeComponent(ticket)}',
           errors: {404: 'This QR expired. Scan the lobby QR again.'}));
 
   Future<void> claim(String ticket, {bool remember = false}) =>

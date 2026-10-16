@@ -26,7 +26,8 @@ class AppState extends ChangeNotifier {
   /// GameNight online: the account and hosted rooms.
   final CloudApi cloud;
 
-  AppState(this.prefs, {GameNightApi Function(Uri base)? apiFactory, CloudApi? cloud})
+  AppState(this.prefs,
+      {GameNightApi Function(Uri base)? apiFactory, CloudApi? cloud})
       : apiFactory = apiFactory ?? ((base) => GameNightApi(base)),
         cloud = cloud ?? CloudApi() {
     profileId = prefs.getString('profile_id') ?? _newProfileId();
@@ -75,6 +76,7 @@ class AppState extends ChangeNotifier {
 
   /// The current game's phone screen, while there is one.
   Companion? companion;
+  String? companionError;
 
   SyncState sync = SyncState.idle;
   String syncMessage = '';
@@ -100,8 +102,10 @@ class AppState extends ChangeNotifier {
       face = List.of(match.first.data);
     } else {
       // The face from before saved faces existed becomes the first one.
-      final art =
-          Artwork(id: newArtworkId(), name: 'Sketch ${artworks.length + 1}', data: List.of(face));
+      final art = Artwork(
+          id: newArtworkId(),
+          name: 'Sketch ${artworks.length + 1}',
+          data: List.of(face));
       artworks.add(art);
       currentArtworkId = art.id;
       _saveArtworks();
@@ -109,11 +113,13 @@ class AppState extends ChangeNotifier {
   }
 
   void _saveArtworks() {
-    prefs.setString('artworks', jsonEncode([for (final a in artworks) a.toJson()]));
+    prefs.setString(
+        'artworks', jsonEncode([for (final a in artworks) a.toJson()]));
     prefs.setString('current_artwork', currentArtworkId);
   }
 
-  Artwork get currentArtwork => artworks.firstWhere((a) => a.id == currentArtworkId);
+  Artwork get currentArtwork =>
+      artworks.firstWhere((a) => a.id == currentArtworkId);
 
   /// Load a saved face into the editor; it becomes your character's face.
   void selectArtwork(String id) {
@@ -138,7 +144,9 @@ class AppState extends ChangeNotifier {
 
   void cloneArtwork(String id) {
     final source = artworks.where((a) => a.id == id).firstOrNull;
-    if (source != null) newArtwork(data: List.of(source.data), name: '${source.name} copy');
+    if (source != null) {
+      newArtwork(data: List.of(source.data), name: '${source.name} copy');
+    }
   }
 
   void deleteArtwork(String id) {
@@ -152,7 +160,10 @@ class AppState extends ChangeNotifier {
   /// A backup of every face, the name and the skin colour, as text the
   /// player can keep in a note. Same format as the browser studio's.
   String exportBackup() => encodeBackup(Backup(
-      username: name, skinColor: skinColor, activeArtworkId: currentArtworkId, artworks: artworks));
+      username: name,
+      skinColor: skinColor,
+      activeArtworkId: currentArtworkId,
+      artworks: artworks));
 
   /// Adds the faces from a backup (skipping ones already here) and takes its
   /// name and skin. Returns how many faces were new.
@@ -162,10 +173,12 @@ class AppState extends ChangeNotifier {
     String? active;
     for (final incoming in backup.artworks) {
       final key = encodeAvatar(incoming.data);
-      var same =
-          artworks.where((a) => a.name == incoming.name && encodeAvatar(a.data) == key).firstOrNull;
+      var same = artworks
+          .where((a) => a.name == incoming.name && encodeAvatar(a.data) == key)
+          .firstOrNull;
       if (same == null) {
-        same = Artwork(id: newArtworkId(), name: incoming.name, data: incoming.data);
+        same = Artwork(
+            id: newArtworkId(), name: incoming.name, data: incoming.data);
         artworks.add(same);
         added++;
       }
@@ -191,8 +204,11 @@ class AppState extends ChangeNotifier {
     await refreshSession();
   }
 
-  Profile get profile =>
-      Profile(id: profileId, username: name, skinColor: skinColor, avatar: encodeAvatar(face));
+  Profile get profile => Profile(
+      id: profileId,
+      username: name,
+      skinColor: skinColor,
+      avatar: encodeAvatar(face));
 
   // ---- Editing ---------------------------------------------------------
 
@@ -244,8 +260,11 @@ class AppState extends ChangeNotifier {
     unawaited(_pushAccount());
     final api = _api;
     if (api == null) {
-      _status(SyncState.savedLocally,
-          signedIn ? 'Saved on your phone and your account' : 'Saved on your phone');
+      _status(
+          SyncState.savedLocally,
+          signedIn
+              ? 'Saved on your phone and your account'
+              : 'Saved on your phone');
       return;
     }
     _saving = true;
@@ -256,24 +275,25 @@ class AppState extends ChangeNotifier {
         _status(SyncState.savedLocally, 'Saved on your phone');
         return;
       }
-      final result =
-          await api.join(profileId, claim: target, seat: claimSeat, linkRevision: linkRevision);
+      final result = await api.join(profileId,
+          claim: target, seat: claimSeat, linkRevision: linkRevision);
       switch (result.status) {
         case 'unlinked':
           _clearClaim();
-          _status(
-              SyncState.savedLocally, 'Controller unlinked. Your character is kept on this phone.');
+          _status(SyncState.savedLocally,
+              'Controller unlinked. Your character is kept on this phone.');
           return;
         case 'no_such_seat':
-          _status(SyncState.warning, result.message ?? 'Nobody is on that seat any more.');
+          _status(SyncState.warning,
+              result.message ?? 'Nobody is on that seat any more.');
           return;
         case 'already_signed_in':
           claim = result.playerId;
           claimSeat = null;
           _bind(result.playerId);
           linkRevision = 0;
-          _status(
-              SyncState.warning, 'Already connected. Your edits update your existing character.');
+          _status(SyncState.warning,
+              'Already connected. Your edits update your existing character.');
           _savePending = true;
           return;
       }
@@ -331,7 +351,9 @@ class AppState extends ChangeNotifier {
     await api.saveProfile(profile);
     if (link.roomCode != null) return joinRoom(link.roomCode!);
     await pushProfile();
-    if (link.claim != null || link.seat != null) return 'Connected to your character.';
+    if (link.claim != null || link.seat != null) {
+      return 'Connected to your character.';
+    }
     return 'Connected. Enter the room code from the lobby to pick up a character.';
   }
 
@@ -426,7 +448,8 @@ class AppState extends ChangeNotifier {
     // The emailed link may open the app after it was closed: keep what ties
     // the code to this phone for as long as the code lives.
     await prefs.setString('email_binding', cloud.emailBinding!);
-    await prefs.setInt('email_binding_at', DateTime.now().millisecondsSinceEpoch);
+    await prefs.setInt(
+        'email_binding_at', DateTime.now().millisecondsSinceEpoch);
   }
 
   void _restoreEmailBinding() {
@@ -446,7 +469,8 @@ class AppState extends ChangeNotifier {
     if (_signInOperation != null) return _signInOperation!;
     if (signedIn) return 'You are already signed in.';
     if (cloud.emailBinding == null) {
-      throw const ApiError('This sign-in link belongs to another phone or browser. '
+      throw const ApiError(
+          'This sign-in link belongs to another phone or browser. '
           'Ask for a new code in this app.');
     }
     return verifySignInCode(link.code);
@@ -540,7 +564,8 @@ class AppState extends ChangeNotifier {
       if (saved != null) _setStudioRevision(saved.revision);
     } on SignedOut {
       await _forgetAccount();
-      _status(SyncState.warning, 'Your sign-in expired. Sign in again to keep your player online.');
+      _status(SyncState.warning,
+          'Your sign-in expired. Sign in again to keep your player online.');
     } on ApiError catch (e) {
       _status(SyncState.warning, e.message);
     } finally {
@@ -562,6 +587,8 @@ class AppState extends ChangeNotifier {
     cloud.token = null;
     account = null;
     hostedRoom = null;
+    companion = null;
+    companionError = null;
     inHostedRoom = false;
     await prefs.remove('cloud_token');
     await prefs.remove('hosted_room');
@@ -621,8 +648,36 @@ class AppState extends ChangeNotifier {
   Future<void> refreshHostedRoom() async {
     if (!cloud.signedIn) return;
     try {
-      hostedRoom = await cloud.roomStatus();
+      final token = cloud.token;
+      final room = await cloud.roomStatus();
+      if (!inHostedRoom || token != cloud.token || _disposed) return;
+      hostedRoom = room;
       sessionError = null;
+      companionError = null;
+      if (!room.connected || room.current == null) {
+        companion = null;
+      } else {
+        try {
+          final response = await cloud.request('GET', '/v1/rooms/companion');
+          if (!inHostedRoom || token != cloud.token || _disposed) return;
+          final next = response is Map<String, dynamic>
+              ? Companion.fromJson(response)
+              : null;
+          if (next?.url case final String path) {
+            final url = cloud.base.resolve(path);
+            if (url.origin != cloud.base.origin ||
+                !url.path.startsWith('/v1/companion/')) {
+              throw const ApiError('Invalid phone screen address.');
+            }
+          }
+          companion = next;
+        } on SignedOut {
+          rethrow;
+        } on ApiError {
+          companion = null;
+          companionError = 'Phone controls could not connect. Retrying…';
+        }
+      }
     } on SignedOut {
       await _forgetAccount();
     } on ApiError catch (e) {
@@ -639,6 +694,8 @@ class AppState extends ChangeNotifier {
       await cloud.leaveRoom();
     }
     hostedRoom = null;
+    companion = null;
+    companionError = null;
     inHostedRoom = false;
     await prefs.remove('hosted_room');
     if (_api == null) _poll?.cancel();

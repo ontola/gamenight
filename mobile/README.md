@@ -3,28 +3,23 @@
 A Flutter app for players on the couch. It does what the phone studio in the
 browser does, as an installable app for Android and iOS:
 
-- **Room.** Scan the lobby QR (or type the address) to connect to a GameNight
-  on your Wi-Fi. Enter the room code and walk your character to your door to
-  be picked up, or scan the QR above a character to sign in as that one.
-  Shows who you are signed in as, the current game and what is up next, and
-  lets you become the main player or be remembered, or hand your character
-  back.
-- **Game.** The current game's own phone screen, for games that declare one
-  (see [Phone screens](../docs/protocol.md#phone-screens)): a hand of cards,
-  a private map. It opens by itself when such a game starts, so there is
-  nothing to install per game. Hexstead in `ontola/gamenight-games` is the
-  example. A game that needs a native phone app instead (like the God game)
-  gets an Install / Open card: on Android GameNight downloads the APK from
-  the GameNight computer and installs it, like a store. Android asks once to
-  allow installs from GameNight and confirms each first install; updates of
-  apps GameNight installed go through without asking on Android 12+. On iOS
-  the player gets the app from the App Store.
-- **You.** Your name, skin colour and the 48×48 face you draw, with the same
-  presets, tools and wire format as the web studio. Every change saves by
-  itself and follows your character into every integrated game. Keep several
-  faces, and copy or restore a backup as text (the web studio's format).
-- **Playlist.** Tonight's queue: drag to reorder, remove a game, or play an
-  earlier game again.
+- **Room.** Join by QR or room code. Once connected, Playing opens the current
+  game's phone screen and settings, Playlist shows the shared queue, and Players
+  contains your room identity and device preferences. The same room connection
+  drives all three views. You can reorder and remove queued games in local and
+  hosted rooms.
+- **Games.** Browse the catalog and choose games for your room.
+- **You.** Edit your name, skin colour and 48×48 face. Changes save automatically.
+
+GameNight branding and Feedback remain in the top bar across these tabs.
+Phone games open under Room automatically. Hosted rooms discover their private
+phone screen through authenticated `GET /v1/rooms/companion`; the returned
+same-origin URL is scoped to the player's seat and session. Local connections
+continue to use `/api/companion`. Signing out or leaving clears the phone screen.
+The cloud and desktop host must both support hosted companions for this flow.
+
+Games can also declare a native phone app. On Android the app offers installation
+from the game's download; on iOS it links to the App Store.
 
 The app signs in to gamenight.ontola.io and joins centrally registered rooms.
 Email sign-in uses an eight-digit, single-use code tied to the app that requested

@@ -18,8 +18,13 @@ import 'settings_panel.dart';
 /// it has any, and the store catalog to browse and queue games from.
 class GameScreen extends StatelessWidget {
   final AppState state;
+  final bool catalogOnly;
   final VoidCallback onJoin;
-  const GameScreen({super.key, required this.state, required this.onJoin});
+  const GameScreen(
+      {super.key,
+      required this.state,
+      required this.onJoin,
+      this.catalogOnly = false});
 
   @override
   Widget build(BuildContext context) {
@@ -27,13 +32,24 @@ class GameScreen extends StatelessWidget {
       listenable: state,
       builder: (context, _) {
         final companion = state.companion;
-        final api = state.api;
+        Uri resolve(String url) => state.inHostedRoom
+            ? state.cloud.base.resolve(url)
+            : state.api!.resolve(url);
         final controls = roomControlsFor(state);
         final session = state.session;
         final settings = SettingsSection(
-            key: const ValueKey('settings'), controls: controls, title: session?.currentTitle);
-        final catalog = CatalogSection(key: const ValueKey('catalog'), controls: controls);
-        if (companion != null && api != null) {
+            key: const ValueKey('settings'),
+            controls: controls,
+            title: state.inHostedRoom
+                ? state.hostedRoom?.currentTitle
+                : session?.currentTitle);
+        final catalog =
+            CatalogSection(key: const ValueKey('catalog'), controls: controls);
+        if (catalogOnly) {
+          return ListView(
+              padding: const EdgeInsets.all(16), children: [catalog]);
+        }
+        if (companion != null && (state.inHostedRoom || state.api != null)) {
           return Column(children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
@@ -42,14 +58,18 @@ class GameScreen extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(companion.title,
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
-                Text('on your phone', style: const TextStyle(color: GnColors.muted, fontSize: 13)),
+                Text('on your phone',
+                    style:
+                        const TextStyle(color: GnColors.muted, fontSize: 13)),
                 if (companion.url != null && controls != null)
                   IconButton(
                     tooltip: 'Game settings',
                     icon: const Icon(Icons.tune),
-                    onPressed: () => _showSettings(context, controls, companion.title),
+                    onPressed: () =>
+                        _showSettings(context, controls, companion.title),
                   ),
               ]),
             ),
@@ -61,59 +81,71 @@ class GameScreen extends StatelessWidget {
                     app: companion.app!,
                     download: companion.app!.download == null
                         ? null
-                        : api.resolve(companion.app!.download!)),
+                        : resolve(companion.app!.download!)),
               ),
             if (companion.url != null)
               Expanded(
                 child: CompanionView(
-                  key: ValueKey(companion.game),
-                  url: api.resolve(companion.url!),
+                  key: ValueKey('${companion.game}:${companion.url}'),
+                  url: resolve(companion.url!),
                 ),
               )
             else
               Expanded(
                 child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    children: [settings, catalog]),
+                    children: [settings]),
               ),
           ]);
         }
         // In a room on this Wi-Fi, or an online one: the Room tab has nothing
         // left to offer, so no "Join a room" here.
         final hosted = state.inHostedRoom ? state.hostedRoom : null;
-        final linked = (session?.linked ?? false) || (hosted?.connected ?? false);
-        final waiting = (session?.waiting ?? false) || (hosted?.waiting ?? false);
-        final playing = session?.currentTitle ?? hosted?.current;
-        return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
-          Section(title: 'Game screen', children: [
-            if (waiting)
-              const Hint('Walk your character to your door in the lobby and stand there to '
-                  'connect. Games with a phone screen open here by themselves.')
-            else if (!linked && state.host != null) ...[
-              const Hint('You are connected to a GameNight, but your character has not been '
-                  'picked up yet. Enter the room code or scan the QR in the lobby.'),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onJoin, child: const Text('Pick up my character')),
-            ] else if (!linked) ...[
-              const Hint('Some games put part of the game on your phone, like your own '
-                  'hand of cards. Join a room and it opens here when such a game starts.'),
-              const SizedBox(height: 12),
-              FilledButton(onPressed: onJoin, child: const Text('Join a room')),
-            ] else if (playing != null)
-              Hint('$playing is played on the TV with your controller. '
-                  'Games with a phone screen open here by themselves.')
-            else
-              const Hint('Nothing is being played right now. Games with a phone screen '
-                  'open here by themselves when they start.'),
-          ]),
-          settings,
-          catalog,
-        ]);
+        final linked =
+            (session?.linked ?? false) || (hosted?.connected ?? false);
+        final waiting =
+            (session?.waiting ?? false) || (hosted?.waiting ?? false);
+        final playing = hosted?.currentTitle ?? session?.currentTitle;
+        return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              Section(title: playing ?? 'Current game', children: [
+                if (waiting)
+                  const Hint(
+                      'Walk your character to your door in the lobby and stand there to '
+                      'connect. Games with a phone screen open here by themselves.')
+                else if (!linked && state.host != null) ...[
+                  const Hint(
+                      'You are connected to a GameNight, but your character has not been '
+                      'picked up yet. Enter the room code or scan the QR in the lobby.'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                      onPressed: onJoin,
+                      child: const Text('Pick up my character')),
+                ] else if (!linked) ...[
+                  const Hint(
+                      'Some games put part of the game on your phone, like your own '
+                      'hand of cards. Join a room and it opens here when such a game starts.'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                      onPressed: onJoin, child: const Text('Join a room')),
+                ] else if (playing != null)
+                  Hint(
+                      '$playing is on the TV. Phone controls appear here when available.')
+                else
+                  const Hint(
+                      'Nothing is being played right now. Games with a phone screen '
+                      'open here by themselves when they start.'),
+              ]),
+              if (state.companionError case final String error) Hint(error),
+              settings,
+            ]);
       },
     );
   }
 
-  void _showSettings(BuildContext context, RoomControls controls, String title) {
+  void _showSettings(
+      BuildContext context, RoomControls controls, String title) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -121,7 +153,8 @@ class GameScreen extends StatelessWidget {
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: SettingsSection(controls: controls, title: title, showEmpty: true),
+          child: SettingsSection(
+              controls: controls, title: title, showEmpty: true),
         ),
       ),
     );
@@ -223,24 +256,30 @@ class _AppCardState extends State<AppCard> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final name = widget.app.name;
-    final canInstall = Apps.supported && package != null && widget.download != null;
+    final canInstall =
+        Apps.supported && package != null && widget.download != null;
     final Widget action;
     String hint;
     switch (step) {
       case _Step.checking:
-        action =
-            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+        action = const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2));
         hint = 'This game has its own app.';
       case _Step.installing:
-        action =
-            const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+        action = const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2));
         hint = 'Installing. Android may ask you to confirm.';
       case _Step.installed:
         action = FilledButton(onPressed: _open, child: const Text('Open'));
         hint = 'Open it to play your side of the game.';
       case _Step.missing:
-        action =
-            FilledButton(onPressed: canInstall ? _install : null, child: const Text('Install'));
+        action = FilledButton(
+            onPressed: canInstall ? _install : null,
+            child: const Text('Install'));
         hint = !Apps.supported
             ? 'Get $name from your app store, then open it to play.'
             : canInstall
@@ -255,13 +294,15 @@ class _AppCardState extends State<AppCard> with WidgetsBindingObserver {
       ]),
       if (error != null) ...[
         const SizedBox(height: 8),
-        Text(error!, style: const TextStyle(color: GnColors.warn, fontSize: 13)),
+        Text(error!,
+            style: const TextStyle(color: GnColors.warn, fontSize: 13)),
       ],
       if (step == _Step.installed && canInstall && apk)
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(
-              onPressed: _install, child: const Text('Update from the GameNight computer')),
+              onPressed: _install,
+              child: const Text('Update from the GameNight computer')),
         ),
     ]);
   }

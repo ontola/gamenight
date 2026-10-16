@@ -16,7 +16,6 @@ import 'diagnostics.dart';
 import 'screens/feedback_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
-import 'screens/playlist_screen.dart';
 import 'screens/room_screen.dart';
 import 'theme.dart';
 
@@ -27,14 +26,17 @@ Future<void> main() async {
   final state = AppState(prefs);
   final reports = ReportService(prefs,
       context: () => {
-            if (state.hostedRoom?.current ?? state.session?.currentGame ?? state.companion?.game
+            if (state.hostedRoom?.current ??
+                    state.session?.currentGame ??
+                    state.companion?.game
                 case final String game)
               'game': game,
           });
   Diagnostics.onFailure = reports.captureFailure;
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    reports.captureError(details.exception, details.stack ?? StackTrace.current, source: 'flutter');
+    reports.captureError(details.exception, details.stack ?? StackTrace.current,
+        source: 'flutter');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     reports.captureError(error, stack);
@@ -50,8 +52,11 @@ Future<void> main() async {
   } catch (_) {
     Diagnostics.failure('Could not read the app launch link');
   }
-  runApp(
-      GameNightApp(state: state, links: links.uriLinkStream, initialLink: first, reports: reports));
+  runApp(GameNightApp(
+      state: state,
+      links: links.uriLinkStream,
+      initialLink: first,
+      reports: reports));
 }
 
 class GameNightApp extends StatelessWidget {
@@ -61,7 +66,12 @@ class GameNightApp extends StatelessWidget {
   /// Links that open the app, e.g. from the sign-in email.
   final Stream<Uri>? links;
   final Uri? initialLink;
-  const GameNightApp({super.key, required this.state, this.links, this.initialLink, this.reports});
+  const GameNightApp(
+      {super.key,
+      required this.state,
+      this.links,
+      this.initialLink,
+      this.reports});
 
   @override
   Widget build(BuildContext context) {
@@ -71,9 +81,15 @@ class GameNightApp extends StatelessWidget {
       theme: gameNightTheme(),
       builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
         value: gameNightSystemUi,
-        child: ReportScope(reports: reports, child: ColoredBox(color: GnColors.bg, child: child!)),
+        child: ReportScope(
+            reports: reports,
+            child: ColoredBox(color: GnColors.bg, child: child!)),
       ),
-      home: HomeScreen(state: state, links: links, initialLink: initialLink, reports: reports),
+      home: HomeScreen(
+          state: state,
+          links: links,
+          initialLink: initialLink,
+          reports: reports),
     );
   }
 }
@@ -83,14 +99,19 @@ class HomeScreen extends StatefulWidget {
   final ReportService? reports;
   final Stream<Uri>? links;
   final Uri? initialLink;
-  const HomeScreen({super.key, required this.state, this.links, this.initialLink, this.reports});
+  const HomeScreen(
+      {super.key,
+      required this.state,
+      this.links,
+      this.initialLink,
+      this.reports});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
-  late int _tab = widget.state.host == null ? 0 : 2;
+  int _tab = 0;
   String? _openedFor;
   final _roomKey = GlobalKey<RoomScreenState>();
   StreamSubscription<Uri>? _links;
@@ -158,7 +179,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// game, so players never have to go looking for it.
   void _followGame() {
     final game = widget.state.companion?.game;
-    if (game != null && game != _openedFor) setState(() => _tab = 1);
+    if (game != null && game != _openedFor) {
+      setState(() => _tab = 0);
+      _roomKey.currentState?.showCurrentGame();
+    }
     _openedFor = game;
   }
 
@@ -167,26 +191,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return ListenableBuilder(
       listenable: widget.state,
       builder: (context, _) {
-        widget.reports?.screen = const ['room', 'games', 'you', 'playlist'][_tab];
-        final linked = widget.state.session?.linked ?? false;
+        widget.reports?.screen = const ['room', 'games', 'you'][_tab];
+        final linked = widget.state.inHostedRoom
+            ? widget.state.hostedRoom?.connected ?? false
+            : widget.state.session?.linked ?? false;
         final pages = [
           RoomScreen(key: _roomKey, state: widget.state),
-          GameScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
+          GameScreen(
+              catalogOnly: true,
+              state: widget.state,
+              onJoin: () => setState(() => _tab = 0)),
           PlayerScreen(state: widget.state),
-          PlaylistScreen(state: widget.state, onJoin: () => setState(() => _tab = 0)),
         ];
         return Scaffold(
           body: SafeArea(
             child: Column(children: [
               UpdateBanner(),
-              if (widget.reports != null)
-                Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                child: Row(children: [
+                  const GameNightLogo(size: 28),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                      child: Text('GameNight',
+                          style: TextStyle(
+                              fontSize: 22, fontWeight: FontWeight.w800))),
+                  if (widget.reports != null)
+                    TextButton.icon(
                       onPressed: _feedback,
                       icon: const Icon(Icons.mic_none, size: 20),
                       label: const Text('Feedback'),
-                    )),
+                    ),
+                ]),
+              ),
               Expanded(child: IndexedStack(index: _tab, children: pages)),
             ]),
           ),
@@ -212,8 +249,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
                 label: 'Games',
               ),
-              const NavigationDestination(icon: Icon(Icons.face_retouching_natural), label: 'You'),
-              const NavigationDestination(icon: Icon(Icons.queue_music), label: 'Playlist'),
+              const NavigationDestination(
+                  icon: Icon(Icons.face_retouching_natural), label: 'You'),
             ],
           ),
         );

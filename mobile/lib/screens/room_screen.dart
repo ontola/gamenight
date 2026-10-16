@@ -6,6 +6,8 @@ import '../app_state.dart';
 import '../link.dart';
 import '../theme.dart';
 import 'scanner_screen.dart';
+import 'game_screen.dart';
+import 'playlist_screen.dart';
 import 'sign_in_screen.dart';
 
 /// Connect to a GameNight on this network and see where you stand in it.
@@ -20,6 +22,11 @@ class RoomScreen extends StatefulWidget {
 class RoomScreenState extends State<RoomScreen> {
   final _address = TextEditingController();
   final _code = TextEditingController();
+  int _section = 0;
+  void showCurrentGame() {
+    if (mounted) setState(() => _section = 0);
+  }
+
   bool _busy = false;
   bool _rememberJoin = false;
   String? _error;
@@ -49,7 +56,8 @@ class RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  Future<void> openLink(String text) => _withAccount(() => state.connect(parseHostLink(text)));
+  Future<void> openLink(String text) =>
+      _withAccount(() => state.connect(parseHostLink(text)));
 
   /// Runs [action]; when it needs an account, signs in first and retries.
   Future<void> _withAccount(Future<String> Function() action) => _run(() async {
@@ -58,15 +66,17 @@ class RoomScreenState extends State<RoomScreen> {
         } on ApiError catch (e) {
           if (e != AppState.signInFirst || !mounted) rethrow;
           final ok = await _signIn(
-              reason: 'Sign in to join this room. Your name and faces are saved '
+              reason:
+                  'Sign in to join this room. Your name and faces are saved '
                   'to your account and follow you to every GameNight.');
           if (ok != true) return null;
           return action();
         }
       });
 
-  Future<bool?> _signIn({String? reason}) => Navigator.of(context)
-      .push<bool>(MaterialPageRoute(builder: (_) => SignInScreen(state: state, reason: reason)));
+  Future<bool?> _signIn({String? reason}) =>
+      Navigator.of(context).push<bool>(MaterialPageRoute(
+          builder: (_) => SignInScreen(state: state, reason: reason)));
 
   Future<void> _scan() async {
     final text = await Navigator.of(context).push<String>(
@@ -83,7 +93,8 @@ class RoomScreenState extends State<RoomScreen> {
     if (state.host != null) {
       await _run(() => state.joinRoom(code, remember: _rememberJoin));
     } else {
-      await _withAccount(() => state.joinHostedRoom(code, remember: _rememberJoin));
+      await _withAccount(
+          () => state.joinHostedRoom(code, remember: _rememberJoin));
     }
     _code.clear();
   }
@@ -93,23 +104,60 @@ class RoomScreenState extends State<RoomScreen> {
     final connected = state.host != null;
     return ListenableBuilder(
         listenable: state,
-        builder: (context, _) => ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              children: [
-                const _Header(),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(_error!, style: const TextStyle(color: GnColors.warn)),
-                  ),
-                if (state.inHostedRoom)
-                  ..._hostedCards()
-                else if (!connected)
-                  ..._connectCards()
-                else
-                  ..._roomCards(),
-              ],
-            ));
+        builder: (context, _) {
+          final details = ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!,
+                      style: const TextStyle(color: GnColors.warn)),
+                ),
+              if (state.inHostedRoom)
+                ..._hostedCards()
+              else if (!connected)
+                ..._connectCards()
+              else
+                ..._roomCards(),
+            ],
+          );
+          final linked = state.inHostedRoom
+              ? state.hostedRoom?.connected ?? false
+              : state.session?.linked ?? false;
+          if (!linked) return details;
+          return Column(children: [
+            Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: SegmentedButton<int>(
+                  segments: const [
+                    ButtonSegment(value: 0, label: Text('Playing')),
+                    ButtonSegment(value: 1, label: Text('Playlist')),
+                    ButtonSegment(value: 2, label: Text('Players')),
+                  ],
+                  selected: {_section},
+                  onSelectionChanged: (value) =>
+                      setState(() => _section = value.first),
+                )),
+            if (state.sessionError case final String error)
+              Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(children: [
+                    const Icon(Icons.wifi_off, color: GnColors.warn),
+                    const SizedBox(width: 8),
+                    Expanded(child: Hint(error))
+                  ])),
+            Expanded(
+                child: IndexedStack(index: _section, children: [
+              GameScreen(
+                  state: state, onJoin: () => setState(() => _section = 2)),
+              PlaylistScreen(
+                  state: state, onJoin: () => setState(() => _section = 2)),
+              details,
+            ])),
+          ]);
+        });
   }
 
   Widget _codeField() => TextField(
@@ -118,10 +166,12 @@ class RoomScreenState extends State<RoomScreen> {
         autocorrect: false,
         maxLength: 6,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 28, letterSpacing: 10, fontFamily: 'monospace'),
+        style: const TextStyle(
+            fontSize: 28, letterSpacing: 10, fontFamily: 'monospace'),
         inputFormatters: [
           FilteringTextInputFormatter.allow(RegExp('[A-Za-z2-9]')),
-          TextInputFormatter.withFunction((_, v) => v.copyWith(text: v.text.toUpperCase())),
+          TextInputFormatter.withFunction(
+              (_, v) => v.copyWith(text: v.text.toUpperCase())),
         ],
         decoration: const InputDecoration(hintText: '······', counterText: ''),
         onChanged: (v) {
@@ -142,54 +192,58 @@ class RoomScreenState extends State<RoomScreen> {
     final connected = room?.connected ?? false;
     final waiting = room?.waiting ?? false;
     return [
-      Section(title: room?.code == null ? 'Your room' : 'Room ${room!.code}', children: [
-        Row(children: [
-          Icon(
-              state.sessionError != null
-                  ? Icons.wifi_off
-                  : connected
-                      ? Icons.check_circle
-                      : Icons.hourglass_top,
-              color: state.sessionError != null
-                  ? GnColors.warn
-                  : connected
-                      ? GnColors.ok
-                      : GnColors.muted),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              state.sessionError ??
-                  (room == null
-                      ? 'Checking your room…'
+      Section(
+          title: room?.code == null ? 'Your room' : 'Room ${room!.code}',
+          children: [
+            Row(children: [
+              Icon(
+                  state.sessionError != null
+                      ? Icons.wifi_off
                       : connected
-                          ? 'Connected as ${state.name}'
-                          : waiting
-                              ? 'Waiting for pickup in the lobby'
-                              : 'Not in a room any more'),
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Hint(connected
-            ? 'Your name and face follow you into every game.'
-            : waiting
-                ? 'Walk your character to your door in the lobby and stand there to connect.'
-                : 'The pickup expired or you left. Enter the room code again.'),
-        if (connected) ...[
-          const SizedBox(height: 12),
-          _Facts(rows: [
-            ('Players in the room', '${room!.players}'),
-            ('Current game', room.current ?? 'In the lobby'),
-            ('Up next', room.next ?? 'No game queued'),
+                          ? Icons.check_circle
+                          : Icons.hourglass_top,
+                  color: state.sessionError != null
+                      ? GnColors.warn
+                      : connected
+                          ? GnColors.ok
+                          : GnColors.muted),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  state.sessionError ??
+                      (room == null
+                          ? 'Checking your room…'
+                          : connected
+                              ? 'Connected as ${state.name}'
+                              : waiting
+                                  ? 'Waiting for pickup in the lobby'
+                                  : 'Not in a room any more'),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            Hint(connected
+                ? 'Your name and face follow you into every game.'
+                : waiting
+                    ? 'Walk your character to your door in the lobby and stand there to connect.'
+                    : 'The pickup expired or you left. Enter the room code again.'),
+            if (connected) ...[
+              const SizedBox(height: 12),
+              _Facts(rows: [
+                ('Players in the room', '${room!.players}'),
+                ('Current game', room.current ?? 'In the lobby'),
+                ('Up next', room.next ?? 'No game queued'),
+              ]),
+              if (!room.fresh)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child:
+                      Hint('The GameNight PC has not checked in for a moment.'),
+                ),
+            ],
           ]),
-          if (!room.fresh)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Hint('The GameNight PC has not checked in for a moment.'),
-            ),
-        ],
-      ]),
       if (room != null && (connected || waiting))
         Section(children: [
           SwitchListTile(
@@ -204,7 +258,8 @@ class RoomScreenState extends State<RoomScreen> {
                           : 'Your player will no longer appear automatically.';
                     }),
             title: const Text('Main player on this GameNight'),
-            subtitle: const Text('Appear at the door on startup, ready for your controller.'),
+            subtitle: const Text(
+                'Appear at the door on startup, ready for your controller.'),
           ),
           if (!room.mainPlayer)
             SwitchListTile(
@@ -243,7 +298,8 @@ class RoomScreenState extends State<RoomScreen> {
   List<Widget> _connectCards() => [
         Section(title: 'Join a room', children: [
           FilledButton.icon(
-            style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+            style:
+                FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
             onPressed: _busy ? null : _scan,
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('Scan the QR on the TV'),
@@ -258,14 +314,16 @@ class RoomScreenState extends State<RoomScreen> {
           child: ExpansionTile(
             tilePadding: const EdgeInsets.symmetric(horizontal: 4),
             childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            title: const Text('Advanced', style: TextStyle(color: GnColors.muted, fontSize: 14)),
+            title: const Text('Advanced',
+                style: TextStyle(color: GnColors.muted, fontSize: 14)),
             children: [
               TextField(
                 controller: _address,
                 keyboardType: TextInputType.url,
                 autocorrect: false,
                 decoration: const InputDecoration(
-                    labelText: 'GameNight address', hintText: '192.168.1.20:7913'),
+                    labelText: 'GameNight address',
+                    hintText: '192.168.1.20:7913'),
                 onSubmitted: _busy ? null : openLink,
               ),
               const SizedBox(height: 12),
@@ -350,7 +408,8 @@ class RoomScreenState extends State<RoomScreen> {
         Section(title: 'Room code', children: [
           _codeField(),
           _rememberBox(),
-          const Hint('The first player to join becomes this GameNight’s main player '
+          const Hint(
+              'The first player to join becomes this GameNight’s main player '
               'and returns next time.'),
         ]),
       if (linked || waiting)
@@ -367,7 +426,8 @@ class RoomScreenState extends State<RoomScreen> {
                           : 'Your player will no longer appear automatically.';
                     }),
             title: const Text('Main player on this GameNight'),
-            subtitle: const Text('Appear at the door on startup, ready for your controller.'),
+            subtitle: const Text(
+                'Appear at the door on startup, ready for your controller.'),
           ),
           if (!s.mainPlayer)
             SwitchListTile(
@@ -382,7 +442,8 @@ class RoomScreenState extends State<RoomScreen> {
                             : 'Your player will no longer be remembered here.';
                       }),
               title: const Text('Remember me on this GameNight'),
-              subtitle: const Text('Return as a guest without becoming the main player.'),
+              subtitle: const Text(
+                  'Return as a guest without becoming the main player.'),
             ),
           if (linked) ...[
             const SizedBox(height: 4),
@@ -420,19 +481,6 @@ class RoomScreenState extends State<RoomScreen> {
       ]),
     ];
   }
-}
-
-class _Header extends StatelessWidget {
-  const _Header();
-  @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.only(bottom: 8),
-        child: Row(children: [
-          GameNightLogo(size: 36),
-          SizedBox(width: 10),
-          Text('GameNight', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-        ]),
-      );
 }
 
 class _Facts extends StatelessWidget {

@@ -1,3 +1,4 @@
+import 'dart:convert';
 // What a player in a room can do from the Game and Playlist tabs: queue a
 // game the room's host can play, play or start one next, and change the
 // match settings of the current (or loaded next) game.
@@ -22,7 +23,8 @@ class HostGame {
   /// What the host says about it: "available", "playing", "downloading"…
   final String state;
 
-  const HostGame({required this.id, this.title, this.playable = false, this.state = ''});
+  const HostGame(
+      {required this.id, this.title, this.playable = false, this.state = ''});
 
   static HostGame? fromJson(Object? j) {
     if (j is! Map || j['id'] is! String) return null;
@@ -85,8 +87,9 @@ class Setting {
       value: value is num ? value.toInt() : value as Object,
       min: (j['min'] as num?)?.toInt(),
       max: (j['max'] as num?)?.toInt(),
-      options:
-          j['options'] is List ? [for (final o in j['options'] as List) o.toString()] : const [],
+      options: j['options'] is List
+          ? [for (final o in j['options'] as List) o.toString()]
+          : const [],
     );
   }
 }
@@ -110,7 +113,9 @@ class GameSettings {
   });
 
   static GameSettings? fromJson(Object? j) {
-    if (j is! Map || j['game'] is! String || j['instance'] is! String) return null;
+    if (j is! Map || j['game'] is! String || j['instance'] is! String) {
+      return null;
+    }
     final raw = j['settings'] is Map ? j['settings'] as Map : const {};
     final settings = [
       for (final MapEntry(:key, :value) in raw.entries)
@@ -132,6 +137,9 @@ enum SettingsAction { set, undo, keep }
 abstract class RoomControls {
   /// The games this room's host has. Empty when it cannot say.
   Future<List<HostGame>> games();
+  Future<PlaylistView> playlist();
+  Future<PlaylistView> movePlaylistEntry(PlaylistView view, int from, int to);
+  Future<PlaylistView> removePlaylistEntry(PlaylistView view, int index);
 
   /// Adds [game] to the end of the room's queue. Never interrupts play.
   Future<void> addToQueue(String game);
@@ -147,7 +155,8 @@ abstract class RoomControls {
   /// Changes settings (or undoes the last change) as this player, against
   /// [current]'s revision. Returns the settings afterwards.
   Future<GameSettings?> applySettings(GameSettings current,
-      {Map<String, Object> values = const {}, SettingsAction action = SettingsAction.set});
+      {Map<String, Object> values = const {},
+      SettingsAction action = SettingsAction.set});
 }
 
 /// The room on a GameNight computer on this Wi-Fi. The host knows this phone
@@ -160,10 +169,20 @@ class LocalRoomControls implements RoomControls {
   String get _query => 'profile=${Uri.encodeQueryComponent(profile)}';
 
   @override
+  Future<PlaylistView> playlist() => api.playlist();
+  @override
+  Future<PlaylistView> movePlaylistEntry(PlaylistView view, int from, int to) =>
+      api.movePlaylistEntry(view, from, to);
+  @override
+  Future<PlaylistView> removePlaylistEntry(PlaylistView view, int index) =>
+      api.removePlaylistEntry(view, index);
+
+  @override
   Future<List<HostGame>> games() async {
     try {
       final j = await api.request('GET', '/api/games?$_query');
-      final list = j is Map && j['games'] is List ? j['games'] as List : const [];
+      final list =
+          j is Map && j['games'] is List ? j['games'] as List : const [];
       return [
         for (final g in list)
           if (HostGame.fromJson(g) case final game?) game
@@ -176,20 +195,24 @@ class LocalRoomControls implements RoomControls {
   }
 
   @override
-  Future<void> addToQueue(String game) => api.request('POST', '/api/playlist/queue',
-      body: {'profile': profile, 'game': game}, failure: 'Could not add that game to the queue.');
+  Future<void> addToQueue(String game) =>
+      api.request('POST', '/api/playlist/queue',
+          body: {'profile': profile, 'game': game},
+          failure: 'Could not add that game to the queue.');
 
   @override
-  Future<void> playNext(String game, {bool start = false}) =>
-      api.request('POST', '/api/playlist/next',
-          body: {'profile': profile, 'game': game, 'start': start},
-          failure: start ? 'Could not start that game.' : 'Could not queue that game.');
+  Future<void> playNext(String game, {bool start = false}) => api.request(
+      'POST', '/api/playlist/next',
+      body: {'profile': profile, 'game': game, 'start': start},
+      failure:
+          start ? 'Could not start that game.' : 'Could not queue that game.');
 
   @override
   Future<GameSettings?> settings({String? game}) async {
     final only = game == null ? '' : '&game=${Uri.encodeQueryComponent(game)}';
     try {
-      return GameSettings.fromJson(await api.request('GET', '/api/settings?$_query$only'));
+      return GameSettings.fromJson(
+          await api.request('GET', '/api/settings?$_query$only'));
     } on ApiError catch (e) {
       if (e.status == 404 || e.status == 403) return null;
       rethrow;
@@ -198,7 +221,8 @@ class LocalRoomControls implements RoomControls {
 
   @override
   Future<GameSettings?> applySettings(GameSettings current,
-      {Map<String, Object> values = const {}, SettingsAction action = SettingsAction.set}) async {
+      {Map<String, Object> values = const {},
+      SettingsAction action = SettingsAction.set}) async {
     final j = await api.request('POST', '/api/settings',
         body: {
           'profile': profile,
@@ -209,7 +233,8 @@ class LocalRoomControls implements RoomControls {
             'values': values,
           },
         },
-        failure: 'The game did not take that change. It may have changed meanwhile.');
+        failure:
+            'The game did not take that change. It may have changed meanwhile.');
     return GameSettings.fromJson(j);
   }
 }
@@ -236,6 +261,47 @@ class CloudRoomControls implements RoomControls {
     final d = room.raw['discovery'];
     return d is Map ? d : null;
   }
+
+  @override
+  Future<PlaylistView> playlist() async {
+    final d = await _discovery();
+    if (d == null || d['playlist'] is! Map) {
+      throw const ApiError('The room playlist is not available yet.');
+    }
+    return PlaylistView(Map<String, dynamic>.from(d));
+  }
+
+  Future<PlaylistView> _editPlaylist(
+      PlaylistView view, Map<String, Object> edit) async {
+    final id = _requestId();
+    final desired = view.entries.map((e) => e.raw).toList();
+    final entry = desired.removeAt(edit['from'] as int);
+    if (edit['remove'] != true) desired.insert(edit['to'] as int, entry);
+    await cloud.request('POST', '/v1/rooms/next', body: {
+      'request_id': id,
+      'edit': {'expected': view.snapshot, ...edit},
+    }, errors: {
+      409: 'Playlist changed. Refresh and try again.',
+      503: 'The GameNight computer is not answering.'
+    });
+    for (var i = 0; i < 8; i++) {
+      await Future<void>.delayed(const Duration(seconds: 1));
+      final next = await playlist();
+      if (jsonEncode(next.entries.map((e) => e.raw).toList()) ==
+          jsonEncode(desired)) {
+        return next;
+      }
+    }
+    throw const ApiError(
+        'The room has not confirmed the playlist change. Check the queue before retrying.');
+  }
+
+  @override
+  Future<PlaylistView> movePlaylistEntry(PlaylistView view, int from, int to) =>
+      _editPlaylist(view, {'from': from, 'to': to});
+  @override
+  Future<PlaylistView> removePlaylistEntry(PlaylistView view, int index) =>
+      _editPlaylist(view, {'from': index, 'remove': true});
 
   @override
   Future<List<HostGame>> games() async {
@@ -272,7 +338,8 @@ class CloudRoomControls implements RoomControls {
 
   @override
   Future<GameSettings?> applySettings(GameSettings current,
-      {Map<String, Object> values = const {}, SettingsAction action = SettingsAction.set}) async {
+      {Map<String, Object> values = const {},
+      SettingsAction action = SettingsAction.set}) async {
     await cloud.request('POST', '/v1/rooms/agent/control', body: {
       'request_id': _requestId(),
       'game': current.game,
