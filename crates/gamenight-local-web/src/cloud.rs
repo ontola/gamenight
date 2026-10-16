@@ -726,8 +726,9 @@ mod pickup_tests {
                 loop {
                     let (_, party) = bridge.snapshot(&state).await.unwrap();
                     let p = party.players.iter().find(|p| p.id == player).unwrap();
-                    if p.name == "Ada" {
-                        assert_eq!(p.avatar.as_deref(), Some("fixture-face"));
+                    // Name and avatar arrive as separate daemon commands. Wait
+                    // for the complete profile within the same latency bound.
+                    if p.name == "Ada" && p.avatar.as_deref() == Some("fixture-face") {
                         assert_eq!(party.players.len(), 2);
                         break;
                     }
