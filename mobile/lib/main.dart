@@ -59,7 +59,7 @@ Future<void> main() async {
       reports: reports));
 }
 
-class GameNightApp extends StatelessWidget {
+class GameNightApp extends StatefulWidget {
   final AppState state;
   final ReportService? reports;
 
@@ -74,24 +74,67 @@ class GameNightApp extends StatelessWidget {
       this.reports});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'GameNight',
-      debugShowCheckedModeBanner: false,
-      theme: gameNightTheme(),
-      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
-        value: gameNightSystemUi,
-        child: ReportScope(
-            reports: reports,
-            child: ColoredBox(color: GnColors.bg, child: child!)),
-      ),
-      home: HomeScreen(
-          state: state,
-          links: links,
-          initialLink: initialLink,
-          reports: reports),
-    );
+  State<GameNightApp> createState() => _GameNightAppState();
+}
+
+class _GameNightAppState extends State<GameNightApp> {
+  final _navigator = GlobalKey<NavigatorState>();
+
+  void _feedback() {
+    final reports = widget.reports;
+    if (reports == null) return;
+    _navigator.currentState?.push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'feedback'),
+      builder: (_) => FeedbackScreen(reports: reports),
+    ));
   }
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        navigatorKey: _navigator,
+        title: 'GameNight',
+        debugShowCheckedModeBanner: false,
+        theme: gameNightTheme(),
+        builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+          value: gameNightSystemUi,
+          child: ReportScope(
+              reports: widget.reports,
+              child: ColoredBox(
+                color: GnColors.bg,
+                child: SafeArea(
+                    bottom: false,
+                    child: Column(children: [
+                      Material(
+                          color: GnColors.bg,
+                          child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                              child: Row(children: [
+                                const GameNightLogo(size: 28),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                    child: Text('GameNight',
+                                        key: ValueKey('app-brand'),
+                                        style: TextStyle(
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w800,
+                                            color: GnColors.text))),
+                                if (widget.reports != null)
+                                  TextButton.icon(
+                                      onPressed: _feedback,
+                                      icon:
+                                          const Icon(Icons.mic_none, size: 20),
+                                      label: const Text('Feedback')),
+                              ]))),
+                      Expanded(child: child!),
+                    ])),
+              )),
+        ),
+        home: HomeScreen(
+            state: widget.state,
+            links: widget.links,
+            initialLink: widget.initialLink,
+            reports: widget.reports),
+      );
 }
 
 class HomeScreen extends StatefulWidget {
@@ -139,15 +182,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) unawaited(widget.reports?.flush());
-  }
-
-  void _feedback() {
-    final reports = widget.reports;
-    if (reports == null) return;
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      settings: const RouteSettings(name: 'feedback'),
-      builder: (_) => FeedbackScreen(reports: reports),
-    ));
   }
 
   /// The link in the sign-in email opens the app and signs in here.
@@ -207,23 +241,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           body: SafeArea(
             child: Column(children: [
               UpdateBanner(),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                child: Row(children: [
-                  const GameNightLogo(size: 28),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                      child: Text('GameNight',
-                          style: TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.w800))),
-                  if (widget.reports != null)
-                    TextButton.icon(
-                      onPressed: _feedback,
-                      icon: const Icon(Icons.mic_none, size: 20),
-                      label: const Text('Feedback'),
-                    ),
-                ]),
-              ),
               Expanded(child: IndexedStack(index: _tab, children: pages)),
             ]),
           ),
