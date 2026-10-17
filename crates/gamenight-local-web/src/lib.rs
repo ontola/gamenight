@@ -233,6 +233,7 @@ pub async fn run_server(
         let local = state.lock().unwrap();
         tokio::spawn(local.companions.clone().run(local.daemon_addr.clone()));
     }
+    tokio::spawn(local_room::watch_first_seat(state.clone()));
     if let Some(bridge) = cloud::Bridge::configured() {
         state.lock().unwrap().cloud = Some(bridge.clone());
         tokio::spawn(bridge.run(state.clone()));

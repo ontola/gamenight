@@ -18,8 +18,11 @@ and account sign-in. In the controller QR confirmation, the first-player default
 is explained and can be declined by unchecking Remember me.
 
 On host startup, the main profile and remembered guests wait at the pickup door,
-with the main profile listed first. A controller must still collect a profile.
-Remembering never claims a seat or starts a game automatically. Turning memory
+with the main profile listed first and marked `main` in the room's pending list.
+The first local controller seat collects that returning main profile
+automatically, once per host run (unlinking it does not pull it back in). A
+main player chosen during this run still waits at the door. Guests still have to be
+collected at the door. Remembering never starts a game automatically. Turning memory
 off leaves the current player connected; leaving the room does not change the
 memory preference. Main player is a startup preference, not an administrator
 role, account login or permission to access another person's account.
