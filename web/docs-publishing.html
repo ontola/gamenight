@@ -142,21 +142,71 @@ A live game must keep a clip: use <strong>Replace gameplay video</strong>, then 
 Show real gameplay and check the loop on a phone. Follow the
 <a href="https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md">gameplay preview guide</a>; duration validation does not
 establish that the footage is good or representative.</p>
-<p>For an authenticated owner session, the same API backs the editor:</p>
+<h3 id="from-the-command-line-or-ci">From the command line or CI</h3>
+<p>One command fills the store page with a publish key (the same key CI uses for
+releases):</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">GAMENIGHT_API_TOKEN=gn_pub_... python3 gamenight-publish.py store
+</code></pre></div>
+<p>Run it in your game's folder. It reads <code>gamenight.json</code> (title, tagline,
+players, tags, round length, links) and uploads what it finds in
+<code>assets/gamenight/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Becomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preview.mp4</code> or <code>preview.webm</code></td>
+<td>the five-second gameplay clip</td>
+</tr>
+<tr>
+<td><code>preview.jpg</code></td>
+<td>the clip's poster</td>
+</tr>
+<tr>
+<td><code>cover.png</code></td>
+<td>portrait cover</td>
+</tr>
+<tr>
+<td><code>icon.png</code></td>
+<td>square icon</td>
+</tr>
+<tr>
+<td><code>gameplay.png</code></td>
+<td>TV screenshot, and the gallery image when there is no <code>screenshots/</code> folder</td>
+</tr>
+<tr>
+<td><code>screenshots/*.png</code></td>
+<td>gallery images, in name order</td>
+</tr>
+</tbody>
+</table>
+<p>Use <code>--manifest</code>, <code>--media</code>, <code>--video</code>, <code>--cover</code> (and so on) or a repeated
+<code>--image</code> for other paths. Rerunning with the same files reuses the uploads and
+costs no media quota. Pricing is never changed from the command line.</p>
+<p>The script uses two endpoints, which accept a publish key or an owner session:</p>
 <ol>
-<li><code>POST /v1/developer/games/{game}/uploads</code> with the raw video bytes. The response
-contains <code>url</code> and <code>kind</code>. Invalid video returns <code>422</code> with an explanation.</li>
-<li><code>PUT /v1/developer/games/{game}</code> with your listing fields and a <code>media</code> array.
-Add <code>{&quot;kind&quot;:&quot;video&quot;,&quot;url&quot;:&quot;URL_FROM_UPLOAD&quot;}</code> and retain any optional items.
-The server puts the video first and sets <code>preview: true</code> and <code>duration: 5</code>.</li>
-<li><code>GET /v1/developer/games/{game}</code> includes <code>media.preview_ready</code> and
-<code>media.required_duration</code>. A stable release returns <code>422</code> if no verified
-gameplay clip is saved. Existing approved clips remain valid.</li>
+<li><code>POST /v1/developer/games/{game}/uploads</code> with the raw file bytes. The response
+contains <code>url</code> and <code>kind</code>. Invalid video returns <code>422</code> with an explanation.
+Uploading the same bytes again returns the same <code>url</code>.</li>
+<li><code>PUT /v1/developer/games/{game}/store</code> with any of <code>title</code>, <code>tagline</code>,
+<code>players_min</code>, <code>players_max</code>, <code>tags</code>, <code>match_minutes</code>, <code>homepage</code>, <code>source</code>,
+<code>cover</code>, <code>icon</code>, <code>screenshot</code>, <code>video</code>, <code>poster</code> and <code>images</code> (up to 9 URLs).
+Fields you leave out stay as they are; an empty string removes artwork or a
+link. <code>video</code> replaces the gameplay clip and <code>images</code> replaces the gallery
+images; YouTube trailers added in the portal are kept. The response says
+whether <code>preview_ready</code> is true.</li>
 </ol>
-<p>Media editing requires an owner session, not a build-upload key. Send the usual
-CSRF header for cookie authentication. Pasting an external video URL or setting
-<code>duration: 5</code> yourself does not verify it, and a clip uploaded for another game
-cannot satisfy this game's requirement.</p>
+<p>The portal editor uses <code>PUT /v1/developer/games/{game}</code> with the full listing,
+pricing and a <code>media</code> array. <code>GET /v1/developer/games/{game}</code> includes
+<code>media.preview_ready</code> and <code>media.required_duration</code>. A stable release returns
+<code>422</code> if no verified gameplay clip is saved. Existing approved clips remain valid.</p>
+<p>Send the usual CSRF header for cookie authentication. Pasting an external video
+URL or setting <code>duration: 5</code> yourself does not verify it, and a clip uploaded for
+another game cannot satisfy this game's requirement.</p>
 <h2 id="optional-artwork">Optional artwork</h2>
 <p>Use a portrait cover for the next-game display, a square icon for game spines and a gameplay screenshot for the TV. These are separate assets. If artwork is absent, the title remains readable; a random icon is not a substitute for a cover.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{
@@ -172,7 +222,7 @@ cannot satisfy this game's requirement.</p>
 <p>Run the <a href="/docs/testing">integration checks</a> against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.</p>
 <p>The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="99c65aa338c2e6849af266501813f9ba5218a053b643b52e61c689cc9e5c8795">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="4e196e7114ccfb4a8670e97c22772dfdb8d631d4b4cb1afec9cf1f875f842c53">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/settings"><small>Next</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#prepare-a-release">Prepare a release</a><a href="#playtests">Playtests</a><a href="#connect-github-actions">Connect GitHub Actions</a><a href="#other-ci-systems-and-local-previews">Other CI systems and local previews</a><a href="#publishing-api">Publishing API</a><a href="#catalog-updates">Catalog updates</a><a href="#required-gameplay-video">Required gameplay video</a><a href="#optional-artwork">Optional artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
