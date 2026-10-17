@@ -27,6 +27,14 @@
     "level": "integrated",
     "protocol": 1
   },
+  "downloads": {
+    "windows": {
+      "url": "https://github.com/joepio/spellstorm/releases/download/v0.1.0/spellstorm-windows.zip",
+      "sha256": "4ea939cc159bef79cb4460b072725dd24d7a8fa0c715a0a626ffd5ae58b1da34",
+      "size_mb": 35,
+      "entrypoint": "Spellstorm.exe"
+    }
+  },
   "requirements": {
     "disk_mb": 120,
     "ram_mb": 1024,
@@ -35,6 +43,8 @@
   },
   "links": {
     "source": "https://github.com/joepio/spellstorm",
-    "homepage": "https://github.com/joepio/spellstorm"
+    "homepage": "https://github.com/joepio/spellstorm",
+    "releases": "https://github.com/joepio/spellstorm/releases",
+    "windows": "https://github.com/joepio/spellstorm/releases/download/v0.1.0/spellstorm-windows.zip"
   }
 }

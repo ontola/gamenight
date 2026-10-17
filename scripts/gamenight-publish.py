@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload immutable GameNight builds using only Python's standard library."""
+"""Upload immutable GameNight builds and store pages using only Python's standard library."""
 import argparse
 import hashlib
 import http.client
@@ -180,6 +180,52 @@ def preview(client, args):
     path.write_text(json.dumps(shelf, indent=2) + '\n')
     print('Preview downloaded and verified. Set GAMENIGHT_LIBRARY=' + str(path))
 
+MEDIA = {'video': ['preview.mp4', 'preview.webm'], 'poster': ['preview.jpg', 'preview.png'],
+         'cover': ['cover.png', 'cover.jpg'], 'icon': ['icon.png'],
+         'screenshot': ['gameplay.png', 'screenshot.png', 'gameplay.jpg', 'screenshot.jpg']}
+
+def store(client, args):
+    manifest = json.loads(args.manifest.read_text()) if args.manifest.is_file() else {}
+    game = args.game or manifest.get('id')
+    if not game:
+        raise ValueError('Pass --game or run next to a gamenight.json with an "id"')
+    body = {k: manifest[k] for k in ('title', 'tagline', 'tags', 'match_minutes') if k in manifest}
+    players = manifest.get('players', {})
+    body.update({f'players_{k}': players[k] for k in ('min', 'max') if k in players})
+    body.update({k: v for k, v in manifest.get('links', {}).items() if k in ('homepage', 'source')})
+    files = {}
+    if args.media and args.media.is_dir():
+        for field, names in MEDIA.items():
+            files[field] = next((args.media / n for n in names if (args.media / n).is_file()), None)
+        shots = args.media / 'screenshots'
+        files['images'] = sorted(p for p in shots.iterdir() if p.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp'}) if shots.is_dir() else []
+    for field in MEDIA:
+        if getattr(args, field):
+            files[field] = getattr(args, field)
+    if args.image:
+        files['images'] = args.image
+    if not files.get('images') and files.get('screenshot'):
+        files['images'] = [files['screenshot']]
+    path = f'/v1/developer/games/{urllib.parse.quote(game, safe="")}'
+    uploaded = {}
+    def upload(file):
+        file = file.resolve()
+        if file not in uploaded:
+            uploaded[file] = client.request('POST', path + '/uploads', file=file)['url']
+            print(f'Uploaded {file.name}', file=sys.stderr)
+        return uploaded[file]
+    for field in MEDIA:
+        if files.get(field):
+            body[field] = upload(files[field])
+    if files.get('images'):
+        body['images'] = [upload(f) for f in files['images']]
+    if not body:
+        raise ValueError('Nothing to send: no gamenight.json fields and no media found')
+    result = client.request('PUT', path + '/store', body)
+    print(json.dumps({'game': game, 'sent': sorted(body), **result}, indent=2))
+    if not result.get('preview_ready'):
+        print('The store still needs a five-second gameplay clip (preview.mp4) before it can go live.', file=sys.stderr)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--server', default='https://gamenight.ontola.io')
@@ -198,9 +244,17 @@ def main():
     p.add_argument('--game', required=True)
     p.add_argument('--platform', choices=['windows', 'mac', 'linux'])
     p.add_argument('--output', type=Path, required=True)
+    p = commands.add_parser('store', help='Fill the store page from gamenight.json and a media folder')
+    p.add_argument('--game', help='Defaults to the id in gamenight.json')
+    p.add_argument('--manifest', type=Path, default=Path('gamenight.json'))
+    p.add_argument('--media', type=Path, default=Path('assets/gamenight'),
+                   help='Folder with preview.mp4, preview.jpg, cover.png, icon.png, gameplay.png and screenshots/')
+    for field in MEDIA:
+        p.add_argument('--' + field, type=Path)
+    p.add_argument('--image', type=Path, action='append', help='Gallery image; repeat for more')
     args = parser.parse_args()
     client = Client(args.server, os.environ.get('GAMENIGHT_API_TOKEN', ''))
-    (push if args.command == 'push' else preview)(client, args)
+    {'push': push, 'preview': preview, 'store': store}[args.command](client, args)
 
 if __name__ == '__main__':
     try:

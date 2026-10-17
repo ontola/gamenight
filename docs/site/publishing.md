@@ -148,21 +148,53 @@ Show real gameplay and check the loop on a phone. Follow the
 [gameplay preview guide](../gameplay-previews.md); duration validation does not
 establish that the footage is good or representative.
 
-For an authenticated owner session, the same API backs the editor:
+### From the command line or CI
 
-1. `POST /v1/developer/games/{game}/uploads` with the raw video bytes. The response
+One command fills the store page with a publish key (the same key CI uses for
+releases):
+
+```sh
+GAMENIGHT_API_TOKEN=gn_pub_... python3 gamenight-publish.py store
+```
+
+Run it in your game's folder. It reads `gamenight.json` (title, tagline,
+players, tags, round length, links) and uploads what it finds in
+`assets/gamenight/`:
+
+| File | Becomes |
+| --- | --- |
+| `preview.mp4` or `preview.webm` | the five-second gameplay clip |
+| `preview.jpg` | the clip's poster |
+| `cover.png` | portrait cover |
+| `icon.png` | square icon |
+| `gameplay.png` | TV screenshot, and the gallery image when there is no `screenshots/` folder |
+| `screenshots/*.png` | gallery images, in name order |
+
+Use `--manifest`, `--media`, `--video`, `--cover` (and so on) or a repeated
+`--image` for other paths. Rerunning with the same files reuses the uploads and
+costs no media quota. Pricing is never changed from the command line.
+
+The script uses two endpoints, which accept a publish key or an owner session:
+
+1. `POST /v1/developer/games/{game}/uploads` with the raw file bytes. The response
    contains `url` and `kind`. Invalid video returns `422` with an explanation.
-2. `PUT /v1/developer/games/{game}` with your listing fields and a `media` array.
-   Add `{"kind":"video","url":"URL_FROM_UPLOAD"}` and retain any optional items.
-   The server puts the video first and sets `preview: true` and `duration: 5`.
-3. `GET /v1/developer/games/{game}` includes `media.preview_ready` and
-   `media.required_duration`. A stable release returns `422` if no verified
-   gameplay clip is saved. Existing approved clips remain valid.
+   Uploading the same bytes again returns the same `url`.
+2. `PUT /v1/developer/games/{game}/store` with any of `title`, `tagline`,
+   `players_min`, `players_max`, `tags`, `match_minutes`, `homepage`, `source`,
+   `cover`, `icon`, `screenshot`, `video`, `poster` and `images` (up to 9 URLs).
+   Fields you leave out stay as they are; an empty string removes artwork or a
+   link. `video` replaces the gameplay clip and `images` replaces the gallery
+   images; YouTube trailers added in the portal are kept. The response says
+   whether `preview_ready` is true.
 
-Media editing requires an owner session, not a build-upload key. Send the usual
-CSRF header for cookie authentication. Pasting an external video URL or setting
-`duration: 5` yourself does not verify it, and a clip uploaded for another game
-cannot satisfy this game's requirement.
+The portal editor uses `PUT /v1/developer/games/{game}` with the full listing,
+pricing and a `media` array. `GET /v1/developer/games/{game}` includes
+`media.preview_ready` and `media.required_duration`. A stable release returns
+`422` if no verified gameplay clip is saved. Existing approved clips remain valid.
+
+Send the usual CSRF header for cookie authentication. Pasting an external video
+URL or setting `duration: 5` yourself does not verify it, and a clip uploaded for
+another game cannot satisfy this game's requirement.
 
 ## Optional artwork
 
