@@ -87,6 +87,11 @@ switch games often. The template does all of this; keep it as you build.
   an LLM. Show the same settings in a small menu on Start. Apply a change
   from the next round when changing it mid-round would be unfair. The menu
   sends its changes with `GameNight.set_setting`, so the app shows them too.
+- **The Start menu follows one layout.** The game's name heads it every time
+  Start opens it, also mid-game, so everyone in the room learns what they are
+  playing. Then Resume, then New round (apply options), then the settings.
+  No button hints in the menu (choose, change, select, resume): a highlighted
+  row and ‹ › around its value speak for themselves.
 - **Leave Back alone.** Back (Select) returns to the party; GameNight handles
   it and pauses your game. Never bind it to anything in the game.
 - **Use the players' colours, names and faces.** Each player picks them once
@@ -94,7 +99,8 @@ switch games often. The template does all of this; keep it as you build.
   SDK's `face.gd`, and name them where it matters, such as the results screen.
 - **Don't flood the screen.** No text over characters, no labels on every
   thing. A clock, a score per player and clear shapes and colours read from the
-  sofa; menus and explanations do not. Controls hints belong in the Start menu.
+  sofa; menus and explanations do not. No control hints during play either:
+  players figure out A and B in seconds.
 - **Rounds keep going.** Show the result briefly, call `notify_finished`,
   then start the next round. Players leave with Back, not with a game over
   screen. Let players keep moving while the result shows.

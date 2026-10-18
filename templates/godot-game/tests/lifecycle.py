@@ -120,6 +120,10 @@ async def run(godot: str, pack: str = "") -> None:
             await hold(frame(1 << START), 0.15)
             await hold(frame(), 0.2)
             await saw("menu open")
+            # Resume and New round sit above the settings: two steps down.
+            for _ in range(2):
+                await hold(frame(move=(0, 32767)), 0.15)
+                await hold(frame(), 0.15)
             await hold(frame(move=(32767, 0)), 0.15)
             await hold(frame(), 0.15)
             changed = await expect("set_setting")

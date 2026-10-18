@@ -210,6 +210,11 @@ func _read(p: Dictionary) -> Vector2:
 	return move.limit_length(1.0)
 
 
+## Every GameNight Start menu has the same layout: the game's name, Resume,
+## New round (applies the options), then the settings. No button hints.
+const MENU_ACTIONS := ["Resume", "New round"]
+
+
 ## Start opens the settings menu for whoever pressed it; play waits meanwhile.
 func _menu() -> bool:
 	if menu_owner < 0:
@@ -226,10 +231,16 @@ func _menu() -> bool:
 		_trace("menu closed")
 		return true
 	if p.pressed.get("up", false) or p.pressed.get("down", false):
-		menu_row = posmod(menu_row + (1 if p.pressed.get("down", false) else -1), SETTINGS.size())
+		menu_row = posmod(menu_row + (1 if p.pressed.get("down", false) else -1), MENU_ACTIONS.size() + SETTINGS.size())
+	if p.pressed.get("a", false) and menu_row < MENU_ACTIONS.size():
+		if MENU_ACTIONS[menu_row] == "New round":
+			_new_round()
+		menu_owner = -1
+		_trace("menu closed")
+		return true
 	var step := int(p.pressed.get("right", false)) - int(p.pressed.get("left", false))
-	if step != 0:
-		var s: Dictionary = SETTINGS[menu_row]
+	if step != 0 and menu_row >= MENU_ACTIONS.size():
+		var s: Dictionary = SETTINGS[menu_row - MENU_ACTIONS.size()]
 		var size := 10 if s.key == "round_seconds" else 1
 		_on_setting(s.key, settings[s.key] + step * size)
 		if GameNight.launched_by_daemon:
@@ -366,12 +377,18 @@ func _draw() -> void:
 			draw_circle(Vector2(820, 380 + i * 64), 22.0, r.color)
 			draw_string(font, Vector2(860, 394 + i * 64), "%s  %d" % [r.name, r.score], HORIZONTAL_ALIGNMENT_LEFT, -1, 40)
 	if menu_owner >= 0:
-		draw_rect(Rect2(660, 380, 600, 44 + SETTINGS.size() * 64), Color(0.05, 0.04, 0.08, 0.92))
-		draw_rect(Rect2(660, 380, 600, 44 + SETTINGS.size() * 64), players[menu_owner].color, false, 4.0)
-		for i in SETTINGS.size():
-			var s: Dictionary = SETTINGS[i]
-			var y := 440 + i * 64
+		var rows := MENU_ACTIONS.size() + SETTINGS.size()
+		var box := Rect2(660, 300, 600, 140 + rows * 64)
+		draw_rect(box, Color(0.05, 0.04, 0.08, 0.92))
+		draw_rect(box, players[menu_owner].color, false, 4.0)
+		draw_string(font, Vector2(660, 380), "Template Game", HORIZONTAL_ALIGNMENT_CENTER, 600, 52)
+		for i in rows:
+			var y := 460 + i * 64
 			var col := Color.WHITE if i == menu_row else Color(1, 1, 1, 0.55)
+			if i < MENU_ACTIONS.size():
+				draw_string(font, Vector2(690, y), MENU_ACTIONS[i], HORIZONTAL_ALIGNMENT_CENTER, 540, 32, col)
+				continue
+			var s: Dictionary = SETTINGS[i - MENU_ACTIONS.size()]
 			draw_string(font, Vector2(690, y), s.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 32, col)
 			draw_string(font, Vector2(1100, y), "< %d >" % settings[s.key], HORIZONTAL_ALIGNMENT_RIGHT, 130, 32, col)
 
