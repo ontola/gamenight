@@ -40,7 +40,7 @@ func _run() -> void:
 	check(not main.room.screens.has("queue1") and not main.room.screens.has("queue2"), "Later games have no cover surfaces")
 	check(main.Room.NEXT_SIZE.x > 2.5 and main.Room.NEXT_SIZE.x < main.Layout.TV_SIZE.x, "Next preview is substantial but smaller than current TV")
 	var p: Dictionary = main.world.players.p0
-	p.x = -4.95; p.y = 0.0; p.grounded = true; p.sleeping = false
+	p.x = main.Layout.stand_x(-4.95); p.y = 0.0; p.grounded = true; p.sleeping = false
 	check(main.station_for("p0").kind == "queue", "Queue has its own station, separate from browsing")
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands == [{"type": "next"}], "Y at the queue starts next while the current game is paused")
@@ -72,13 +72,13 @@ func _run() -> void:
 	check(main.station_for("p0").is_empty(), "High shelf is outside TV interaction range")
 	p.y = 0.0
 	main.input("p0", 0, Vector2.ZERO)
-	p.x = -9.6
+	p.x = main.Layout.stand_x(-9.6)
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1].type == "queue_next", "Selector sets next without starting it")
 	check(main.station_for("p0").label.begins_with("Set "), "Selector label describes queue placement")
 	main.world.players.p1.x = 0.0
 	main.world.players.p1.y = main.Layout.TV_CONSOLE[2]
-	main.world.players.p2.x = -4.95
+	main.world.players.p2.x = main.Layout.stand_x(-4.95)
 	main.world.players.p2.y = 0.0
 	main.world.players.p1.grounded = true
 	main.world.players.p2.grounded = true
@@ -144,7 +144,7 @@ func _run() -> void:
 	check(main.upcoming().is_empty() and main.queue_title_rows().is_empty(), "Empty queue clears both surfaces")
 	main._station_cooldown.clear()
 	main.input("p0", 0, Vector2.ZERO)
-	p.x = -4.95
+	p.x = main.Layout.stand_x(-4.95)
 	var command_count := recorder.commands.size()
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands.size() == command_count, "Empty queue cannot launch a game")

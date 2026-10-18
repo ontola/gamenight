@@ -55,6 +55,21 @@ const MUSIC_PADS := [3.05, 3.6, 4.15]
 const PROFILE_DOORS := [9.35, 10.75]
 const DOOR_HALF := 0.6
 
+## Where the camera sits; it looks straight down -z, so x projects simply.
+const CAMERA := Vector3(0, 4.7, 20.4)
+## The z of the furniture players use: bookcase, cabinet, TV, jukebox, doors.
+const OBJECTS_Z := -2.0
+
+## The x on the furniture plane that a player at (x, z) appears in front of
+## from the camera. Perspective spreads the near play plane outward, so near
+## the walls a player can look in front of a cabinet before standing at it.
+static func apparent_x(x: float, z: float = 0.0) -> float:
+	return CAMERA.x + (x - CAMERA.x) * (CAMERA.z - OBJECTS_Z) / (CAMERA.z - z)
+
+## Where to stand on the floor to appear in front of furniture at x.
+static func stand_x(x: float) -> float:
+	return CAMERA.x + (x - CAMERA.x) * CAMERA.z / (CAMERA.z - OBJECTS_Z)
+
 const TV_CENTER := Vector3(0, 3.95, BACK + 0.12)
 const TV_SIZE := Vector2(5.6, 3.15)
 const PLAQUE_CENTER := Vector3(10.1, 4.9, BACK + 0.08)

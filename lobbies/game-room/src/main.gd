@@ -419,7 +419,10 @@ func station_for(id: String) -> Dictionary:
 	var p: Dictionary = world.players.get(id, {})
 	if p.is_empty() or not p.grounded or p.sleeping: return {}
 	var on_floor: bool = absf(p.y) <= 0.1
-	var at_tv_floor: bool = on_floor and p.x >= Layout.TV_STATION.x and p.x <= Layout.TV_STATION.y
+	# Stations follow what the camera shows: where the player appears against
+	# the furniture, not where they stand on the play plane.
+	var x := Layout.apparent_x(p.x)
+	var at_tv_floor: bool = on_floor and x >= Layout.TV_STATION.x and x <= Layout.TV_STATION.y
 	var on_tv_console: bool = absf(p.y - Layout.TV_CONSOLE[2]) <= 0.1 and p.x >= Layout.TV_CONSOLE[0] and p.x <= Layout.TV_CONSOLE[1]
 	if at_tv_floor or on_tv_console:
 		var tv := tv_station()
@@ -428,23 +431,23 @@ func station_for(id: String) -> Dictionary:
 		return tv
 	if not on_floor: return {}
 	var shelf := shelf_games()
-	if p.x >= Layout.GAME_SHELF.x and p.x <= Layout.GAME_SHELF.y and not shelf.is_empty():
+	if x >= Layout.GAME_SHELF.x and x <= Layout.GAME_SHELF.y and not shelf.is_empty():
 		var game: Dictionary = shelf[shelf_offset % shelf.size()]
 		var reason := _unavailable(game)
 		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
 			"label": reason if not reason.is_empty() else "Set %s up next" % str(game.get("title", "game")),
 			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
-	if p.x >= Layout.UP_NEXT.x and p.x <= Layout.UP_NEXT.y:
+	if x >= Layout.UP_NEXT.x and x <= Layout.UP_NEXT.y:
 		return queue_station()
 	var track: Variant = party.get("now_playing")
-	if track is Dictionary and not track.is_empty() and absf(p.x - Layout.JUKEBOX) <= 0.85:
+	if track is Dictionary and not track.is_empty() and absf(x - Layout.JUKEBOX) <= 0.85:
 		return {"id": "music1", "kind": "music", "label": "Pause music" if track.get("playing", false) else "Play music",
 			"action": "play_pause", "enabled": true, "extra": "LB previous RB next"}
-	if absf(p.x - Layout.EXIT_DOOR) <= 0.6:
+	if absf(x - Layout.EXIT_DOOR) <= 0.6:
 		return {"id": "exit", "kind": "exit", "label": "Leave", "enabled": true}
 	var pending := pending_profiles()
 	for i in mini(pending.size(), Layout.PROFILE_DOORS.size()):
-		if absf(p.x - Layout.PROFILE_DOORS[i]) <= Layout.DOOR_HALF:
+		if absf(x - Layout.PROFILE_DOORS[i]) <= Layout.DOOR_HALF:
 			var linked: bool = links.get("linked", {}).has(id)
 			var name := str(pending[i].get("profile", {}).get("display_name", "Player"))
 			return {"id": "door%d" % i, "kind": "door", "pending": str(pending[i].get("id", "")),

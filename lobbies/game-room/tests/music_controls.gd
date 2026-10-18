@@ -33,7 +33,7 @@ func _run() -> void:
 	var recorder := RecordingClient.new()
 	main.client = recorder
 	var p: Dictionary = main.world.players.p0
-	p.x = main.Layout.JUKEBOX; p.y = 0.0; p.grounded = true; p.sleeping = false
+	p.x = main.Layout.stand_x(main.Layout.JUKEBOX); p.y = 0.0; p.grounded = true; p.sleeping = false
 	var station: Dictionary = main.station_for("p0")
 	check(station.extra == "LB previous RB next", "Music hint contains both bumper controls")
 	check(station.action == "play_pause", "Y keeps play/pause at the jukebox")
@@ -50,7 +50,7 @@ func _run() -> void:
 	p.x += 1.0
 	press(main, main.BTN_LB)
 	check(recorder.commands.is_empty(), "Bumpers outside the jukebox do not control music")
-	p.x = main.Layout.JUKEBOX; p.grounded = false
+	p.x = main.Layout.stand_x(main.Layout.JUKEBOX); p.grounded = false
 	press(main, main.BTN_RB)
 	check(recorder.commands.is_empty(), "Airborne players do not control the station")
 	p.grounded = true
@@ -64,7 +64,7 @@ func _run() -> void:
 	check(recorder.commands.is_empty(), "No music command without a media session")
 	main.party.now_playing = {"title": "Demo track", "artist": "Test artist", "playing": false}
 	check(main.station_for("p0").label == "Play music", "Paused session offers play")
-	p.x = main.Layout.GAME_SHELF.x + 0.2
+	p.x = main.Layout.stand_x(main.Layout.GAME_SHELF.x + 0.2)
 	var offset: int = main.shelf_offset
 	press(main, main.BTN_RB)
 	check(main.shelf_offset == (offset + 1) % main.shelf_games().size(), "RB still browses games at the shelf")
@@ -74,7 +74,7 @@ func _run() -> void:
 	for prompt in main.room._prompts.values(): check(not prompt.node.visible, "Inactive station stays invisible")
 	p.sleeping = false
 	for entry in [["shelf", -9.6], ["tv", 0.0], ["music", main.Layout.JUKEBOX], ["exit", main.Layout.EXIT_DOOR], ["door0", main.Layout.PROFILE_DOORS[0]]]:
-		p.x = entry[1]
+		p.x = main.Layout.stand_x(entry[1])
 		main._update_prompts()
 		check(main.room._prompts[entry[0]].node.visible, "Station appears within range: " + entry[0])
 		var anchor: Vector3 = main.room._prompts[entry[0]].node.position
@@ -90,13 +90,13 @@ func _run() -> void:
 		check(not main.room._prompts[entry[0]].node.visible, "Station disappears out of range: " + entry[0])
 	check(not main.room.featured_box.visible, "Selected cover hides when nobody browses the cupboard")
 	check(not main.room.get_node("shelf_lb").visible and not main.room.get_node("shelf_rb").visible, "Shelf bumpers disappear out of range")
-	p.x = -9.6
+	p.x = main.Layout.stand_x(-9.6)
 	main._update_prompts()
 	check(main.room.featured_box.visible, "Selected cover appears for a nearby player")
 	check(main.room.get_node("shelf_lb").visible and main.room.get_node("shelf_rb").visible, "Shelf bumpers appear within range")
 	var other: Dictionary = main.world.players.p1
-	other.x = main.Layout.JUKEBOX; other.y = 0.0; other.grounded = true; other.sleeping = false
-	p.x = main.Layout.JUKEBOX
+	other.x = main.Layout.stand_x(main.Layout.JUKEBOX); other.y = 0.0; other.grounded = true; other.sleeping = false
+	p.x = main.Layout.stand_x(main.Layout.JUKEBOX)
 	main._update_prompts()
 	p.x = 7.0
 	main._update_prompts()
@@ -116,13 +116,13 @@ func _run() -> void:
 	var all_buttons: int = main.World.BTN_Y | main.BTN_LB | main.BTN_RB | main.BTN_START | main.World.BTN_X | main.World.BTN_B | main.World.BTN_A
 	var shelf_before: int = main.shelf_offset
 	for x in [main.Layout.JUKEBOX, -9.6, 0.0, main.Layout.EXIT_DOOR, main.Layout.PROFILE_DOORS[0]]:
-		p.x = x
+		p.x = main.Layout.stand_x(x)
 		main._controllers_changed([{"controller": "demo:0", "buttons": all_buttons, "axes": [32767, 0]}])
 		var position := Vector2(p.x, p.y)
 		main._physics_process(0.1)
 		check(Vector2(p.x, p.y) == position and p.held == 0 and p.pressed == 0, "Inactive controller input cannot move or act")
 	check(recorder.commands.is_empty() and main.menus.is_empty() and main.shelf_offset == shelf_before, "Inactive Y/LB/RB/Start/X cannot command, open a menu or browse")
-	p.x = main.Layout.JUKEBOX
+	p.x = main.Layout.stand_x(main.Layout.JUKEBOX)
 	recorder.active = true
 	main._focus_changed(true)
 	main._station_cooldown.clear()
@@ -174,7 +174,7 @@ func _run() -> void:
 		if arg.begins_with("--capture-dir="):
 			var directory := arg.trim_prefix("--capture-dir=")
 			DirAccess.make_dir_recursive_absolute(directory)
-			p.x = main.Layout.JUKEBOX
+			p.x = main.Layout.stand_x(main.Layout.JUKEBOX)
 			main._update_prompts()
 			main.profiles.p0.name = "Alex"
 			main.world.items.clear()

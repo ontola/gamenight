@@ -77,7 +77,7 @@ func _phase(game: String) -> String:
 
 func _place(id: String, x: float) -> void:
 	var p: Dictionary = main.world.players[id]
-	p.x = x; p.y = 0.0; p.vx = 0.0; p.vy = 0.0; p.grounded = true; p.sleeping = false
+	p.x = Layout.stand_x(x); p.y = 0.0; p.vx = 0.0; p.vy = 0.0; p.grounded = true; p.sleeping = false
 
 func _press(id: String, button: int) -> void:
 	if not await _until("lobby owns input", func(): return main.client.active): return
