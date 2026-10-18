@@ -27,7 +27,7 @@ Every new preview, from CI or by hand, becomes the playtest build. A new invite 
 
 ## Connect GitHub Actions
 
-In **API keys**, create a named key for your game. Upload-only is the default; enable publishing permission only when CI should publish stable releases. Copy the secret immediately: it is shown once. Store it as `GAMENIGHT_API_TOKEN` in repository Actions secrets, or an environment secret when using a protected environment.
+In **API keys**, create a named key for your game. Every key can upload builds and publish stable releases for that game, so keep it secret and revoke it when you no longer need it. Copy the secret immediately: it is shown once. Store it as `GAMENIGHT_API_TOKEN` in repository Actions secrets, or an environment secret when using a protected environment.
 
 Add this step after packaging and testing:
 
