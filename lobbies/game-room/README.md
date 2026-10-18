@@ -20,8 +20,8 @@ godot --path lobbies/game-room -- --demo [--scene=action|stations|sleep|empty]
 ```
 
 The project runs from source without an editor import step: the fonts (Outfit
-for all text, the pixel font only for the neon wordmark) and the logo are read
-from their files at runtime.
+for all text, Bungee only for the neon GameNight wordmark) are read from their
+files at runtime.
 
 ## Controls
 

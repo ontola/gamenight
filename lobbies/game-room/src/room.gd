@@ -7,6 +7,7 @@ const Canvas = preload("res://src/canvas.gd")
 
 const AMBER := Color("ffb454")
 const VIOLET := Color("7c5cff")
+const NIGHT_LILAC := Color("a78bfa")  # "Night" in the wordmark
 const GREEN := Color("3ddc97")
 const PINK := Color("ff4f8b")
 const CYAN := Color("38d6ff")
@@ -15,7 +16,7 @@ const TEXT := Color("f2f1f8")
 
 var font: FontFile
 var bold: FontFile
-var pixel: FontFile                 # wordmark only
+var wordmark: FontFile              # Bungee, the GameNight wordmark only
 var _label_font: FontFile
 var _label_bold: FontFile
 var camera: Camera3D
@@ -50,7 +51,7 @@ var mood := VIOLET                 # tinted by the next game's colour
 func _ready() -> void:
 	font = load_font()
 	bold = load_font(800)
-	pixel = load_pixel_font()
+	wordmark = load_wordmark_font()
 	_label_font = load_font(600, true)
 	_label_bold = load_font(800, true)
 	_environment()
@@ -79,7 +80,7 @@ func _ready() -> void:
 
 ## Fonts load straight from the files, so the project runs without an editor
 ## import step (.godot/ and *.import are ignored). Outfit is the GameNight UI
-## face; the pixel font is kept only for the wordmark on the neon sign.
+## face; Bungee is the GameNight wordmark, as in the app and on the website.
 static func load_font(weight := 600, msdf := false) -> FontFile:
 	var f := FontFile.new()
 	f.load_dynamic_font("res://assets/fonts/outfit-%d.woff2" % weight)
@@ -89,12 +90,9 @@ static func load_font(weight := 600, msdf := false) -> FontFile:
 	f.generate_mipmaps = msdf
 	return f
 
-static func load_pixel_font() -> FontFile:
+static func load_wordmark_font() -> FontFile:
 	var f := FontFile.new()
-	f.load_dynamic_font("res://assets/fonts/ark-pixel-16px-latin.ttf")
-	f.antialiasing = TextServer.FONT_ANTIALIASING_NONE
-	f.hinting = TextServer.HINTING_NONE
-	f.subpixel_positioning = TextServer.SUBPIXEL_POSITIONING_DISABLED
+	f.load_dynamic_font("res://assets/fonts/bungee-regular.ttf")
 	return f
 
 func mat(color: Color, roughness := 0.7, metallic := 0.0, emission := Color.BLACK, energy := 0.0) -> StandardMaterial3D:
@@ -396,20 +394,34 @@ func _window() -> void:
 	moon.look_at(Vector3(-4.0, 0, 2.5))
 
 func _logo() -> void:
-	# GameNight wordmark as a real neon sign: the text is rendered once into a
-	# transparent texture and used as emission, so glow picks it up.
+	# The GameNight wordmark as a real neon sign, in the app's two colours:
+	# the text is rendered once into a transparent texture and used as
+	# emission, so glow picks it up.
 	var y := 8.0
 	var z := Layout.BACK + 0.12
-	var sign_texture := screen("logo", Vector2i(1024, 256), func(canvas: Control):
-		var f: Font = pixel
+	var sign_texture := screen("logo", Vector2i(1280, 320), func(canvas: Control):
+		var words := [["Game", AMBER], ["Night", NIGHT_LILAC]]
+		var size := 180
+		var widths := words.map(func(w): return wordmark.get_string_size(w[0], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+		var total: float = widths[0] + widths[1]
+		if total > 1200:
+			size = int(size * 1200 / total)
+			widths = words.map(func(w): return wordmark.get_string_size(w[0], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+			total = widths[0] + widths[1]
 		var sub := "COUCH MULTIPLAYER CLUB"
-		# Soft halo first, then the tube itself.
-		for k in [30, 18, 10]:
-			canvas.draw_string_outline(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, k, Color(AMBER, 0.12))
-			canvas.draw_string_outline(font, Vector2(0, 222), sub, HORIZONTAL_ALIGNMENT_CENTER, 1024, 44, k / 2, Color(VIOLET, 0.15))
-		canvas.draw_string_outline(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, 4, AMBER.lightened(0.2))
-		canvas.draw_string(f, Vector2(0, 150), "GAMENIGHT", HORIZONTAL_ALIGNMENT_CENTER, 1024, 160, Color("ffd59a"))
-		canvas.draw_string(font, Vector2(0, 222), sub, HORIZONTAL_ALIGNMENT_CENTER, 1024, 44, Color("d9d0ff")))
+		# Soft halo first, then the tube itself, per word in its own colour.
+		var x := (1280 - total) / 2
+		for i in words.size():
+			var at := Vector2(x, 196)
+			var color: Color = words[i][1]
+			for k in [30, 18, 10]:
+				canvas.draw_string_outline(wordmark, at, words[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, size, k, Color(color, 0.2))
+			canvas.draw_string_outline(wordmark, at, words[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, size, 4, color.lightened(0.2))
+			canvas.draw_string(wordmark, at, words[i][0], HORIZONTAL_ALIGNMENT_LEFT, -1, size, color)
+			x += widths[i]
+		for k in [16, 9, 5]:
+			canvas.draw_string_outline(font, Vector2(0, 286), sub, HORIZONTAL_ALIGNMENT_CENTER, 1280, 46, k, Color(VIOLET, 0.15))
+		canvas.draw_string(font, Vector2(0, 286), sub, HORIZONTAL_ALIGNMENT_CENTER, 1280, 46, Color("d9d0ff")))
 	screens.logo.viewport.transparent_bg = true
 	screens.logo.viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	var m := StandardMaterial3D.new()
@@ -418,21 +430,11 @@ func _logo() -> void:
 	m.albedo_color = Color(0.3, 0.3, 0.3)
 	m.emission_enabled = true
 	m.emission_texture = sign_texture
-	m.emission_energy_multiplier = 5.0
+	# Bright enough to glow, low enough that the two colours stay apart.
+	m.emission_energy_multiplier = 3.2
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR
-	quad(Vector2(10.24, 2.56), Vector3(0.75, y - 0.35, z), m)
-	_neon.append({"material": m, "base": 5.0, "phase": 0.0, "speed": 0.0, "flicker": true})
-	var svg := FileAccess.get_file_as_string("res://assets/icon.svg")
-	var img := Image.new()
-	if img.load_svg_from_string(svg, 0.5) == OK:
-		var icon := StandardMaterial3D.new()
-		icon.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
-		icon.albedo_texture = ImageTexture.create_from_image(img)
-		icon.albedo_color = Color(0.4, 0.4, 0.4)
-		icon.emission_enabled = true
-		icon.emission_texture = icon.albedo_texture
-		icon.emission_energy_multiplier = 1.6
-		quad(Vector2(1.6, 1.6), Vector3(-5.0, y - 0.1, z), icon)
+	quad(Vector2(10.4, 2.6), Vector3(0, y - 0.3, z), m)
+	_neon.append({"material": m, "base": 3.2, "phase": 0.0, "speed": 0.0, "flicker": true})
 	var lamp := OmniLight3D.new()
 	lamp.light_color = AMBER
 	lamp.light_energy = 2.2
@@ -936,9 +938,10 @@ func _foreground() -> void:
 		sphere(0.07, Vector3(-1.35 + (i % 4) * 0.1, 0.72, table_z - 0.1 + (i / 4) * 0.15), mat(Color("ffcf5a"), 0.9))
 	for i in 3:
 		var can_color: Color = [PINK, GREEN, CYAN][i]
-		cylinder(0.06, 0.2, Vector3(0.2 + i * 0.3, 0.65, table_z + 0.1 * (i - 1)), mat(can_color, 0.25, 0.7))
-	var pad := box(Vector3(0.5, 0.06, 0.28), Vector3(0.95, 0.58, table_z + 0.2), mat(Color("1a1a24"), 0.4))
-	pad.rotation.y = 0.4
+		cylinder(0.06, 0.2, Vector3(-0.75 + i * 0.25, 0.65, table_z + 0.1 * (i - 1)), mat(can_color, 0.25, 0.7))
+	# The two controllers from the GameNight logo, put down mid-evening.
+	_logo_pad(AMBER, Vector3(0.3, 0.6, table_z - 0.1), 0.24)
+	_logo_pad(VIOLET, Vector3(0.75, 0.62, table_z + 0.2), -0.23)
 	for s in [-1, 1]:
 		var x: float = s * 11.0
 		cylinder(0.35, 0.6, Vector3(x, 0.3, 2.5), mat(Color("c46c4a"), 0.8))
@@ -946,6 +949,25 @@ func _foreground() -> void:
 			var a := leaf * TAU / 7
 			var l := box(Vector3(0.12, 1.4, 0.02), Vector3(x + cos(a) * 0.2, 1.2, 2.5 + sin(a) * 0.2), mat(Color("2f8f5a").darkened(leaf * 0.05), 0.9))
 			l.rotation = Vector3(sin(a) * 0.5, a, cos(a) * 0.5)
+
+## A controller shaped like the ones in the logo: a rounded body with two
+## round grips, a d-pad and two buttons knocked out in dark.
+func _logo_pad(color: Color, pos: Vector3, yaw: float) -> void:
+	var pad := Node3D.new()
+	pad.position = pos
+	pad.rotation.y = yaw
+	pad.scale = Vector3.ONE * 1.6
+	add_child(pad)
+	# A faint glow of their own keeps them readable in the dim foreground.
+	var body := mat(color, 0.45, 0.0, color, 0.5)
+	var ink := mat(Color("0b0b12"), 0.6)
+	box(Vector3(0.36, 0.07, 0.17), Vector3(0, 0, -0.02), body, pad)
+	for side in [-1, 1]:
+		cylinder(0.085, 0.07, Vector3(side * 0.13, 0, 0.04), body, pad)
+	box(Vector3(0.09, 0.012, 0.028), Vector3(-0.1, 0.04, -0.02), ink, pad, false)
+	box(Vector3(0.028, 0.012, 0.09), Vector3(-0.1, 0.04, -0.02), ink, pad, false)
+	for b in [Vector3(0.09, 0.04, -0.05), Vector3(0.13, 0.04, 0.0)]:
+		cylinder(0.022, 0.012, b, ink, pad)
 
 func _string_lights() -> void:
 	# Party bulbs sagging along the top of the back wall.
