@@ -1141,8 +1141,7 @@ func _draw_item_hints(canvas: Control, camera: Camera3D) -> void:
 		at.x = clampf(at.x, 4, canvas.size.x - size.x - 4)
 		at.y = clampf(at.y, 4, canvas.size.y - size.y - 4)
 		var pressed := maxf(0.0, 1.0 - (_time - float(press.get("time", -1.0))) / .2) if not press.is_empty() else 0.0
-		canvas.draw_set_transform(at, 0, Vector2.ONE * factor)
-		Room.draw_prompt(canvas, {"items": items, "enabled": true, "pressed": {"B": pressed}}, bold)
+		Room.draw_prompt(canvas, {"items": items, "enabled": true, "pressed": {"B": pressed}}, bold, Transform2D(0, Vector2.ONE * factor, 0, at))
 		canvas.draw_set_transform(Vector2.ZERO)
 
 ## A black capsule with a yellow Y badge, like the platformer lobby.

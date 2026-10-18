@@ -675,7 +675,10 @@ func press_prompt(name: String, key: String) -> void:
 		redraw("bumper_" + key)
 
 ## Xbox face buttons in their colours, each followed by what it does.
-static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
+## `base` places the whole prompt (the HUD scales it to an object on screen);
+## the badge press animation composes with it instead of replacing it.
+static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font, base := Transform2D.IDENTITY) -> void:
+	canvas.draw_set_transform_matrix(base)
 	var colors := {"A": Color("5cb85c"), "B": Color("e2574c"), "X": Color("3b8eea"), "Y": Color("f8cd34")}
 	var h := 96.0
 	var x := 20.0
@@ -699,9 +702,9 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font) -> void:
 			# Depress the physical badge, keeping the label and pill stationary.
 			# A stronger travel + compressed face remains readable across the room.
 			canvas.draw_circle(center, h / 2 - 13, color.darkened(.65))
-			canvas.draw_set_transform(center + Vector2(0, pressed * 10), 0, Vector2(1.0, 1.0 - pressed * .18))
+			canvas.draw_set_transform_matrix(base * Transform2D(0, Vector2(1.0, 1.0 - pressed * .18), 0, center + Vector2(0, pressed * 10)))
 			canvas.draw_circle(Vector2.ZERO, h / 2 - 14, color.darkened(pressed * .12))
-			canvas.draw_set_transform(Vector2.ZERO)
+			canvas.draw_set_transform_matrix(base)
 			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17 + pressed * 10), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
 		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
 		x += badge_width + tw + 36
