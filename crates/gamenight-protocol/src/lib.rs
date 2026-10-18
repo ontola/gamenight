@@ -19,6 +19,10 @@ pub use avatar::Avatar;
 /// Bumped only on breaking changes. Additive changes (new message types, new
 /// optional fields) do not bump this.
 pub const PROTOCOL_VERSION: u32 = 1;
+/// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
+/// gamenight.gd). Bump both together when the addon gains a feature games
+/// rely on, so an older vendored copy warns at runtime.
+pub const GODOT_SDK_VERSION: u32 = 2;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -1100,6 +1104,9 @@ pub enum ServerMessage {
     Welcome {
         protocol_version: u32,
         party: PartySnapshot,
+        /// The Godot addon version this host ships; older copies warn.
+        #[serde(default)]
+        godot_sdk: u32,
     },
     /// Broadcast to overlays whenever party state changes.
     PartyState {

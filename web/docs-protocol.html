@@ -112,8 +112,11 @@ the runtime. A disconnect alone preserves players and bindings. See
 { &quot;type&quot;: &quot;hello&quot;, &quot;role&quot;: &quot;overlay&quot; }
 </code></pre></div>
 <p>The daemon answers with a <code>welcome</code>:</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;welcome&quot;, &quot;protocol_version&quot;: 1, &quot;party&quot;: { ... } }
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;welcome&quot;, &quot;protocol_version&quot;: 1, &quot;godot_sdk&quot;: 2, &quot;party&quot;: { ... } }
 </code></pre></div>
+<p><code>godot_sdk</code> is the version of the Godot addon this host ships. The addon
+compares it with its own <code>SDK_VERSION</code> and warns when a game's vendored copy
+is older; other engines can ignore it.</p>
 <p>One connection per game id: a second <code>hello</code> for the same game is answered
 with an <code>error</code> and the connection is closed. Identity is per <em>title</em>, not per
 session — one process hosts many disposable sessions over the night.</p>
@@ -892,7 +895,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="c1345c3adba7a4ae38173db38edba88bfabce250e4dc0dc2eb140dc2b593eae5">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="6d3335d27a670d9511939dbd31b43dcde77f2325d359c0f689fd0de7aaeb2227">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

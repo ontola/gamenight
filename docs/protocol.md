@@ -66,8 +66,12 @@ the runtime. A disconnect alone preserves players and bindings. See
 The daemon answers with a `welcome`:
 
 ```json
-{ "type": "welcome", "protocol_version": 1, "party": { ... } }
+{ "type": "welcome", "protocol_version": 1, "godot_sdk": 2, "party": { ... } }
 ```
+
+`godot_sdk` is the version of the Godot addon this host ships. The addon
+compares it with its own `SDK_VERSION` and warns when a game's vendored copy
+is older; other engines can ignore it.
 
 One connection per game id: a second `hello` for the same game is answered
 with an `error` and the connection is closed. Identity is per *title*, not per

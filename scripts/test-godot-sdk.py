@@ -5,6 +5,10 @@ import http.server,threading,struct,zlib
 from pathlib import Path
 r=Path(__file__).resolve().parents[1]
 a=argparse.ArgumentParser();a.add_argument('--godot',default='godot');args=a.parse_args()
+import re
+_rust=re.search(r'GODOT_SDK_VERSION: u32 = (\d+);',(r/'crates/gamenight-protocol/src/lib.rs').read_text())
+_godot=re.search(r'const SDK_VERSION := (\d+)',(r/'sdk/godot/addons/gamenight/gamenight.gd').read_text())
+assert _rust and _godot and _rust[1]==_godot[1], 'Bump GODOT_SDK_VERSION and the addon SDK_VERSION together'
 with tempfile.TemporaryDirectory(prefix='gamenight-godot-sdk-') as folder:
  p=Path(folder);shutil.copytree(r/'sdk/godot/addons',p/'addons');shutil.copytree(r/'sdk/godot/tests',p/'tests')
  (p/'idle.tscn').write_text('[gd_scene format=3]\n[node name="Idle" type="Node"]\n')

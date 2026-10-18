@@ -176,6 +176,7 @@ impl GameNight {
                     ServerMessage::Welcome {
                         protocol_version,
                         party,
+                        ..
                     } => {
                         if protocol_version != PROTOCOL_VERSION {
                             return Err(SdkError::Protocol(format!(

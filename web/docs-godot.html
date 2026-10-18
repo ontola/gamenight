@@ -52,7 +52,7 @@ development connections may reconnect automatically.</p>
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L318">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L322">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
 <p>To get live roster updates, opt in from <code>prepared</code>, before Ready:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _on_prepared(session_id: String, seats: Array, players: Array) -&gt; void:
@@ -174,7 +174,7 @@ func _host_music(party: Dictionary):
 <p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
 soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="8425a6613947e112a5c0689af846e82b23c66119cc6fa1111436a3975c647fff">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="ac0d27f24cde875a2c4b061c1341db380b008e50e76aaf40913764710b583c6e">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#phone-screens">Phone screens</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

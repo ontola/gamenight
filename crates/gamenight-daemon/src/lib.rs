@@ -25,7 +25,7 @@ use tracing::{debug, info, warn};
 use gamenight_core::{Command, Effect, GameCommand, GameNight};
 use gamenight_protocol::{
     ClientMessage, GameId, GameMeta, LaunchSpec, Role, ServerMessage, SessionId, ENV_ADDR,
-    ENV_GAMENIGHT, ENV_GAME_ID, ENV_OVERLAY_URL, ENV_TOKEN, PROTOCOL_VERSION,
+    ENV_GAMENIGHT, ENV_GAME_ID, ENV_OVERLAY_URL, ENV_TOKEN, GODOT_SDK_VERSION, PROTOCOL_VERSION,
 };
 
 type Tx = mpsc::UnboundedSender<String>;
@@ -1643,6 +1643,7 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
+                    godot_sdk: GODOT_SDK_VERSION,
                     party: if role == Role::Lobby {
                         lobby_snapshot(s.snapshot())
                     } else {
@@ -1678,6 +1679,7 @@ async fn serve(
                 &tx,
                 &ServerMessage::Welcome {
                     protocol_version: PROTOCOL_VERSION,
+                    godot_sdk: GODOT_SDK_VERSION,
                     party: s.snapshot(),
                 },
             );
