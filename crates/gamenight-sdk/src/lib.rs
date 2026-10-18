@@ -378,6 +378,22 @@ impl GameNight {
             .await
     }
 
+    /// Change one of this game's declared settings, for example from its own
+    /// Start menu, so the party's apps show the same value. The daemon
+    /// validates it and answers with `setting_changed`, like any other write.
+    pub async fn set_setting(
+        &mut self,
+        key: impl Into<String>,
+        value: SettingValue,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::SetSetting {
+            game: None,
+            key: key.into(),
+            value,
+        })
+        .await
+    }
+
     /// Offer a phone screen: GameNight serves `entry` (relative to the
     /// absolute directory `root`) to seated players' phones while this game
     /// is active. Call after connecting.

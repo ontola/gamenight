@@ -383,8 +383,18 @@ async fn settings_flow_daemon_validates_and_pushes() {
         .wait_for(|p| p.settings[0].values["items"] == SettingValue::Toggle(false))
         .await;
 
-    // Role enforcement: games take settings from the party, not vice versa.
-    // (Raw socket: the SDK deliberately has no way to send party commands.)
+    // The game's own Start menu writes back, so the party sees the same value;
+    // the daemon echoes it like any other write.
+    game.gn
+        .set_setting("items", SettingValue::Toggle(true))
+        .await
+        .unwrap();
+    overlay
+        .wait_for(|p| p.settings[0].values["items"] == SettingValue::Toggle(true))
+        .await;
+
+    // A game can only change its own settings: the target comes from the
+    // connection, so naming another game changes nothing there.
     let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
         .await
         .unwrap();
@@ -400,9 +410,9 @@ async fn settings_flow_daemon_validates_and_pushes() {
     .unwrap();
     ws.send(Message::Text(
         ClientMessage::SetSetting {
-            game: None,
+            game: Some(GameId::new("lobby")),
             key: "items".into(),
-            value: SettingValue::Toggle(true),
+            value: SettingValue::Toggle(false),
         }
         .to_json(),
     ))
@@ -411,12 +421,19 @@ async fn settings_flow_daemon_validates_and_pushes() {
     loop {
         match Overlay::recv_raw(&mut ws).await {
             ServerMessage::Error { message } => {
-                assert!(message.contains("party commands"), "{message}");
+                assert!(message.contains("raw-game"), "{message}");
                 break;
             }
             _ => continue,
         }
     }
+    let snap = overlay.wait_for(|p| !p.settings.is_empty()).await;
+    let lobby = snap
+        .settings
+        .iter()
+        .find(|s| s.game == GameId::new("lobby"))
+        .unwrap();
+    assert_eq!(lobby.values["items"], SettingValue::Toggle(true));
 }
 
 #[tokio::test]

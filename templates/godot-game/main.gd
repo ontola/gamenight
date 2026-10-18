@@ -11,7 +11,8 @@ extends Node2D
 ##
 ## Couch rules it shows: play starts at once, with no setup screen. Settings
 ## are declared to GameNight, so players can change them from the app (or ask
-## an LLM), and Start opens a small menu with the same settings. Back is left to
+## an LLM), and Start opens a small menu that changes the same settings through
+## GameNight. Back is left to
 ## GameNight (it returns to the party). Players are their own colour, name and
 ## face; the screen shows little else.
 ##
@@ -231,6 +232,9 @@ func _menu() -> bool:
 		var s: Dictionary = SETTINGS[menu_row]
 		var size := 10 if s.key == "round_seconds" else 1
 		_on_setting(s.key, settings[s.key] + step * size)
+		if GameNight.launched_by_daemon:
+			# Tell GameNight, so the app and an LLM see the same value.
+			GameNight.set_setting(s.key, settings[s.key])
 	return true
 
 

@@ -4,7 +4,7 @@
 Checks the session lifecycle and the controller path: hello, declared
 settings and a change from the party, prepare with a local seat and a bot
 seat, ready, start, the left stick moves seat 0, A dashes, Start opens the
-settings menu and B closes it, pause, resume and dispose. Grow it with every control you add.
+settings menu, a change there is sent to GameNight, B closes it, pause, resume and dispose. Grow it with every control you add.
 
     python3 tests/lifecycle.py [--godot path/to/godot] [--pack game.pck]   (needs `websockets`)
 """
@@ -116,6 +116,11 @@ async def run(godot: str, pack: str = "") -> None:
             await hold(frame(1 << START), 0.15)
             await hold(frame(), 0.2)
             await saw("menu open")
+            await hold(frame(move=(32767, 0)), 0.15)
+            await hold(frame(), 0.15)
+            changed = await expect("set_setting")
+            assert (changed["key"], changed["value"]) == ("round_seconds", 40), changed
+            print("ok: the menu writes the setting back to GameNight")
             await hold(frame(1 << B), 0.15)
             await hold(frame(), 0.2)
             await saw("menu closed")

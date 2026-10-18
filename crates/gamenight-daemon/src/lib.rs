@@ -2061,6 +2061,17 @@ fn message_to_command(
                 return Err("only games declare settings".into())
             }
         },
+        // A game's own menu may change its own settings, so the party's apps
+        // and LLMs see the same values. The game id comes from the
+        // connection, never the message: a game cannot touch another's.
+        ClientMessage::SetSetting { key, value, .. } if is_game => match registration {
+            Registration::Game(game) => Command::SetSetting {
+                game: Some(game.clone()),
+                key,
+                value,
+            },
+            _ => return Err("only games change their own settings".into()),
+        },
         ClientMessage::Ready { .. }
         | ClientMessage::Finished { .. }
         | ClientMessage::Progress { .. } => return Err("only games report session state".into()),

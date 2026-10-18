@@ -105,6 +105,12 @@ and sends them back when a game declares settings again. It does not yet have a
 separate acknowledgement for "applied in gameplay". A saved value may therefore
 be pending the next round. See the [protocol reference](/docs/protocol).
 
+A game's own menu can change its settings too: send `set_setting` for one of
+your keys (Godot `GameNight.set_setting(key, value)`, Rust
+`GameNight::set_setting`). GameNight validates it, stores it as the party's
+choice and echoes `setting_changed`, so the app and the assistant show the
+value players picked in the game.
+
 Mineclonia maps its integer percentages onto the existing world physics factors.
 It applies them on a worker, coalesces repeated edits and retries mailbox
 conflicts. Mod installation waits for an in-flight settings update. These two

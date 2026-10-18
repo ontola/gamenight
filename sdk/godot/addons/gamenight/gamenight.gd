@@ -192,6 +192,12 @@ func declare_settings(settings: Array) -> void:
 
 var _declared_settings: Array = []
 
+## Change one of this game's declared settings, for example from its own
+## Start menu, so the party's apps (and an LLM) show the same value. The daemon
+## validates it and answers with [signal setting_changed], like any other write.
+func set_setting(key: String, value: Variant) -> void:
+	_send({"type": "set_setting", "key": key, "value": value})
+
 ## Optional: give each player a screen of their own on their phone (see
 ## "Phone screens" in docs/protocol.md). `root` is an absolute directory the
 ## host's web server may serve, `entry` a page inside it, and `app` a native

@@ -47,7 +47,7 @@ A connection announces itself with its first message, a `hello`:
 
 | role | who | sends | receives |
 |---|---|---|---|
-| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` + `declare_companion` + `companion_message` (optional) | session lifecycle commands, `controller_frame`, `setting_changed`, `companion_message`, `companion_presence` |
+| `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` + `set_setting` (its own) + `declare_companion` + `companion_message` (optional) | session lifecycle commands, `controller_frame`, `setting_changed`, `companion_message`, `companion_presence` |
 | `overlay` | party UI / controller surface / LLM (via `gamenight-mcp`) | party commands | `party_state` snapshots |
 | `lobby` | selected replacement lobby executable | party commands, `lobby_ready`, `quit_party` | full snapshots, `lobby_focus`, runtime controller frames |
 
@@ -161,6 +161,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `request_overlay` *(optional)* | "get me back to the party" — a player asked to leave your game |
 | `request_start` *(optional)* | explicit player request to start or resume; never a focus callback |
 | `declare_settings` *(optional)* | the match settings this game exposes (see [Match settings](#match-settings)) |
+| `set_setting` *(optional)* | change one of this game's own settings, from its in-game menu (see [Match settings](#match-settings)) |
 | `declare_companion` *(optional)* | a phone screen for this game (see [Phone screens](#phone-screens)) |
 | `companion_message` *(optional)* | JSON for one player's phone screen, or every phone |
 
@@ -392,6 +393,12 @@ mid-match needs no lookup. The daemon validates against the declared spec;
 rejections are `error` messages that spell out what would have been legal
 (`"'towerfall' has no setting 'itemz'; available: items, stock, arena"`) —
 written to be shown to a human or fed back to an LLM correcting itself.
+
+A game may send the same `set_setting` for its own settings, for example from
+its Start menu, so the party's apps and LLMs show what the players picked in
+the game. The daemon takes the game from the connection and ignores `game` in
+the message, so a game can never change another game's settings. The write is
+validated and echoed like any other.
 
 Valid writes land in the next snapshot's `settings` and are pushed to the
 game:

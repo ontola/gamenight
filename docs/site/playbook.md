@@ -85,9 +85,8 @@ switch games often. The template does all of this; keep it as you build.
   option with `GameNight.declare_settings` and apply `setting_changed`, so
   players can change them from the GameNight app, the lobby, or by asking
   an LLM. Show the same settings in a small menu on Start. Apply a change
-  from the next round when changing it mid-round would be unfair. A menu
-  change stays in the game for now: games cannot write a setting back to
-  GameNight yet.
+  from the next round when changing it mid-round would be unfair. The menu
+  sends its changes with `GameNight.set_setting`, so the app shows them too.
 - **Leave Back alone.** Back (Select) returns to the party; GameNight handles
   it and pauses your game. Never bind it to anything in the game.
 - **Use the players' colours, names and faces.** Each player picks them once

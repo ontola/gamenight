@@ -159,6 +159,11 @@ preloading. It is not static catalog metadata. GameNight remembers party choices
 and sends them back when a game declares settings again. It does not yet have a
 separate acknowledgement for &quot;applied in gameplay&quot;. A saved value may therefore
 be pending the next round. See the <a href="/docs/protocol">protocol reference</a>.</p>
+<p>A game's own menu can change its settings too: send <code>set_setting</code> for one of
+your keys (Godot <code>GameNight.set_setting(key, value)</code>, Rust
+<code>GameNight::set_setting</code>). GameNight validates it, stores it as the party's
+choice and echoes <code>setting_changed</code>, so the app and the assistant show the
+value players picked in the game.</p>
 <p>Mineclonia maps its integer percentages onto the existing world physics factors.
 It applies them on a worker, coalesces repeated edits and retries mailbox
 conflicts. Mod installation waits for an in-flight settings update. These two
@@ -202,7 +207,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="2ffcb97391e3c8c68e1d6f87c95c3c7a95deec25d881491a4ffdb447066aacd8">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="7fb0f1da22d9be90a050b230f7d22563e7ede8d9ba2e43b1200f234770d8ca2a">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/publishing"><small>Previous</small>Publish a game</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

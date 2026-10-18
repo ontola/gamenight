@@ -46,7 +46,7 @@ development connections may reconnect automatically.</p>
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L227">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L233">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
 <h2 id="controllers-and-live-profiles">Controllers and live profiles</h2>
 <p>Use the runtime stream in managed play. A seat's controller token is opaque;
@@ -140,7 +140,7 @@ instead whenever <code>DisplayServer.window_get_mode()</code> is <code>WINDOW_MO
 Leave the window itself to <code>GameNightScreen</code>. Godot refuses <code>hide()</code> on the main
 window, and on Windows setting <code>borderless</code> shows the window again.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="76f01c6438786207873bbc1b9363e2d557dcdc912515ed7e1813d6b23772ffe1">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="77f4c8e9f01975e7e153c8caf96e73970079051c53b23de1d30472dc928b6fe7">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
