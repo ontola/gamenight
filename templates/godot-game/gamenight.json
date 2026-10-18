@@ -1,0 +1,22 @@
+{
+  "id": "template-game",
+  "title": "Template Game",
+  "tagline": "One line that says what you do and why it is fun with friends.",
+  "developer": "Your Name",
+  "players": {
+    "min": 1,
+    "max": 8,
+    "best": 4
+  },
+  "match_minutes": 5,
+  "price": "free",
+  "tags": [
+    "party",
+    "godot"
+  ],
+  "integration": {
+    "level": "integrated",
+    "protocol": 1
+  },
+  "links": {}
+}

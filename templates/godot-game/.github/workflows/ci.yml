@@ -1,0 +1,98 @@
+name: Build and release
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Publish a release with this tag (for example v0.1.0); empty for a plain build
+        required: false
+        default: ''
+permissions:
+  contents: read
+env:
+  GODOT_VERSION: 4.5
+jobs:
+  gamenight-sdk:
+    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Godot and the Windows export templates
+        run: |
+          base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
+          curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip && mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot" && rm godot.zip
+          curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dir"
+          unzip -q -j templates.tpz templates/version.txt templates/windows_release_x86_64.exe templates/windows_release_x86_64_console.exe -d "$dir"
+          rm templates.tpz
+          pip install websockets
+      - name: Import
+        run: $RUNNER_TEMP/godot --headless --import || true
+      - name: Bots play a whole round
+        run: $RUNNER_TEMP/godot --headless --fixed-fps 60 --path . -- --sim 4000 --seed 1
+      - name: GameNight lifecycle and controller input
+        run: python tests/lifecycle.py --godot $RUNNER_TEMP/godot
+      - name: Export Windows build
+        run: |
+          mkdir -p build/windows
+          $RUNNER_TEMP/godot --headless --export-release "Windows" build/windows/TemplateGame.exe
+          $RUNNER_TEMP/godot --headless --export-pack "Windows" build/game.pck
+      - name: The exported game runs
+        run: python tests/lifecycle.py --godot $RUNNER_TEMP/godot --pack build/game.pck
+      - name: Package
+        run: |
+          cd build/windows
+          zip -q -9 template-game-windows.zip TemplateGame*.exe
+          sha256sum template-game-windows.zip > release-sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: template-game-windows
+          path: |
+            build/windows/template-game-windows.zip
+            build/windows/release-sha256.txt
+          if-no-files-found: error
+  release:
+    needs: build
+    # Tag pushes may be blocked for agents; a manual run that names the tag works everywhere.
+    if: github.event_name == 'workflow_dispatch' && startsWith(inputs.release, 'v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # A publish key from the GameNight portal; without it the store step is skipped.
+      GAMENIGHT_API_TOKEN: ${{ secrets.GAMENIGHT_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: template-game-windows
+          path: release
+      - name: Publish the tested build and the store media
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release }}
+        run: |
+          cd release
+          sha256sum --check release-sha256.txt
+          media=$(ls ../assets/gamenight/*.{mp4,jpg,png} 2>/dev/null || true)
+          gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" template-game-windows.zip release-sha256.txt $media --repo "$GITHUB_REPOSITORY" --title "Template Game $RELEASE_TAG" --generate-notes
+      # Fills the store page from gamenight.json and assets/gamenight.
+      - uses: actions/checkout@v4
+        if: env.GAMENIGHT_API_TOKEN != ''
+        with:
+          repository: ontola/gamenight
+          path: .gamenight
+          sparse-checkout: scripts/gamenight-publish.py
+          sparse-checkout-cone-mode: false
+      - name: Update the GameNight store page
+        if: env.GAMENIGHT_API_TOKEN != ''
+        run: python3 .gamenight/scripts/gamenight-publish.py store

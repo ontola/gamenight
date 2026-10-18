@@ -9,6 +9,18 @@
     ]
   },
   {
+    "slug": "playbook",
+    "title": "Game playbook",
+    "group": "Start here",
+    "source": "docs/site/playbook.md",
+    "watch": [
+      "templates/godot-game/main.gd",
+      "templates/godot-game/.github/workflows/ci.yml",
+      "scripts/new-godot-game.py",
+      "scripts/gamenight-publish.py"
+    ]
+  },
+  {
     "slug": "engines",
     "title": "Engine support",
     "group": "Start here",

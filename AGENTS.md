@@ -27,6 +27,13 @@ Before creating, changing or publishing a five-second store video, read
 of quick, readable gameplay cuts; encoding and playback checks alone do not
 meet the preview quality bar. Apply this when adding a playable catalog entry too.
 
+# New games
+
+Start a new game with `python3 scripts/new-godot-game.py DEST ID TITLE` and follow
+[docs/site/playbook.md](docs/site/playbook.md). `templates/godot-game` is a
+scaffold, not a game: keep it small and run `scripts/test-godot-template.py`
+after changing it. Add lessons from real games to the playbook's pitfalls.
+
 # Game source boundaries
 
 Keep game source outside this repository. LÖVE games live in

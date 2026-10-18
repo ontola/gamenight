@@ -4,6 +4,8 @@ GameNight puts local multiplayer games in one lobby. Players pick a game, keep t
 
 ## Pick your engine
 
+Starting a new game? The [Game playbook](/docs/playbook) gets you from an idea to the store with a Godot template, headless tests and one-command publishing.
+
 | Engine | Starting point | What is included |
 | --- | --- | --- |
 | [LÖVE / Lua](/docs/love) | Shared party runner | Lifecycle, controller mapping, window handling and faces |

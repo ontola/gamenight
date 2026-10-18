@@ -1,0 +1,35 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="Template Game"
+config/description="A GameNight couch game."
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.5", "GL Compatibility")
+
+[autoload]
+
+GameNight="*res://addons/gamenight/gamenight.gd"
+GameNightScreen="*res://addons/gamenight/screen.gd"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gamenight/plugin.cfg")
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
