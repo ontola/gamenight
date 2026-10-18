@@ -203,11 +203,27 @@ async fn claim_main(state: &SharedState, player: PlayerId) -> Option<StatusCode>
         }
         (pending, s.cloud.clone())
     };
+    let cloud = bridge.is_some();
     let status = match bridge {
         Some(b) => b.pickup(state, &pending, player).await,
         None => pickup(state, &pending, player).await,
     };
     tracing::info!(%status, "main player collected by the first seat");
+    // A controller that just sat down is unknown to the cloud until its next
+    // poll, which answers Gone. Try again then instead of giving up for good.
+    if cloud
+        && matches!(
+            status,
+            StatusCode::GONE | StatusCode::SERVICE_UNAVAILABLE | StatusCode::BAD_GATEWAY
+        )
+    {
+        state
+            .lock()
+            .unwrap()
+            .local_room
+            .auto_claimed
+            .remove(&pending);
+    }
     Some(status)
 }
 

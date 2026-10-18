@@ -432,19 +432,7 @@ impl Bridge {
             *self.waiting.lock().unwrap() =
                 serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
             // Apply confirmed profiles before lower-priority ticket requests.
-            {
-                let mut local = state.lock().unwrap();
-                let retired: Vec<_> = applied
-                    .keys()
-                    .filter(|account| !updates.updates.iter().any(|u| &u.account == *account))
-                    .cloned()
-                    .collect();
-                for account in retired {
-                    if let Some(player) = local.bindings.remove(&format!("cloud_{account}")) {
-                        *local.link_revisions.entry(player).or_default() += 1;
-                    }
-                }
-            }
+            retire_unreported(&mut state.lock().unwrap(), &updates.updates);
             applied.retain(|account, _| updates.updates.iter().any(|u| &u.account == account));
             for u in &updates.updates {
                 if !seats.contains(&u.seat)
@@ -461,6 +449,20 @@ impl Bridge {
                     let mut local = state.lock().unwrap();
                     if *local.link_revisions.get(&player).unwrap_or(&0) != u.seat.revision {
                         continue;
+                    }
+                    // The cloud decides who holds a cloud seat: an account it
+                    // moved elsewhere gives this one up and is applied again.
+                    let moved: Vec<_> = local
+                        .bindings
+                        .iter()
+                        .filter(|(bound, p)| {
+                            **p == player && *bound != &id && bound.starts_with("cloud_")
+                        })
+                        .map(|(bound, _)| bound.clone())
+                        .collect();
+                    for bound in moved {
+                        local.bindings.remove(&bound);
+                        applied.remove(&bound["cloud_".len()..]);
                     }
                     if local
                         .bindings
@@ -500,6 +502,9 @@ impl Bridge {
                     applied.insert(u.account.clone(), (u.seat.clone(), u.profile_revision));
                 }
             }
+            // The cloud knows every seat now, so a main player whose pickup
+            // came too early for a new controller is collected after all.
+            crate::local_room::claim_main_for_first_seat(&state, &party).await;
             // Before applying a selection, so a newly granted game is already
             // eligible when the party picks it.
             if delivered_grants.as_ref() != Some(&updates.grants)
@@ -559,6 +564,34 @@ impl Bridge {
                     },
                 }
             }
+        }
+    }
+}
+
+/// The cloud is the authority on cloud links. Drop every local one it no
+/// longer reports, not only those this process applied: a party carried over
+/// an update or a room registered again keeps links the cloud never sent here.
+/// Such a stale link held its seat, so each phone that chose that seat was
+/// unlinked again a few seconds later. A seat another account takes over in
+/// the same poll keeps its revision, so that account's link still applies.
+fn retire_unreported(local: &mut crate::ServerState, updates: &[Update]) {
+    let retired: Vec<_> = local
+        .bindings
+        .iter()
+        .filter(|(id, _)| {
+            id.strip_prefix("cloud_")
+                .is_some_and(|account| !updates.iter().any(|u| u.account == account))
+        })
+        .map(|(id, player)| (id.clone(), *player))
+        .collect();
+    for (id, player) in retired {
+        local.bindings.remove(&id);
+        let revision = *local.link_revisions.get(&player).unwrap_or(&0);
+        let taken_over = updates
+            .iter()
+            .any(|u| u.seat.player == player.0.to_string() && u.seat.revision == revision);
+        if !taken_over {
+            *local.link_revisions.entry(player).or_default() += 1;
         }
     }
 }
@@ -764,5 +797,39 @@ mod pickup_tests {
     #[tokio::test]
     async fn immediate_pickup_refresh_still_rejects_an_unlinked_seat() {
         pickup_fixture(true).await;
+    }
+}
+
+#[cfg(test)]
+mod retire_tests {
+    use super::*;
+
+    fn update(account: &str, player: PlayerId, revision: u64) -> Update {
+        serde_json::from_value(serde_json::json!({
+            "seat":{"index":0,"player":player.0.to_string(),"revision":revision},
+            "account":account,"profile_revision":1,
+            "profile":{"display_name":"Joep","skin_color":"#abcdef","avatar":""}
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_stale_cloud_link_gives_its_seat_to_the_phone_that_chose_it() {
+        let mut local = crate::ServerState::new("127.0.0.1:1".into());
+        let seat = PlayerId(uuid::Uuid::new_v4());
+        let other = PlayerId(uuid::Uuid::new_v4());
+        let lan = PlayerId(uuid::Uuid::new_v4());
+        // Carried from before an update or a new room: the cloud never sent it.
+        local.bindings.insert("cloud_old".into(), seat);
+        local.bindings.insert("cloud_gone".into(), other);
+        local.bindings.insert("lan-profile".into(), lan);
+        local.link_revisions.insert(seat, 3);
+        retire_unreported(&mut local, &[update("guest:phone", seat, 3)]);
+        assert_eq!(local.bindings.len(), 1, "only the LAN link stays");
+        assert!(local.bindings.contains_key("lan-profile"));
+        // The phone's claim still matches the seat, so it applies.
+        assert_eq!(local.link_revisions[&seat], 3);
+        // A seat nobody takes over is revoked like before.
+        assert_eq!(local.link_revisions[&other], 1);
     }
 }

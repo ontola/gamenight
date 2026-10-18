@@ -500,14 +500,21 @@ class CloudApi {
     guestToken = null;
   }
 
-  Future<void> joinRoom(String code, {bool remember = false}) =>
-      _send('POST', '/v1/rooms/join', body: {
+  /// Already seated in that room counts as joined: the room tab shows it.
+  Future<void> joinRoom(String code, {bool remember = false}) async {
+    const seated = 'You are already in this room.';
+    try {
+      await _send('POST', '/v1/rooms/join', body: {
         'code': code,
         if (remember) 'remember': true
       }, errors: {
         404: 'No room with that code. Check the code on the TV.',
-        409: 'You are already in this room.',
+        409: seated,
       });
+    } on ApiError catch (e) {
+      if (e.message != seated) rethrow;
+    }
+  }
 
   Future<HostedRoom> roomStatus() async => HostedRoom(
       await _send('GET', '/v1/rooms/status') as Map<String, dynamic>);
