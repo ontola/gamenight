@@ -57,6 +57,11 @@ var _item_prompt_presses: Dictionary = {}
 var _pressed_flash: Dictionary = {}  # station id -> time of last press
 var _door_nodes: Array = []
 var _door_key := ""
+## Loading percentage shown per game. Games report progress in phases that
+## jump (3% to 53%), or not at all; the bar estimates in between so it
+## always moves: it creeps toward the next phase and eases into each report.
+var _load_shown := {}
+var _load_report := {}
 var _screen_key := ""
 var _shelf_key := ""
 var _time := 0.0
@@ -695,7 +700,9 @@ func _process(delta: float) -> void:
 		var queue := upcoming()
 		if not queue.is_empty(): next = game_meta(queue[0].game)
 	room.set_mood(Color.from_string(str(next.get("color", "")), VIOLET) if not next.is_empty() else VIOLET)
-	var key := JSON.stringify([party.get("active_session"), party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset])
+	_update_loading(delta)
+	var shown := _load_shown.keys().map(func(game): return [game, loading_percent(game)])
+	var key := JSON.stringify([party.get("active_session"), party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset, shown])
 	if key != _screen_key:
 		_screen_key = key
 		_redraw_screens()
@@ -821,7 +828,7 @@ func _draw_tv(canvas: Control) -> void:
 		detail = "Press Y at the TV to resume"
 		var loading := _loading_session(str(game.id))
 		if not loading.is_empty():
-			kicker = "LOADING %d%%" % int(loading.progress) if loading.get("progress") != null else "LOADING…"
+			kicker = "LOADING %d%%" % loading_percent(str(game.id))
 			kicker_color = AMBER
 			detail = str(loading.get("progress_label", "Preparing game"))
 		elif not _fits_party(game):
@@ -844,7 +851,7 @@ func _draw_tv(canvas: Control) -> void:
 					kicker = "UP NEXT · READY"
 					kicker_color = GREEN
 				else:
-					kicker = "LOADING %d%%" % int(warm.get("progress", 0)) if warm.get("progress") != null else "LOADING…"
+					kicker = "LOADING %d%%" % loading_percent(str(game.id))
 					kicker_color = AMBER
 			if issue.is_empty(): detail = "Press Y at the TV to start"
 	if game.is_empty():
@@ -928,6 +935,32 @@ func _draw_queue_preview(canvas: Control) -> void:
 	_text(canvas, title, Vector2(24, 375 if not status.is_empty() else 390), _fit(title, 46, size.x - 48, 30), TEXT)
 	if not status.is_empty(): _text(canvas, status, Vector2(24, 408), _fit(status, 24, size.x - 48, 17), PINK if not _issue(str(game.id)).is_empty() else AMBER)
 
+func _update_loading(delta: float) -> void:
+	var seen := {}
+	for key in ["active_session", "warm_session", "warming"]:
+		var session: Variant = party.get(key)
+		if not (session is Dictionary and str(session.get("phase")) in ["created", "preparing"]): continue
+		var game := str(session.get("game"))
+		if seen.has(game): continue
+		seen[game] = true
+		var reported := clampf(float(session.progress), 0.0, 100.0) if session.get("progress") != null else 0.0
+		var report: Array = _load_report.get(game, [-1.0, _time])
+		if reported != report[0]:
+			report = [reported, _time]
+			_load_report[game] = report
+		# Creep halfway toward 95% over this phase, never reaching it.
+		var ceiling := reported + (95.0 - reported) * 0.5 if reported < 95.0 else reported
+		var estimate := reported + (ceiling - reported) * (1.0 - exp(-(_time - float(report[1])) / 6.0))
+		var now: float = _load_shown.get(game, 0.0)
+		_load_shown[game] = minf(99.0, maxf(now, now + (estimate - now) * minf(1.0, delta * 2.5)))
+	for game in _load_shown.keys():
+		if not seen.has(game):
+			_load_shown.erase(game)
+			_load_report.erase(game)
+
+func loading_percent(game_id: String) -> int:
+	return int(_load_shown.get(game_id, 0.0))
+
 ## Loading can move from the warm slot to the active slot after Play next.
 func _loading_session(game_id: String) -> Dictionary:
 	for key in ["active_session", "warm_session", "warming"]:
@@ -940,11 +973,7 @@ func _draw_loading_bar(canvas: Control, rect: Rect2, game_id: String) -> void:
 	var loading := _loading_session(game_id)
 	if loading.is_empty(): return
 	canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.92))
-	if loading.get("progress") != null:
-		canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(float(loading.progress) / 100.0, 0.0, 1.0), rect.size.y)), AMBER)
-	else:
-		# No invented percentage for games that only report a loading phase.
-		canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x, 3)), AMBER)
+	canvas.draw_rect(Rect2(rect.position, Vector2(rect.size.x * _load_shown.get(game_id, 0.0) / 100.0, rect.size.y)), AMBER)
 
 func _queue_status(game_id: String) -> String:
 	var issue := _issue(game_id)
@@ -952,7 +981,7 @@ func _queue_status(game_id: String) -> String:
 	var loading := _loading_session(game_id)
 	if not loading.is_empty():
 		var label := str(loading.get("progress_label", "Preparing game"))
-		return "%d%% · %s" % [int(loading.progress), label] if loading.get("progress") != null else label
+		return "%d%% · %s" % [loading_percent(game_id), label]
 	var warm: Variant = party.get("warm_session")
 	if warm is Dictionary and str(warm.get("game")) == game_id and warm.get("phase") == "ready": return "Ready to play"
 	return ""

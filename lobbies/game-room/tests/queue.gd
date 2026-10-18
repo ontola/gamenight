@@ -7,6 +7,10 @@ class RecordingClient extends "res://addons/gamenight/lobby.gd":
 
 var failures := 0
 
+func tick(main) -> void:
+	main._time += 1.0 / 60.0
+	main._update_loading(1.0 / 60.0)
+
 func _initialize() -> void:
 	_run.call_deferred()
 
@@ -86,10 +90,18 @@ func _run() -> void:
 	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved."
 	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}
 	main.set_party(party)
-	check(main._queue_status("ballkickers") == "World ready. Loading 2 player views", "Queue shows real game loading progress")
-	party.warm_session.progress = 50
+	check(main._queue_status("ballkickers") == "0% · World ready. Loading 2 player views", "Queue shows real game loading progress")
+	for i in 120: tick(main)
+	var unreported: int = main.loading_percent("ballkickers")
+	check(unreported > 0 and unreported < 50, "Loading without a percentage still moves: %d" % unreported)
+	party.warm_session.progress = 53
 	main.set_party(party)
-	check(main._queue_status("ballkickers").begins_with("50%"), "Queue shows the actual loading percentage")
+	tick(main)
+	check(main.loading_percent("ballkickers") < 53, "A reported jump eases in instead of jumping")
+	for i in 180: tick(main)
+	var eased: int = main.loading_percent("ballkickers")
+	check(eased >= 53 and eased < 95, "The bar reaches the report and keeps creeping: %d" % eased)
+	check(main._queue_status("ballkickers").begins_with("%d%%" % eased), "Queue shows the shown loading percentage")
 	party.erase("onboarding_error")
 	main.set_party(party)
 	main.toasts.clear()
@@ -98,7 +110,7 @@ func _run() -> void:
 	party.active_session = party.warm_session.duplicate(true)
 	party.erase("warm_session")
 	main.set_party(party)
-	check(main._loading_session("ballkickers").get("progress") == 50, "Loading stays visible after Play next moves it to the active slot")
+	check(main._loading_session("ballkickers").get("progress") == 53, "Loading stays visible after Play next moves it to the active slot")
 	party.active_session.phase = "running"
 	main.set_party(party)
 	check(main._loading_session("ballkickers").is_empty(), "Completed games do not keep stale loading progress")
