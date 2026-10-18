@@ -106,6 +106,11 @@ players can change them from the GameNight app, the lobby, or by asking
 an LLM. Show the same settings in a small menu on Start. Apply a change
 from the next round when changing it mid-round would be unfair. The menu
 sends its changes with <code>GameNight.set_setting</code>, so the app shows them too.</li>
+<li><strong>The Start menu follows one layout.</strong> The game's name heads it every time
+Start opens it, also mid-game, so everyone in the room learns what they are
+playing. Then Resume, then New round (apply options), then the settings.
+No button hints in the menu (choose, change, select, resume): a highlighted
+row and ‹ › around its value speak for themselves.</li>
 <li><strong>Leave Back alone.</strong> Back (Select) returns to the party; GameNight handles
 it and pauses your game. Never bind it to anything in the game.</li>
 <li><strong>Use the players' colours, names and faces.</strong> Each player picks them once
@@ -113,7 +118,8 @@ in GameNight. Colour the player's character, draw their face on it with the
 SDK's <code>face.gd</code>, and name them where it matters, such as the results screen.</li>
 <li><strong>Don't flood the screen.</strong> No text over characters, no labels on every
 thing. A clock, a score per player and clear shapes and colours read from the
-sofa; menus and explanations do not. Controls hints belong in the Start menu.</li>
+sofa; menus and explanations do not. No control hints during play either:
+players figure out A and B in seconds.</li>
 <li><strong>Rounds keep going.</strong> Show the result briefly, call <code>notify_finished</code>,
 then start the next round. Players leave with Back, not with a game over
 screen. Let players keep moving while the result shows.</li>
@@ -200,7 +206,7 @@ such as one with the CI run id.</li>
 first seconds of play don't stutter.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="ddfb6124aa992eb0b1fbf0d0efc2fbfefac2a754564fe26000d5aa707c660755">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="8beaf9b2ea31ce7d91e53283580a7a26ffcb60296a9c9bfca2a3418626dff31c">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

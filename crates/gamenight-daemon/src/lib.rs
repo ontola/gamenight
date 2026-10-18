@@ -145,8 +145,9 @@ impl HostUpdate {
     }
 }
 
-/// How long an empty, idle lobby waits before updating on its own.
-const UNATTENDED_UPDATE_AFTER: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+/// How long the lobby waits with everyone asleep (no controller touched for
+/// over a minute) before updating on its own.
+const UNATTENDED_UPDATE_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// Everything written to the resume file. The daemon writes `party`; the
 /// process that hosts the phone server adds `web` after the daemon stops.
@@ -368,10 +369,10 @@ impl Shared {
         Ok(())
     }
 
-    /// An empty, idle room updates by itself after a while.
+    /// A quiet lobby updates by itself: nobody bothered, party kept.
     fn maybe_update_unattended(&mut self) {
         let idle = self.update_ready.is_some()
-            && self.night.seated_count() == 0
+            && self.night.couch_idle()
             && self.night.between_games()
             && !self.shutdown_requested;
         if !idle {

@@ -39,7 +39,7 @@ func _run() -> void:
 	var party: Dictionary = main.party.duplicate(true)
 	party["update_ready"] = "0.2.300"
 	main.set_party(party)
-	check(main.toasts.any(func(t): return "new version" in t.text), "A ready update is announced")
+	check(main.toasts.any(func(t): return "version ready" in t.text), "A ready update is announced")
 	check(main.menu_items("p0")[0].action == "update", "Update is the first menu item")
 	press(main, main.BTN_START)
 	press(main, main.World.BTN_A)

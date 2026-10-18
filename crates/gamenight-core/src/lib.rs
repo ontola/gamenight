@@ -324,6 +324,33 @@ mod night_tests {
     }
 
     #[test]
+    fn a_paused_game_behind_the_lobby_still_allows_an_update() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("First", None, None));
+        let first = night.snapshot().players[0].id;
+        night.handle(Command::BindController {
+            player_id: first,
+            controller: "ordinal:0".into(),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("arena"),
+        });
+        night.handle(Command::SetPlaylist {
+            entries: vec![entry("arena")],
+        });
+        let session = night.snapshot().warm_session.unwrap().id;
+        night.handle(Command::SessionReady { session });
+        night.handle(activity("ordinal:0"));
+        assert!(night.snapshot().active_session.is_some());
+        assert!(!night.between_games(), "never during play");
+        night.handle(Command::OverlayOpened);
+        assert!(night.between_games(), "back in the lobby");
+        assert!(!night.couch_idle(), "someone just pressed a button");
+        night.handle(idle(100));
+        assert!(night.couch_idle());
+    }
+
+    #[test]
     fn games_without_instant_join_keep_their_roster_until_next_round() {
         let mut night = GameNight::default();
         night.handle(join_cmd("First", None, None));

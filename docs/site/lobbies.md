@@ -134,8 +134,9 @@ host update that finished downloading. Offer it between games. After
 `apply_update` the runtime saves players, seats, controllers, phone links,
 the queue and settings, the launcher covers the screen and installs, and the
 new runtime restores the party with the same player IDs. The cover stays until
-the new lobby sends `lobby_ready`. An empty room updates by itself after ten
-idle minutes. Games themselves restart: an update only happens between games.
+the new lobby sends `lobby_ready`. With the lobby on screen and nobody touching a
+controller for about two minutes, the runtime updates by itself. Updates never
+interrupt play; a game paused behind the lobby is closed by the restart.
 
 Use `party_state` as the authoritative result. Commands currently have no
 request IDs or individual success acknowledgements. Do not blindly replay

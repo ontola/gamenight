@@ -226,7 +226,7 @@ func set_party(snapshot: Dictionary) -> void:
 	var was_ready := update_ready()
 	party = snapshot
 	if was_ready.is_empty() and not update_ready().is_empty():
-		toast("A new version of GameNight is ready. Press Start to update.", GREEN)
+		toast("New GameNight version ready. It installs when the room is quiet, or press Start.", GREEN)
 	profiles.clear()
 	for player in party.get("players", []): profiles[str(player.id)] = player
 	controllers.clear()

@@ -1003,14 +1003,27 @@ impl GameNight {
         }
     }
 
-    /// Nothing is being played, so the host may restart without interrupting
-    /// a game. Warm games are only preloaded and may be stopped.
+    /// The lobby is on screen, so the host may restart without pulling
+    /// anyone out of a game. Games stay active (paused) behind the lobby
+    /// after a round, so a paused game here counts as between games; warm
+    /// games are only preloaded. Both are stopped by a restart.
     pub fn between_games(&self) -> bool {
-        self.active.as_ref().is_none_or(|session| {
-            matches!(
-                session.info().phase,
-                SessionPhase::Finished | SessionPhase::Disposed
-            )
+        self.overlay_open
+            || self.active.as_ref().is_none_or(|session| {
+                matches!(
+                    session.info().phase,
+                    SessionPhase::Finished | SessionPhase::Disposed
+                )
+            })
+    }
+
+    /// Nobody on the couch has touched a controller for a while: every
+    /// player is asleep, or nobody is seated.
+    pub fn couch_idle(&self) -> bool {
+        self.players.iter().all(|player| {
+            self.presence
+                .get(&player.id)
+                .is_none_or(|(_, state)| *state == gamenight_protocol::PresenceState::Sleeping)
         })
     }
 
