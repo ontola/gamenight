@@ -155,27 +155,55 @@ job.</p>
 <p>The contract checks cover the protocol. Your game also needs tests of its own
 that a person would otherwise do by hand. What worked in our games:</p>
 <ul>
-<li><strong>A fake host.</strong> A small script plays GameNight: it starts the game with
+<li>
+<p><strong>A fake host.</strong> A small script plays GameNight: it starts the game with
 <code>GAMENIGHT=1</code>, <code>GAMENIGHT_ADDR</code>, <code>GAMENIGHT_GAME_ID</code> and <code>GAMENIGHT_TOKEN</code>,
 answers <code>hello</code>, sends Prepare, waits for Ready, sends Start, controller
 frames, Pause, Resume and Dispose, and checks what the game did. The
-<a href="/docs/playbook">Godot template</a> includes one in <code>tests/lifecycle.py</code>.</li>
-<li><strong>Keep sending frames.</strong> Input older than 250 ms counts as released, so a
-test that holds a button must repeat the frame, about every 50 ms.</li>
-<li><strong>Listen on a free port.</strong> Bind port 0 and pass the port in
+<a href="/docs/playbook">Godot template</a> includes one in <code>tests/lifecycle.py</code>.
+Godot games also get a reusable one with the SDK:
+<code>addons/gamenight/fake_host.py</code>, Python standard library only and kept
+current by <code>sync.py --all</code>. It already does the next three points.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-python">import sys; sys.path.insert(0, &quot;addons/gamenight&quot;)
+from fake_host import FakeHost, frame, BUTTON_A
+
+with FakeHost(&quot;godot&quot;, game_id=&quot;my-game&quot;, path=&quot;.&quot;) as host:
+    host.welcome()
+    host.prepare([host.local_seat(0, &quot;ada&quot;)], [{&quot;id&quot;: &quot;ada&quot;, &quot;name&quot;: &quot;Ada&quot;}])
+    host.start()
+    host.hold(frame(BUTTON_A), 0.1)
+    host.saw(&quot;jump Ada&quot;)   # a line your game printed with GAME_TRACE=1
+</code></pre></div>
+<p>Pass <code>pack=</code> to run the exported game.</p>
+</li>
+<li>
+<p><strong>Keep sending frames.</strong> Input older than 250 ms counts as released, so a
+test that holds a button must repeat the frame, about every 50 ms.</p>
+</li>
+<li>
+<p><strong>Listen on a free port.</strong> Bind port 0 and pass the port in
 <code>GAMENIGHT_ADDR</code>, so a test never meets a real GameNight on the same machine
-and tests can run side by side.</li>
-<li><strong>Write the game's output to a file on Windows.</strong> Godot on Windows writes
-stdout synchronously; an unread pipe blocks the game before it connects.</li>
-<li><strong>Trace what players would notice.</strong> Print a line per event behind an
+and tests can run side by side.</p>
+</li>
+<li>
+<p><strong>Write the game's output to a file on Windows.</strong> Godot on Windows writes
+stdout synchronously; an unread pipe blocks the game before it connects.</p>
+</li>
+<li>
+<p><strong>Trace what players would notice.</strong> Print a line per event behind an
 environment variable (<code>GAME_TRACE=1</code>), and wait for those lines in the
-test. Pause state and menus are not visible over the protocol.</li>
-<li><strong>Run the exported game too.</strong> Run the same test against the exported
+test. Pause state and menus are not visible over the protocol.</p>
+</li>
+<li>
+<p><strong>Run the exported game too.</strong> Run the same test against the exported
 build in CI. Exports leave out excluded folders and non-resource files,
-which only shows there.</li>
-<li><strong>Bots play whole rounds.</strong> Seeded bots playing a full match catch broken
+which only shows there.</p>
+</li>
+<li>
+<p><strong>Bots play whole rounds.</strong> Seeded bots playing a full match catch broken
 rules and stuck rounds. Count every mechanic and fail when one never
-happened.</li>
+happened.</p>
+</li>
 </ul>
 <p>Then test with real controllers and real people. Use the
 <a href="https://github.com/ontola/gamenight/blob/main/docs/desktop-integration-checklist.md">desktop checklist</a>: two profiles, reversed
@@ -183,7 +211,7 @@ connection order, a pad unplugged and plugged back in, repeated Back and
 Resume, and several game switches. Tuning against bots alone misses how the
 controls feel.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="bcdbffe1bd6a8b38d561b9171a495af77eea056c049cac9e72116499c5abeb70">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="ec40c7afd5cdd4e40f6f8206ee688152c9c5b7249d305cf45c9eededad47cc7f">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/performance"><small>Previous</small>Performance</a><a href="/docs/publishing"><small>Next</small>Publish a game</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a><a href="#your-games-own-tests">Your game&#x27;s own tests</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

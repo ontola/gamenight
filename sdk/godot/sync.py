@@ -21,7 +21,7 @@ from pathlib import Path
 
 SDK = Path(__file__).resolve().parent / "addons" / "gamenight"
 REQUIRED = ["gamenight.gd"]
-OPTIONAL = ["screen.gd", "lobby.gd", "face.gd", "artwork.gd", "plugin.gd", "plugin.cfg"]
+OPTIONAL = ["screen.gd", "lobby.gd", "face.gd", "artwork.gd", "plugin.gd", "plugin.cfg", "fake_host.py"]
 
 
 def wanted(addon: Path, everything: bool) -> list[str]:

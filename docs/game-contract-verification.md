@@ -180,6 +180,23 @@ that a person would otherwise do by hand. What worked in our games:
   answers `hello`, sends Prepare, waits for Ready, sends Start, controller
   frames, Pause, Resume and Dispose, and checks what the game did. The
   [Godot template](/docs/playbook) includes one in `tests/lifecycle.py`.
+  Godot games also get a reusable one with the SDK:
+  `addons/gamenight/fake_host.py`, Python standard library only and kept
+  current by `sync.py --all`. It already does the next three points.
+
+  ```python
+  import sys; sys.path.insert(0, "addons/gamenight")
+  from fake_host import FakeHost, frame, BUTTON_A
+
+  with FakeHost("godot", game_id="my-game", path=".") as host:
+      host.welcome()
+      host.prepare([host.local_seat(0, "ada")], [{"id": "ada", "name": "Ada"}])
+      host.start()
+      host.hold(frame(BUTTON_A), 0.1)
+      host.saw("jump Ada")   # a line your game printed with GAME_TRACE=1
+  ```
+
+  Pass `pack=` to run the exported game.
 - **Keep sending frames.** Input older than 250 ms counts as released, so a
   test that holds a button must repeat the frame, about every 50 ms.
 - **Listen on a free port.** Bind port 0 and pass the port in
