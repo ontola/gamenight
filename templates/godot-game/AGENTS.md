@@ -42,3 +42,5 @@ store clip stay reproducible.
 Push to main. A manual run of the CI workflow with a `release` tag such as
 `v0.1.0` publishes a GitHub release; with the `GAMENIGHT_API_TOKEN` secret
 it also fills the store page from `gamenight.json` and `assets/gamenight`.
+Those two are the only home of the game's metadata and store media: never copy
+them into another repository.
