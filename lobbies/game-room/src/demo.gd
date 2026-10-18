@@ -73,12 +73,14 @@ func _stage() -> void:
 			var bomb: Dictionary = w.spawn_item("bomb", -3.6, 0.0)
 			bomb.vx = 0.0; bomb.vy = 0.0; bomb.fuse = main._capture_at - 0.08
 			w.spawn_item("ball", 2.8, 0.2)
-			w.spawn_item("hatbox", 9.6, 3.15)
+			w.spawn_item("popcorn", 9.6, 3.15)
+			w.spawn_item("bazooka", 10.2, 0.0)
+			w.spawn_item("saber", -1.9, 0.0)
 			var blaster: Dictionary = w.spawn_item("blaster", -6.0, 0.6)
 			blaster.holder = "p0"; w.players.p0.item = blaster.id
 			w.spawn_item("bomb", -5.4, 5.9)
 		"stations":
-			var places := [[-9.4, 0.0], [0.0, 0.0], [9.35, 0.0], [6.0, 0.85]]
+			var places := [[main.Layout.stand_x(-9.4), 0.0], [0.0, 0.0], [main.Layout.stand_x(9.35), 0.0], [6.0, 0.85]]
 			for i in places.size():
 				var p: Dictionary = w.players["p%d" % i]
 				p.x = places[i][0]; p.y = places[i][1]; p.spawn = 0

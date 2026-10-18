@@ -29,7 +29,17 @@ const BTN_DOWN := 1 << 11
 const BTN_LEFT := 1 << 12
 const BTN_RIGHT := 1 << 13
 
-const ITEM_KINDS := ["bomb", "blaster", "hatbox", "bomb", "blaster", "ball"]
+const ITEM_KINDS := ["bomb", "blaster", "popcorn", "minigun", "bazooka", "laser", "saber", "bomb", "blaster", "ball"]
+## Weapons fired with X. Shots: speed, life, knock (sideways), lift, stun,
+## gravity (0 flies straight) and blast (explodes where it lands).
+const WEAPONS := {
+	"blaster": {"ammo": 8, "cooldown": 0.22, "recoil": 1.5, "speed": 20.0, "life": 0.7, "knock": 6.5, "lift": 4.5, "stun": 0.3},
+	"minigun": {"ammo": 60, "cooldown": 0.06, "recoil": 0.7, "speed": 24.0, "life": 0.6, "knock": 3.4, "lift": 2.2, "stun": 0.12, "spread": 0.12},
+	"bazooka": {"ammo": 2, "cooldown": 0.9, "recoil": 7.0, "speed": 12.0, "life": 1.8, "knock": 0.0, "lift": 0.0, "stun": 0.0, "blast": true},
+	"popcorn": {"ammo": 10, "cooldown": 0.3, "recoil": 0.0, "speed": 7.0, "life": 1.4, "knock": 1.8, "lift": 1.6, "stun": 0.06, "gravity": 0.6, "handful": 6},
+	"laser": {"ammo": 4, "cooldown": 0.55, "recoil": 2.5, "knock": 10.0, "lift": 5.0, "stun": 0.45},
+	"saber": {"ammo": 14, "cooldown": 0.32, "recoil": 0.0, "knock": 11.0, "lift": 7.0, "stun": 0.45},
+}
 const DROP_EVERY := 9.0
 const MAX_ITEMS := 6
 const ITEM_LIFE := 30.0
@@ -189,10 +199,15 @@ func _actions(p: Dictionary, stunned: bool) -> void:
 	if p.pressed & BTN_B:
 		if not item.is_empty(): _drop_item(p, true)
 		else: _grab(p)
-	if p.pressed & BTN_X:
+	# The minigun fires while X is held; everything else once per press.
+	if not item.is_empty() and item.kind == "minigun" and p.held & BTN_X:
+		_fire(p, item)
+	elif p.pressed & BTN_X:
 		if item.is_empty(): _punch(p)
-		elif item.kind == "blaster": _fire(p, item)
 		elif item.kind == "bomb": _drop_item(p, true)
+		elif item.kind == "laser": _laser(p, item)
+		elif item.kind == "saber": _slash(p, item)
+		elif WEAPONS.has(item.kind): _fire(p, item)
 
 ## The exact item B will use, shared with the floating pickup hint.
 func pickup_target(p: Dictionary) -> Dictionary:
@@ -208,12 +223,6 @@ func _grab(p: Dictionary) -> void:
 	if item.is_empty(): return
 	if item.kind == "ball":
 		_kick(p, item, 1.6)
-		return
-	if item.kind == "hatbox":
-		p.hat = item.hat
-		p.cheer = 0.6
-		item.dead = true
-		events.append({"type": "hat", "x": item.x, "y": item.y, "player": p.id, "hat": item.hat})
 		return
 	item.holder = p.id
 	p.item = item.id
@@ -253,12 +262,58 @@ func _punch(p: Dictionary) -> void:
 
 func _fire(p: Dictionary, item: Dictionary) -> void:
 	if p.fire_cd > 0: return
-	p.fire_cd = 0.22
+	var w: Dictionary = WEAPONS[item.kind]
+	p.fire_cd = w.cooldown
+	for n in w.get("handful", 1):
+		var spread: float = w.get("spread", 0.0)
+		var shot := {"kind": item.kind, "x": p.x + p.facing * 0.7, "y": p.y + 0.72 + rng.randf_range(-spread, spread),
+			"vx": p.facing * w.speed, "vy": 0.0, "owner": p.id, "life": w.life, "hue": rng.randf(),
+			"knock": w.knock, "lift": w.lift, "stun": w.stun, "gravity": w.get("gravity", 0.0), "blast": w.get("blast", false)}
+		if w.has("handful"):
+			shot.vx = p.facing * rng.randf_range(w.speed * 0.6, w.speed * 1.3)
+			shot.vy = rng.randf_range(3.0, 7.5)
+		shots.append(shot)
+	events.append({"type": "fire", "kind": item.kind, "x": p.x + p.facing * 0.8, "y": p.y + 0.72, "player": p.id})
+	p.vx -= p.facing * w.recoil
+	_use_ammo(p, item)
+
+## A beam across the room: everyone in its line flies, nothing stops it.
+func _laser(p: Dictionary, item: Dictionary) -> void:
+	if p.fire_cd > 0: return
+	var w: Dictionary = WEAPONS.laser
+	p.fire_cd = w.cooldown
+	var y: float = p.y + 0.72
+	var end: float = Layout.RIGHT if p.facing > 0 else Layout.LEFT
+	for id in players:
+		var other: Dictionary = players[id]
+		if other == p or y < other.y or y > other.y + HEIGHT: continue
+		if signf(other.x - p.x) != signf(p.facing): continue
+		_knock(other, p.facing * w.knock, w.lift, w.stun)
+		events.append({"type": "hit", "x": other.x, "y": y, "player": id})
+	events.append({"type": "laser", "x": p.x + p.facing * 0.8, "x1": end, "y": y, "player": p.id})
+	p.vx -= p.facing * w.recoil
+	_use_ammo(p, item)
+
+## A wide, hard swing. Wears out after a number of swings.
+func _slash(p: Dictionary, item: Dictionary) -> void:
+	if p.fire_cd > 0: return
+	var w: Dictionary = WEAPONS.saber
+	p.fire_cd = w.cooldown
+	p.punch = 0.24
+	var reach := Rect2(p.x + (-0.3 if p.facing > 0 else -1.9), p.y, 2.2, HEIGHT + 0.3)
+	for id in players:
+		var other: Dictionary = players[id]
+		if other == p: continue
+		if reach.intersects(Rect2(other.x - HALF_W, other.y, HALF_W * 2, HEIGHT)):
+			_knock(other, p.facing * w.knock, w.lift, w.stun)
+			events.append({"type": "hit", "x": other.x, "y": other.y + 0.8, "player": other.id})
+	for other in items:
+		if other.kind == "ball" and reach.has_point(Vector2(other.x, other.y + 0.4)): _kick(p, other, 2.4)
+	events.append({"type": "slash", "x": p.x + p.facing * 0.9, "y": p.y + 0.9, "player": p.id, "facing": p.facing})
+	_use_ammo(p, item)
+
+func _use_ammo(p: Dictionary, item: Dictionary) -> void:
 	item.ammo -= 1
-	shots.append({"x": p.x + p.facing * 0.7, "y": p.y + 0.72, "vx": p.facing * 20.0, "owner": p.id,
-		"life": 0.7, "hue": rng.randf()})
-	events.append({"type": "fire", "x": p.x + p.facing * 0.8, "y": p.y + 0.72, "player": p.id})
-	p.vx -= p.facing * 1.5
 	if item.ammo <= 0:
 		item.dead = true
 		p.item = -1
@@ -282,10 +337,9 @@ func _item(id: int) -> Dictionary:
 	return {}
 
 func spawn_item(kind: String, x: float, y: float) -> Dictionary:
-	var hats := ["cap", "crown", "party", "tophat", "beanie", "headphones"]
 	var item := {"id": _next_item, "kind": kind, "x": x, "y": y, "vx": rng.randf_range(-1, 1),
-		"vy": 0.0, "holder": "", "fuse": -1.0, "ammo": 8, "age": 0.0, "spin": 0.0,
-		"hat": hats[rng.randi() % hats.size()], "thrower": "", "dead": false}
+		"vy": 0.0, "holder": "", "fuse": -1.0, "ammo": WEAPONS.get(kind, {}).get("ammo", 0), "age": 0.0, "spin": 0.0,
+		"thrower": "", "dead": false}
 	_next_item += 1
 	items.append(item)
 	return item
@@ -296,7 +350,7 @@ func _maybe_drop() -> void:
 	var free := items.filter(func(i): return i.holder == "")
 	if free.size() >= MAX_ITEMS: return
 	var kind: String = ITEM_KINDS[rng.randi() % ITEM_KINDS.size()]
-	if kind == "ball" and items.any(func(i): return i.kind == "ball"): kind = "hatbox"
+	if kind == "ball" and items.any(func(i): return i.kind == "ball"): kind = "popcorn"
 	spawn_item(kind, rng.randf_range(Layout.LEFT + 1.5, Layout.RIGHT - 1.5), Layout.CEILING - 0.6)
 	events.append({"type": "drop", "x": items[-1].x, "y": items[-1].y})
 
@@ -356,18 +410,22 @@ func _step_items() -> void:
 
 func _explode(item: Dictionary) -> void:
 	item.dead = true
-	events.append({"type": "explode", "x": item.x, "y": item.y + 0.25})
+	_blast(item.x, item.y + 0.25, item)
+
+## Bombs and bazooka rockets: everyone and everything nearby flies.
+func _blast(x: float, y: float, source: Dictionary = {}) -> void:
+	events.append({"type": "explode", "x": x, "y": y})
 	for id in players:
 		var p: Dictionary = players[id]
-		var offset := Vector2(p.x - item.x, p.y + 0.6 - item.y)
+		var offset := Vector2(p.x - x, p.y + 0.85 - y)
 		var distance := offset.length()
 		if distance < 2.6:
 			var push := (1.0 - distance / 2.6) * 16.0 + 4.0
 			var direction := offset.normalized() if distance > 0.05 else Vector2.UP
 			_knock(p, direction.x * push, absf(direction.y) * push * 0.6 + 6.0, 0.6)
 	for other in items:
-		if other == item or other.holder != "": continue
-		var offset := Vector2(other.x - item.x, other.y - item.y)
+		if other == source or other.holder != "": continue
+		var offset := Vector2(other.x - x, other.y + 0.25 - y)
 		if offset.length() < 2.6:
 			other.vx += signf(offset.x) * 9.0
 			other.vy += 7.0
@@ -375,16 +433,27 @@ func _explode(item: Dictionary) -> void:
 
 func _step_shots() -> void:
 	for shot in shots:
+		var gravity: float = shot.get("gravity", 0.0)
+		if gravity > 0:
+			shot.vy -= GRAVITY * gravity * DT
+			shot.y += shot.vy * DT
 		shot.x += shot.vx * DT
 		shot.life -= DT
-		if shot.x < Layout.LEFT or shot.x > Layout.RIGHT: shot.life = 0
+		if shot.x < Layout.LEFT or shot.x > Layout.RIGHT or shot.y < 0.0:
+			shot.life = 0
+			if shot.get("blast", false): _blast(clampf(shot.x, Layout.LEFT, Layout.RIGHT), maxf(shot.y, 0.3))
+		elif shot.life <= 0 and shot.get("blast", false):
+			_blast(shot.x, shot.y)
 		for id in players:
 			var p: Dictionary = players[id]
 			if id == shot.owner or shot.life <= 0: continue
 			if absf(p.x - shot.x) < HALF_W + 0.1 and shot.y > p.y and shot.y < p.y + HEIGHT:
-				_knock(p, signf(shot.vx) * 6.5, 4.5, 0.3)
 				shot.life = 0
-				events.append({"type": "hit", "x": shot.x, "y": shot.y, "player": id})
+				if shot.get("blast", false):
+					_blast(shot.x, shot.y)
+				else:
+					_knock(p, signf(shot.vx) * shot.get("knock", 6.5), shot.get("lift", 4.5), shot.get("stun", 0.3))
+					events.append({"type": "hit", "x": shot.x, "y": shot.y, "player": id, "kind": shot.get("kind", "")})
 		for item in items:
 			if item.kind == "ball" and Vector2(item.x - shot.x, item.y + 0.45 - shot.y).length() < 0.55:
 				item.vx += signf(shot.vx) * 4

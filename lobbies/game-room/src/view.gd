@@ -149,9 +149,6 @@ func _update_items(world) -> void:
 		node.position = Vector3(item.x, item.y, 0.05)
 		if item.kind == "ball":
 			node.get_meta("spinner").rotation.z = -item.spin
-		elif item.kind == "hatbox":
-			node.rotation.y = sin(_time * 2 + item.id) * 0.4
-			node.position.y += 0.05 + sin(_time * 3 + item.id) * 0.05
 		elif item.kind == "bomb":
 			var spark: OmniLight3D = node.get_node("spark")
 			if item.fuse >= 0:
@@ -160,7 +157,7 @@ func _update_items(world) -> void:
 				node.scale = Vector3.ONE * pulse
 			else:
 				spark.light_energy = 0.0
-		elif item.kind == "blaster":
+		elif world.WEAPONS.has(item.kind):
 			var players: Dictionary = world.players
 			var facing: float = players[item.holder].facing if players.has(item.holder) else 1.0
 			node.rotation.y = 0 if facing > 0 else PI
@@ -194,14 +191,48 @@ func _make_item(item: Dictionary) -> Node3D:
 			room.box(Vector3(0.12, 0.25, 0.12), Vector3(-0.08, -0.08, 0), room.mat(Color("2b2b3d"), 0.4), node)
 			room.cylinder(0.07, 0.05, Vector3(0.42, 0.1, 0), room.mat(glow, 0.3, 0, glow, 4.0), node).rotation.z = PI / 2
 			room.box(Vector3(0.4, 0.04, 0.17), Vector3(0.12, 0.17, 0), room.mat(glow, 0.3, 0, glow, 3.0), node)
-		"hatbox":
-			var c: Color = [Color("ff4f8b"), Color("38d6ff"), Color("3ddc97"), Color("ffb454")][item.id % 4]
-			room.box(Vector3(0.5, 0.42, 0.42), Vector3(0, 0.21, 0), room.mat(c, 0.5), node)
-			room.box(Vector3(0.54, 0.1, 0.46), Vector3(0, 0.44, 0), room.mat(c.darkened(0.15), 0.5), node)
-			room.box(Vector3(0.08, 0.48, 0.44), Vector3(0, 0.24, 0), room.mat(Color("f2f1f8"), 0.4, 0, Color("ffffff"), 0.3), node)
-			room.box(Vector3(0.52, 0.48, 0.08), Vector3(0, 0.24, 0), room.mat(Color("f2f1f8"), 0.4, 0, Color("ffffff"), 0.3), node)
-			var question: Label3D = room.label("?", Vector3(0, 0.95, 0), 48, Color(2.2, 2.0, 0.8), node, 8)
-			question.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		"minigun":
+			var metal: Material = room.mat(Color("3a3848"), 0.35, 0.8)
+			room.box(Vector3(0.4, 0.24, 0.22), Vector3(-0.02, 0.1, 0), room.mat(Color("ffb454"), 0.4), node)
+			room.box(Vector3(0.12, 0.22, 0.12), Vector3(-0.12, -0.1, 0), room.mat(Color("2b2b3d"), 0.4), node)
+			for i in 6:
+				var a := i * TAU / 6
+				room.cylinder(0.025, 0.55, Vector3(0.45, 0.1 + sin(a) * 0.06, cos(a) * 0.06), metal, node).rotation.z = PI / 2
+			room.cylinder(0.1, 0.05, Vector3(0.68, 0.1, 0), metal, node).rotation.z = PI / 2
+		"bazooka":
+			var tube: Material = room.mat(Color("5d6b3a"), 0.6)
+			room.cylinder(0.12, 1.0, Vector3(0.1, 0.18, 0), tube, node).rotation.z = PI / 2
+			room.cylinder(0.15, 0.08, Vector3(-0.4, 0.18, 0), room.mat(Color("2b2b3d"), 0.4), node).rotation.z = PI / 2
+			room.box(Vector3(0.1, 0.24, 0.1), Vector3(-0.05, -0.02, 0), room.mat(Color("2b2b3d"), 0.4), node)
+			room.sphere(0.1, Vector3(0.62, 0.18, 0), room.mat(Color("ff4f4f"), 0.4, 0, Color("ff4f4f"), 1.5), node)
+		"laser":
+			var cyan := Color("38d6ff")
+			room.box(Vector3(0.5, 0.14, 0.14), Vector3(0.1, 0.1, 0), room.mat(Color("f2f1f8"), 0.2, 0.3), node)
+			room.box(Vector3(0.1, 0.22, 0.1), Vector3(-0.08, -0.06, 0), room.mat(Color("2b2b3d"), 0.4), node)
+			room.cylinder(0.05, 0.3, Vector3(0.42, 0.1, 0), room.mat(cyan, 0.2, 0, cyan, 5.0), node).rotation.z = PI / 2
+			for i in 3: room.box(Vector3(0.04, 0.17, 0.16), Vector3(-0.05 + i * 0.1, 0.1, 0), room.mat(cyan, 0.2, 0, cyan, 3.0), node)
+		"saber":
+			var blade: Color = [Color("38d6ff"), Color("ff4f4f"), Color("3ddc97"), Color("7c5cff")][item.id % 4]
+			var saber := Node3D.new()
+			saber.rotation.z = -0.5
+			node.add_child(saber)
+			room.cylinder(0.05, 0.26, Vector3(0, 0.0, 0), room.mat(Color("c9c4d8"), 0.25, 0.8), saber)
+			room.cylinder(0.035, 1.05, Vector3(0, 0.65, 0), room.mat(blade.lightened(0.6), 0.2, 0, blade, 6.0), saber)
+			var glow := OmniLight3D.new()
+			glow.light_color = blade
+			glow.omni_range = 1.8
+			glow.light_energy = 1.2
+			glow.position = Vector3(0, 0.65, 0.1)
+			saber.add_child(glow)
+		"popcorn":
+			var red: Material = room.mat(Color("e2574c"), 0.6)
+			var white: Material = room.mat(Color("f2f1f8"), 0.6)
+			for i in 8:
+				var a := i * TAU / 8
+				room.box(Vector3(0.09, 0.38, 0.03), Vector3(sin(a) * 0.15, 0.19, cos(a) * 0.15), red if i % 2 == 0 else white, node).rotation.y = a
+			room.cylinder(0.15, 0.36, Vector3(0, 0.19, 0), room.mat(Color("2b2b3d"), 0.6), node)
+			for i in 9:
+				room.sphere(0.07, Vector3((i % 3 - 1) * 0.09, 0.4 + (i / 3) * 0.04, (i / 3 - 1) * 0.07), room.mat(Color("fff1c4"), 0.9), node)
 		"ball":
 			var ball := Node3D.new()
 			ball.position = Vector3(0, 0.45, 0)
@@ -237,11 +268,15 @@ func _update_shots(world) -> void:
 		var shot: Dictionary = world.shots[i]
 		node.visible = true
 		node.position = Vector3(shot.x, shot.y, 0.1)
-		var c := Color.from_hsv(shot.hue, 0.8, 1.0)
+		var kind := str(shot.get("kind", "blaster"))
+		var c: Color = {"minigun": Color("ffd27a"), "bazooka": Color("ff7a3c"), "popcorn": Color("fff1c4")}.get(kind, Color.from_hsv(shot.hue, 0.8, 1.0))
 		var core: MeshInstance3D = node.get_node("core")
 		core.material_override.emission = c
-		core.scale = Vector3(2.2, 0.8, 0.8)
-		node.get_node("light").light_color = c
+		core.material_override.emission_energy_multiplier = 0.4 if kind == "popcorn" else 8.0
+		core.scale = {"minigun": Vector3(2.4, 0.4, 0.4), "bazooka": Vector3(3.2, 1.3, 1.3), "popcorn": Vector3(0.75, 0.75, 0.75)}.get(kind, Vector3(2.2, 0.8, 0.8))
+		var light: OmniLight3D = node.get_node("light")
+		light.visible = kind != "popcorn"
+		light.light_color = c
 
 func _event(event: Dictionary, world) -> void:
 	var pos := Vector3(event.get("x", 0.0), event.get("y", 0.0), 0.2)
@@ -257,10 +292,21 @@ func _event(event: Dictionary, world) -> void:
 			burst(pos, 14, [Color("ffffff"), Color("ffe066")], 5.0, 0.35, 0.06)
 			room.shake(0.25)
 		"fire":
-			room.flash(pos, Color.from_hsv(randf(), 0.7, 1.0), 2.5, 2.5)
-		"hat":
-			burst(pos + Vector3(0, 0.6, 0), 40, [Color("ff4f8b"), Color("38d6ff"), Color("3ddc97"), Color("ffb454"), Color("7c5cff")], 6.0, 1.2, 0.07, true)
-			room.flash(pos, Color("ff4f8b"), 4.0, 3.0)
+			match str(event.get("kind", "")):
+				"popcorn": burst(pos, 6, [Color("fff1c4")], 2.0, 0.3, 0.05)
+				"bazooka":
+					room.flash(pos, Color("ff7a3c"), 6.0, 4.0)
+					burst(pos, 18, [Color("6a6880"), Color("4a4458")], 2.5, 0.8, 0.14)
+					room.shake(0.3)
+				"minigun": room.flash(pos, Color("ffd27a"), 1.5, 2.0)
+				_: room.flash(pos, Color.from_hsv(randf(), 0.7, 1.0), 2.5, 2.5)
+		"laser":
+			_beam(float(event.x), float(event.x1), float(event.y))
+			room.flash(pos, Color("38d6ff"), 6.0, 4.0)
+			room.shake(0.35)
+		"slash":
+			burst(pos, 22, [Color("38d6ff"), Color("f2f1f8")], 6.0, 0.25, 0.05)
+			room.flash(pos, Color("38d6ff"), 3.0, 3.0)
 		"land":
 			if event.get("speed", 0.0) > 14: burst(pos, 10, [Color("8c80b0")], 2.0, 0.4, 0.06)
 		"walljump", "jump":
@@ -270,6 +316,14 @@ func _event(event: Dictionary, world) -> void:
 			room.flash(pos + Vector3(0, 0.6, 0), Color("7c5cff"), 5.0, 3.0)
 		"drop":
 			pass
+
+## The laser: a bright bar across the room that thins out and goes.
+func _beam(x0: float, x1: float, y: float) -> void:
+	var cyan := Color("38d6ff")
+	var beam: MeshInstance3D = room.box(Vector3(absf(x1 - x0), 0.12, 0.12), Vector3((x0 + x1) / 2, y, 0.15), room.mat(cyan.lightened(0.5), 0.2, 0, cyan, 9.0), self, false)
+	var tween := beam.create_tween()
+	tween.tween_property(beam, "scale", Vector3(1, 0.05, 0.05), 0.22)
+	tween.tween_callback(beam.queue_free)
 
 ## Short-lived particle burst. Confetti falls and flutters, sparks don't.
 func burst(pos: Vector3, amount: int, colors: Array, speed: float, lifetime: float, size: float, confetti := false) -> void:

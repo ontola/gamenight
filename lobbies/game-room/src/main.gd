@@ -1131,13 +1131,13 @@ func _draw_item_hints(canvas: Control, camera: Camera3D) -> void:
 		if not press.is_empty(): top = press.position
 		elif node != null and node.visible: top = node.global_position
 		else: continue
-		top += Vector3(0, 1.2 if item.kind == "hatbox" else 0.95, 0)
+		top += Vector3(0, 0.95, 0)
 		if camera.is_position_behind(top): continue
 		var ui_scale := canvas.get_global_transform().get_scale()
 		var at := camera.unproject_position(top) / ui_scale
 		var above := camera.unproject_position(top + Vector3(0, .4032, 0)) / ui_scale
 		var factor := at.distance_to(above) / 96.0
-		var label := "Open" if item.kind == "hatbox" else ("Kick" if item.kind == "ball" else "Pick up")
+		var label := "Kick" if item.kind == "ball" else "Pick up"
 		var items := [["B", label]]
 		var size := Vector2(room._prompt_size(items)) * factor
 		at -= size * .5

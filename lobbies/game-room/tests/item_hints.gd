@@ -28,7 +28,7 @@ func _run() -> void:
 	p.x = 0.0; p.y = 0.0
 	other.x = 0.0; other.y = 0.0
 	var bomb := w.spawn_item("bomb", 0.5, 0.0)
-	var box := w.spawn_item("hatbox", 0.6, 0.0)
+	var box := w.spawn_item("saber", 0.6, 0.0)
 	check(w.pickup_target(p) == bomb, "Hint follows the first item B will actually use")
 	check(main.pickup_hint_items().size() == 1, "Two players sharing a target show one badge")
 	p.x = -0.31; other.x = -0.31
@@ -55,11 +55,11 @@ func _run() -> void:
 	check(w.pickup_target(other) == box, "Another player can target the remaining free item")
 	w.set_input("p1", World.BTN_B, Vector2.ZERO)
 	w.step()
-	check(box.dead and other.hat == box.hat, "B opens the hinted hat box")
+	check(other.item == box.id and box.holder == "p1", "B grabs the hinted saber")
 	check(w.pickup_target(other).is_empty(), "Consumed or held items cannot be targeted")
-	# An already-consumed box must not be opened twice within one simulation step.
+	# A dead item must not be picked up before cleanup.
 	w.items.clear(); p.item = -1
-	box = w.spawn_item("hatbox", 0.0, 0.0)
+	box = w.spawn_item("popcorn", 0.0, 0.0)
 	box.dead = true
 	check(w.pickup_target(p).is_empty(), "Dead items are excluded before cleanup")
 	w.items.clear()
@@ -90,7 +90,7 @@ func _capture(main, directory: String) -> void:
 	for i in 4:
 		var p: Dictionary = w.players["p%d" % i]
 		p.x = [-5.0, -1.7, 2.0, 8.3][i]; p.y = 0.0; p.spawn = 0.0
-		var item: Dictionary = w.spawn_item(["bomb", "hatbox", "blaster", "ball"][i], p.x + 0.6, 0.0)
+		var item: Dictionary = w.spawn_item(["bomb", "popcorn", "minigun", "ball"][i], p.x + 0.6, 0.0)
 		item.vx = 0.0
 	main.view.update(w, 0.1)
 	main.hud.queue_redraw()
