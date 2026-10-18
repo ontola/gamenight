@@ -2,6 +2,15 @@
 
 Use the [developer portal](/developers) to add your game, upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.
 
+## Where your game's data lives
+
+Keep two things in your repository and let GameNight production hold the rest:
+
+- `gamenight.json` holds the facts about the game: id, title, tagline, players, round length, tags, emoji, colour, requirements and links. Start it with `"$schema": "https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json"` so editors check it.
+- `assets/gamenight/` holds the store media sources: `preview.mp4`, `preview.jpg`, `cover.png`, `icon.png`, `gameplay.png` and an optional `screenshots/` folder.
+
+Builds, the store page, ownership and visibility live in production. `gamenight-publish.py push` (or the GitHub Action) sends builds and `gamenight-publish.py store` sends `gamenight.json` and the media. Do not put store text or media anywhere else. Hosts pick up a stable release from the hosted catalog; a new game needs no entry in the GameNight repository.
+
 ## Prepare a release
 
 For a new game, sign in to the [developer portal](/developers) and choose **Add your game**. Free games can upload builds right away; ask for integration help from the game's **Help** tab. Existing catalog games need GameNight to register the correct owner once; matching a game name does not establish ownership.

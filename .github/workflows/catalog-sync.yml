@@ -1,0 +1,30 @@
+# Keeps catalog/games in step with each game's own gamenight.json and
+# assets/gamenight. The entries are generated; edit the game's repository instead.
+name: Catalog sync
+on:
+  schedule:
+    - cron: '17 4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: catalog-sync
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install pillow
+      - name: Rebuild entries from the game repositories
+        run: python3 scripts/sync-catalog.py
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Validate the catalog
+        run: cargo test -p gamenight-catalog
+      - name: Commit changed entries
+        run: |
+          git diff --quiet -- catalog/games && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898748+github-actions[bot]@users.noreply.github.com"
+          git add catalog/games
+          git commit -m "Catalog: sync from the games' gamenight.json"
+          git push

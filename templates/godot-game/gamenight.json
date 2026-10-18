@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json",
   "id": "template-game",
   "title": "Template Game",
   "tagline": "One line that says what you do and why it is fun with friends.",

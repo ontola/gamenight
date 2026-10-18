@@ -17,7 +17,7 @@ You get a small, working Godot 4 couch game with:
 | Part | What it does |
 | --- | --- |
 | `main.gd` | the game: GameNight lifecycle, seats, faces, settings and a Start menu, bots, dev flags |
-| `gamenight.json` | the store and catalog entry: title, tagline, players, tags |
+| `gamenight.json` | the game's metadata: title, tagline, players, tags; the only place you edit them |
 | `tests/lifecycle.py` | a fake GameNight host drives prepare, start, controller input, pause, resume, dispose |
 | `tools/capture_preview.sh`, `tools/encode_preview.py` | the five-second store clip, frame by frame |
 | `.github/workflows/ci.yml` | tests, Windows export, release, store page |
@@ -144,6 +144,7 @@ Add `cover.png` (portrait 360x480), `icon.png` (128x128) and `gameplay.png`
 
 1. [Register the game](/developers) in the developer portal and create a
    publish key. Save it as the `GAMENIGHT_API_TOKEN` secret of the repository.
+   The first stable release needs GameNight's distribution approval.
 2. Run the CI workflow by hand with `release` set to `v0.1.0`. It tests,
    exports Windows, publishes the GitHub release and fills the store page.
 3. Or fill the store page from your machine:
@@ -155,8 +156,17 @@ GAMENIGHT_API_TOKEN=gn_pub_... python3 gamenight-publish.py store
 It reads `gamenight.json` and uploads what is in `assets/gamenight/`. See
 [Publish a game](/docs/publishing) for builds, channels and review.
 
+Everything players see lives in GameNight production, filled from your
+repository by these commands. Do not add the game to `ontola/gamenight`'s
+`catalog/games` or to any store file in another repository: installed hosts
+get stable releases from the hosted catalog. Store visibility (listed or
+hidden) is a GameNight staff setting.
+
 ## Pitfalls we hit
 
+- Game data copied into other repositories drifts. Bombing Bugs ended up with
+  its tagline in three places. Edit `gamenight.json` and `assets/gamenight/`
+  only, and let the publish commands carry them to production.
 - Headless Godot hangs on a parse error; untyped values from arrays and
   dictionaries are the usual cause. Give them a type (`var c: Vector3 = ...`).
 - Agents often cannot push git tags. Release with the workflow input instead.
