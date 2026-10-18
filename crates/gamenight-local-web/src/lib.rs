@@ -67,7 +67,24 @@ pub struct JoinSessionRequest {
     pub seat: Option<u8>,
 }
 
+/// Which phone drives which player, and the room they joined, kept across a
+/// host restart for an update. Player ids survive that restart, so the
+/// bindings stay valid and phones carry on without scanning again.
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct WebCarry {
+    pub profiles: HashMap<String, Profile>,
+    pub bindings: HashMap<String, PlayerId>,
+    #[serde(default)]
+    pub link_revisions: HashMap<PlayerId, u64>,
+    #[serde(default)]
+    pub room_code: Option<String>,
+    #[serde(default)]
+    pub cloud_session: Option<String>,
+}
+
 pub struct ServerState {
+    /// A carried phone state to apply once the server has loaded its memory.
+    pub resume: Option<WebCarry>,
     onboarding: Option<onboarding::Handoff>,
     local_room: local_room::Room,
     join_base: String,
@@ -93,8 +110,19 @@ pub struct ServerState {
 }
 
 impl ServerState {
+    pub fn carry(&self) -> WebCarry {
+        WebCarry {
+            profiles: self.profiles.clone(),
+            bindings: self.bindings.clone(),
+            link_revisions: self.link_revisions.clone(),
+            room_code: Some(self.local_room.code().to_owned()),
+            cloud_session: self.cloud.as_ref().and_then(cloud::Bridge::session_token),
+        }
+    }
+
     pub fn new(daemon_addr: String) -> Self {
         Self {
+            resume: None,
             onboarding: None,
             local_room: local_room::Room::new(),
             join_base: gamenight_protocol::web_base_url(),
@@ -222,9 +250,25 @@ pub async fn run_server(
     let memory = memory::Memory::load(memory::path())?;
     {
         let mut local = state.lock().unwrap();
+        let resume = local.resume.take();
+        if let Some(carry) = resume {
+            local.profiles = carry.profiles;
+            local.bindings = carry.bindings;
+            local.link_revisions = carry.link_revisions;
+            if let Some(code) = carry.room_code {
+                local.local_room.set_code(code);
+            }
+            local.resume = Some(WebCarry {
+                cloud_session: carry.cloud_session,
+                ..Default::default()
+            });
+        }
         for profile in memory.profiles.values() {
             local.profiles.insert(profile.id.clone(), profile.clone());
-            local.local_room.restore(&profile.id);
+            // Someone still seated from before a restart is not waiting.
+            if !local.bindings.contains_key(&profile.id) {
+                local.local_room.restore(&profile.id);
+            }
         }
         local.local_room.main_profile = memory.main_profile.clone();
         local.memory = memory;
@@ -234,7 +278,16 @@ pub async fn run_server(
         tokio::spawn(local.companions.clone().run(local.daemon_addr.clone()));
     }
     tokio::spawn(local_room::watch_first_seat(state.clone()));
+    let cloud_session = state
+        .lock()
+        .unwrap()
+        .resume
+        .take()
+        .and_then(|carry| carry.cloud_session);
     if let Some(bridge) = cloud::Bridge::configured() {
+        if let Some(token) = cloud_session {
+            bridge.resume_session(token);
+        }
         state.lock().unwrap().cloud = Some(bridge.clone());
         tokio::spawn(bridge.run(state.clone()));
     }
@@ -879,5 +932,24 @@ mod room_pickup_tests {
                 expected
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod carry_tests {
+    use super::*;
+
+    #[test]
+    fn phone_links_survive_a_restart_file() {
+        let mut state = ServerState::new("127.0.0.1:0".into());
+        let player = PlayerId::new();
+        state.bindings.insert("phone".into(), player);
+        state.link_revisions.insert(player, 3);
+        let code = state.local_room.code().to_owned();
+        let json = serde_json::to_value(state.carry()).unwrap();
+        let carry: WebCarry = serde_json::from_value(json).unwrap();
+        assert_eq!(carry.bindings["phone"], player);
+        assert_eq!(carry.link_revisions[&player], 3);
+        assert_eq!(carry.room_code.as_deref(), Some(code.as_str()));
     }
 }

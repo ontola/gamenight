@@ -8,4 +8,5 @@ repository.workspace = true
 
 [dependencies]
 gamenight-protocol = { workspace = true }
+serde = { workspace = true }
 thiserror = { workspace = true }

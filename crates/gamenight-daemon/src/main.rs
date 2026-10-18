@@ -142,13 +142,28 @@ async fn run() -> std::io::Result<()> {
             )
         });
 
+    // A desktop host restarting into an update left its party behind.
+    let update = gamenight_daemon::HostUpdate::from_env();
+    let resume = update
+        .as_ref()
+        .and_then(|update| gamenight_daemon::Resume::take(&update.resume));
+    let mut web_carry = None;
+    let mut carry = None;
+    if let Some(resume) = resume {
+        web_carry = resume
+            .web
+            .and_then(|web| serde_json::from_value::<gamenight_local_web::WebCarry>(web).ok());
+        carry = Some(resume.party);
+    }
+
     // Optional LAN character studio. Local games do not require an HTTP server.
+    let mut web_state = None;
     if std::env::var_os("GAMENIGHT_WEB").is_some() {
-        let web_daemon_addr = addr.clone();
+        let mut server = gamenight_local_web::ServerState::new(addr.clone());
+        server.resume = web_carry;
+        let state = std::sync::Arc::new(std::sync::Mutex::new(server));
+        web_state = Some(state.clone());
         tokio::spawn(async move {
-            let state = std::sync::Arc::new(std::sync::Mutex::new(
-                gamenight_local_web::ServerState::new(web_daemon_addr),
-            ));
             // All interfaces, not loopback: phones on the same network have to
             // be able to reach the join pages.
             let server_addr =
@@ -161,14 +176,28 @@ async fn run() -> std::io::Result<()> {
     if std::env::var_os("GAMENIGHT_EXIT_WITH_LOBBY").is_some() {
         let lobby =
             lobby_game.ok_or_else(|| std::io::Error::other("Desktop mode requires a lobby"))?;
-        return gamenight_daemon::run_desktop(
+        gamenight_daemon::run_desktop(
             listener,
             library,
             lobby,
             prewarm_handle,
             install_progress,
+            update.clone(),
+            carry,
         )
-        .await;
+        .await?;
+        // The daemon saved the party to restart into an update; add which
+        // phone drives whom so they reconnect without scanning again.
+        if let (Some(update), Some(state)) = (update, web_state) {
+            if let Ok(bytes) = std::fs::read(&update.resume) {
+                let mut resume: gamenight_daemon::Resume =
+                    serde_json::from_slice(&bytes).map_err(std::io::Error::other)?;
+                let web = state.lock().unwrap_or_else(|e| e.into_inner()).carry();
+                resume.web = Some(serde_json::to_value(web).map_err(std::io::Error::other)?);
+                resume.write(&update.resume)?;
+            }
+        }
+        return Ok(());
     }
     gamenight_daemon::run_with_prewarm_progress(
         listener,

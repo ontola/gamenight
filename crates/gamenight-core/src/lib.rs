@@ -10,7 +10,7 @@ mod playlist;
 mod session;
 mod vote;
 
-pub use night::{Command, Effect, GameCommand, GameNight};
+pub use night::{Command, Effect, GameCommand, GameNight, PartyCarry};
 pub use playlist::Playlist;
 pub use session::{IllegalTransition, Session};
 pub use vote::VoteBoard;

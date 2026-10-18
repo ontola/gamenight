@@ -111,7 +111,7 @@ Existing overlay connections retain their [trusted local scope](../../SECURITY.m
 
 The lobby receives `party_state`, `lobby_focus`, `controller_frame` and `error`.
 It may issue the existing [party commands](../protocol.md#party-commands-overlay-daemon),
-plus `lobby_ready` and `quit_party`. It cannot report another game's session
+plus `lobby_ready`, `quit_party` and `apply_update`. It cannot report another game's session
 lifecycle or publish physical controller frames.
 
 | Request | Meaning |
@@ -126,6 +126,15 @@ lifecycle or publish physical controller frames.
 | `close_overlay` | Resume only the pause caused by opening the lobby |
 | `set_setting {game,key,value}` | Apply a setting validated by the runtime |
 | `quit_party` | Explicitly shut down the runtime and its children |
+| `apply_update` | Restart into the downloaded host update named by `update_ready`, keeping the party; refused while a game is played |
+
+On the packaged Windows host, `party_state.update_ready` holds the version of a
+host update that finished downloading. Offer it between games. After
+`apply_update` the runtime saves players, seats, controllers, phone links,
+the queue and settings, the launcher covers the screen and installs, and the
+new runtime restores the party with the same player IDs. The cover stays until
+the new lobby sends `lobby_ready`. An empty room updates by itself after ten
+idle minutes. Games themselves restart: an update only happens between games.
 
 Use `party_state` as the authoritative result. Commands currently have no
 request IDs or individual success acknowledgements. Do not blindly replay

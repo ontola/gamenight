@@ -81,7 +81,7 @@ def main():
     (stage / 'bundled-game').mkdir()
     (stage / 'bundled-game/main.lua').write_text('original content')
     app_id = 'GameNightSmoke.' + uuid.uuid4().hex
-    for version in ['1.0.0', '2.0.0']:
+    for version in ['1.0.0', '2.0.0', '3.0.0']:
         (stage / 'version.txt').write_text(version)
         run(args.vpk, 'pack', '--packId', app_id, '--packVersion', version,
             '--packDir', str(stage), '--mainExe', 'Smoke.exe', '--channel', 'win-test',
@@ -152,12 +152,33 @@ def main():
                         env=dict(os.environ, GAMENIGHT_SMOKE_INSTALL=str(installed)))
             return check.stdout.strip() == '0'
         wait_for(update_finished, 'Updater did not complete')
-        process, report = start(root / '2.0.0')
+        process, report = start(root / '3.0.0')
         assert report['version'] == '2.0.0'
         assert (data / 'settings.json').read_text() == 'preserve this setting'
         assert (Path(report['content']) / 'main.lua').read_text() == 'original content'
+        # In-place update: the party asks, the app restarts into the new version
+        # by itself with a cover over the screen until the new lobby is up.
+        wait_for(lambda: log_contains('Update downloaded'), 'Update for the restart was not downloaded')
+        ready = json.loads((data / 'update-ready.json').read_text())
+        assert ready['version'] == '3.0.0', ready
+        (data / 'running.json').unlink()
+        (data / 'children-closed').unlink(missing_ok=True)
+        (data / 'exit').write_text('restart')
+        process.wait(timeout=30)
+        (data / 'exit').unlink()
+        wait_for(lambda: (data / 'running.json').is_file(), 'App did not restart into the update')
+        report = json.loads((data / 'running.json').read_text())
+        process = RunningApp(report['pid'])
+        assert report['version'] == '3.0.0', report
+        assert report['resumed'], 'Restarted app did not find the saved party'
+        assert not (data / 'update-ready.json').exists(), 'Applied update still offered'
+
+        def cover_closed():
+            out = run('tasklist', '/FI', 'IMAGENAME eq GameNightUpdateCover.exe', '/FO', 'CSV', '/NH').stdout
+            return 'GameNightUpdateCover.exe' not in out
+        wait_for(cover_closed, 'Update cover stayed on screen after the restart')
         close(process, report)
-        print('PASS: install, offline start, corrupt download, deferred update, restart, data preservation, child cleanup, app-local C++ runtime')
+        print('PASS: install, offline start, corrupt download, deferred update, restart, in-place update restart, data preservation, child cleanup, app-local C++ runtime')
     finally:
         # Scope cleanup to the uniquely identified fixture installation only.
         if 'process' in locals() and process.poll() is None:

@@ -215,6 +215,16 @@ impl Bridge {
         &self.origin
     }
 
+    /// The cloud room this host holds, so a restart can keep it.
+    pub fn session_token(&self) -> Option<String> {
+        self.session.lock().unwrap().clone()
+    }
+    /// Continue a room registered by the previous process. The cloud keeps a
+    /// room for a short while without polls, so the code and phones stay.
+    pub fn resume_session(&self, token: String) {
+        *self.session.lock().unwrap() = Some(token);
+    }
+
     pub fn waiting(&self) -> serde_json::Value {
         self.waiting.lock().unwrap().clone()
     }

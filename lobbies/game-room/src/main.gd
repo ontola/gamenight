@@ -218,7 +218,10 @@ func _fit_fullscreen() -> void:
 # ---------------------------------------------------------------- party state
 
 func set_party(snapshot: Dictionary) -> void:
+	var was_ready := update_ready()
 	party = snapshot
+	if was_ready.is_empty() and not update_ready().is_empty():
+		toast("A new version of GameNight is ready. Press Start to update.", GREEN)
 	profiles.clear()
 	for player in party.get("players", []): profiles[str(player.id)] = player
 	controllers.clear()
@@ -518,8 +521,14 @@ func _celebrate(id: String, station_id: String) -> void:
 
 # ---------------------------------------------------------------- menu
 
+func update_ready() -> String:
+	var version = party.get("update_ready")
+	return "" if version == null else str(version)
+
 func menu_items(id: String) -> Array:
 	var items := [{"label": "Close menu", "action": "close"}, {"label": "Leave the party", "action": "leave"}]
+	# The host restarts into the new version and brings the party back.
+	if not update_ready().is_empty(): items.push_front({"label": "Update GameNight now", "action": "update"})
 	if links.get("linked", {}).has(id): items.insert(1, {"label": "Unlink my phone profile", "action": "unlink"})
 	items.append({"label": "Select other lobby", "action": "chooser"})
 	items.append({"label": "Quit GameNight", "action": "quit"})
@@ -539,6 +548,10 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 		var action: String = items[menu.index].action
 		match action:
 			"close": menus.erase(id)
+			"update":
+				menus.erase(id)
+				toast("Updating GameNight… everyone stays in the party.", GREEN)
+				client._command({"type": "apply_update"})
 			"leave":
 				menus.erase(id)
 				client.leave(id)
@@ -1014,6 +1027,14 @@ func _draw_hud(canvas: Control) -> void:
 		canvas.draw_rect(Rect2(rect.position, Vector2(4, rect.size.y)), t.color)
 		_text(canvas, t.text, rect.position + Vector2(24, size + 4), size, TEXT)
 		y -= rect.size.y + 10
+	if not update_ready().is_empty():
+		var size := int(18 * scale)
+		var msg := "Update ready  ·  Start to install"
+		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 40
+		var rect := Rect2(canvas.size.x - w - 24 * scale, 24 * scale, w, size + 22)
+		canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.85))
+		canvas.draw_rect(Rect2(rect.position, Vector2(4, rect.size.y)), GREEN)
+		_text(canvas, msg, rect.position + Vector2(20, size + 4), size, TEXT)
 	if demo == null and not client.connected:
 		var size := int(24 * scale)
 		var msg := "Connecting to GameNight…"

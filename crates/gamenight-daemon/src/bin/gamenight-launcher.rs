@@ -175,6 +175,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .env("GAMENIGHT_BUNDLED_LOBBIES", &bundled_lobbies)
         .env("GAMENIGHT_ONBOARDING_FILE", onboarding)
         .env("GAMENIGHT_BROWSER_REQUEST", &browser_request)
+        .env_remove("GAMENIGHT_UPDATE_READY_FILE")
+        .env_remove("GAMENIGHT_RESUME_FILE")
+        .env_remove("GAMENIGHT_UPDATE_SPLASH_FILE")
         .stdin(Stdio::piped())
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(local.join("daemon.log"))?)
@@ -191,6 +194,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     {
         use std::os::windows::process::CommandExt;
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let files = updates.files();
+        command
+            .env("GAMENIGHT_UPDATE_READY_FILE", &files.ready)
+            .env("GAMENIGHT_RESUME_FILE", &files.resume)
+            .env("GAMENIGHT_UPDATE_SPLASH_FILE", &files.splash);
     }
     let mut child = command.spawn()?;
     #[cfg(windows)]
@@ -232,6 +240,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .into());
     }
     #[cfg(windows)]
+    if updates.files().resume.exists() {
+        // The party asked for the new version and is waiting for it.
+        if !updates.restart_into_update() {
+            drop(lock);
+            Command::new(&executable).spawn()?;
+        }
+        return Ok(());
+    }
+    #[cfg(windows)]
     updates.apply_on_exit();
     Ok(())
 }
@@ -247,6 +264,14 @@ fn stop_tree(child: &mut std::process::Child) -> io::Result<()> {
 }
 
 fn main() {
+    // A copy of this executable covering the screen during an update.
+    #[cfg(windows)]
+    if std::env::args().nth(1).as_deref() == Some("--update-cover") {
+        if let Some(flag) = std::env::args_os().nth(2) {
+            windows::show_update_cover(flag.into());
+        }
+        return;
+    }
     #[cfg(windows)]
     velopack::VelopackApp::build()
         .set_auto_apply_on_startup(false)

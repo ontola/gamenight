@@ -722,6 +722,10 @@ pub struct PartySnapshot {
     /// Phone screens declared by connected games (see [`CompanionScreen`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub companions: Vec<CompanionScreen>,
+    /// A newer version of the host app is downloaded and can be applied
+    /// with `apply_update` between games. The value is its version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub update_ready: Option<String>,
 }
 
 /// A game's own phone screen: a small web page that GameNight serves to the
@@ -827,6 +831,9 @@ pub enum ClientMessage {
     QuitParty,
     /// Retry the configured replacement lobby after a crash. Trusted local UI only.
     RetryLobby,
+    /// Restart the host into the update named by `update_ready`, keeping the
+    /// party. Lobby only, and only between games.
+    ApplyUpdate,
     /// Only the authenticated lobby may publish physical input.
     ControllerFrame {
         controllers: Vec<ControllerState>,

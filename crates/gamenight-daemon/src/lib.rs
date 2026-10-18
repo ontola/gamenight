@@ -22,7 +22,7 @@ use tokio::sync::{mpsc, Mutex};
 use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, info, warn};
 
-use gamenight_core::{Command, Effect, GameCommand, GameNight};
+use gamenight_core::{Command, Effect, GameCommand, GameNight, PartyCarry};
 use gamenight_protocol::{
     ClientMessage, GameId, GameMeta, LaunchSpec, Role, ServerMessage, SessionId, ENV_ADDR,
     ENV_GAMENIGHT, ENV_GAME_ID, ENV_OVERLAY_URL, ENV_TOKEN, GODOT_SDK_VERSION, PROTOCOL_VERSION,
@@ -111,6 +111,72 @@ struct Shared {
     /// Playtests on this host, by game: the sha256 of the preview build being
     /// installed or on the shelf, and when its install last failed.
     playtests: HashMap<GameId, (String, Option<std::time::Instant>)>,
+    /// Files shared with the desktop launcher for updates, when it set them.
+    update: Option<HostUpdate>,
+    /// The downloaded host version waiting to be applied.
+    update_ready: Option<String>,
+    update_checked: Option<std::time::Instant>,
+    /// Since when nobody has been seated and nothing played, for unattended updates.
+    unattended_since: Option<std::time::Instant>,
+}
+
+/// The update handoff with the desktop launcher. The launcher downloads in
+/// the background and writes `ready`; the daemon decides when (between
+/// games), writes the party to `resume` and exits; the launcher applies the
+/// update and starts again, covering the screen until `splash` disappears.
+#[derive(Debug, Clone)]
+pub struct HostUpdate {
+    pub ready: std::path::PathBuf,
+    pub resume: std::path::PathBuf,
+    pub splash: std::path::PathBuf,
+}
+
+impl HostUpdate {
+    pub fn from_env() -> Option<Self> {
+        let path = |key: &str| std::env::var_os(key).map(std::path::PathBuf::from);
+        Some(Self {
+            ready: path("GAMENIGHT_UPDATE_READY_FILE")?,
+            resume: path("GAMENIGHT_RESUME_FILE")?,
+            splash: path("GAMENIGHT_UPDATE_SPLASH_FILE")?,
+        })
+    }
+}
+
+/// How long an empty, idle lobby waits before updating on its own.
+const UNATTENDED_UPDATE_AFTER: std::time::Duration = std::time::Duration::from_secs(10 * 60);
+
+/// Everything written to the resume file. The daemon writes `party`; the
+/// process that hosts the phone server adds `web` after the daemon stops.
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct Resume {
+    pub party: PartyCarry,
+    #[serde(default)]
+    pub web: Option<serde_json::Value>,
+}
+
+impl Resume {
+    /// Read and remove a resume file. A stale one (a crash long ago, a
+    /// manual restart the next day) is ignored: the night is over by then.
+    pub fn take(path: &std::path::Path) -> Option<Self> {
+        let fresh = std::fs::metadata(path)
+            .and_then(|meta| meta.modified())
+            .ok()
+            .and_then(|modified| modified.elapsed().ok())
+            .is_some_and(|age| age < std::time::Duration::from_secs(15 * 60));
+        let bytes = std::fs::read(path).ok();
+        let _ = std::fs::remove_file(path);
+        let resume = serde_json::from_slice(&bytes?).ok();
+        if !fresh {
+            return None;
+        }
+        resume
+    }
+
+    pub fn write(&self, path: &std::path::Path) -> std::io::Result<()> {
+        let temporary = path.with_extension("tmp");
+        std::fs::write(&temporary, serde_json::to_vec(self)?)?;
+        std::fs::rename(temporary, path)
+    }
 }
 
 impl Shared {
@@ -154,6 +220,10 @@ impl Shared {
             lobby_recovery_opened: false,
             companions: HashMap::new(),
             playtests: HashMap::new(),
+            update: None,
+            update_ready: None,
+            update_checked: None,
+            unattended_since: None,
         }
     }
 
@@ -171,7 +241,76 @@ impl Shared {
         party.game_issues.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.companions = self.companions.values().cloned().collect();
         party.companions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+        party.update_ready = self.update_ready.clone();
         party
+    }
+
+    /// Re-read the launcher's "update downloaded" note now and then.
+    fn refresh_update_ready(&mut self) {
+        let Some(update) = &self.update else { return };
+        let now = std::time::Instant::now();
+        if self
+            .update_checked
+            .is_some_and(|at| now.duration_since(at) < std::time::Duration::from_secs(5))
+        {
+            return;
+        }
+        self.update_checked = Some(now);
+        let version = std::fs::read(&update.ready)
+            .ok()
+            .filter(|bytes| bytes.len() <= 4096)
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|value| value["version"].as_str().map(str::to_owned));
+        if version != self.update_ready {
+            info!(?version, "host update readiness changed");
+            self.update_ready = version;
+            self.broadcast_party();
+        }
+    }
+
+    /// Restart into the downloaded update if nothing is being played. The
+    /// party is written for the next process; the launcher does the rest.
+    fn restart_for_update(&mut self) -> Result<(), String> {
+        let Some(update) = &self.update else {
+            return Err("this host cannot update itself".into());
+        };
+        if self.update_ready.is_none() {
+            return Err("no update is ready".into());
+        }
+        if !self.night.between_games() {
+            return Err("finish the current game before updating".into());
+        }
+        let resume = Resume {
+            party: self.night.carry(),
+            web: None,
+        };
+        resume
+            .write(&update.resume)
+            .map_err(|error| format!("could not save the party: {error}"))?;
+        info!("restarting into a host update; party saved");
+        self.shutdown_requested = true;
+        Ok(())
+    }
+
+    /// An empty, idle room updates by itself after a while.
+    fn maybe_update_unattended(&mut self) {
+        let idle = self.update_ready.is_some()
+            && self.night.seated_count() == 0
+            && self.night.between_games()
+            && !self.shutdown_requested;
+        if !idle {
+            self.unattended_since = None;
+            return;
+        }
+        let since = *self
+            .unattended_since
+            .get_or_insert_with(std::time::Instant::now);
+        if since.elapsed() >= UNATTENDED_UPDATE_AFTER {
+            if let Err(error) = self.restart_for_update() {
+                warn!(%error, "unattended update skipped");
+                self.unattended_since = None;
+            }
+        }
     }
 
     fn record_game_issue(&mut self, game: GameId, kind: gamenight_protocol::GameIssueKind) {
@@ -1259,7 +1398,7 @@ pub async fn run_with_prewarm(
     lobby_game: Option<GameId>,
     prewarm: Option<gamenight_installer::PrewarmHandle>,
 ) -> std::io::Result<()> {
-    run_inner(listener, library, lobby_game, prewarm, None, false, false).await
+    run_inner(listener, library, lobby_game, prewarm, None, false, None).await
 }
 
 /// [`run_with_prewarm`], plus the background installer's progress stream and
@@ -1279,7 +1418,7 @@ pub async fn run_with_prewarm_progress(
         prewarm,
         install_progress,
         true,
-        false,
+        None,
     )
     .await
 }
@@ -1292,6 +1431,8 @@ pub async fn run_desktop(
     lobby_game: GameId,
     prewarm: Option<gamenight_installer::PrewarmHandle>,
     install_progress: Option<mpsc::UnboundedReceiver<gamenight_protocol::InstallStatus>>,
+    update: Option<HostUpdate>,
+    carry: Option<PartyCarry>,
 ) -> std::io::Result<()> {
     run_inner(
         listener,
@@ -1300,9 +1441,16 @@ pub async fn run_desktop(
         prewarm,
         install_progress,
         true,
-        true,
+        Some(Desktop { update, carry }),
     )
     .await
+}
+
+/// What only the packaged desktop app has: quitting with its lobby, and
+/// updating itself without losing the party.
+struct Desktop {
+    update: Option<HostUpdate>,
+    carry: Option<PartyCarry>,
 }
 
 /// The one real body behind the `run*` family.
@@ -1318,12 +1466,22 @@ async fn run_inner(
     prewarm: Option<gamenight_installer::PrewarmHandle>,
     install_progress: Option<mpsc::UnboundedReceiver<gamenight_protocol::InstallStatus>>,
     music: bool,
-    exit_with_lobby: bool,
+    desktop: Option<Desktop>,
 ) -> std::io::Result<()> {
     let addr = listener.local_addr()?;
     info!(%addr, "gamenight daemon listening");
     let shared = Arc::new(Mutex::new(Shared::new(library, addr.to_string(), prewarm)));
-    shared.lock().await.exit_with_lobby = exit_with_lobby;
+    let exit_with_lobby = desktop.is_some();
+    if let Some(desktop) = desktop {
+        let mut s = shared.lock().await;
+        s.exit_with_lobby = true;
+        s.update = desktop.update;
+        if let Some(carry) = desktop.carry {
+            info!(players = carry.players.len(), "party restored after update");
+            let fx = s.night.restore(carry);
+            s.apply_effects(fx, None);
+        }
+    }
     let watched_lobby = lobby_game.clone();
     if let Some(rx) = install_progress {
         spawn_install_progress_pump(shared.clone(), rx);
@@ -1392,6 +1550,17 @@ async fn run_inner(
             },
             _ = lifetime_tick.tick() => {
                 let mut s = shared.lock().await;
+                s.refresh_update_ready();
+                s.maybe_update_unattended();
+                // Lobbies without the lobby API (the Clubhouse) never send
+                // `lobby_ready`; their connection is the closest signal.
+                if !s.runtime_input
+                    && watched_lobby.as_ref().is_some_and(|lobby| s.games.contains_key(lobby))
+                {
+                    if let Some(update) = &s.update {
+                        let _ = std::fs::remove_file(&update.splash);
+                    }
+                }
                 if s.shutdown_requested {
                     s.kill_all_children();
                     return Ok(());
@@ -1760,6 +1929,18 @@ async fn serve(
                 }
                 continue;
             }
+            if matches!(parsed, ClientMessage::ApplyUpdate) {
+                let mut s = shared.lock().await;
+                let result = if matches!(registration, Registration::Lobby(_)) {
+                    s.restart_for_update()
+                } else {
+                    Err("only the lobby can apply an update".into())
+                };
+                if let Err(message) = result {
+                    send(&tx, &ServerMessage::Error { message });
+                }
+                continue;
+            }
             if matches!(
                 parsed,
                 ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby
@@ -1769,6 +1950,13 @@ async fn serve(
                     if matches!(parsed, ClientMessage::QuitParty) {
                         s.shutdown_requested = true;
                     } else {
+                        if matches!(parsed, ClientMessage::LobbyReady) {
+                            // The new lobby is on screen; the launcher's
+                            // update cover may go.
+                            if let Some(update) = &s.update {
+                                let _ = std::fs::remove_file(&update.splash);
+                            }
+                        }
                         s.dispatch(Command::GameConnected { game: game.clone() }, Some(&tx));
                     }
                 } else {
@@ -1989,7 +2177,10 @@ fn message_to_command(
         | ClientMessage::CompanionPresence { .. } => {
             return Err("phone screens require dedicated routing".into())
         }
-        ClientMessage::LobbyReady | ClientMessage::QuitParty | ClientMessage::RetryLobby => {
+        ClientMessage::LobbyReady
+        | ClientMessage::QuitParty
+        | ClientMessage::RetryLobby
+        | ClientMessage::ApplyUpdate => {
             return Err("lobby lifecycle requires dedicated routing".into())
         }
         ClientMessage::DownloadGrants { .. } | ClientMessage::Playtests { .. } => {
@@ -2735,7 +2926,10 @@ mod desktop_lifetime_tests {
                 None,
                 None,
                 false,
-                true,
+                Some(Desktop {
+                    update: None,
+                    carry: None,
+                }),
             ),
         )
         .await
@@ -2748,7 +2942,7 @@ mod desktop_lifetime_tests {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         assert!(tokio::time::timeout(
             std::time::Duration::from_millis(300),
-            run_inner(listener, Vec::new(), None, None, None, false, false)
+            run_inner(listener, Vec::new(), None, None, None, false, None)
         )
         .await
         .is_err());
@@ -2774,7 +2968,10 @@ mod desktop_lifetime_tests {
                 None,
                 None,
                 false,
-                true
+                Some(Desktop {
+                    update: None,
+                    carry: None
+                })
             )
         )
         .await
@@ -2836,5 +3033,105 @@ mod welcome_artwork_tests {
         assert!(compact.library[0].icon.is_none());
         assert!(compact.library[0].screenshot.is_none());
         assert!(original.library[0].cover.is_some());
+    }
+}
+
+#[cfg(test)]
+mod update_restart_tests {
+    use super::*;
+
+    fn host_update() -> HostUpdate {
+        let dir = std::env::temp_dir().join(format!("gamenight-update-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        HostUpdate {
+            ready: dir.join("update-ready.json"),
+            resume: dir.join("resume.json"),
+            splash: dir.join("update-splash.flag"),
+        }
+    }
+
+    fn join(s: &mut Shared, name: &str, controller: &str) -> gamenight_protocol::PlayerId {
+        s.dispatch(
+            Command::JoinParty {
+                name: name.into(),
+                seat: None,
+                color: Some("#ff4f8b".into()),
+                avatar: None,
+                library: Vec::new(),
+            },
+            None,
+        );
+        let id = s
+            .night
+            .snapshot()
+            .players
+            .iter()
+            .find(|p| p.name == name)
+            .unwrap()
+            .id;
+        s.dispatch(
+            Command::BindController {
+                player_id: id,
+                controller: controller.into(),
+            },
+            None,
+        );
+        id
+    }
+
+    #[test]
+    fn update_restart_brings_the_same_party_back() {
+        let update = host_update();
+        let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        s.update = Some(update.clone());
+        let ada = join(&mut s, "Ada", "xinput:0");
+        let bo = join(&mut s, "Bo", "xinput:1");
+        s.dispatch(
+            Command::QueueGame {
+                game: GameId::new("hexstead"),
+                first: false,
+            },
+            None,
+        );
+        assert!(
+            s.restart_for_update().is_err(),
+            "nothing to restart into yet"
+        );
+        std::fs::write(&update.ready, r#"{"version":"0.2.300"}"#).unwrap();
+        s.refresh_update_ready();
+        assert_eq!(s.snapshot().update_ready.as_deref(), Some("0.2.300"));
+        s.restart_for_update().unwrap();
+        assert!(s.shutdown_requested);
+
+        let before = s.night.snapshot();
+        let resume = Resume::take(&update.resume).expect("fresh resume file");
+        assert!(!update.resume.exists(), "a resume file is used once");
+        let mut next = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        let fx = next.night.restore(resume.party);
+        next.apply_effects(fx, None);
+        let after = next.night.snapshot();
+        assert_eq!(after.players, before.players);
+        assert_eq!(after.seats, before.seats);
+        assert_eq!(after.playlist.entries, before.playlist.entries);
+        let seat = |id| {
+            after
+                .seats
+                .iter()
+                .find(|s| s.occupant.player_id() == Some(id))
+                .and_then(|s| s.controller.clone())
+        };
+        assert_eq!(seat(ada).as_deref(), Some("xinput:0"));
+        assert_eq!(seat(bo).as_deref(), Some("xinput:1"));
+        std::fs::remove_dir_all(update.ready.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn stale_or_missing_resume_files_are_ignored() {
+        let update = host_update();
+        assert!(Resume::take(&update.resume).is_none());
+        std::fs::write(&update.resume, b"not json").unwrap();
+        assert!(Resume::take(&update.resume).is_none());
+        assert!(!update.resume.exists());
+        std::fs::remove_dir_all(update.ready.parent().unwrap()).unwrap();
     }
 }

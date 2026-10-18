@@ -10,6 +10,12 @@ mod windows;
 
 #[cfg(windows)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if std::env::args().nth(1).as_deref() == Some("--update-cover") {
+        if let Some(flag) = std::env::args_os().nth(2) {
+            windows::show_update_cover(flag.into());
+        }
+        return Ok(());
+    }
     velopack::VelopackApp::build()
         .set_auto_apply_on_startup(false)
         .run();
@@ -27,6 +33,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = velopack::sources::FileSource::new(feed);
     let manager = velopack::UpdateManager::new(source.clone(), None, None)?;
     let content = seed_content(root, &data, "bundled-game", "fixture-1")?;
+    let files = windows::UpdateFiles::new(&data);
+    // Started again by the updater after a restart: the lobby is "ready".
+    let resumed = std::fs::remove_file(&files.resume).is_ok();
+    if resumed {
+        std::fs::remove_file(&files.splash)?;
+    }
     let updates = windows::Updates::with_source(&data, source);
     use std::os::windows::process::CommandExt;
     let child = std::process::Command::new(&exe)
@@ -38,7 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         data.join("running.tmp"),
         serde_json::to_vec(&serde_json::json!({
             "version": manager.get_current_version_as_string(), "pid": std::process::id(),
-            "child":child.id(), "content":content
+            "child":child.id(), "content":content, "resumed":resumed
         }))?,
     )?;
     std::fs::rename(data.join("running.tmp"), data.join("running.json"))?;
@@ -51,6 +63,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     job.close()?;
     std::fs::write(data.join("children-closed"), "yes")?;
+    if std::fs::read_to_string(data.join("exit"))? == "restart" {
+        // What the daemon does when the party asks for the update.
+        std::fs::write(&files.resume, "{}")?;
+        if !updates.restart_into_update() {
+            return Err("update was not applied for a restart".into());
+        }
+        return Ok(());
+    }
     updates.apply_on_exit();
     Ok(())
 }

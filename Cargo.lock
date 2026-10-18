@@ -518,6 +518,7 @@ name = "gamenight-core"
 version = "0.1.0"
 dependencies = [
  "gamenight-protocol",
+ "serde",
  "thiserror 2.0.19",
 ]
 
@@ -534,6 +535,7 @@ dependencies = [
  "gamenight-sdk",
  "gilrs",
  "objc2",
+ "serde",
  "serde_json",
  "sha2 0.10.9",
  "tokio",

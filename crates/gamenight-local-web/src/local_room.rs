@@ -43,6 +43,12 @@ impl Room {
             restored: Default::default(),
         }
     }
+    pub fn code(&self) -> &str {
+        &self.code
+    }
+    pub fn set_code(&mut self, code: String) {
+        self.code = code;
+    }
     pub fn restore(&mut self, profile: &str) {
         self.restored.insert(profile.into());
         self.pending.insert(

@@ -251,6 +251,25 @@ pub enum Effect {
     Reject { reason: String },
 }
 
+/// The part of a night that outlives the host process: who sits where with
+/// which controller, the queue and the chosen settings. Written just before
+/// the host restarts into an update and read back by the new process, so the
+/// couch comes back as it left. Sessions, votes and processes are not carried:
+/// an update only happens between games.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PartyCarry {
+    pub players: Vec<Player>,
+    #[serde(default)]
+    pub preferred_colors: HashMap<PlayerId, String>,
+    pub seats: Vec<Seat>,
+    #[serde(default)]
+    pub playlist: Vec<PlaylistEntry>,
+    #[serde(default)]
+    pub history: Vec<GameId>,
+    #[serde(default)]
+    pub settings: Vec<GameSettings>,
+}
+
 #[derive(Debug)]
 pub struct GameNight {
     players: Vec<Player>,
@@ -934,6 +953,7 @@ impl GameNight {
             onboarding_error: None,
             game_issues: Vec::new(),
             companions: Vec::new(),
+            update_ready: None,
             presence: self.presence_snapshot(),
             players: self.players.clone(),
             seats: self.seats.clone(),
@@ -980,6 +1000,57 @@ impl GameNight {
                 settings
             },
         }
+    }
+
+    /// Nothing is being played, so the host may restart without interrupting
+    /// a game. Warm games are only preloaded and may be stopped.
+    pub fn between_games(&self) -> bool {
+        self.active.as_ref().is_none_or(|session| {
+            matches!(
+                session.info().phase,
+                SessionPhase::Finished | SessionPhase::Disposed
+            )
+        })
+    }
+
+    /// Everything [`PartyCarry`] keeps across a host restart.
+    pub fn carry(&self) -> PartyCarry {
+        PartyCarry {
+            players: self.players.clone(),
+            preferred_colors: self.preferred_colors.clone(),
+            seats: self.seats.clone(),
+            playlist: self.playlist.entries().to_vec(),
+            history: self.history.clone(),
+            settings: self.settings.clone(),
+        }
+    }
+
+    /// Put a carried party back, keeping player ids so phones and lobbies
+    /// that remember an id still point at the same person. Only for a fresh
+    /// night: call before any game connects.
+    pub fn restore(&mut self, carry: PartyCarry) -> Vec<Effect> {
+        let mut seats = carry.seats;
+        for (index, seat) in seats.iter_mut().enumerate() {
+            seat.index = index as u8;
+            if seat
+                .occupant
+                .player_id()
+                .is_some_and(|id| !carry.players.iter().any(|p| p.id == id))
+            {
+                seat.occupant = SeatOccupant::Empty;
+            }
+        }
+        if !seats.is_empty() {
+            self.seats = seats;
+        }
+        self.players = carry.players;
+        self.preferred_colors = carry.preferred_colors;
+        self.playlist.set_entries(carry.playlist);
+        self.history = carry.history;
+        self.settings = carry.settings;
+        let mut fx = vec![Effect::StateChanged];
+        self.rewarm_if_misfit(&mut fx);
+        fx
     }
 
     /// The host's background music, if any is playing — chiefly so the daemon

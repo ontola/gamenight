@@ -1,7 +1,7 @@
 extends Node
 ## Offline demo: a synthetic party with drawn faces and simple bots, for
 ## screenshots and for trying the room without a GameNight runtime.
-##   godot --path . -- --demo [--scene=action|stations|sleep|empty] [--links=file.json]
+##   godot --path . -- --demo [--scene=action|stations|sleep|empty] [--links=file.json] [--update-ready]
 
 var main
 var scene := "action"
@@ -40,6 +40,11 @@ func _ready() -> void:
 		"now_playing": {"title": "Midnight City", "artist": "M83", "playing": true, "source": "Spotify"}}
 	if scene == "sleep": party.presence = [{"player_id": "p1", "state": "sleeping"}, {"player_id": "p3", "state": "sleeping"}]
 	main.set_party(party)
+	# --update-ready: a downloaded host update, with one player's menu open.
+	if OS.get_cmdline_user_args().has("--update-ready"):
+		party.update_ready = "0.2.300"
+		main.set_party(party)
+		main.menus.p0 = {"index": 0, "confirm": false}
 	var links := {"room": {"room_code": "KJX4", "pending": [
 		{"id": "pend1", "profile": {"display_name": "Sanne", "skin_color": "#edc59a", "avatar": _face(8)}},
 		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(9)}}]}, "linked": {}}
