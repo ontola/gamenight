@@ -4238,6 +4238,8 @@ mod next_game_status_tests {
             min_players: None,
             max_players: None,
             best_players: None,
+            play_with: Default::default(),
+            min_phones: None,
             launch: None,
         }
     }

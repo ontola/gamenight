@@ -27,6 +27,8 @@ fn spawnable_meta(id: &str) -> GameMeta {
         min_players: None,
         max_players: None,
         best_players: None,
+        play_with: Default::default(),
+        min_phones: None,
         launch: Some(LaunchSpec {
             // The compiled demo-game binary; identity arrives via GAMENIGHT_*.
             command: env!("CARGO_BIN_EXE_demo-game").to_string(),

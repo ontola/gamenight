@@ -372,6 +372,8 @@ impl Bridge {
         // What the daemon last accepted; resent only when the set changes.
         let mut delivered_grants: Option<BTreeMap<String, String>> = None;
         let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
+        // Waiting phones that asked for a seat of their own, tried once each.
+        let mut phone_seats: HashMap<String, Option<PlayerId>> = HashMap::new();
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {},
@@ -500,6 +502,48 @@ impl Bridge {
                     response.0["status"] == "claimed" || response.0["status"] == "joined"
                 }) {
                     applied.insert(u.account.clone(), (u.seat.clone(), u.profile_revision));
+                }
+            }
+            // A phone that asked to play on its own gets a player first; the
+            // cloud links it once a poll has reported that player's seat.
+            for (id, player) in phone_seats.clone() {
+                if !updates.pending.iter().any(|p| p["id"] == id.as_str()) {
+                    phone_seats.remove(&id);
+                    // Linked when the cloud reports an account on its seat.
+                    let linked = player.is_some_and(|player| {
+                        updates
+                            .updates
+                            .iter()
+                            .any(|u| u.seat.player == player.0.to_string())
+                    });
+                    if let (Some(player), false) = (player, linked) {
+                        crate::phones::remove(&state, player).await;
+                    }
+                }
+            }
+            for waiting in updates.pending.iter().filter(|p| p["phone_seat"] == true) {
+                let Some(id) = waiting["id"].as_str() else {
+                    continue;
+                };
+                match phone_seats.get(id).copied() {
+                    None => {
+                        let player = crate::phones::create(&state, &waiting["profile"])
+                            .await
+                            .ok();
+                        phone_seats.insert(id.to_string(), player);
+                        self.refresh.notify_one();
+                    }
+                    Some(Some(player))
+                        if seats.iter().any(|s| s.player == player.0.to_string()) =>
+                    {
+                        let status = self.pickup(&state, id, player).await;
+                        tracing::info!(%status, "linking a phone player");
+                        if !status.is_success() && status != axum::http::StatusCode::GONE {
+                            crate::phones::remove(&state, player).await;
+                            phone_seats.insert(id.to_string(), None);
+                        }
+                    }
+                    _ => {}
                 }
             }
             // The cloud knows every seat now, so a main player whose pickup

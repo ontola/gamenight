@@ -152,6 +152,38 @@ does not invent AI occupants to fill it. Explicitly assigned `ai` seats are
 preserved in `prepare` only within the game's maximum capacity, with humans
 taking priority. AI occupants do not count toward the human minimum.
 
+### Controllers and phones
+
+Some games are played on phones, so the range above counts what each player
+holds, not just who is seated. A game says so with `play_with`:
+
+| `play_with` | counts |
+|---|---|
+| `controller` (default) | players holding a controller |
+| `phone` | players with a linked phone; a controller is optional |
+| `controller_and_phone` | players holding both |
+| `controller_or_phone` | players holding either; pair with `min_phones` for asymmetric games (one god on a phone, the rest on controllers) |
+
+A player's phone is linked once their phone joined the room and is bound to
+them, whichever way (lobby door, QR, hosted room). The host's web server sends
+the daemon that list with `set_phones`, and every snapshot carries it as
+`phones`. A seat with a phone and no controller is a **phone-only player**:
+someone who joined with only a phone because there were more phones than
+controllers. A player with neither a controller nor a phone (a development
+keyboard, an older client) counts as holding a controller.
+
+So two controllers and four phones fit a four-player phone game, and a
+phone-only player never fills a seat in a controller game: such games receive
+that seat as `empty` in `prepare` and `party_updated`, and phone-only players
+do not hold up a vote. Screens show why a game does not fit ("Needs 2 phones"),
+mirroring `GameMeta::shortfall` in the Rust crate.
+
+Nobody is too late. Before a game starts, a new player or a newly linked phone
+re-prepares the warm game like any other join. While it runs, a player's phone
+can link at any time and the game hears `companion_presence`, so it can hand
+their seat back from a bot. A new phone-only player joins a running game with
+`instant_join: true` at once, and other games on their next round.
+
 Party snapshots include optional `next_game_index`, the exact upcoming
 playlist occurrence even before its process connects. Use it for the Up Next
 preview: two queued entries can have the same game ID. Older hosts omit it.
@@ -241,6 +273,7 @@ role; the runtime supplies its controller stream.
 | message | effect |
 |---|---|
 | `join_party {name, seat?}` | new player; the requested seat if free, else the first empty one |
+| `join_phone_player {name, color?, avatar?}` | new player who plays on a phone and holds no controller; takes a free seat, or adds one past the controller seats (eight at most) |
 | `leave_party {player_id}` | player leaves; their seat empties |
 | `rename_player {player_id, name}` | change a player's display name |
 | `set_player_color {player_id, color}` | game-controlled clothing/team colour (`#rrggbb`); independent of skin |
@@ -265,6 +298,11 @@ someone seated owns. Each message replaces the previous set. A paid catalog game
 downloads only while it has a grant, which is appended to its download URL as
 `?grant=` (or `&grant=`); a newly granted game is fetched next. Other roles get an
 `error`. Tokens are secrets and never appear in logs or `party_state`.
+
+`set_phones {players}` comes from the host's web server, which pairs phones with
+players: the players whose phone is linked now, replacing the previous list.
+It appears in the snapshot as `phones` (see [Controllers and
+phones](#controllers-and-phones)).
 
 `playtests {playtests}` is also for the trusted local web server only. Each item
 is a game's preview build that this table may play because someone seated owns

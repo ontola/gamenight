@@ -102,6 +102,8 @@ mod night_tests {
             min_players: None,
             max_players: None,
             best_players: None,
+            play_with: Default::default(),
+            min_phones: None,
             launch: None,
         }
     }
@@ -567,6 +569,103 @@ mod night_tests {
         });
         assert!(prepared_session(&fx).is_none());
         assert!(night.snapshot().warming.is_none());
+    }
+
+    fn bind_all(night: &mut GameNight) -> Vec<gamenight_protocol::PlayerId> {
+        let ids: Vec<_> = night.snapshot().players.iter().map(|p| p.id).collect();
+        for (i, id) in ids.iter().enumerate() {
+            night.handle(Command::BindController {
+                player_id: *id,
+                controller: format!("ordinal:{i}"),
+            });
+        }
+        ids
+    }
+
+    #[test]
+    fn phone_games_count_linked_phones_not_controllers() {
+        let mut night = GameNight::default();
+        let mut cards = meta("cards");
+        cards.play_with = gamenight_protocol::PlayWith::Phone;
+        cards.min_players = Some(2);
+        let mut duo = meta("duo");
+        duo.max_players = Some(2);
+        night.set_library(vec![cards, duo]);
+        for name in ["one", "two", "three"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        let ids = bind_all(&mut night);
+        for game in ["cards", "duo"] {
+            night.handle(Command::GameConnected {
+                game: GameId::new(game),
+            });
+        }
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("cards"), entry("duo")],
+        });
+        assert!(prepared_session(&fx).is_none(), "no phones, three pads");
+
+        let fx = night.handle(Command::SetPhones {
+            players: vec![ids[0]],
+        });
+        assert!(prepared_session(&fx).is_none(), "one phone is not two");
+        let fx = night.handle(Command::SetPhones {
+            players: vec![ids[0], ids[2]],
+        });
+        let (game, _) = prepared_session(&fx).unwrap();
+        assert_eq!(game, GameId::new("cards"));
+        assert_eq!(night.snapshot().phones.len(), 2);
+    }
+
+    #[test]
+    fn phone_only_players_skip_controller_games_and_votes() {
+        let mut night = GameNight::default();
+        let mut duo = meta("duo");
+        duo.max_players = Some(2);
+        night.set_library(vec![duo.clone()]);
+        night.handle(join_cmd("one", None, None));
+        night.handle(join_cmd("two", None, None));
+        bind_all(&mut night);
+        night.handle(join_cmd("phone", None, None));
+        let phone = night.snapshot().players[2].id;
+        night.handle(Command::GameConnected {
+            game: GameId::new("duo"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("duo")],
+        });
+        assert!(prepared_session(&fx).is_none(), "three without phones");
+        let fx = night.handle(Command::SetPhones {
+            players: vec![phone],
+        });
+        let (game, _) = prepared_session(&fx).unwrap();
+        assert_eq!(game, GameId::new("duo"));
+        let seats = fx
+            .iter()
+            .find_map(|e| match e {
+                Effect::ToGame {
+                    command: GameCommand::Prepare { seats, .. },
+                    ..
+                } => Some(seats.clone()),
+                _ => None,
+            })
+            .unwrap();
+        assert!(
+            !seats.iter().any(|s| s.occupant.player_id() == Some(phone)),
+            "a pad game gets no seat for a phone-only player"
+        );
+        let party = night.snapshot();
+        let seat = party
+            .seats
+            .iter()
+            .find(|s| s.occupant.player_id() == Some(phone))
+            .unwrap();
+        assert!(!night.voters().contains(&phone));
+        assert_eq!(
+            duo.shortfall(&party.seats, &party.phones),
+            None,
+            "{seat:?} is phone-only"
+        );
     }
 
     #[test]
@@ -1200,6 +1299,8 @@ mod night_tests {
             min_players: None,
             max_players: None,
             best_players: None,
+            play_with: Default::default(),
+            min_phones: None,
             launch: None,
         }]);
         for g in ["g1", "g2", "g9"] {
@@ -1253,6 +1354,8 @@ mod night_tests {
                 min_players: None,
                 max_players: None,
                 best_players: None,
+                play_with: Default::default(),
+                min_phones: None,
                 launch: Some(gamenight_protocol::LaunchSpec {
                     command: "/games/launchable".into(),
                     args: vec![],
@@ -1273,6 +1376,8 @@ mod night_tests {
                 min_players: None,
                 max_players: None,
                 best_players: None,
+                play_with: Default::default(),
+                min_phones: None,
                 launch: None,
             },
         ]);
@@ -2397,6 +2502,8 @@ mod player_count_fit_tests {
             min_players: Some(min),
             max_players: Some(max),
             best_players: best,
+            play_with: Default::default(),
+            min_phones: None,
             launch: Some(LaunchSpec {
                 command: "/bin/true".into(),
                 args: vec![],

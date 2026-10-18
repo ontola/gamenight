@@ -102,6 +102,10 @@ Field rules (enforced by `cargo test -p gamenight-catalog`):
   and matches the game id used on the wire.
 - `players` — `min`/`max` are required; `best` is the count the game shines
   at. Don't lie: `max` is *couch* seats, not online lobby size.
+  `play_with` says what each player holds: `controller` (default), `phone`,
+  `controller_and_phone` or `controller_or_phone`; `min`/`max` count only the
+  players holding it. `min_phones` asks for at least that many phones, for
+  games where only some play on one (needs a `play_with` that uses phones).
 - `price` — `free`, `pay_what_you_want`, or `paid`.
 - `integration.level` — the metadata stage above. A `certified` label does not
   replace platform and package-matched evidence in the integration rating.

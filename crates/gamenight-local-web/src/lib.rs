@@ -13,6 +13,7 @@ pub mod host_lobby;
 mod local_room;
 mod memory;
 mod onboarding;
+mod phones;
 mod playlist;
 mod room_controls;
 mod docs_pages {
@@ -230,6 +231,7 @@ pub fn create_router(state: SharedState) -> Router {
             post(local_room::main_player),
         )
         .route("/api/local-room/cancel/:id", post(local_room::cancel))
+        .route("/api/local-room/phone-seat", post(local_room::phone_seat))
         .route("/api/room-pickup/:pending/:player", post(room_pickup))
         .route("/api/player-links/:id/unlink", post(unlink_player))
         .route("/api/profiles", post(save_profile))
@@ -278,6 +280,7 @@ pub async fn run_server(
         tokio::spawn(local.companions.clone().run(local.daemon_addr.clone()));
     }
     tokio::spawn(local_room::watch_first_seat(state.clone()));
+    tokio::spawn(phones::watch(state.clone()));
     let cloud_session = state
         .lock()
         .unwrap()

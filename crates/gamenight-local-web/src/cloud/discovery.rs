@@ -27,20 +27,16 @@ pub(crate) struct Selection {
 
 pub(crate) fn snapshot(party: &PartySnapshot, acknowledged: &Option<String>) -> Value {
     let mut games = Vec::new();
-    let count = party
-        .seats
-        .iter()
-        .filter(|s| s.occupant.player_id().is_some())
-        .count() as u8;
     for game in &party.library {
         let install = party
             .installs
             .iter()
             .find(|i| i.game == game.id)
             .filter(|i| !not_on_this_host(i));
-        // Mirror the daemon's human range; a minimum does not imply AI support.
+        // Mirror the daemon's human range, counted by what each player holds
+        // (controller or phone); a minimum does not imply AI support.
         // Keep every title in discovery, but don't offer an unsupported selection.
-        let selectable = game.fits_players(count)
+        let selectable = game.fits_party(&party.seats, &party.phones)
             && (game.launch.is_some()
                 || party.connected_games.contains(&game.id)
                 || install.is_some());

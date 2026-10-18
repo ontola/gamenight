@@ -10,8 +10,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 
 use gamenight_protocol::{
     GameId, GameMeta, GameSettings, InstallState, InstallStatus, MediaAction, NowPlaying,
-    PartySnapshot, Player, PlayerId, PlaylistEntry, Seat, SeatOccupant, SessionId, SessionPhase,
-    SettingSpec, SettingValue, SettingsAction, VoteOption,
+    PartySnapshot, PlayWith, Player, PlayerId, PlaylistEntry, Seat, SeatOccupant, SessionId,
+    SessionPhase, SettingSpec, SettingValue, SettingsAction, VoteOption,
 };
 
 use crate::playlist::Playlist;
@@ -53,6 +53,16 @@ pub enum Command {
     },
     LeaveParty {
         player_id: PlayerId,
+    },
+    /// A player on a phone only; may add a seat past the controller seats.
+    JoinPhonePlayer {
+        name: String,
+        color: Option<String>,
+        avatar: Option<String>,
+    },
+    /// The players whose phone is linked (see `PartySnapshot::phones`).
+    SetPhones {
+        players: Vec<PlayerId>,
     },
     RenamePlayer {
         player_id: PlayerId,
@@ -270,11 +280,16 @@ pub struct PartyCarry {
     pub settings: Vec<GameSettings>,
 }
 
+/// Seats including those added for phone-only players.
+const MAX_SEATS: usize = 8;
+
 #[derive(Debug)]
 pub struct GameNight {
     players: Vec<Player>,
     preferred_colors: HashMap<PlayerId, String>,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
+    /// Players with a linked phone, as the host's web server last reported.
+    phones: Vec<PlayerId>,
     participation: HashMap<SessionId, bool>,
     seats: Vec<Seat>,
     playlist: Playlist,
@@ -339,6 +354,7 @@ impl GameNight {
             players: Vec::new(),
             preferred_colors: HashMap::new(),
             presence: HashMap::new(),
+            phones: Vec::new(),
             participation: HashMap::new(),
             seats: (0..seat_count)
                 .map(|index| Seat {
@@ -525,6 +541,38 @@ impl GameNight {
                 library,
             } => self.on_join(name, seat, color, avatar, library, &mut fx),
             Command::LeaveParty { player_id } => self.on_leave(player_id, &mut fx),
+            Command::JoinPhonePlayer {
+                name,
+                color,
+                avatar,
+            } => {
+                let free = self.seats.iter().any(|s| s.occupant.is_empty());
+                if !free && self.seats.len() >= MAX_SEATS {
+                    fx.push(Effect::Reject {
+                        reason: "the party is full".into(),
+                    });
+                } else {
+                    if !free {
+                        self.seats.push(Seat {
+                            index: self.seats.len() as u8,
+                            occupant: SeatOccupant::Empty,
+                            controller: None,
+                        });
+                    }
+                    self.on_join(name, None, color, avatar, Vec::new(), &mut fx)
+                }
+            }
+            Command::SetPhones { mut players } => {
+                players.sort_by_key(|p| p.0);
+                players.dedup();
+                if players != self.phones {
+                    self.phones = players;
+                    fx.push(Effect::StateChanged);
+                    // A linked phone can make a phone game playable, or a
+                    // phone-only player stop counting for a controller game.
+                    self.rewarm_if_misfit(&mut fx);
+                }
+            }
             Command::RenamePlayer { player_id, name } => {
                 self.on_rename_player(player_id, name, &mut fx)
             }
@@ -956,6 +1004,7 @@ impl GameNight {
             update_ready: None,
             lobbies: Vec::new(),
             presence: self.presence_snapshot(),
+            phones: self.party_phones(),
             players: self.players.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.snapshot(),
@@ -1099,9 +1148,10 @@ impl GameNight {
     }
 
     /// Players who currently hold a seat — the set whose consensus decides votes.
-    fn voters(&self) -> Vec<PlayerId> {
+    pub(crate) fn voters(&self) -> Vec<PlayerId> {
         self.seats
             .iter()
+            .filter(|s| !self.phone_only(s))
             .filter_map(|s| s.occupant.player_id())
             .filter(|id| {
                 !self
@@ -2004,16 +2054,28 @@ impl GameNight {
     /// Games the shelf knows nothing about fit anything — see
     /// `GameMeta::fits_players`.
     fn game_fits_party(&self, game: &GameId) -> bool {
-        let players = self
-            .seats
-            .iter()
-            .filter(|s| s.occupant.player_id().is_some())
-            .count()
-            .min(u8::MAX as usize) as u8;
+        let phones = self.party_phones();
         self.library
             .iter()
             .find(|m| &m.id == game)
-            .is_none_or(|m| m.fits_players(players))
+            .is_none_or(|m| m.fits_party(&self.seats, &phones))
+    }
+
+    /// Linked phones of players still in the party.
+    fn party_phones(&self) -> Vec<PlayerId> {
+        self.phones
+            .iter()
+            .filter(|id| self.players.iter().any(|p| p.id == **id))
+            .copied()
+            .collect()
+    }
+
+    /// A seat held by a phone and no controller. Such a player has no
+    /// avatar to walk onto a lobby pad, so it never holds up a vote.
+    fn phone_only(&self, seat: &Seat) -> bool {
+        seat.occupant
+            .player_id()
+            .is_some_and(|id| seat.controller.is_none() && self.phones.contains(&id))
     }
 
     /// Whether playlist entry `index` is actually something that can be
@@ -2146,12 +2208,22 @@ impl GameNight {
     /// Games advertising solo support accept one human and manage their AI.
     fn seats_for(&self, game: &GameId) -> Vec<Seat> {
         let mut seats = self.seats.clone();
-        if let Some(max) = self
-            .library
-            .iter()
-            .find(|m| &m.id == game)
-            .and_then(|m| m.max_players)
-        {
+        let meta = self.library.iter().find(|m| &m.id == game);
+        // A game played with controllers gets no seat for someone on a phone
+        // alone: that player has nothing to steer it with.
+        if meta.is_none_or(|m| {
+            matches!(
+                m.play_with,
+                PlayWith::Controller | PlayWith::ControllerAndPhone
+            )
+        }) {
+            for seat in &mut seats {
+                if self.phone_only(seat) {
+                    seat.occupant = SeatOccupant::Empty;
+                }
+            }
+        }
+        if let Some(max) = meta.and_then(|m| m.max_players) {
             let humans = seats
                 .iter()
                 .filter(|s| s.occupant.player_id().is_some())

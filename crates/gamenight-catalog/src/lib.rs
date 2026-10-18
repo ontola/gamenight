@@ -70,6 +70,43 @@ pub struct Players {
     /// The count the game shines at.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub best: Option<u8>,
+    /// What each player holds to play. `min`/`max` count only the players
+    /// who hold it, so a phone game with two phones on the couch fits two.
+    #[serde(default, skip_serializing_if = "PlayWith::is_controller")]
+    pub play_with: PlayWith,
+    /// At least this many players on a phone, for games where only some
+    /// play on one (`play_with: "controller_or_phone"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_phones: Option<u8>,
+}
+
+/// What a player needs in hand: a controller (default), a linked phone,
+/// both, or either.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayWith {
+    #[default]
+    Controller,
+    Phone,
+    ControllerAndPhone,
+    ControllerOrPhone,
+}
+
+impl PlayWith {
+    pub fn is_controller(&self) -> bool {
+        *self == PlayWith::Controller
+    }
+}
+
+impl From<PlayWith> for gamenight_protocol::PlayWith {
+    fn from(value: PlayWith) -> Self {
+        match value {
+            PlayWith::Controller => Self::Controller,
+            PlayWith::Phone => Self::Phone,
+            PlayWith::ControllerAndPhone => Self::ControllerAndPhone,
+            PlayWith::ControllerOrPhone => Self::ControllerOrPhone,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -323,6 +360,16 @@ fn validate_entry(entry: &CatalogEntry, filename: &str, hosted: bool) -> Vec<Str
         check(
             (entry.players.min..=entry.players.max).contains(&best),
             "players.best must be within min..=max",
+        );
+    }
+    if let Some(phones) = entry.players.min_phones {
+        check(
+            (1..=entry.players.max).contains(&phones),
+            "players.min_phones must be within 1..=max",
+        );
+        check(
+            entry.players.play_with != PlayWith::Controller,
+            "players.min_phones needs a play_with that uses phones",
         );
     }
 

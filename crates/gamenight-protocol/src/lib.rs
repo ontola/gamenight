@@ -470,13 +470,124 @@ pub struct GameMeta {
     /// all merely fit.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub best_players: Option<u8>,
+    /// What each player holds to play: a controller (the default), a phone,
+    /// both, or either. The player range above counts only the party members
+    /// who hold what this asks for.
+    #[serde(default, skip_serializing_if = "PlayWith::is_controller")]
+    pub play_with: PlayWith,
+    /// Phones the game needs at the least among its players, for games where
+    /// only some play on a phone (one god on a phone, the rest on controllers).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_phones: Option<u8>,
     /// How to start this game. Absent = the daemon waits for the process to
     /// show up on its own (dev mode / externally managed).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub launch: Option<LaunchSpec>,
 }
 
+/// What a player needs in hand to play a game. A phone counts once its owner
+/// has linked it to their player (`PartySnapshot::phones`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlayWith {
+    /// A controller. Phones may still open the game's phone screen.
+    #[default]
+    Controller,
+    /// A phone; controllers are not needed (cards, trading, private choices).
+    Phone,
+    /// A controller and a phone each.
+    ControllerAndPhone,
+    /// Either: asymmetric games where some play on a phone, the rest on a
+    /// controller. Pair with `min_phones`.
+    ControllerOrPhone,
+}
+
+impl PlayWith {
+    pub fn is_controller(&self) -> bool {
+        *self == PlayWith::Controller
+    }
+}
+
+/// Who in the party can play a given game, by what they hold.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct PartyFit {
+    /// Seated people in the party.
+    pub humans: u8,
+    /// Of those, the ones holding what the game asks for.
+    pub able: u8,
+    /// Of the able, the ones with a linked phone.
+    pub phones: u8,
+}
+
+/// Why a game cannot be played by the party right now, for screens to say.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Shortfall {
+    TooManyPlayers { max: u8 },
+    NeedsPlayers { min: u8 },
+    NeedsPhones { min: u8 },
+    NeedsControllers { min: u8 },
+}
+
+/// Whether a seated player holds a controller and a linked phone. A player
+/// with neither (a dev keyboard, an older client) counts as holding a
+/// controller, so only someone known to be phone-only loses it.
+pub fn holds(seat: &Seat, phones: &[PlayerId]) -> Option<(bool, bool)> {
+    let player = seat.occupant.player_id()?;
+    let phone = phones.contains(&player);
+    Some((seat.controller.is_some() || !phone, phone))
+}
+
 impl GameMeta {
+    /// Count the party for this game. See [`PlayWith`].
+    pub fn party_fit(&self, seats: &[Seat], phones: &[PlayerId]) -> PartyFit {
+        let mut fit = PartyFit::default();
+        for (controller, phone) in seats.iter().filter_map(|seat| holds(seat, phones)) {
+            fit.humans = fit.humans.saturating_add(1);
+            let able = match self.play_with {
+                PlayWith::Controller => controller,
+                PlayWith::Phone => phone,
+                PlayWith::ControllerAndPhone => controller && phone,
+                PlayWith::ControllerOrPhone => controller || phone,
+            };
+            if able {
+                fit.able = fit.able.saturating_add(1);
+                fit.phones = fit.phones.saturating_add(u8::from(phone));
+            }
+        }
+        fit
+    }
+
+    /// What stops this party from playing the game, if anything. An empty
+    /// party fits everything, as in [`GameMeta::fits_players`].
+    pub fn shortfall(&self, seats: &[Seat], phones: &[PlayerId]) -> Option<Shortfall> {
+        let fit = self.party_fit(seats, phones);
+        if fit.humans == 0 {
+            return None;
+        }
+        if let Some(max) = self.max_players.filter(|max| fit.able > *max) {
+            return Some(Shortfall::TooManyPlayers { max });
+        }
+        let min = self.min_players.unwrap_or(1).max(1);
+        if fit.able < min {
+            return Some(match self.play_with {
+                PlayWith::Phone | PlayWith::ControllerAndPhone if fit.humans >= min => {
+                    Shortfall::NeedsPhones { min }
+                }
+                _ if fit.humans >= min => Shortfall::NeedsControllers { min },
+                _ => Shortfall::NeedsPlayers { min },
+            });
+        }
+        match self.min_phones {
+            Some(min) if fit.phones < min => Some(Shortfall::NeedsPhones { min }),
+            _ => None,
+        }
+    }
+
+    /// Whether this party, with these phones linked, can play the game.
+    pub fn fits_party(&self, seats: &[Seat], phones: &[PlayerId]) -> bool {
+        self.shortfall(seats, phones).is_none()
+    }
+
     /// Whether this game can be played by `players` people on one couch.
     ///
     /// An empty party (nobody has joined yet) fits everything: the lobby
@@ -719,6 +830,11 @@ pub struct PartySnapshot {
     /// one that shows none at all. Screens render this only when it's `Some`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub now_playing: Option<NowPlaying>,
+    /// Players with a phone linked to them, whichever way it joined. Games
+    /// that need phones count these (see [`PlayWith`]). A seat with a phone
+    /// and no controller is a phone-only player.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub phones: Vec<PlayerId>,
     /// Phone screens declared by connected games (see [`CompanionScreen`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub companions: Vec<CompanionScreen>,
@@ -852,6 +968,11 @@ pub enum ClientMessage {
     SwitchLobby {
         lobby: GameId,
     },
+    /// The players whose phone is linked, replacing the previous list. Sent
+    /// by the host's web server, which pairs phones with players.
+    SetPhones {
+        players: Vec<PlayerId>,
+    },
     /// Only the authenticated lobby may publish physical input.
     ControllerFrame {
         controllers: Vec<ControllerState>,
@@ -895,6 +1016,15 @@ pub enum ClientMessage {
         avatar: Option<String>,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         library: Vec<GameId>,
+    },
+    /// Add a player who plays on their phone and holds no controller. Takes
+    /// a free seat, or adds one past the controller seats (up to eight).
+    JoinPhonePlayer {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        color: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        avatar: Option<String>,
     },
     LeaveParty {
         player_id: PlayerId,
@@ -1246,6 +1376,56 @@ impl std::fmt::Debug for Playtest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn seated(controller: bool) -> (Seat, PlayerId) {
+        let id = PlayerId::new();
+        let seat = Seat {
+            index: 0,
+            occupant: SeatOccupant::Local { player_id: id },
+            controller: controller.then(|| "ordinal:0".into()),
+        };
+        (seat, id)
+    }
+
+    #[test]
+    fn games_count_what_players_hold() {
+        let god: GameMeta = serde_json::from_str(
+            r#"{"id":"god","title":"God","min_players":2,"max_players":4,
+                "play_with":"controller_or_phone","min_phones":1}"#,
+        )
+        .unwrap();
+        let (pad, _) = seated(true);
+        let (both, both_id) = seated(true);
+        let (phone, phone_id) = seated(false);
+        assert_eq!(
+            god.shortfall(&[pad.clone(), both.clone()], &[]),
+            Some(Shortfall::NeedsPhones { min: 1 })
+        );
+        assert!(god.fits_party(&[pad.clone(), phone.clone()], &[phone_id]));
+        let fit = god.party_fit(
+            &[pad.clone(), both.clone(), phone.clone()],
+            &[both_id, phone_id],
+        );
+        assert_eq!((fit.humans, fit.able, fit.phones), (3, 3, 2));
+
+        let mut cards = god.clone();
+        cards.play_with = PlayWith::Phone;
+        cards.min_phones = None;
+        assert_eq!(
+            cards.shortfall(&[pad.clone(), both.clone()], &[both_id]),
+            Some(Shortfall::NeedsPhones { min: 2 })
+        );
+        let mut duo = cards.clone();
+        duo.play_with = PlayWith::Controller;
+        duo.max_players = Some(2);
+        // A phone-only player does not take a pad seat.
+        assert!(duo.fits_party(&[pad.clone(), both.clone(), phone.clone()], &[phone_id]));
+        assert_eq!(
+            duo.shortfall(&[pad, phone], &[phone_id]),
+            Some(Shortfall::NeedsControllers { min: 2 })
+        );
+        assert!(!serde_json::to_string(&duo).unwrap().contains("play_with"));
+    }
 
     #[test]
     fn round_trip_client_message() {

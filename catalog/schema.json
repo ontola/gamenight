@@ -224,6 +224,16 @@
         }
       ]
     },
+    "PlayWith": {
+      "description": "What a player needs in hand: a controller (default), a linked phone,\nboth, or either.",
+      "type": "string",
+      "enum": [
+        "controller",
+        "phone",
+        "controller_and_phone",
+        "controller_or_phone"
+      ]
+    },
     "Players": {
       "type": "object",
       "properties": {
@@ -249,6 +259,20 @@
           "format": "uint8",
           "maximum": 255,
           "minimum": 0
+        },
+        "min_phones": {
+          "description": "At least this many players on a phone, for games where only some\nplay on one (`play_with: \"controller_or_phone\"`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0
+        },
+        "play_with": {
+          "description": "What each player holds to play. `min`/`max` count only the players\nwho hold it, so a phone game with two phones on the couch fits two.",
+          "$ref": "#/$defs/PlayWith"
         }
       },
       "additionalProperties": false,

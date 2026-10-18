@@ -305,6 +305,12 @@ class GameNightApi {
       _send('POST', '/api/player-links/${Uri.encodeComponent(player)}/unlink',
           failure: 'Could not leave this character. Try again.');
 
+  /// Play on this phone alone: GameNight adds a player without a controller.
+  Future<void> phoneSeat(String profile) =>
+      _send('POST', '/api/local-room/phone-seat',
+          body: {'profile': profile},
+          failure: 'Could not take a seat. Is GameNight still running?');
+
   Future<void> cancelPickup(String profile) =>
       _send('POST', '/api/local-room/cancel/${Uri.encodeComponent(profile)}',
           body: {});

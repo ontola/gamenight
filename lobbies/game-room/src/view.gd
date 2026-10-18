@@ -11,6 +11,8 @@ var faces = Face.new()
 var actors: Dictionary = {}    # player id -> {node, sprite, light, zzz, key}
 var item_nodes: Dictionary = {}
 var shot_nodes: Array = []
+## Players with a linked phone; they get a small glowing phone by their head.
+var phones: Array = []
 var _time := 0.0
 var _next_order := 0
 
@@ -74,7 +76,21 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	zzz.position = Vector3(0.6, 1.8, 0.1)
 	zzz.visible = false
 	node.add_child(zzz)
-	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "key": "", "depth": 0.0, "order": 0}
+	var phone := MeshInstance3D.new()
+	var slab := BoxMesh.new()
+	slab.size = Vector3(0.16, 0.28, 0.03)
+	phone.mesh = slab
+	var glow := StandardMaterial3D.new()
+	glow.albedo_color = Color("1b1f2e")
+	glow.emission_enabled = true
+	glow.emission = Color("7cc7ff")
+	glow.emission_energy_multiplier = 1.6
+	phone.material_override = glow
+	phone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	phone.position = Vector3(-0.55, 1.75, 0.1)
+	phone.visible = false
+	node.add_child(phone)
+	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "phone": phone, "key": "", "depth": 0.0, "order": 0}
 
 ## The z a player is drawn at: the surface they stand on (couch, shelf) so
 ## they sit on it, plus a small per-player step so overlapping sprites never
@@ -110,6 +126,8 @@ func update(world, delta: float) -> void:
 		body.position = Vector3(0, 0.85 * body.scale.y, -0.42)
 		sprite.rotation.z = sin(_time * 30) * 0.15 if p.stun > 0 else 0.0
 		actor.zzz.visible = p.sleeping
+		actor.phone.visible = phones.has(id) and not p.sleeping
+		actor.phone.position.y = 1.75 + sin(_time * 2.0 + actor.order) * 0.04
 		if p.sleeping:
 			# Rotate the whole pose, including the player's drawing and hat.
 			# Centre the curled body over its resting spot, with its cheek on

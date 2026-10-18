@@ -259,6 +259,8 @@ class RoomScreenState extends State<RoomScreen> {
                 ),
             ],
           ]),
+      if (room != null && (waiting || room.choosingPlayer))
+        _phoneSeatCard(asked: room.phoneSeat),
       if (!state.isGuest && room != null && (connected || waiting))
         Section(children: [
           SwitchListTile(
@@ -309,6 +311,27 @@ class RoomScreenState extends State<RoomScreen> {
       ]),
     ];
   }
+
+  /// More phones than controllers: a phone can play as a player of its own,
+  /// in games played on phones. Late is fine, also while a game runs.
+  Widget _phoneSeatCard({required bool asked}) =>
+      Section(title: 'No controller?', children: [
+        Hint(asked
+            ? 'Adding your player to the party…'
+            : 'Play on this phone instead. You join games that are played on '
+                'phones, also when one has already started.'),
+        const SizedBox(height: 12),
+        FilledButton.tonalIcon(
+          onPressed: _busy || asked
+              ? null
+              : () => _run(() async {
+                    await state.playOnPhone();
+                    return 'Taking a seat on this phone.';
+                  }),
+          icon: const Icon(Icons.smartphone, size: 18),
+          label: const Text('Play on this phone'),
+        ),
+      ]);
 
   List<Widget> _connectCards() => [
         if (state.sessionError != null)
@@ -432,6 +455,7 @@ class RoomScreenState extends State<RoomScreen> {
           ),
         ],
       ]),
+      if (waiting) _phoneSeatCard(asked: false),
       if (!linked && !waiting)
         Section(title: 'Room code', children: [
           _codeField(),

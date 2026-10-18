@@ -464,6 +464,8 @@ async fn playing_an_uninstalled_game_bumps_the_prewarm_queue() {
         min_players: None,
         max_players: None,
         best_players: None,
+        play_with: Default::default(),
+        min_phones: None,
         launch: None, // no launch spec: not installed yet
     }];
     let (prewarm, mut priority_rx) = gamenight_installer::prewarm_channel();
@@ -673,6 +675,8 @@ async fn a_game_that_quits_is_not_respawned() {
         min_players: None,
         max_players: None,
         best_players: None,
+        play_with: Default::default(),
+        min_phones: None,
         launch: Some(gamenight_protocol::LaunchSpec {
             command: std::env::current_exe().unwrap().display().to_string(),
             args: vec![

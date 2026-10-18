@@ -97,6 +97,8 @@ class HostedRoom {
   bool get waiting => status == 'waiting';
   bool get choosingPlayer => status == 'choose_player';
   bool get guest => raw['guest'] == true;
+  /// Asked to play on this phone; the GameNight PC is adding the player.
+  bool get phoneSeat => raw['phone_seat'] == true;
   List<Map<String, dynamic>> get seats => (raw['seats'] as List? ?? [])
       .whereType<Map>()
       .map((v) => Map<String, dynamic>.from(v))
@@ -165,6 +167,7 @@ class CloudApi {
         path == '/v1/rooms/status' ||
         path == '/v1/rooms/companion' ||
         path == '/v1/rooms/next' ||
+        path == '/v1/rooms/phone-seat' ||
         path.startsWith('/v1/rooms/guest/');
     final usesGuest = guestToken != null && guestPath;
     final cookieMutation = browserCookies &&
@@ -520,6 +523,12 @@ class CloudApi {
       await _send('GET', '/v1/rooms/status') as Map<String, dynamic>);
 
   Future<void> cancelPickup() => _send('POST', '/v1/rooms/cancel', body: {});
+
+  /// Play on this phone alone. The GameNight PC adds the player on its next
+  /// check-in; older GameNight PCs keep the phone waiting.
+  Future<void> phoneSeat() => _send('POST', '/v1/rooms/phone-seat',
+      body: {},
+      errors: {410: 'You are no longer waiting in this room.'});
 
   Future<void> leaveRoom() => _send('POST', '/v1/pairing/unlink', body: {});
 

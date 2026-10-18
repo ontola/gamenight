@@ -30,6 +30,14 @@ individual profile update. Clients should refresh party state before retrying
 an ambiguous operation. Concurrent fresh joins still rely on snapshot differences;
 request correlation is a future protocol improvement.
 
+### Playing on the phone alone
+
+`POST /api/local-room/phone-seat` with `{"profile"}` seats a profile that waits
+in the local room as a player of its own, holding no controller, and links it.
+It answers 204, or 410 when the profile is not waiting. Use it when there are
+more phones than controllers; see
+[controllers and phones](protocol.md#controllers-and-phones).
+
 ### Player session status
 
 `GET /api/profiles/:id/session` reports `linked`, `player_name`, zero-based

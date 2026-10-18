@@ -130,3 +130,15 @@ pub(crate) async fn party(
     let _ = ws.close(None).await;
     Ok(party)
 }
+
+/// Waits until the daemon's party shows exactly these linked phones.
+pub(crate) async fn wait_for_phones(
+    ws: &mut DaemonWs,
+    phones: &[PlayerId],
+) -> Result<(), DaemonError> {
+    read_matching(ws, |message| match message {
+        ServerMessage::PartyState { party } => (party.phones == phones).then_some(()),
+        _ => None,
+    })
+    .await
+}

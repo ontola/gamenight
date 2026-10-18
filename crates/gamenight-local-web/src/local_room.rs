@@ -117,6 +117,39 @@ pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> St
         .or_insert_with(|| (uuid::Uuid::new_v4().to_string(), now() + 300));
     StatusCode::NO_CONTENT
 }
+#[derive(Deserialize)]
+pub struct PhoneSeat {
+    profile: String,
+}
+/// A waiting phone takes a seat of its own and plays on the phone, for when
+/// there are more phones than controllers.
+pub async fn phone_seat(
+    State(state): State<SharedState>,
+    Json(req): Json<PhoneSeat>,
+) -> StatusCode {
+    let (pending, profile) = {
+        let s = state.lock().unwrap();
+        if s.cloud.is_some() {
+            return StatusCode::NOT_FOUND;
+        }
+        let Some((id, _)) = s
+            .local_room
+            .pending
+            .get(&req.profile)
+            .filter(|(_, expires)| *expires > now())
+        else {
+            return StatusCode::GONE;
+        };
+        let Some(p) = s.profiles.get(&req.profile) else {
+            return StatusCode::NOT_FOUND;
+        };
+        (
+            id.clone(),
+            serde_json::json!({"display_name":p.username,"preferred_color":p.preferred_color,"avatar":p.avatar}),
+        )
+    };
+    crate::phones::seat_waiting(&state, &pending, &profile).await
+}
 pub async fn cancel(Path(id): Path<String>, State(state): State<SharedState>) -> StatusCode {
     state.lock().unwrap().local_room.pending.remove(&id);
     StatusCode::NO_CONTENT

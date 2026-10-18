@@ -245,6 +245,7 @@ func set_party(snapshot: Dictionary) -> void:
 	for id in profiles:
 		world.ensure_player(id, slots.get(id, i))
 		i += 1
+	view.phones = party.get("phones", [])
 	view.sync_profiles(profiles, world.players)
 	_update_sleep()
 	var shelf := shelf_games()
@@ -293,10 +294,43 @@ func _human_count() -> int:
 		if seat.get("occupant", {}).get("player_id") != null: count += 1
 	return count
 
+## Seated players who hold what `game` is played with, mirroring the host's
+## `GameMeta::party_fit`: {humans, able, phones}. A player with neither a
+## controller nor a linked phone counts as holding a controller.
+func party_fit(game: Dictionary) -> Dictionary:
+	var phones: Array = party.get("phones", [])
+	var play_with := str(game.get("play_with", "controller"))
+	var fit := {"humans": 0, "able": 0, "phones": 0}
+	for seat in party.get("seats", []):
+		var id: Variant = seat.get("occupant", {}).get("player_id")
+		if id == null: continue
+		var phone := phones.has(id)
+		var pad: bool = seat.get("controller") != null or not phone
+		var able: bool = {"phone": phone, "controller_and_phone": pad and phone, "controller_or_phone": pad or phone}.get(play_with, pad)
+		fit.humans += 1
+		if able:
+			fit.able += 1
+			if phone: fit.phones += 1
+	return fit
+
+## Why this party can't play `game` ("" when it can). An empty party fits all.
+func _shortfall(game: Dictionary) -> String:
+	var fit := party_fit(game)
+	if fit.humans == 0: return ""
+	if game.get("max_players") != null and fit.able > int(game.max_players): return "Too many players"
+	var low := 1 if game.get("min_players") == null else maxi(1, int(game.min_players))
+	var play_with := str(game.get("play_with", "controller"))
+	if fit.able < low:
+		if fit.humans < low: return "Needs %d players" % low
+		if play_with in ["phone", "controller_and_phone"]: return "Needs %d phones" % low
+		return "Needs %d controllers" % low
+	if game.get("min_phones") != null and fit.phones < int(game.min_phones):
+		return "Needs a phone" if int(game.min_phones) == 1 else "Needs %d phones" % int(game.min_phones)
+	return ""
+
 func _fits_party(game: Dictionary) -> bool:
-	var count := _human_count()
 	# Match host prewarming before anyone joins. Re-evaluate on every snapshot.
-	return count == 0 or ((game.get("min_players") == null or count >= int(game.min_players)) and (game.get("max_players") == null or count <= int(game.max_players)))
+	return _shortfall(game).is_empty()
 
 func current_game() -> Dictionary:
 	var session: Variant = party.get("active_session")
@@ -472,10 +506,7 @@ func queue_station() -> Dictionary:
 
 func _unavailable(game: Dictionary) -> String:
 	if not client.connected and demo == null: return "Waiting for GameNight"
-	var count := _human_count()
-	if game.get("max_players") != null and count > int(game.max_players): return "Too many players"
-	if game.get("min_players") != null and count < int(game.min_players): return "Needs %d players" % int(game.min_players)
-	return ""
+	return _shortfall(game)
 
 ## Y uses the station; at the shelf, queue (X) adds the box at the end.
 func _use_station(id: String, queue := false) -> void:

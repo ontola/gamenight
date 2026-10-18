@@ -454,6 +454,20 @@ class AppState extends ChangeNotifier {
     await refreshSession();
   }
 
+  /// No controller free: play on this phone as a player of its own.
+  Future<void> playOnPhone() async {
+    if (inHostedRoom) {
+      try {
+        await cloud.phoneSeat();
+      } finally {
+        await refreshHostedRoom();
+      }
+      return;
+    }
+    await _api?.phoneSeat(profileId);
+    await refreshSession();
+  }
+
   Future<void> setRemember(bool value) async {
     await _api?.remember(profileId, value);
     await refreshSession();

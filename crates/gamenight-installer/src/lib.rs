@@ -142,6 +142,8 @@ pub fn game_meta(entry: &CatalogEntry, installed: &InstalledGame) -> GameMeta {
         min_players: Some(entry.players.min),
         max_players: Some(entry.players.max),
         best_players: entry.players.best,
+        play_with: entry.players.play_with.into(),
+        min_phones: entry.players.min_phones,
         launch: Some(installed.launch_spec()),
     }
 }

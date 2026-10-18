@@ -317,6 +317,8 @@ pub async fn certify(config: Config) -> Result<Report, String> {
         min_players: None,
         max_players: None,
         best_players: None,
+        play_with: Default::default(),
+        min_phones: None,
         launch: None,
     }];
     let daemon = tokio::spawn(gamenight_daemon::run_with_library(listener, library));

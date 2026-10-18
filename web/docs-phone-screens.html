@@ -28,6 +28,23 @@ to be someone else.</li>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-js">const game = GameNight.connect((data) =&gt; render(data), (status) =&gt; showStatus(status));
 game.send({ action: &quot;roll&quot; });
 </code></pre></div>
+<h2 id="phones-count-as-players">Phones count as players</h2>
+<p>If your game is played on phones, say so in <code>gamenight.json</code>, so GameNight
+counts phones and not just controllers:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">&quot;players&quot;: { &quot;min&quot;: 2, &quot;max&quot;: 6, &quot;best&quot;: 4, &quot;play_with&quot;: &quot;phone&quot; }
+</code></pre></div>
+<p>Use <code>&quot;controller_and_phone&quot;</code> when every player needs both, and
+<code>&quot;controller_or_phone&quot;</code> with <code>&quot;min_phones&quot;: 1</code> when only some players are on a
+phone, like one god among controller players. Two controllers and four phones
+then fit a four-player phone game: people without a controller tap <strong>Play on
+this phone</strong> in the GameNight app and get a seat of their own. See
+<a href="/docs/protocol#controllers-and-phones">controllers and phones</a>.</p>
+<p>Phones join late all the time: someone's battery died, someone walked in.
+Nobody is too late. Seat everyone you were given in <code>prepare</code>, play the ones
+without a phone with a bot, and hand the seat back the moment
+<code>companion_presence</code> says their phone connected. With <code>instant_join: true</code>, a
+new phone-only player also arrives mid-round in <code>party_updated</code>; otherwise on
+the next round.</p>
 <h2 id="in-godot">In Godot</h2>
 <p>Keep the page in a folder of your project, such as <code>res://phone</code>, and declare
 it once from <code>_ready()</code>:</p>
@@ -138,7 +155,7 @@ speak the same protocol. iOS apps are only possible through the App Store.</p>
 only, so bind <code>0.0.0.0</code>; and a game with mouse capture needs a way to the
 &quot;join as phone&quot; option from a controller.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="02f25023dce235a0fa8ccc37c4550a9ef743d0742c8c6ac56010222e4e2fb3ac">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="3398b878ea64220d7f0f5b76818f6bbb2d098e10fa59a9a98f0848dd474a14bb">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/faces"><small>Previous</small>Faces &amp; colours</a><a href="/docs/performance"><small>Next</small>Performance</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#in-godot">In Godot</a><a href="#in-love">In LÖVE</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#phones-count-as-players">Phones count as players</a><a href="#in-godot">In Godot</a><a href="#in-love">In LÖVE</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

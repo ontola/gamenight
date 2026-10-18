@@ -72,6 +72,30 @@ func _run() -> void:
 	main.set_party(party)
 	check(main.upcoming().is_empty(), "No playable title means no false suggestion")
 	check(not main.tv_station().enabled, "Empty eligible queue cannot be started")
+	# Phone games count linked phones; phone-only players skip pad games.
+	party.library = [
+		{"id": "cards", "title": "Cards", "min_players": 2, "max_players": 4, "play_with": "phone"},
+		{"id": "god", "title": "God", "min_players": 2, "max_players": 4, "play_with": "controller_or_phone", "min_phones": 1},
+		{"id": "duo", "title": "Two Together", "min_players": 2, "max_players": 2}]
+	party.playlist = {"entries": party.library.map(func(g): return {"game": g.id, "title": g.title})}
+	party.players = initial.players.slice(0, 3)
+	party.seats = initial.seats.slice(0, 3)
+	for i in 3: party.seats[i].controller = "ordinal:%d" % i
+	party.phones = []
+	party.active_session = null
+	main.set_party(party)
+	check(main._unavailable(main.game_meta("cards")) == "Needs 2 phones", "Phone game asks for phones, not players")
+	check(main._unavailable(main.game_meta("god")) == "Needs a phone", "Asymmetric game asks for its phone")
+	check(main._unavailable(main.game_meta("duo")) == "Too many players", "Three pads are too many for a duo")
+	var ids3: Array = party.seats.map(func(s): return s.occupant.player_id)
+	party.phones = [ids3[0], ids3[1]]
+	main.set_party(party)
+	check(ids(main) == ["cards", "god"], "Two phones make the phone games playable")
+	party.seats[2].controller = null
+	party.phones = [ids3[2]]
+	main.set_party(party)
+	check(main._unavailable(main.game_meta("duo")).is_empty(), "A phone-only player does not take a pad seat")
+	check(main._unavailable(main.game_meta("god")).is_empty(), "Two pads and a phone play the god game")
 	print("GAME_ROOM_ELIGIBILITY_", "PASS" if failures == 0 else "FAIL")
 	var client: Node = main.client
 	main.free()

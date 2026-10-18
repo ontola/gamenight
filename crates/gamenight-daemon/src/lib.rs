@@ -1304,6 +1304,8 @@ pub fn bundled_lobby_meta() -> Option<GameMeta> {
         min_players: Some(1),
         max_players: Some(4),
         best_players: Some(4),
+        play_with: Default::default(),
+        min_phones: None,
         launch: Some(LaunchSpec {
             command: command.display().to_string(),
             args: Vec::new(),
@@ -1365,6 +1367,8 @@ pub fn demo_library() -> Vec<GameMeta> {
         min_players: Some(1),
         max_players: Some(4),
         best_players: Some(2),
+        play_with: Default::default(),
+        min_phones: None,
         launch: demo_game_launch(),
     }]
 }
@@ -2383,6 +2387,16 @@ fn message_to_command(
             library,
         },
         ClientMessage::LeaveParty { player_id } => Command::LeaveParty { player_id },
+        ClientMessage::SetPhones { players } => Command::SetPhones { players },
+        ClientMessage::JoinPhonePlayer {
+            name,
+            color,
+            avatar,
+        } => Command::JoinPhonePlayer {
+            name,
+            color,
+            avatar,
+        },
         ClientMessage::RenamePlayer { player_id, name } => {
             Command::RenamePlayer { player_id, name }
         }

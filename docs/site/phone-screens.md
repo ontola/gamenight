@@ -22,6 +22,29 @@ const game = GameNight.connect((data) => render(data), (status) => showStatus(st
 game.send({ action: "roll" });
 ```
 
+## Phones count as players
+
+If your game is played on phones, say so in `gamenight.json`, so GameNight
+counts phones and not just controllers:
+
+```json
+"players": { "min": 2, "max": 6, "best": 4, "play_with": "phone" }
+```
+
+Use `"controller_and_phone"` when every player needs both, and
+`"controller_or_phone"` with `"min_phones": 1` when only some players are on a
+phone, like one god among controller players. Two controllers and four phones
+then fit a four-player phone game: people without a controller tap **Play on
+this phone** in the GameNight app and get a seat of their own. See
+[controllers and phones](/docs/protocol#controllers-and-phones).
+
+Phones join late all the time: someone's battery died, someone walked in.
+Nobody is too late. Seat everyone you were given in `prepare`, play the ones
+without a phone with a bot, and hand the seat back the moment
+`companion_presence` says their phone connected. With `instant_join: true`, a
+new phone-only player also arrives mid-round in `party_updated`; otherwise on
+the next round.
+
 ## In Godot
 
 Keep the page in a folder of your project, such as `res://phone`, and declare

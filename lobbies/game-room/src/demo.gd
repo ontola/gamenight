@@ -28,7 +28,8 @@ func _ready() -> void:
 		{"id": "spaceracer", "title": "Space Racer", "color": "#38d6ff", "players": "1-8", "max_players": 8},
 		{"id": "ballkickers", "title": "Ball Kickers", "color": "#3ddc97", "players": "2-8", "max_players": 8},
 		{"id": "downhill-rush", "title": "Downhill Rush", "color": "#ffb454", "players": "1-4", "max_players": 4},
-		{"id": "god-game", "title": "God Game", "color": "#ff4f8b", "players": "2-6", "max_players": 6},
+		{"id": "god-game", "title": "God Game", "color": "#ff4f8b", "players": "2-6", "max_players": 6, "play_with": "controller_or_phone", "min_phones": 1},
+		{"id": "hexstead", "title": "Hexstead", "color": "#e8c14a", "players": "2-6", "min_players": 2, "max_players": 6, "play_with": "phone"},
 		{"id": "blast-party", "title": "Blast Party", "color": "#a78bfa", "players": "2-4", "max_players": 4},
 	]
 	_cover_art(library)
@@ -36,6 +37,7 @@ func _ready() -> void:
 		{"game": "god-game", "title": "God Game"}, {"game": "blast-party", "title": "Blast Party"}]
 	var party := {"players": players, "seats": seats, "library": library,
 		"playlist": {"entries": entries if scene != "empty" else []}, "presence": [],
+		"phones": ["p0", "p2", "p3"].filter(func(id): return players.any(func(p): return p.id == id)),
 		"warm_session": {"game": "spaceracer", "phase": "preparing", "progress": 64, "progress_label": "Loading"},
 		"now_playing": {"title": "Midnight City", "artist": "M83", "playing": true, "source": "Spotify"}}
 	if scene == "sleep": party.presence = [{"player_id": "p1", "state": "sleeping"}, {"player_id": "p3", "state": "sleeping"}]

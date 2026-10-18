@@ -173,7 +173,8 @@ def preview(client, args):
             arguments = [str(executable if runtime.get('argument') == 'entry_point' else executable.parent)]
         shelf.append({'id': entry['id'], 'title': entry['title'], 'min_players': entry['players']['min'],
                       'max_players': entry['players']['max'], 'launch': {'command': str(command),
-                      'args': arguments, 'cwd': str(executable.parent), 'env': {}}})
+                      'args': arguments, 'cwd': str(executable.parent), 'env': {}},
+                      **{key: entry['players'][key] for key in ('play_with', 'min_phones') if key in entry['players']}})
     if not shelf:
         raise ValueError('No preview is available for this platform')
     path = output / 'shelf.json'

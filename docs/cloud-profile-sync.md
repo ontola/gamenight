@@ -65,3 +65,16 @@ and thirty/hour per account, twenty/minute per forwarded client IP and 120/minut
 globally. It holds at most eight pending profiles per room. Hosted-service IP
 limits assume its backend is reachable only through its trusted reverse proxy.
 The existing controller-specific QR flow remains available.
+
+### A seat of its own
+
+When there are more phones than controllers, a waiting phone may play on the
+phone alone. It posts `/v1/rooms/phone-seat` (signed in, or with its guest room
+token), and its pending entry reaches the host with `"phone_seat": true`. The
+host adds a player without a controller (`join_phone_player`), waits until a
+poll has reported that player's seat, then completes the pickup with
+`/v1/lobbies/pickup` as for a door pickup. No existing character changes hands,
+so controller seats keep their physical pickup. If the entry expires or is
+cancelled before the pickup, the host removes the player again. On the LAN the
+same request is `POST /api/local-room/phone-seat` with `{"profile"}`. Hosts that
+predate this leave the phone waiting.

@@ -212,6 +212,52 @@ host may prewarm a game; the first join rechecks its eligibility.</p>
 does not invent AI occupants to fill it. Explicitly assigned <code>ai</code> seats are
 preserved in <code>prepare</code> only within the game's maximum capacity, with humans
 taking priority. AI occupants do not count toward the human minimum.</p>
+<h3 id="controllers-and-phones">Controllers and phones</h3>
+<p>Some games are played on phones, so the range above counts what each player
+holds, not just who is seated. A game says so with <code>play_with</code>:</p>
+<table>
+<thead>
+<tr>
+<th><code>play_with</code></th>
+<th>counts</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>controller</code> (default)</td>
+<td>players holding a controller</td>
+</tr>
+<tr>
+<td><code>phone</code></td>
+<td>players with a linked phone; a controller is optional</td>
+</tr>
+<tr>
+<td><code>controller_and_phone</code></td>
+<td>players holding both</td>
+</tr>
+<tr>
+<td><code>controller_or_phone</code></td>
+<td>players holding either; pair with <code>min_phones</code> for asymmetric games (one god on a phone, the rest on controllers)</td>
+</tr>
+</tbody>
+</table>
+<p>A player's phone is linked once their phone joined the room and is bound to
+them, whichever way (lobby door, QR, hosted room). The host's web server sends
+the daemon that list with <code>set_phones</code>, and every snapshot carries it as
+<code>phones</code>. A seat with a phone and no controller is a <strong>phone-only player</strong>:
+someone who joined with only a phone because there were more phones than
+controllers. A player with neither a controller nor a phone (a development
+keyboard, an older client) counts as holding a controller.</p>
+<p>So two controllers and four phones fit a four-player phone game, and a
+phone-only player never fills a seat in a controller game: such games receive
+that seat as <code>empty</code> in <code>prepare</code> and <code>party_updated</code>, and phone-only players
+do not hold up a vote. Screens show why a game does not fit (&quot;Needs 2 phones&quot;),
+mirroring <code>GameMeta::shortfall</code> in the Rust crate.</p>
+<p>Nobody is too late. Before a game starts, a new player or a newly linked phone
+re-prepares the warm game like any other join. While it runs, a player's phone
+can link at any time and the game hears <code>companion_presence</code>, so it can hand
+their seat back from a bot. A new phone-only player joins a running game with
+<code>instant_join: true</code> at once, and other games on their next round.</p>
 <p>Party snapshots include optional <code>next_game_index</code>, the exact upcoming
 playlist occurrence even before its process connects. Use it for the Up Next
 preview: two queued entries can have the same game ID. Older hosts omit it.</p>
@@ -324,6 +370,10 @@ role; the runtime supplies its controller stream.</p>
 <td>new player; the requested seat if free, else the first empty one</td>
 </tr>
 <tr>
+<td><code>join_phone_player {name, color?, avatar?}</code></td>
+<td>new player who plays on a phone and holds no controller; takes a free seat, or adds one past the controller seats (eight at most)</td>
+</tr>
+<tr>
 <td><code>leave_party {player_id}</code></td>
 <td>player leaves; their seat empties</td>
 </tr>
@@ -399,6 +449,10 @@ someone seated owns. Each message replaces the previous set. A paid catalog game
 downloads only while it has a grant, which is appended to its download URL as
 <code>?grant=</code> (or <code>&amp;grant=</code>); a newly granted game is fetched next. Other roles get an
 <code>error</code>. Tokens are secrets and never appear in logs or <code>party_state</code>.</p>
+<p><code>set_phones {players}</code> comes from the host's web server, which pairs phones with
+players: the players whose phone is linked now, replacing the previous list.
+It appears in the snapshot as <code>phones</code> (see <a href="#controllers-and-phones">Controllers and
+phones</a>).</p>
 <p><code>playtests {playtests}</code> is also for the trusted local web server only. Each item
 is a game's preview build that this table may play because someone seated owns
 or tests the game: <code>entry</code> (a catalog entry whose downloads point at the
@@ -900,7 +954,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="7d42017ee0bcaab047044aec7c458aa1a29f6a46180e77ce8d37edd4825e721c">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="572ec59b0a2cdae24540402cf3849c4bd018984f5d738ee127c15545fb83c2a8">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
