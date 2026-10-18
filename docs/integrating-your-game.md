@@ -67,13 +67,20 @@ Progress is optional. Ready must mean that Start can show playable content
 without another loading screen. Do not require player input to finish preparing.
 Keep the connection and lifecycle handling active while hidden or paused.
 
+A long load (a large world, a first-time shader build) needs more care:
+report a stage at least every five seconds, keep handling roster changes and
+`dispose` while loading, and when the roster changes during loading, prepare
+for the latest one rather than queueing every request. See
+[Performance](/docs/performance#load-everything-before-ready).
+
 On `start`, show the prepared window and begin play. On `pause`, stop simulation,
 timers and audio, then hide the game so the lobby can appear. On `resume`, show
 the same game state and continue. Pause and resume are required for release,
 including when the game is showing results rather than active gameplay.
 
 On `dispose`, stop the session, hide the window, silence audio and release session
-resources. Wait for another Prepare. If the host connection is lost, exit cleanly
+resources. Wait for another Prepare: the same process usually serves several
+sessions in one evening, so keep the game running and reuse what you loaded. If the host connection is lost, exit cleanly
 rather than leaving a game window or background process behind.
 
 ## Controllers belong to players

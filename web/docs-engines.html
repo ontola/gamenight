@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-engines">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-engines" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines" aria-current="page">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-engines" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines" aria-current="page">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="engine-support">Engine support</h1>
 <p>Which engines GameNight supports, how far, and where to start. Pick the row for
 your engine, then follow its guide. If your engine is not listed as
@@ -35,14 +35,14 @@ windows or faces into your engine yourself.</li>
 <tr>
 <td><a href="/docs/godot">Godot 4</a></td>
 <td>Full</td>
-<td><code>sdk/godot</code> addon</td>
-<td>Spaceracer, Ballkickers, Growing Guns, Frog Fighter, Downhill Rush, The Voice and the Will</td>
+<td><a href="/docs/playbook">Godot template</a> and <code>sdk/godot</code> addon</td>
+<td>Spaceracer, Ballkickers, Spellstorm, Hexstead, Downhill Rush, Bombing Bugs, The Builders, Growing Guns, Frog Fighter, The Voice and the Will</td>
 </tr>
 <tr>
 <td><a href="/docs/love">LÖVE / Lua</a></td>
 <td>Full</td>
 <td>Shared party runner</td>
-<td>Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies, Hexstead</td>
+<td>Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies</td>
 </tr>
 <tr>
 <td><a href="/docs/rust">Rust / Bevy</a></td>
@@ -109,7 +109,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 </tr>
 <tr>
 <td>Controller input per seat</td>
-<td>SDK (<code>frame_for_seat</code>)</td>
+<td>SDK (<code>frame_for_seat</code>, <code>just_pressed</code>, deadzones)</td>
 <td>SDK</td>
 <td>You (typed frames)</td>
 <td>No</td>
@@ -140,8 +140,8 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>You</td>
 </tr>
 <tr>
-<td>Phone screens for each player</td>
-<td>SDK</td>
+<td><a href="/docs/phone-screens">Phone screens</a> for each player</td>
+<td>SDK (<code>declare_companion_folder</code>)</td>
 <td>You</td>
 <td>SDK</td>
 <td>No</td>
@@ -186,8 +186,8 @@ or faces, and no phone screens. Games still have to parse those messages
 themselves.</li>
 <li><strong>Rust / Bevy</strong>: the SDK delivers typed events but no Bevy plugin. Input,
 window behaviour and face rendering are left to the game.</li>
-<li><strong>LÖVE</strong>: phone screens are not in the shared runner yet; Hexstead sends the
-messages itself.</li>
+<li><strong>LÖVE</strong>: phone screens are not in the shared runner yet; a LÖVE game sends
+the <a href="/docs/phone-screens">phone screen</a> messages itself.</li>
 <li><strong>Godot 4</strong>: Godot has no package manager, so each game vendors the addon.
 Run <code>sdk/godot/sync.py</code> and the CI check to keep copies current.</li>
 </ul>
@@ -198,7 +198,7 @@ against the <a href="/docs/protocol">protocol reference</a> and the
 <a href="/docs/controllers">controller rules</a>. Before calling an integration done, run
 the <a href="/docs/testing">integration checks</a>.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/engines.md">Edit this page</a><span data-source-fingerprint="af39bcc2e4622132fe042e736d97d83ca587945717da79c3d877a3bbc3ae671d">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/engines.md">Edit this page</a><span data-source-fingerprint="e51fe42d19b1a8c2853baa1789b648d8eef87894e851cb2536f258d7e94b2eb5">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/playbook"><small>Previous</small>Game playbook</a><a href="/docs/lifecycle"><small>Next</small>Game lifecycle</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#support-levels">Support levels</a><a href="#features-per-engine">Features per engine</a><a href="#open-work">Open work</a><a href="#for-agents-and-code-generators">For agents and code generators</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

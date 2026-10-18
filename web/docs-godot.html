@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-godot">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-godot" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot" aria-current="page">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-godot" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot" aria-current="page">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="godot-4">Godot 4</h1>
 <p>The Godot addon handles lifecycle messages, runtime controller frames and live
 player profiles over WebSocket. Your game connects these to its simulation and
@@ -23,6 +23,12 @@ rendering.</p>
       path: .  # the folder that holds project.godot
 </code></pre></div>
 <p>The connection reads the launch environment automatically. Keep standalone menus separate from the managed path using <code>GameNight.launched_by_daemon</code>.</p>
+<p>A game you start by hand stays offline, so a test run never joins the party
+on your machine. To connect it to a development host anyway, set
+<code>GAMENIGHT_ADDR=127.0.0.1:7912</code>, or call <code>GameNight.connect_to_host()</code>.</p>
+<p>Use the <code>GameNight</code> autoload and connect to its signals; don't subclass it and
+override its message handling. A subclass that replaces <code>_handle</code> silently
+loses performance reports, settings replay and future protocol features.</p>
 <h2 id="lifecycle-signals">Lifecycle signals</h2>
 <p>These declarations come directly from the addon:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">signal prepared(session_id: String, seats: Array, players: Array)
@@ -46,8 +52,17 @@ development connections may reconnect automatically.</p>
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L233">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L318">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
+<p>To get live roster updates, opt in from <code>prepared</code>, before Ready:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _on_prepared(session_id: String, seats: Array, players: Array) -&gt; void:
+    GameNight.notify_participation(session_id, false)  # true: new players can join mid-round
+    build_level(seats, players)
+    GameNight.notify_ready(session_id)
+</code></pre></div>
+<p>Report real play with <code>GameNight.report_activity(seat)</code> on a press or a stick
+past its deadzone, so GameNight does not mark a player asleep. It sends at
+most once a second per controller. See <a href="/docs/controllers#joining-and-changing-profiles">Controllers &amp; players</a>.</p>
 <h2 id="controllers-and-live-profiles">Controllers and live profiles</h2>
 <p>Use the runtime stream in managed play. A seat's controller token is opaque;
 it is not a Godot joystick index. <code>frame_for_seat</code> resolves the token from the
@@ -57,11 +72,24 @@ input is more than 250 ms old.</p>
     if GameNight.phase != &quot;running&quot;:
         return
     var frame = GameNight.frame_for_seat(0)
-    var movement = Vector2(GameNight.axis(frame, 0), GameNight.axis(frame, 1))
-    # Apply movement to the character assigned to seat 0.
-    if GameNight.button(frame, 0): # A, held; add your own press-edge detection.
-        pass
+    var movement = GameNight.stick(frame, 0)          # left stick, deadzone applied
+    var throttle = GameNight.trigger(frame, 1)        # right trigger, 0 to 1
+    if GameNight.just_pressed(0, GameNight.BUTTON_A): # one press, one jump
+        jump(0)
+    if GameNight.button(frame, GameNight.BUTTON_X):   # held
+        charge(0)
+    if movement != Vector2.ZERO:
+        GameNight.report_activity(0)
 </code></pre></div>
+<p>The SDK names every button and axis (<code>BUTTON_A</code> to <code>BUTTON_RIGHT</code>,
+<code>AXIS_LEFT_X</code> to <code>AXIS_RIGHT_TRIGGER</code>). <code>stick</code> and <code>trigger</code> apply the
+deadzones our games settled on (<code>STICK_DEADZONE</code> 0.15, <code>TRIGGER_DEADZONE</code>
+0.06); pass your own as the last argument. <code>just_pressed</code> is true on the
+physics tick a button went down; read it in <code>_physics_process</code>. After Start
+and Resume, a button still held from the lobby must be released first, so the
+press that started the game does not also fire in it.</p>
+<p><code>frame_for_seat</code> is empty while the session is not running. Your own Start
+menu can read input while paused with <code>frame_for_seat(seat, true)</code>.</p>
 <p>Use <code>GameNight.roster_changed</code> to refresh seat ownership, names, skin colour
 and avatar artwork. The current snapshot is available in <code>GameNight.party</code>.
 <code>devices_for_local_seats()</code> is only for standalone play and returns no native
@@ -75,36 +103,7 @@ circle under the artwork and supports historic avatar anchors.</p>
 request Start or Resume. A game preparing in the background stays quiet until
 the runtime explicitly starts it. The helper handles the window and master
 audio bus; your lifecycle callbacks must still pause the simulation and timers.</p>
-<h2 id="godot-lobby-example">Godot lobby example</h2>
-<p>The SDK includes a runnable Living Room project using a separate authenticated
-lobby client. It shows live player names and faces and can join, queue, play
-and resume. See <a href="/docs/lobbies">Build a lobby</a> for launch instructions and the
-runtime-owned controller contract. Its client is independent of the game autoloads.</p>
-<h2 id="before-release">Before release</h2>
-<p>Check the <a href="/docs/lifecycle">lifecycle contract</a> and <a href="/docs/controllers">controller stream</a>, then run <a href="/docs/testing">packaged integration checks</a>. Run <code>python scripts/test-godot-sdk.py --godot /path/to/godot</code> for the headless
-adapter regression checks. The lobby has a separate real-daemon flow test.
-These tests and source-checked documentation do not verify your game callbacks,
-physical controllers or platform window behaviour. Enabling the plugin alone
-does not certify a game.</p>
-<h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
-<p>The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
-<h2 id="yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</h2>
-<p>The welcome snapshot and subsequent <code>GameNight.party_updated</code> snapshots include
-<code>now_playing</code> when GameNight detects a host music player. Check <code>playing</code>, not
-just whether a track exists: paused tracks still have metadata. When it is true,
-mute your music bus only. Keep effects audible and preserve the player's own
-music preference. Restore that preference when host music pauses or disappears.</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _ready():
-    GameNight.party_updated.connect(_host_music)
-    _host_music(GameNight.party)
-
-func _host_music(party: Dictionary):
-    var track = party.get(&quot;now_playing&quot;, {})
-    var playing = track is Dictionary and bool(track.get(&quot;playing&quot;, false))
-    AudioServer.set_bus_mute(AudioServer.get_bus_index(&quot;Music&quot;), playing)
-</code></pre></div>
-<p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
-soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
+<h3 id="keep-the-window-hidden-at-launch">Keep the window hidden at launch</h3>
 <p>For a game that prepares before being played, set <code>display/window/size/mode</code> to
 <code>1</code> (Minimized) and <code>display/window/size/no_focus</code> to <code>true</code> at engine startup.
 Minimizing in <code>_ready()</code> is too late to prevent the initial window appearing.
@@ -139,8 +138,43 @@ and the lobby waits on &quot;preloading&quot; forever. Await <code>get_tree().pr
 instead whenever <code>DisplayServer.window_get_mode()</code> is <code>WINDOW_MODE_MINIMIZED</code>.
 Leave the window itself to <code>GameNightScreen</code>. Godot refuses <code>hide()</code> on the main
 window, and on Windows setting <code>borderless</code> shows the window again.</p>
+<h2 id="phone-screens">Phone screens</h2>
+<p><code>GameNight.declare_companion_folder(&quot;res://phone&quot;)</code> serves a folder of your
+game as each player's phone screen. See <a href="/docs/phone-screens">Phone screens</a>
+for the export settings it needs and how to keep the game in charge.</p>
+<h2 id="godot-lobby-example">Godot lobby example</h2>
+<p>The SDK includes a runnable Living Room project using a separate authenticated
+lobby client. It shows live player names and faces and can join, queue, play
+and resume. See <a href="/docs/lobbies">Build a lobby</a> for launch instructions and the
+runtime-owned controller contract. Its client is independent of the game autoloads.</p>
+<h2 id="before-release">Before release</h2>
+<p>Check the <a href="/docs/lifecycle">lifecycle contract</a> and <a href="/docs/controllers">controller stream</a>, then run <a href="/docs/testing">packaged integration checks</a>. Run <code>python scripts/test-godot-sdk.py --godot /path/to/godot</code> for the headless
+adapter regression checks. The lobby has a separate real-daemon flow test.
+These tests and source-checked documentation do not verify your game callbacks,
+physical controllers or platform window behaviour. Enabling the plugin alone
+does not certify a game.</p>
+<h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
+<p>For what to do about the numbers, see <a href="/docs/performance">Performance</a>.</p>
+<p>The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
+<h2 id="yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</h2>
+<p>The welcome snapshot and subsequent <code>GameNight.party_updated</code> snapshots include
+<code>now_playing</code> when GameNight detects a host music player. Check <code>playing</code>, not
+just whether a track exists: paused tracks still have metadata. When it is true,
+mute your music bus only. Keep effects audible and preserve the player's own
+music preference. Restore that preference when host music pauses or disappears.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _ready():
+    GameNight.party_updated.connect(_host_music)
+    _host_music(GameNight.party)
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="77f4c8e9f01975e7e153c8caf96e73970079051c53b23de1d30472dc928b6fe7">Built from repository sources</span></footer>
+func _host_music(party: Dictionary):
+    var track = party.get(&quot;now_playing&quot;, {})
+    var playing = track is Dictionary and bool(track.get(&quot;playing&quot;, false))
+    AudioServer.set_bus_mute(AudioServer.get_bus_index(&quot;Music&quot;), playing)
+</code></pre></div>
+<p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
+soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
+
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="8425a6613947e112a5c0689af846e82b23c66119cc6fa1111436a3975c647fff">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#phone-screens">Phone screens</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

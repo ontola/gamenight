@@ -126,6 +126,25 @@
     ]
   },
   {
+    "slug": "phone-screens",
+    "title": "Phone screens",
+    "group": "Integration",
+    "source": "docs/site/phone-screens.md",
+    "watch": [
+      "sdk/godot/addons/gamenight/gamenight.gd",
+      "crates/gamenight-local-web/src/companion.rs"
+    ]
+  },
+  {
+    "slug": "performance",
+    "title": "Performance",
+    "group": "Ship your game",
+    "source": "docs/site/performance.md",
+    "watch": [
+      "sdk/godot/addons/gamenight/screen.gd"
+    ]
+  },
+  {
     "slug": "testing",
     "title": "Test your integration",
     "group": "Ship your game",
@@ -143,6 +162,13 @@
     "watch": [
       "scripts/package-love-party.py"
     ]
+  },
+  {
+    "slug": "store-clip",
+    "title": "Store clip",
+    "group": "Ship your game",
+    "source": "docs/gameplay-previews.md",
+    "watch": []
   },
   {
     "slug": "settings",

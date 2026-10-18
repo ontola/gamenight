@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-publishing">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-publishing" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing" aria-current="page">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-publishing" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing" aria-current="page">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="publish-a-game">Publish a game</h1>
 <p>Use the <a href="/developers">developer portal</a> to add your game, upload builds, manage versions, edit your listing and create API keys. GameNight hosts accepted packages. You keep your own build tools, CI and source repository.</p>
 <h2 id="prepare-a-release">Prepare a release</h2>
@@ -64,8 +64,27 @@ jobs:
       file: my-game-windows.zip   # path inside that artifact
       entrypoint: Game.exe
 </code></pre></div>
-<p>Pass the named secret explicitly when calling across repository owners. The reusable job selects your <code>gamenight</code> environment, where you can store the key.</p>
+<p>Pass the named secret explicitly when calling across repository owners:
+<code>secrets: inherit</code> does not reach a reusable workflow in another organization. The reusable job selects your <code>gamenight</code> environment, where you can store the key.</p>
 <p>The shared first-party pack uses a <code>gamenight-&lt;game-id&gt;</code> GitHub environment per game, each holding its <code>GAMENIGHT_API_TOKEN</code>. Native repositories use a <code>gamenight</code> environment. Set the repository variable <code>GAMENIGHT_PUBLISH_ENABLED=true</code> after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.</p>
+<h3 id="ci-pitfalls-we-hit">CI pitfalls we hit</h3>
+<ul>
+<li><strong>Every preview needs a new version.</strong> A version identifies immutable bytes,
+so a rebuilt commit cannot reuse <code>${{ github.sha }}</code>. Add the run:
+<code>ci-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}</code>.</li>
+<li><strong>Pin what you run with your key.</strong> Pin <code>ontola/gamenight</code> actions and
+reusable workflows to a reviewed commit, and check out a pinned copy of
+<code>scripts/gamenight-publish.py</code> for the store step. Keep both on the same
+commit, and update them together.</li>
+<li><strong>Pin and checksum your engine.</strong> Download a fixed Godot version and check
+its SHA-256, in CI and in the export templates.</li>
+<li><strong>Test the exported build in CI.</strong> Run your lifecycle test against the
+exported game, not only the editor project. Files under an excluded folder
+(such as <code>tests/</code>) and raw files outside the include filter are missing
+there, and the game only breaks in GameNight.</li>
+<li><strong>Agents often cannot push tags.</strong> Trigger releases with a workflow input
+instead of a tag push.</li>
+</ul>
 <h2 id="other-ci-systems-and-local-previews">Other CI systems and local previews</h2>
 <p><a href="/developers/gamenight-publish.py">Download the Python uploader</a>. It requires Python 3.11 or later and no third-party packages. Set <code>GAMENIGHT_API_TOKEN</code> in your shell or CI secret environment, then:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python gamenight-publish.py push --game my-game --file dist/game.zip --platform windows --entrypoint Game.exe --version 1.2.0 --channel preview --changelog &quot;New arenas&quot;
@@ -140,7 +159,7 @@ not replace the gameplay clip. Drafts and private preview builds need no media.<
 for frame and container rounding, and rejects unreadable or longer videos.
 A live game must keep a clip: use <strong>Replace gameplay video</strong>, then save.
 Show real gameplay and check the loop on a phone. Follow the
-<a href="https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md">gameplay preview guide</a>; duration validation does not
+<a href="/docs/store-clip">gameplay preview guide</a>; duration validation does not
 establish that the footage is good or representative.</p>
 <h3 id="from-the-command-line-or-ci">From the command line or CI</h3>
 <p>One command fills the store page with a publish key (the same key CI uses for
@@ -222,7 +241,7 @@ another game cannot satisfy this game's requirement.</p>
 <p>Run the <a href="/docs/testing">integration checks</a> against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.</p>
 <p>The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="e4080ad06349ef3c68da51dd1d5128e88ea0fe8673e27f44f6efbeb044271daa">Built from repository sources</span></footer>
-<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/settings"><small>Next</small>Game settings</a></nav></article>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="2e6f0ece1ab55c00bc9787f538bf337e9c625bd1cba94cd391da398784024422">Built from repository sources</span></footer>
+<nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/store-clip"><small>Next</small>Store clip</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#prepare-a-release">Prepare a release</a><a href="#playtests">Playtests</a><a href="#connect-github-actions">Connect GitHub Actions</a><a href="#other-ci-systems-and-local-previews">Other CI systems and local previews</a><a href="#publishing-api">Publishing API</a><a href="#catalog-updates">Catalog updates</a><a href="#required-gameplay-video">Required gameplay video</a><a href="#optional-artwork">Optional artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

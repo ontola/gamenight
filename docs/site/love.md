@@ -23,7 +23,7 @@ Keep simulation in a game module and leave lifecycle handling in the runner. A m
 
 The input entries belong to the supplied player slots. Do not replace them with `love.joystick.getJoysticks()` in managed mode. The shared input adapter neutralises disconnected devices and frames older than 250 ms.
 
-Register a new module in `modes` in [main.lua](../../games/love-party/main.lua), add its renderer and add its ID to `GAMES` in [the packaging script](../../scripts/package-love-party.py). These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.
+Register a new module in `modes` in [main.lua](https://github.com/ontola/gamenight-games/blob/main/love-party/main.lua), add its renderer and add its ID to `GAMES` in [the packaging script](../../scripts/package-love-party.py). These are explicit registries, not automatic plugin discovery. Use an existing game as the full worked example.
 
 ## Draw a player face
 

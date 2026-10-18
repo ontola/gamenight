@@ -15,8 +15,8 @@ your engine, then follow its guide. If your engine is not listed as
 
 | Engine | Level | Start with | Games using it |
 | --- | --- | --- | --- |
-| [Godot 4](/docs/godot) | Full | `sdk/godot` addon | Spaceracer, Ballkickers, Growing Guns, Frog Fighter, Downhill Rush, The Voice and the Will |
-| [LÖVE / Lua](/docs/love) | Full | Shared party runner | Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies, Hexstead |
+| [Godot 4](/docs/godot) | Full | [Godot template](/docs/playbook) and `sdk/godot` addon | Spaceracer, Ballkickers, Spellstorm, Hexstead, Downhill Rush, Bombing Bugs, The Builders, Growing Guns, Frog Fighter, The Voice and the Will |
+| [LÖVE / Lua](/docs/love) | Full | Shared party runner | Blast Party, Neon Trails, Neon Siege, Ricochet Club, Volley Trouble, Stack Together, Bubble Buddies |
 | [Rust / Bevy](/docs/rust) | Partial | `gamenight-sdk` crate | Demo game, Bevy lobby |
 | [C / C++](/docs/c) | Partial | `sdk/c/gamenight.h` | None yet (transport example only) |
 | [Unity](/docs/other-engines) | Protocol only | Wire protocol | None |
@@ -32,11 +32,11 @@ your game code must handle it. "No" means the SDK cannot do it yet.
 | --- | --- | --- | --- | --- | --- |
 | Connect, hello and launch token | SDK | SDK | SDK | SDK | You |
 | Prepare, Ready, Start, Pause, Resume, Dispose | SDK | SDK | SDK | SDK | You |
-| Controller input per seat | SDK (`frame_for_seat`) | SDK | You (typed frames) | No | You |
+| Controller input per seat | SDK (`frame_for_seat`, `just_pressed`, deadzones) | SDK | You (typed frames) | No | You |
 | Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | You |
 | Match settings from the lobby and phone | SDK | SDK | SDK | SDK | You |
 | Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | You |
-| Phone screens for each player | SDK | You | SDK | No | You |
+| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | You | SDK | No | You |
 | Performance diagnostics | SDK | SDK | You (manual samples) | No | You |
 | Headless contract test in CI | Yes | Yes | Yes | Compile only | No |
 | Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | n/a |
@@ -55,8 +55,8 @@ This list doubles as the roadmap for engine support.
   themselves.
 - **Rust / Bevy**: the SDK delivers typed events but no Bevy plugin. Input,
   window behaviour and face rendering are left to the game.
-- **LÖVE**: phone screens are not in the shared runner yet; Hexstead sends the
-  messages itself.
+- **LÖVE**: phone screens are not in the shared runner yet; a LÖVE game sends
+  the [phone screen](/docs/phone-screens) messages itself.
 - **Godot 4**: Godot has no package manager, so each game vendors the addon.
   Run `sdk/godot/sync.py` and the CI check to keep copies current.
 

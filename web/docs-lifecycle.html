@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-lifecycle">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-lifecycle" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle" aria-current="page">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-lifecycle" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle" aria-current="page">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="integrating-your-game-with-gamenight">Integrating your game with GameNight</h1>
 <p>GameNight supplies the party, seats and lifecycle. Your game owns gameplay,
 rounds and results. Players can stay in a game until they choose another one.</p>
@@ -59,12 +59,18 @@ Keep the window hidden and audio silent. Do not steal focus during launch.</p>
 <p>Progress is optional. Ready must mean that Start can show playable content
 without another loading screen. Do not require player input to finish preparing.
 Keep the connection and lifecycle handling active while hidden or paused.</p>
+<p>A long load (a large world, a first-time shader build) needs more care:
+report a stage at least every five seconds, keep handling roster changes and
+<code>dispose</code> while loading, and when the roster changes during loading, prepare
+for the latest one rather than queueing every request. See
+<a href="/docs/performance#load-everything-before-ready">Performance</a>.</p>
 <p>On <code>start</code>, show the prepared window and begin play. On <code>pause</code>, stop simulation,
 timers and audio, then hide the game so the lobby can appear. On <code>resume</code>, show
 the same game state and continue. Pause and resume are required for release,
 including when the game is showing results rather than active gameplay.</p>
 <p>On <code>dispose</code>, stop the session, hide the window, silence audio and release session
-resources. Wait for another Prepare. If the host connection is lost, exit cleanly
+resources. Wait for another Prepare: the same process usually serves several
+sessions in one evening, so keep the game running and reuse what you loaded. If the host connection is lost, exit cleanly
 rather than leaving a game window or background process behind.</p>
 <h2 id="controllers-belong-to-players">Controllers belong to players</h2>
 <p>A seat is a playable position. Its occupant identifies a player; its <code>controller</code>
@@ -168,7 +174,7 @@ a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
 repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="146967a3eab85d1801d1159e41bc1fb817a77d167be76716a3dbd2f63a9e6b15">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="af444c982a63fa0e5eeb5d0c744eed4c753e411ca69d6d2985a596abce54acb5">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/engines"><small>Previous</small>Engine support</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#submit-a-game">Submit a game</a><a href="#connect">Connect</a><a href="#prepare-before-taking-the-screen">Prepare before taking the screen</a><a href="#controllers-belong-to-players">Controllers belong to players</a><a href="#back-focus-and-fullscreen">Back, focus and fullscreen</a><a href="#rounds-continue-inside-the-session">Rounds continue inside the session</a><a href="#live-players-and-settings">Live players and settings</a><a href="#player-faces-and-colours">Player faces and colours</a><a href="#artwork-for-the-catalog-and-lobby">Artwork for the catalog and lobby</a><a href="#verify-before-shipping">Verify before shipping</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

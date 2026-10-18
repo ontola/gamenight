@@ -74,9 +74,28 @@ jobs:
       entrypoint: Game.exe
 ```
 
-Pass the named secret explicitly when calling across repository owners. The reusable job selects your `gamenight` environment, where you can store the key.
+Pass the named secret explicitly when calling across repository owners:
+`secrets: inherit` does not reach a reusable workflow in another organization. The reusable job selects your `gamenight` environment, where you can store the key.
 
 The shared first-party pack uses a `gamenight-<game-id>` GitHub environment per game, each holding its `GAMENIGHT_API_TOKEN`. Native repositories use a `gamenight` environment. Set the repository variable `GAMENIGHT_PUBLISH_ENABLED=true` after registering ownership and configuring secrets. These workflows upload previews; CI does not silently replace a public release.
+
+### CI pitfalls we hit
+
+- **Every preview needs a new version.** A version identifies immutable bytes,
+  so a rebuilt commit cannot reuse `${{ github.sha }}`. Add the run:
+  `ci-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}`.
+- **Pin what you run with your key.** Pin `ontola/gamenight` actions and
+  reusable workflows to a reviewed commit, and check out a pinned copy of
+  `scripts/gamenight-publish.py` for the store step. Keep both on the same
+  commit, and update them together.
+- **Pin and checksum your engine.** Download a fixed Godot version and check
+  its SHA-256, in CI and in the export templates.
+- **Test the exported build in CI.** Run your lifecycle test against the
+  exported game, not only the editor project. Files under an excluded folder
+  (such as `tests/`) and raw files outside the include filter are missing
+  there, and the game only breaks in GameNight.
+- **Agents often cannot push tags.** Trigger releases with a workflow input
+  instead of a tag push.
 
 ## Other CI systems and local previews
 

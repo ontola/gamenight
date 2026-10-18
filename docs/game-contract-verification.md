@@ -169,3 +169,36 @@ job. That additionally requires the tested artifact hashes to match the
 catalog downloads. Update the release catalog and verify the corresponding
 packages before publication. Never substitute `--candidate-gate` in a release
 job.
+
+## Your game's own tests
+
+The contract checks cover the protocol. Your game also needs tests of its own
+that a person would otherwise do by hand. What worked in our games:
+
+- **A fake host.** A small script plays GameNight: it starts the game with
+  `GAMENIGHT=1`, `GAMENIGHT_ADDR`, `GAMENIGHT_GAME_ID` and `GAMENIGHT_TOKEN`,
+  answers `hello`, sends Prepare, waits for Ready, sends Start, controller
+  frames, Pause, Resume and Dispose, and checks what the game did. The
+  [Godot template](/docs/playbook) includes one in `tests/lifecycle.py`.
+- **Keep sending frames.** Input older than 250 ms counts as released, so a
+  test that holds a button must repeat the frame, about every 50 ms.
+- **Listen on a free port.** Bind port 0 and pass the port in
+  `GAMENIGHT_ADDR`, so a test never meets a real GameNight on the same machine
+  and tests can run side by side.
+- **Write the game's output to a file on Windows.** Godot on Windows writes
+  stdout synchronously; an unread pipe blocks the game before it connects.
+- **Trace what players would notice.** Print a line per event behind an
+  environment variable (`GAME_TRACE=1`), and wait for those lines in the
+  test. Pause state and menus are not visible over the protocol.
+- **Run the exported game too.** Run the same test against the exported
+  build in CI. Exports leave out excluded folders and non-resource files,
+  which only shows there.
+- **Bots play whole rounds.** Seeded bots playing a full match catch broken
+  rules and stuck rounds. Count every mechanic and fail when one never
+  happened.
+
+Then test with real controllers and real people. Use the
+[desktop checklist](desktop-integration-checklist.md): two profiles, reversed
+connection order, a pad unplugged and plugged back in, repeated Back and
+Resume, and several game switches. Tuning against bots alone misses how the
+controls feel.

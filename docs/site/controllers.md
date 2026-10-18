@@ -24,9 +24,37 @@ AI seats receive bots. Empty seats receive no controllable pawn. Keep standalone
 
 ## Joining and changing profiles
 
-After Prepare, send `participation` before Ready. Set `instant_join` only if the match can accept new players immediately. Handle `party_updated` without resetting the running match. Update names, clothing, skin and face artwork independently.
+After Prepare, send `participation` before Ready (`GameNight.notify_participation` in Godot). Set `instant_join` only if the match can accept new players immediately. Handle `party_updated` without resetting the running match. Update names, clothing, skin and face artwork independently.
+
+What our games do with a changing roster:
+
+- **Fixed roster per round** (`instant_join: false`) is the simple default: a
+  racing or sports game applies the new seats when the next round starts.
+- **Drop in mid-round** (`instant_join: true`) suits games where one more
+  player does not break fairness: spawn the newcomer near the others, or
+  behind the leader in a race, rather than at the start.
+- **A joining player replaces a bot**, never the other way round. AI never
+  takes a seat a person holds.
+- **A player who leaves** keeps their score until the round ends; their pawn
+  can stand still, fade out or become a bot.
+- **Colours can collide.** Two profiles may pick the same colour. Keep each
+  player's own colour where you can and only shift the later duplicate.
+- **Read the seat count from Prepare.** Don't assume a maximum. Declare
+  `players_min` and `players_max` honestly in your catalog entry.
 
 `controller_input` reports activity for presence and joining. It does not send movement to the game. Replacement lobbies use runtime-owned sampling; the legacy platformer publishes its own authenticated frames. Games consume the same frame format in both modes. See [Build a lobby](/docs/lobbies#input-and-screen-ownership).
+
+## Start opens your menu, Back leaves
+
+Back/Select belongs to GameNight and always returns to the party, even from
+inside your pause menu. Start opens and closes your game's own menu with its
+settings and the controls. In managed play, leave out anything GameNight
+already chose (players, game mode picked in the lobby).
+
+Use press edges for every menu and action button, and require a release after
+Start and Resume, so the press that started the game does not also act in it.
+Hold-to-confirm (about a second) suits actions that end a round or reset
+progress.
 
 ## Back must toggle once
 

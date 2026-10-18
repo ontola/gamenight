@@ -20,6 +20,14 @@ jobs:
 
 The connection reads the launch environment automatically. Keep standalone menus separate from the managed path using `GameNight.launched_by_daemon`.
 
+A game you start by hand stays offline, so a test run never joins the party
+on your machine. To connect it to a development host anyway, set
+`GAMENIGHT_ADDR=127.0.0.1:7912`, or call `GameNight.connect_to_host()`.
+
+Use the `GameNight` autoload and connect to its signals; don't subclass it and
+override its message handling. A subclass that replaces `_handle` silently
+loses performance reports, settings replay and future protocol features.
+
 ## Lifecycle signals
 
 These declarations come directly from the addon:
@@ -40,6 +48,19 @@ The addon provides this implementation:
 
 Call `GameNight.notify_ready(session_id)` only after your level and first frame are prepared. `notify_finished` reports a round; your game still owns the results screen and next round.
 
+To get live roster updates, opt in from `prepared`, before Ready:
+
+```gdscript
+func _on_prepared(session_id: String, seats: Array, players: Array) -> void:
+    GameNight.notify_participation(session_id, false)  # true: new players can join mid-round
+    build_level(seats, players)
+    GameNight.notify_ready(session_id)
+```
+
+Report real play with `GameNight.report_activity(seat)` on a press or a stick
+past its deadzone, so GameNight does not mark a player asleep. It sends at
+most once a second per controller. See [Controllers & players](/docs/controllers#joining-and-changing-profiles).
+
 ## Controllers and live profiles
 
 Use the runtime stream in managed play. A seat's controller token is opaque;
@@ -52,11 +73,26 @@ func _physics_process(delta: float) -> void:
     if GameNight.phase != "running":
         return
     var frame = GameNight.frame_for_seat(0)
-    var movement = Vector2(GameNight.axis(frame, 0), GameNight.axis(frame, 1))
-    # Apply movement to the character assigned to seat 0.
-    if GameNight.button(frame, 0): # A, held; add your own press-edge detection.
-        pass
+    var movement = GameNight.stick(frame, 0)          # left stick, deadzone applied
+    var throttle = GameNight.trigger(frame, 1)        # right trigger, 0 to 1
+    if GameNight.just_pressed(0, GameNight.BUTTON_A): # one press, one jump
+        jump(0)
+    if GameNight.button(frame, GameNight.BUTTON_X):   # held
+        charge(0)
+    if movement != Vector2.ZERO:
+        GameNight.report_activity(0)
 ```
+
+The SDK names every button and axis (`BUTTON_A` to `BUTTON_RIGHT`,
+`AXIS_LEFT_X` to `AXIS_RIGHT_TRIGGER`). `stick` and `trigger` apply the
+deadzones our games settled on (`STICK_DEADZONE` 0.15, `TRIGGER_DEADZONE`
+0.06); pass your own as the last argument. `just_pressed` is true on the
+physics tick a button went down; read it in `_physics_process`. After Start
+and Resume, a button still held from the lobby must be released first, so the
+press that started the game does not also fire in it.
+
+`frame_for_seat` is empty while the session is not running. Your own Start
+menu can read input while paused with `frame_for_seat(seat, true)`.
 
 Use `GameNight.roster_changed` to refresh seat ownership, names, skin colour
 and avatar artwork. The current snapshot is available in `GameNight.party`.
@@ -75,47 +111,7 @@ request Start or Resume. A game preparing in the background stays quiet until
 the runtime explicitly starts it. The helper handles the window and master
 audio bus; your lifecycle callbacks must still pause the simulation and timers.
 
-## Godot lobby example
-
-The SDK includes a runnable Living Room project using a separate authenticated
-lobby client. It shows live player names and faces and can join, queue, play
-and resume. See [Build a lobby](/docs/lobbies) for launch instructions and the
-runtime-owned controller contract. Its client is independent of the game autoloads.
-
-## Before release
-
-Check the [lifecycle contract](/docs/lifecycle) and [controller stream](/docs/controllers), then run [packaged integration checks](/docs/testing). Run `python scripts/test-godot-sdk.py --godot /path/to/godot` for the headless
-adapter regression checks. The lobby has a separate real-daemon flow test.
-These tests and source-checked documentation do not verify your game callbacks,
-physical controllers or platform window behaviour. Enabling the plugin alone
-does not certify a game.
-
-## Optional performance diagnostics
-
-The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
-
-
-## Yield your soundtrack to host music
-
-The welcome snapshot and subsequent `GameNight.party_updated` snapshots include
-`now_playing` when GameNight detects a host music player. Check `playing`, not
-just whether a track exists: paused tracks still have metadata. When it is true,
-mute your music bus only. Keep effects audible and preserve the player's own
-music preference. Restore that preference when host music pauses or disappears.
-
-```gdscript
-func _ready():
-    GameNight.party_updated.connect(_host_music)
-    _host_music(GameNight.party)
-
-func _host_music(party: Dictionary):
-    var track = party.get("now_playing", {})
-    var playing = track is Dictionary and bool(track.get("playing", false))
-    AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), playing)
-```
-
-Use a dedicated `Music` bus. Growing Guns uses `MusicA` and `MusicB` for its two
-soundtrack layers. Do not mute `Master`: that also silences game effects.
+### Keep the window hidden at launch
 
 For a game that prepares before being played, set `display/window/size/mode` to
 `1` (Minimized) and `display/window/size/no_focus` to `true` at engine startup.
@@ -155,3 +151,53 @@ and the lobby waits on "preloading" forever. Await `get_tree().process_frame`
 instead whenever `DisplayServer.window_get_mode()` is `WINDOW_MODE_MINIMIZED`.
 Leave the window itself to `GameNightScreen`. Godot refuses `hide()` on the main
 window, and on Windows setting `borderless` shows the window again.
+
+## Phone screens
+
+`GameNight.declare_companion_folder("res://phone")` serves a folder of your
+game as each player's phone screen. See [Phone screens](/docs/phone-screens)
+for the export settings it needs and how to keep the game in charge.
+
+## Godot lobby example
+
+The SDK includes a runnable Living Room project using a separate authenticated
+lobby client. It shows live player names and faces and can join, queue, play
+and resume. See [Build a lobby](/docs/lobbies) for launch instructions and the
+runtime-owned controller contract. Its client is independent of the game autoloads.
+
+## Before release
+
+Check the [lifecycle contract](/docs/lifecycle) and [controller stream](/docs/controllers), then run [packaged integration checks](/docs/testing). Run `python scripts/test-godot-sdk.py --godot /path/to/godot` for the headless
+adapter regression checks. The lobby has a separate real-daemon flow test.
+These tests and source-checked documentation do not verify your game callbacks,
+physical controllers or platform window behaviour. Enabling the plugin alone
+does not certify a game.
+
+## Optional performance diagnostics
+
+For what to do about the numbers, see [Performance](/docs/performance).
+
+The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
+
+
+## Yield your soundtrack to host music
+
+The welcome snapshot and subsequent `GameNight.party_updated` snapshots include
+`now_playing` when GameNight detects a host music player. Check `playing`, not
+just whether a track exists: paused tracks still have metadata. When it is true,
+mute your music bus only. Keep effects audible and preserve the player's own
+music preference. Restore that preference when host music pauses or disappears.
+
+```gdscript
+func _ready():
+    GameNight.party_updated.connect(_host_music)
+    _host_music(GameNight.party)
+
+func _host_music(party: Dictionary):
+    var track = party.get("now_playing", {})
+    var playing = track is Dictionary and bool(track.get("playing", false))
+    AudioServer.set_bus_mute(AudioServer.get_bus_index("Music"), playing)
+```
+
+Use a dedicated `Music` bus. Growing Guns uses `MusicA` and `MusicB` for its two
+soundtrack layers. Do not mute `Master`: that also silences game effects.

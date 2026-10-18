@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-controllers">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-controllers" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers" aria-current="page">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-controllers" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers" aria-current="page">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="controllers-players">Controllers &amp; players</h1>
 <p>A controller belongs to a seat through its host token. A profile belongs to a player through its ID. Those associations must survive switching games and reconnecting devices.</p>
 <h2 id="match-tokens-not-array-positions">Match tokens, not array positions</h2>
@@ -60,14 +60,39 @@ end
 <p><a href="https://github.com/ontola/gamenight-games/blob/ecc5a942cf7af5f95bab254d8e48559824dc7403/love-party/shared/input.lua#L19">Source: games/love-party/shared/input.lua</a></p>
 <p>AI seats receive bots. Empty seats receive no controllable pawn. Keep standalone device enumeration separate from managed input.</p>
 <h2 id="joining-and-changing-profiles">Joining and changing profiles</h2>
-<p>After Prepare, send <code>participation</code> before Ready. Set <code>instant_join</code> only if the match can accept new players immediately. Handle <code>party_updated</code> without resetting the running match. Update names, clothing, skin and face artwork independently.</p>
+<p>After Prepare, send <code>participation</code> before Ready (<code>GameNight.notify_participation</code> in Godot). Set <code>instant_join</code> only if the match can accept new players immediately. Handle <code>party_updated</code> without resetting the running match. Update names, clothing, skin and face artwork independently.</p>
+<p>What our games do with a changing roster:</p>
+<ul>
+<li><strong>Fixed roster per round</strong> (<code>instant_join: false</code>) is the simple default: a
+racing or sports game applies the new seats when the next round starts.</li>
+<li><strong>Drop in mid-round</strong> (<code>instant_join: true</code>) suits games where one more
+player does not break fairness: spawn the newcomer near the others, or
+behind the leader in a race, rather than at the start.</li>
+<li><strong>A joining player replaces a bot</strong>, never the other way round. AI never
+takes a seat a person holds.</li>
+<li><strong>A player who leaves</strong> keeps their score until the round ends; their pawn
+can stand still, fade out or become a bot.</li>
+<li><strong>Colours can collide.</strong> Two profiles may pick the same colour. Keep each
+player's own colour where you can and only shift the later duplicate.</li>
+<li><strong>Read the seat count from Prepare.</strong> Don't assume a maximum. Declare
+<code>players_min</code> and <code>players_max</code> honestly in your catalog entry.</li>
+</ul>
 <p><code>controller_input</code> reports activity for presence and joining. It does not send movement to the game. Replacement lobbies use runtime-owned sampling; the legacy platformer publishes its own authenticated frames. Games consume the same frame format in both modes. See <a href="/docs/lobbies#input-and-screen-ownership">Build a lobby</a>.</p>
+<h2 id="start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</h2>
+<p>Back/Select belongs to GameNight and always returns to the party, even from
+inside your pause menu. Start opens and closes your game's own menu with its
+settings and the controls. In managed play, leave out anything GameNight
+already chose (players, game mode picked in the lobby).</p>
+<p>Use press edges for every menu and action button, and require a release after
+Start and Resume, so the press that started the game does not also act in it.
+Hold-to-confirm (about a second) suits actions that end a round or reset
+progress.</p>
 <h2 id="back-must-toggle-once">Back must toggle once</h2>
 <p>Request the lobby with <code>request_overlay</code>. Use press/release edges and the shared one-second release gate. The same held press must not reopen the game after focus changes. Never issue Resume or <code>request_start</code> from a focus callback.</p>
 <h2 id="check-real-devices">Check real devices</h2>
 <p>Test two different profiles, reversed connection order, unplugging one pad and reconnecting it. Then switch between games. Synthetic frames can check token matching, but they do not prove that a physical controller belongs to the right player on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="cb0d5c50c305c105bf69163c543999719780a541a1fa85f0b4260894f6787b1a">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="22e3bf8d8f2c186bcb1f6cc677cdd2109155c96d5b1c7da1c651553c80942de8">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/other-engines"><small>Previous</small>Unity, Unreal &amp; others</a><a href="/docs/faces"><small>Next</small>Faces &amp; colours</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
