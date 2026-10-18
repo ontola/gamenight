@@ -71,6 +71,8 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--binary-revision")
     parser.add_argument("--lobby-revision")
+    parser.add_argument("--sign-identity", default="-",
+                        help="Developer ID Application identity; '-' signs ad hoc")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     app = package(repo, args.binaries, args.output, args.version, args.binary_revision, args.lobby_revision)
@@ -97,9 +99,14 @@ def main():
         subprocess.run(["swiftc", "-target", arch + "-apple-macosx12.0", str(repo / "scripts/macos-link.swift"), "-o", str(binary)], check=True)
         architectures.append(str(binary))
     subprocess.run(["lipo", "-create", *architectures, "-output", str(links / "MacOS/GameNight Link")], check=True)
-    # Ad-hoc signing supports Apple Silicon execution. It is not notarization.
+    # Sign inside out. Ad-hoc signing only permits Apple Silicon execution; a
+    # Developer ID signature with hardened runtime and timestamp is what
+    # notarization (and so Gatekeeper on other Macs) requires.
+    sign = ["codesign", "--force", "--sign", args.sign_identity]
+    if args.sign_identity != "-":
+        sign += ["--options", "runtime", "--timestamp"]
     for path in [app / "Contents/Resources/bin/gamenight-daemon", app / "Contents/Helpers/GameNight.app", links.parent, app]:
-        subprocess.run(["codesign", "--force", "--sign", "-", str(path)], check=True)
+        subprocess.run([*sign, str(path)], check=True)
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     print(app)
 

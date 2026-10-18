@@ -19,7 +19,8 @@ published release. A failed build leaves the previous release available.
 artifact SHA-256 checksums. Website deployment consumes this manifest separately;
 publishing on GitHub alone does not prove the website download has changed.
 
-These remain previews. macOS uses ad-hoc signing, not Apple notarization. Windows
+These remain previews. macOS is signed with Developer ID and notarized when the
+signing secrets in `macos-distribution.md` are configured, otherwise ad hoc. Windows
 uses configured Azure signing when available. Automated tests do not replace
 physical controller, GPU or clean-machine acceptance tests.
 

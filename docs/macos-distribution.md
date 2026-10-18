@@ -26,4 +26,20 @@ Download `gamenight-macos-installer` and inspect the `gamenight-macos-smoke` scr
 
 For changes limited to packaging or catalog metadata, `binaries_run` can reuse successful native build artifacts from an earlier run. The asset manifest records both the packaging commit and the binary commit. Never reuse all binaries when Rust sources or dependencies have changed. `lobby_run` can reuse only the lobby while rebuilding the host; use it only when lobby sources and dependencies are unchanged. The manifest records the lobby commit separately.
 
-The build currently uses ad-hoc signatures. These permit native Apple Silicon execution but are not Developer ID signatures or Apple notarization. Do not describe this package as notarized. Physical controller behavior still needs a real Mac/controller test; an automated launch is not that test.
+## Signing and notarization
+
+Without Developer ID credentials the build falls back to ad-hoc signatures, with a workflow warning. Those permit native Apple Silicon execution on the build machine, but Gatekeeper blocks the downloaded app ("Apple could not verify GameNight.app"). Testers can then use System Settings > Privacy & Security > Open Anyway, or `xattr -dr com.apple.quarantine /Applications/GameNight.app`.
+
+With these repository secrets, the workflow signs every executable inside out with hardened runtime and a secure timestamp, signs the DMG, notarizes it with `notarytool`, staples the ticket and checks it with `spctl`:
+
+| Secret | Value |
+| --- | --- |
+| `MACOS_CERTIFICATE_P12` | Base64 of a **Developer ID Application** certificate with its private key, exported from Keychain Access as `.p12` (`base64 -i cert.p12 \| pbcopy`). |
+| `MACOS_CERTIFICATE_PASSWORD` | The export password of that `.p12`. |
+| `APPLE_API_KEY_P8` | Contents (or base64) of an App Store Connect API key `AuthKey_XXXX.p8` with the Developer role. |
+| `APPLE_API_KEY_ID` | That key's ID. |
+| `APPLE_API_ISSUER_ID` | The issuer ID shown above the keys list in App Store Connect > Users and Access > Integrations. |
+
+Once the certificate secret is present, a missing API key fails the build instead of silently shipping an unnotarized DMG. The automatic release workflow passes these secrets on with `secrets: inherit`.
+
+Physical controller behavior still needs a real Mac/controller test; an automated launch is not that test.

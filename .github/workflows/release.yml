@@ -46,6 +46,7 @@ jobs:
   macos:
     needs: [select, windows]
     uses: ./.github/workflows/macos-preview.yml
+    secrets: inherit
     with:
       ref: ${{ needs.select.outputs.revision }}
       version: ${{ needs.select.outputs.version }}
