@@ -3,6 +3,14 @@
 A GameNight couch game in Godot 4.5 (GL Compatibility). The GameNight game
 playbook is the full guide: https://gamenight.ontola.io/docs/playbook
 
+## Couch design rules
+
+- Start playing at once; no setup screen before the first round.
+- Every option is a GameNight setting (`SETTINGS` in main.gd) and also sits
+  in the Start menu. Never bind Back: GameNight owns it.
+- Use the players' colours, names and faces; keep text off the play field.
+- Rounds keep going: results, `notify_finished`, next round.
+
 ## Check every change
 
     godot --headless --import                                   # parse errors show here

@@ -29,7 +29,7 @@ cd my-game &amp;&amp; git init &amp;&amp; git add -A &amp;&amp; git commit -m &q
 <tbody>
 <tr>
 <td><code>main.gd</code></td>
-<td>the game: GameNight lifecycle, seats, bots, dev flags</td>
+<td>the game: GameNight lifecycle, seats, faces, settings and a Start menu, bots, dev flags</td>
 </tr>
 <tr>
 <td><code>gamenight.json</code></td>
@@ -94,18 +94,39 @@ metres along a path), what to spawn round the players, a closer camera.</li>
 </ul>
 <p>Look at the screenshots yourself after visual changes. Text over characters
 and HUD clutter read badly on a TV; let shapes and colour carry the state.</p>
-<h2 id="couch-rules-that-matter">Couch rules that matter</h2>
+<h2 id="design-for-the-couch">Design for the couch</h2>
+<p>Players sit on a sofa, a few metres from the TV, holding controllers, and
+switch games often. The template does all of this; keep it as you build.</p>
 <ul>
-<li>Controllers follow seats. Read <code>GameNight.frame_for_seat(seat)</code>, never
-joystick indices, when GameNight launched the game.</li>
-<li>Bots fill seats. The host can seat AI players; the same bots power your
-sim and your store clip.</li>
-<li>Prepare loads everything while hidden, then <code>notify_ready</code>. Start shows it.
-Pause freezes play, timers and audio. Finishing a round calls
-<code>notify_finished</code> and starts the next one: players leave with Back.</li>
-<li>See <a href="/docs/lifecycle">Game lifecycle</a>, <a href="/docs/controllers">Controllers &amp; players</a>
-and <a href="/docs/faces">Faces &amp; colours</a>.</li>
+<li><strong>Start playing at once.</strong> No title screen, no setup screen before the
+first round. The lobby already picked the game and the players.</li>
+<li><strong>Settings live in the Start menu, and in GameNight.</strong> Declare every
+option with <code>GameNight.declare_settings</code> and apply <code>setting_changed</code>, so
+players can change them from the GameNight app, the lobby, or by asking
+an LLM. Show the same settings in a small menu on Start. Apply a change
+from the next round when changing it mid-round would be unfair. A menu
+change stays in the game for now: games cannot write a setting back to
+GameNight yet.</li>
+<li><strong>Leave Back alone.</strong> Back (Select) returns to the party; GameNight handles
+it and pauses your game. Never bind it to anything in the game.</li>
+<li><strong>Use the players' colours, names and faces.</strong> Each player picks them once
+in GameNight. Colour the player's character, draw their face on it with the
+SDK's <code>face.gd</code>, and name them where it matters, such as the results screen.</li>
+<li><strong>Don't flood the screen.</strong> No text over characters, no labels on every
+thing. A clock, a score per player and clear shapes and colours read from the
+sofa; menus and explanations do not. Controls hints belong in the Start menu.</li>
+<li><strong>Rounds keep going.</strong> Show the result briefly, call <code>notify_finished</code>,
+then start the next round. Players leave with Back, not with a game over
+screen.</li>
+<li><strong>Bots fill empty seats.</strong> The host can seat AI players, so a game works with
+one person. The same bots run your sim and your store clip.</li>
+<li><strong>Controllers follow seats.</strong> Read <code>GameNight.frame_for_seat(seat)</code> when
+GameNight launched the game, never joystick indices.</li>
+<li><strong>Prepare quietly.</strong> Load everything in Prepare while hidden, then call
+<code>notify_ready</code>. Start shows it; Pause freezes play, timers and audio.</li>
 </ul>
+<p>More detail: <a href="/docs/lifecycle">Game lifecycle</a>, <a href="/docs/controllers">Controllers &amp; players</a>,
+<a href="/docs/faces">Faces &amp; colours</a> and <a href="/docs/settings">Game settings</a>.</p>
 <h2 id="the-store-clip">The store clip</h2>
 <p>The store needs a five-second clip of real gameplay. Read the
 <a href="https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md">gameplay preview guide</a>:
@@ -144,7 +165,7 @@ Start cuts at frame 20 or later.</li>
 at phone size.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="072305645e0e5173eba68e7ae998168b96e13c70288bc03b82caa4a85097158a">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="2d358df799beb60089df4a2121b7092c4746c2f3da43b4f826b2a74c9a70d726">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#couch-rules-that-matter">Couch rules that matter</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -9,27 +9,46 @@ extends Node2D
 ##                                                 bots play; checks the rules, prints a state hash
 ## With GAME_TRACE=1 the game prints what happens (tests/lifecycle.py reads it).
 ##
+## Couch rules it shows: play starts at once, with no setup screen. Settings
+## are declared to GameNight, so players can change them from the app (or ask
+## an LLM), and Start opens a small menu with the same settings. Back is left to
+## GameNight (it returns to the party). Players are their own colour, name and
+## face; the screen shows little else.
+##
 ## Determinism: all randomness comes from the global RNG, seeded once from
 ## --seed, and the simulation only moves in _physics_process. Same seed and
 ## --fixed-fps give the same run, so tests, balance numbers and the store clip
 ## can be reproduced.
 
 const ARENA := Rect2(80, 80, 1760, 920)
-const ROUND_SECONDS := 60.0
 const RESULTS_SECONDS := 4.0
 const SPEED := 420.0
 const DASH_SPEED := 1300.0
 const DASH_TIME := 0.18
 const DASH_COOLDOWN := 0.9
 const RADIUS := 28.0
-const ORBS := 6
+const FACE := preload("res://addons/gamenight/face.gd")
+# The SDK's controller frame button order.
+const BUTTON_A := 0
+const BUTTON_B := 1
+const BUTTON_START := 7
 const COLORS := [Color("#e8553d"), Color("#3d8fe0"), Color("#5cc45a"), Color("#e6c13a"),
 	Color("#b05ce0"), Color("#3ac9c4"), Color("#e07ab8"), Color("#9aa3ad")]
 const NAMES := ["Red", "Blue", "Green", "Yellow", "Purple", "Teal", "Pink", "Grey"]
 
+## Declared to GameNight; the app, an LLM or the Start menu change them.
+const SETTINGS := [
+	{"key": "round_seconds", "label": "Round length (seconds)", "kind": "number", "default": 60, "min": 20, "max": 180},
+	{"key": "orbs", "label": "Orbs on the field", "kind": "number", "default": 6, "min": 2, "max": 16},
+]
+var settings := {"round_seconds": 60, "orbs": 6}
+
 var players: Array[Dictionary] = []
 var orbs: Array[Vector2] = []
-var clock := ROUND_SECONDS
+var clock := 60.0
+var menu_owner := -1
+var menu_row := 0
+var faces := FACE.new()
 var results := 0.0
 var round_number := 0
 var host_paused := false
@@ -60,6 +79,8 @@ func _ready() -> void:
 	else:
 		randomize()
 	if GameNight.launched_by_daemon and shot == "" and sim_frames == 0:
+		GameNight.daemon_connected.connect(func(): GameNight.declare_settings(SETTINGS))
+		GameNight.setting_changed.connect(_on_setting)
 		GameNight.prepared.connect(_on_prepared)
 		GameNight.started.connect(func(_s): _set_paused(false))
 		GameNight.resumed.connect(func(_s): _set_paused(false))
@@ -89,6 +110,7 @@ func _on_prepared(session_id: String, seats: Array, profiles: Array) -> void:
 		for p in profiles:
 			if str(p.get("id", "")) != "" and str(p.get("id")) == str(occupant.get("player_id", "")):
 				entry.name = str(p.get("name", ""))
+				entry.profile = p
 				if p.has("color"):
 					entry.color = Color.from_string(str(p.color), Color.WHITE)
 		roster.append(entry)
@@ -100,6 +122,14 @@ func _on_prepared(session_id: String, seats: Array, profiles: Array) -> void:
 	_trace("seated " + ", ".join(players.map(func(p): return "bot" if p.bot else "%s (seat %d)" % [p.name, p.seat])))
 	# Ready only once the first frame can be drawn: the level is built above.
 	GameNight.notify_ready(session_id)
+
+
+## Values from the party apply from the next round.
+func _on_setting(key: String, value: Variant) -> void:
+	for s in SETTINGS:
+		if s.key == key:
+			settings[key] = clampi(int(value), s.min, s.max)
+			_trace("setting %s = %d" % [key, settings[key]])
 
 
 func _on_disposed(_s: String) -> void:
@@ -120,13 +150,14 @@ func _seat(roster: Array) -> void:
 		players.append({
 			"name": r.get("name", NAMES[i % NAMES.size()]), "color": r.get("color", COLORS[i % COLORS.size()]),
 			"bot": r.bot, "seat": r.seat, "pad": r.pad, "pos": Vector2.ZERO, "vel": Vector2.ZERO,
-			"dash": 0.0, "cooldown": 0.0, "score": 0, "was_a": false,
+			"dash": 0.0, "cooldown": 0.0, "score": 0, "profile": r.get("profile", {}),
+			"held": {}, "pressed": {},
 		})
 
 
 func _new_round() -> void:
 	round_number += 1
-	clock = ROUND_SECONDS
+	clock = float(settings.round_seconds)
 	results = 0.0
 	for i in players.size():
 		var angle := TAU * i / players.size()
@@ -134,7 +165,7 @@ func _new_round() -> void:
 		players[i].vel = Vector2.ZERO
 		players[i].score = 0
 	orbs.clear()
-	for i in ORBS:
+	for i in settings.orbs:
 		orbs.append(_free_spot())
 
 
@@ -143,30 +174,64 @@ func _free_spot() -> Vector2:
 		randf_range(ARENA.position.y + 60, ARENA.end.y - 60))
 
 
-## Returns [move, dash pressed this frame] for one player.
-func _input_for(p: Dictionary) -> Array:
+## Reads one player: stick (or keys) and which buttons went down this frame.
+## Back is never read: GameNight owns it.
+func _read(p: Dictionary) -> Vector2:
 	var move := Vector2.ZERO
-	var a := false
+	var held := {"a": false, "b": false, "start": false}
 	if p.bot:
 		var target := _nearest_orb(p.pos)
 		move = (target - p.pos).limit_length(1.0)
-		a = p.pos.distance_to(target) < 260.0 and randf() < 0.03
+		held.a = p.pos.distance_to(target) < 260.0 and randf() < 0.03
 	elif p.seat >= 0:
 		var f := GameNight.frame_for_seat(p.seat)
 		move = Vector2(GameNight.axis(f, 0), GameNight.axis(f, 1))
-		a = GameNight.button(f, 0)
+		held = {"a": GameNight.button(f, BUTTON_A), "b": GameNight.button(f, BUTTON_B),
+			"start": GameNight.button(f, BUTTON_START)}
 	else:
 		move = Vector2(Input.get_joy_axis(p.pad, JOY_AXIS_LEFT_X), Input.get_joy_axis(p.pad, JOY_AXIS_LEFT_Y))
-		a = Input.is_joy_button_pressed(p.pad, JOY_BUTTON_A)
+		held = {"a": Input.is_joy_button_pressed(p.pad, JOY_BUTTON_A),
+			"b": Input.is_joy_button_pressed(p.pad, JOY_BUTTON_B),
+			"start": Input.is_joy_button_pressed(p.pad, JOY_BUTTON_START)}
 		if p.pad == 0:
 			move += Vector2(float(Input.is_key_pressed(KEY_D)) - float(Input.is_key_pressed(KEY_A)),
 				float(Input.is_key_pressed(KEY_S)) - float(Input.is_key_pressed(KEY_W)))
-			a = a or Input.is_key_pressed(KEY_SPACE)
+			held.a = held.a or Input.is_key_pressed(KEY_SPACE)
+			held.start = held.start or Input.is_key_pressed(KEY_ESCAPE)
 	if move.length() < 0.2:
 		move = Vector2.ZERO
-	var pressed: bool = a and not p.was_a
-	p.was_a = a
-	return [move.limit_length(1.0), pressed]
+	# Menu navigation uses the stick like a d-pad: one step per push.
+	for dir in ["left", "right", "up", "down"]:
+		held[dir] = {"left": move.x < -0.6, "right": move.x > 0.6, "up": move.y < -0.6, "down": move.y > 0.6}[dir]
+	for k in held:
+		p.pressed[k] = held[k] and not p.held.get(k, false)
+	p.held = held
+	return move.limit_length(1.0)
+
+
+## Start opens the settings menu for whoever pressed it; play waits meanwhile.
+func _menu() -> bool:
+	if menu_owner < 0:
+		for i in players.size():
+			if not players[i].bot and players[i].pressed.get("start", false):
+				menu_owner = i
+				menu_row = 0
+				_trace("menu open")
+				return true
+		return false
+	var p: Dictionary = players[menu_owner]
+	if p.pressed.get("start", false) or p.pressed.get("b", false):
+		menu_owner = -1
+		_trace("menu closed")
+		return true
+	if p.pressed.get("up", false) or p.pressed.get("down", false):
+		menu_row = posmod(menu_row + (1 if p.pressed.get("down", false) else -1), SETTINGS.size())
+	var step := int(p.pressed.get("right", false)) - int(p.pressed.get("left", false))
+	if step != 0:
+		var s: Dictionary = SETTINGS[menu_row]
+		var size := 10 if s.key == "round_seconds" else 1
+		_on_setting(s.key, settings[s.key] + step * size)
+	return true
 
 
 func _nearest_orb(from: Vector2) -> Vector2:
@@ -189,6 +254,12 @@ func _physics_process(delta: float) -> void:
 		_save_shot()
 	if host_paused or players.is_empty():
 		return
+	var moves: Array[Vector2] = []
+	for p in players:
+		moves.append(_read(p))
+	if _menu():
+		queue_redraw()
+		return
 	if results > 0.0:
 		results -= delta
 		if results <= 0.0:
@@ -196,12 +267,12 @@ func _physics_process(delta: float) -> void:
 		queue_redraw()
 		return
 	clock -= delta
-	for p in players:
-		var input := _input_for(p)
-		var move: Vector2 = input[0]
+	for i in players.size():
+		var p: Dictionary = players[i]
+		var move: Vector2 = moves[i]
 		p.cooldown = maxf(0.0, p.cooldown - delta)
 		p.dash = maxf(0.0, p.dash - delta)
-		if input[1] and p.cooldown == 0.0:
+		if p.pressed.a and p.cooldown == 0.0:
 			p.dash = DASH_TIME
 			p.cooldown = DASH_COOLDOWN
 			p.vel = (move if move != Vector2.ZERO else Vector2.RIGHT) * DASH_SPEED
@@ -264,16 +335,35 @@ func _draw() -> void:
 	for o in orbs:
 		draw_circle(o, 14.0, Color("#ffe58a"))
 	for p in players:
+		# The player's colour is the body, their own face sits on it.
 		var c: Color = p.color
 		draw_circle(p.pos, RADIUS, c.lightened(0.35) if p.dash > 0.0 else c)
+		if not p.profile.is_empty():
+			faces.draw_face(self, p.profile, p.pos, RADIUS * 0.72)
 		draw_arc(p.pos, RADIUS + 6.0, 0.0, TAU * (1.0 - p.cooldown / DASH_COOLDOWN), 24, c.darkened(0.3), 4.0)
-	# The only text is the clock and scores: everything else reads from shapes.
+	# The only text is the clock and scores, and names on the results screen.
 	var font := ThemeDB.fallback_font
 	draw_string(font, Vector2(900, 60), "%d" % ceili(maxf(clock, 0.0)), HORIZONTAL_ALIGNMENT_CENTER, 120, 48)
 	for i in players.size():
 		var p: Dictionary = players[i]
 		draw_circle(Vector2(120 + i * 140, 1040), 14.0, p.color)
 		draw_string(font, Vector2(145 + i * 140, 1054), str(p.score), HORIZONTAL_ALIGNMENT_LEFT, -1, 36)
+	if results > 0.0:
+		var ranking := players.duplicate()
+		ranking.sort_custom(func(x, y): return x.score > y.score)
+		for i in ranking.size():
+			var r: Dictionary = ranking[i]
+			draw_circle(Vector2(820, 380 + i * 64), 22.0, r.color)
+			draw_string(font, Vector2(860, 394 + i * 64), "%s  %d" % [r.name, r.score], HORIZONTAL_ALIGNMENT_LEFT, -1, 40)
+	if menu_owner >= 0:
+		draw_rect(Rect2(660, 380, 600, 44 + SETTINGS.size() * 64), Color(0.05, 0.04, 0.08, 0.92))
+		draw_rect(Rect2(660, 380, 600, 44 + SETTINGS.size() * 64), players[menu_owner].color, false, 4.0)
+		for i in SETTINGS.size():
+			var s: Dictionary = SETTINGS[i]
+			var y := 440 + i * 64
+			var col := Color.WHITE if i == menu_row else Color(1, 1, 1, 0.55)
+			draw_string(font, Vector2(690, y), s.label, HORIZONTAL_ALIGNMENT_LEFT, -1, 32, col)
+			draw_string(font, Vector2(1100, y), "< %d >" % settings[s.key], HORIZONTAL_ALIGNMENT_RIGHT, 130, 32, col)
 
 
 func _save_shot() -> void:

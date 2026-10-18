@@ -16,7 +16,7 @@ You get a small, working Godot 4 couch game with:
 
 | Part | What it does |
 | --- | --- |
-| `main.gd` | the game: GameNight lifecycle, seats, bots, dev flags |
+| `main.gd` | the game: GameNight lifecycle, seats, faces, settings and a Start menu, bots, dev flags |
 | `gamenight.json` | the store and catalog entry: title, tagline, players, tags |
 | `tests/lifecycle.py` | a fake GameNight host drives prepare, start, controller input, pause, resume, dispose |
 | `tools/capture_preview.sh`, `tools/encode_preview.py` | the five-second store clip, frame by frame |
@@ -74,17 +74,40 @@ Build flags for everything you would otherwise set up by hand:
 Look at the screenshots yourself after visual changes. Text over characters
 and HUD clutter read badly on a TV; let shapes and colour carry the state.
 
-## Couch rules that matter
+## Design for the couch
 
-- Controllers follow seats. Read `GameNight.frame_for_seat(seat)`, never
-  joystick indices, when GameNight launched the game.
-- Bots fill seats. The host can seat AI players; the same bots power your
-  sim and your store clip.
-- Prepare loads everything while hidden, then `notify_ready`. Start shows it.
-  Pause freezes play, timers and audio. Finishing a round calls
-  `notify_finished` and starts the next one: players leave with Back.
-- See [Game lifecycle](/docs/lifecycle), [Controllers & players](/docs/controllers)
-  and [Faces & colours](/docs/faces).
+Players sit on a sofa, a few metres from the TV, holding controllers, and
+switch games often. The template does all of this; keep it as you build.
+
+- **Start playing at once.** No title screen, no setup screen before the
+  first round. The lobby already picked the game and the players.
+- **Settings live in the Start menu, and in GameNight.** Declare every
+  option with `GameNight.declare_settings` and apply `setting_changed`, so
+  players can change them from the GameNight app, the lobby, or by asking
+  an LLM. Show the same settings in a small menu on Start. Apply a change
+  from the next round when changing it mid-round would be unfair. A menu
+  change stays in the game for now: games cannot write a setting back to
+  GameNight yet.
+- **Leave Back alone.** Back (Select) returns to the party; GameNight handles
+  it and pauses your game. Never bind it to anything in the game.
+- **Use the players' colours, names and faces.** Each player picks them once
+  in GameNight. Colour the player's character, draw their face on it with the
+  SDK's `face.gd`, and name them where it matters, such as the results screen.
+- **Don't flood the screen.** No text over characters, no labels on every
+  thing. A clock, a score per player and clear shapes and colours read from the
+  sofa; menus and explanations do not. Controls hints belong in the Start menu.
+- **Rounds keep going.** Show the result briefly, call `notify_finished`,
+  then start the next round. Players leave with Back, not with a game over
+  screen.
+- **Bots fill empty seats.** The host can seat AI players, so a game works with
+  one person. The same bots run your sim and your store clip.
+- **Controllers follow seats.** Read `GameNight.frame_for_seat(seat)` when
+  GameNight launched the game, never joystick indices.
+- **Prepare quietly.** Load everything in Prepare while hidden, then call
+  `notify_ready`. Start shows it; Pause freezes play, timers and audio.
+
+More detail: [Game lifecycle](/docs/lifecycle), [Controllers & players](/docs/controllers),
+[Faces & colours](/docs/faces) and [Game settings](/docs/settings).
 
 ## The store clip
 

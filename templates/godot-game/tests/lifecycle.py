@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Plays a fake GameNight host against the game, headless.
 
-Checks the session lifecycle and the controller path: hello, prepare with a
-local seat and a bot seat, ready, start, the left stick moves seat 0, A
-dashes, pause, resume and dispose. Grow it with every control you add.
+Checks the session lifecycle and the controller path: hello, declared
+settings and a change from the party, prepare with a local seat and a bot
+seat, ready, start, the left stick moves seat 0, A dashes, Start opens the
+settings menu and B closes it, pause, resume and dispose. Grow it with every control you add.
 
     python3 tests/lifecycle.py [--godot path/to/godot] [--pack game.pck]   (needs `websockets`)
 """
@@ -20,7 +21,7 @@ import websockets
 ROOT = Path(__file__).resolve().parents[1]
 GAME_ID = json.loads((ROOT / "gamenight.json").read_text())["id"]
 PORT = 7941
-A = 0
+A, B, START = 0, 1, 7
 
 
 def frame(buttons=0, move=(0, 0)):
@@ -86,6 +87,12 @@ async def run(godot: str, pack: str = "") -> None:
             hello = await expect("hello")
             assert hello["game"] == GAME_ID and hello.get("token") == "t", hello
             await send({"type": "welcome", "party": {}})
+            declared = await expect("declare_settings")
+            keys = {s["key"] for s in declared["settings"]}
+            assert keys == {"round_seconds", "orbs"}, keys
+            await send({"type": "setting_changed", "game": GAME_ID, "key": "round_seconds", "value": 30})
+            await saw("setting round_seconds = 30")
+            print("ok: settings declared and changed by the party")
             seats = [
                 {"index": 0, "controller": "pad1", "occupant": {"kind": "local", "player_id": "ada"}},
                 {"index": 1, "occupant": {"kind": "ai"}},
@@ -105,6 +112,14 @@ async def run(godot: str, pack: str = "") -> None:
             await hold(frame(), 0.2)
             await saw("dash Ada")
             print("ok: A dashes")
+
+            await hold(frame(1 << START), 0.15)
+            await hold(frame(), 0.2)
+            await saw("menu open")
+            await hold(frame(1 << B), 0.15)
+            await hold(frame(), 0.2)
+            await saw("menu closed")
+            print("ok: Start opens the settings menu, B closes it")
 
             await send({"type": "pause", "session": "s1"})
             await saw("paused")
