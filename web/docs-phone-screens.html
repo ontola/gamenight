@@ -53,8 +53,21 @@ up there.</p>
 <p><code>GameNight.send_companion_message(data, player_id)</code> reaches one phone, or every
 phone when <code>player_id</code> is empty. Other engines send the same
 <code>declare_companion</code> and <code>companion_message</code> messages; see the
-<a href="/docs/protocol#phone-screens">protocol reference</a>. The LÖVE runner has no helper
-yet.</p>
+<a href="/docs/protocol#phone-screens">protocol reference</a>.</p>
+<h2 id="in-love">In LÖVE</h2>
+<p>The shared runner declares the page and routes messages when a mode sets
+<code>phone</code>. A <code>.love</code> file is a zip, so the runner copies the folder to the save
+directory first and warns when it would not fit a hosted room:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-lua">M.phone = {
+    folder = &quot;games/cards_phone&quot;,
+    message = function(state, player, data, send)
+        -- a tap from `player`; answer with send(view, player)
+    end,
+    presence = function(state, player, connected, send)
+        if connected then send(view_for(state, player), player) end
+    end,
+}
+</code></pre></div>
 <h2 id="keep-the-game-in-charge">Keep the game in charge</h2>
 <p>The pattern that worked in Hexstead:</p>
 <ul>
@@ -125,7 +138,7 @@ speak the same protocol. iOS apps are only possible through the App Store.</p>
 only, so bind <code>0.0.0.0</code>; and a game with mouse capture needs a way to the
 &quot;join as phone&quot; option from a controller.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="89dc99b6017f8eb8f06b5653b3c552ade6803fef2b56e78a994732dc7033a40a">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="02f25023dce235a0fa8ccc37c4550a9ef743d0742c8c6ac56010222e4e2fb3ac">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/faces"><small>Previous</small>Faces &amp; colours</a><a href="/docs/performance"><small>Next</small>Performance</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#in-godot">In Godot</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#in-godot">In Godot</a><a href="#in-love">In LÖVE</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

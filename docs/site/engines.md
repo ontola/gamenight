@@ -36,7 +36,7 @@ your game code must handle it. "No" means the SDK cannot do it yet.
 | Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | You |
 | Match settings from the lobby and phone | SDK | SDK | SDK | SDK | You |
 | Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | You |
-| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | You | SDK | No | You |
+| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | SDK (`mode.phone`) | SDK | No | You |
 | Performance diagnostics | SDK | SDK | You (manual samples) | No | You |
 | Headless contract test in CI | Yes | Yes | Yes | Compile only | No |
 | Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | n/a |
@@ -55,8 +55,6 @@ This list doubles as the roadmap for engine support.
   themselves.
 - **Rust / Bevy**: the SDK delivers typed events but no Bevy plugin. Input,
   window behaviour and face rendering are left to the game.
-- **LÖVE**: phone screens are not in the shared runner yet; a LÖVE game sends
-  the [phone screen](/docs/phone-screens) messages itself.
 - **Godot 4**: Godot has no package manager, so each game vendors the addon.
   Run `sdk/godot/sync.py` and the CI check to keep copies current.
 

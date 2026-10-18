@@ -33,7 +33,7 @@ cd my-game &amp;&amp; git init &amp;&amp; git add -A &amp;&amp; git commit -m &q
 </tr>
 <tr>
 <td><code>gamenight.json</code></td>
-<td>the store and catalog entry: title, tagline, players, tags</td>
+<td>the game's metadata: title, tagline, players, tags; the only place you edit them</td>
 </tr>
 <tr>
 <td><code>tests/lifecycle.py</code></td>
@@ -155,7 +155,8 @@ the seeds and commit next to the clip, so anyone can make it again.</p>
 <h2 id="release-and-store-page">Release and store page</h2>
 <ol>
 <li><a href="/developers">Register the game</a> in the developer portal and create a
-publish key. Save it as the <code>GAMENIGHT_API_TOKEN</code> secret of the repository.</li>
+publish key. Save it as the <code>GAMENIGHT_API_TOKEN</code> secret of the repository.
+The first stable release needs GameNight's distribution approval.</li>
 <li>Run the CI workflow by hand with <code>release</code> set to <code>v0.1.0</code>. It tests,
 exports Windows, publishes the GitHub release and fills the store page.</li>
 <li>Or fill the store page from your machine:</li>
@@ -164,8 +165,16 @@ exports Windows, publishes the GitHub release and fills the store page.</li>
 </code></pre></div>
 <p>It reads <code>gamenight.json</code> and uploads what is in <code>assets/gamenight/</code>. See
 <a href="/docs/publishing">Publish a game</a> for builds, channels and review.</p>
+<p>Everything players see lives in GameNight production, filled from your
+repository by these commands. Do not add the game to <code>ontola/gamenight</code>'s
+<code>catalog/games</code> or to any store file in another repository: installed hosts
+get stable releases from the hosted catalog. Store visibility (listed or
+hidden) is a GameNight staff setting.</p>
 <h2 id="pitfalls-we-hit">Pitfalls we hit</h2>
 <ul>
+<li>Game data copied into other repositories drifts. Bombing Bugs ended up with
+its tagline in three places. Edit <code>gamenight.json</code> and <code>assets/gamenight/</code>
+only, and let the publish commands carry them to production.</li>
 <li>Headless Godot hangs on a parse error; untyped values from arrays and
 dictionaries are the usual cause. Give them a type (<code>var c: Vector3 = ...</code>).</li>
 <li>Agents often cannot push git tags. Release with the workflow input instead.</li>
@@ -191,7 +200,7 @@ such as one with the CI run id.</li>
 first seconds of play don't stutter.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="44b606dc84aa9517e9524e5cc99017981d5afe8bf93324c510cc540d1ef00f12">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="ddfb6124aa992eb0b1fbf0d0efc2fbfefac2a754564fe26000d5aa707c660755">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

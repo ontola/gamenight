@@ -52,8 +52,25 @@ up there.
 `GameNight.send_companion_message(data, player_id)` reaches one phone, or every
 phone when `player_id` is empty. Other engines send the same
 `declare_companion` and `companion_message` messages; see the
-[protocol reference](/docs/protocol#phone-screens). The LÖVE runner has no helper
-yet.
+[protocol reference](/docs/protocol#phone-screens).
+
+## In LÖVE
+
+The shared runner declares the page and routes messages when a mode sets
+`phone`. A `.love` file is a zip, so the runner copies the folder to the save
+directory first and warns when it would not fit a hosted room:
+
+```lua
+M.phone = {
+    folder = "games/cards_phone",
+    message = function(state, player, data, send)
+        -- a tap from `player`; answer with send(view, player)
+    end,
+    presence = function(state, player, connected, send)
+        if connected then send(view_for(state, player), player) end
+    end,
+}
+```
 
 ## Keep the game in charge
 
