@@ -12,7 +12,10 @@ mod windows;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args().nth(1).as_deref() == Some("--update-cover") {
         if let Some(flag) = std::env::args_os().nth(2) {
-            windows::show_update_cover(flag.into());
+            let text = std::env::args()
+                .nth(3)
+                .unwrap_or_else(|| "Updating GameNight\u{2026}".into());
+            windows::show_update_cover(flag.into(), text);
         }
         return Ok(());
     }
