@@ -10,6 +10,8 @@ playbook is the full guide: https://gamenight.ontola.io/docs/playbook
   in the Start menu. Never bind Back: GameNight owns it.
 - Use the players' colours, names and faces; keep text off the play field.
 - Rounds keep going: results, `notify_finished`, next round.
+- Calm camera, players stay together on screen; start sparse with effects and sound.
+- Punish the failure, not the action; keep the causes of failure few and readable.
 
 ## Check every change
 

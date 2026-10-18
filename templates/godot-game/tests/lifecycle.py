@@ -12,15 +12,16 @@ import argparse
 import asyncio
 import json
 import os
+import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import websockets
 
 ROOT = Path(__file__).resolve().parents[1]
 GAME_ID = json.loads((ROOT / "gamenight.json").read_text())["id"]
-PORT = 7941
 A, B, START = 0, 1, 7
 
 
@@ -62,27 +63,30 @@ async def run(godot: str, pack: str = "") -> None:
             await send(msg)
             await asyncio.sleep(0.05)
 
-    async def read_stdout(proc):
-        loop = asyncio.get_running_loop()
-        while line := await loop.run_in_executor(None, proc.stdout.readline):
-            lines.append(line.decode(errors="replace").strip())
+    # The game writes to a file, not a pipe: a full pipe stalls Godot on Windows.
+    log = tempfile.NamedTemporaryFile(prefix="game-", suffix=".log", delete=False)
+    log.close()
 
     async def saw(text, timeout=8.0):
         loop = asyncio.get_running_loop()
         end = loop.time() + timeout
         while loop.time() < end:
+            lines[:] = Path(log.name).read_text(errors="replace").splitlines()
             if any(text in line for line in lines):
                 return
             await asyncio.sleep(0.1)
         raise AssertionError(f"game never printed {text!r}; last lines: {lines[-8:]}")
 
-    async with websockets.serve(handler, "127.0.0.1", PORT):
-        env = dict(os.environ, GAMENIGHT="1", GAMENIGHT_ADDR=f"127.0.0.1:{PORT}",
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    async with websockets.serve(handler, "127.0.0.1", port):
+        env = dict(os.environ, GAMENIGHT="1", GAMENIGHT_ADDR=f"127.0.0.1:{port}",
                    GAMENIGHT_GAME_ID=GAME_ID, GAMENIGHT_TOKEN="t", GAME_TRACE="1")
         game = ["--main-pack", pack] if pack else ["--path", str(ROOT)]
+        output = open(log.name, "w")
         proc = subprocess.Popen([godot, "--headless", *game], env=env,
-                                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        reader = asyncio.create_task(read_stdout(proc))
+                                stdout=output, stderr=subprocess.DEVNULL)
         try:
             hello = await expect("hello")
             assert hello["game"] == GAME_ID and hello.get("token") == "t", hello
@@ -140,7 +144,8 @@ async def run(godot: str, pack: str = "") -> None:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.kill()
-            reader.cancel()
+            output.close()
+            os.unlink(log.name)
 
 
 def main() -> int:

@@ -97,7 +97,20 @@ switch games often. The template does all of this; keep it as you build.
   sofa; menus and explanations do not. Controls hints belong in the Start menu.
 - **Rounds keep going.** Show the result briefly, call `notify_finished`,
   then start the next round. Players leave with Back, not with a game over
-  screen.
+  screen. Let players keep moving while the result shows.
+- **A calm camera.** Everyone shares one screen: keep the camera still or
+  slow, keep players leashed together so nobody leaves the frame, and snap
+  (don't glide) when someone teleports or respawns.
+- **Punish the failure, not the action.** Trying something should never hurt;
+  missing it may. Keep the visible causes of failure to a few that everyone
+  can read at a glance.
+- **Fewer, clearer mechanics.** Cut mechanics that look alike but behave
+  differently; simple spatial rules win.
+- **Start sparse.** Effects, screen shake and audio beds were toned down in
+  every playtest. Add spectacle when a playtest asks for it.
+- **Asymmetric games:** private information goes to each player's phone
+  (see Phone screens in the [protocol](/docs/protocol)), shared state stays on
+  the TV, and the TV shows what the phone players chose.
 - **Bots fill empty seats.** The host can seat AI players, so a game works with
   one person. The same bots run your sim and your store clip.
 - **Controllers follow seats.** Read `GameNight.frame_for_seat(seat)` when
@@ -153,3 +166,17 @@ It reads `gamenight.json` and uploads what is in `assets/gamenight/`. See
   Start cuts at frame 20 or later.
 - A big level needs the camera close enough to read on a phone; check the clip
   at phone size.
+- Test the exported build, not only the project: files under `tests/` are left
+  out of exports, and game code that loads them breaks only there. The
+  template's CI runs the lifecycle test against the exported pack.
+- On Windows, a test host that reads Godot through `stdout=PIPE` can stall the
+  game once the pipe fills. Write the output to a file (the template does), and
+  pick a free port instead of a fixed one.
+- `secrets: inherit` does not pass secrets to a reusable workflow in another
+  organisation. Pass each secret by name.
+- Build versions are immutable: give every preview upload a unique version,
+  such as one with the CI run id.
+- TVs often run at 120 Hz: turn on physics interpolation
+  (`physics/common/physics_interpolation`), or motion judders.
+- Prewarm shaders and particles during Prepare, before `notify_ready`, so the
+  first seconds of play don't stutter.

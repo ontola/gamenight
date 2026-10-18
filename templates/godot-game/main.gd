@@ -264,13 +264,16 @@ func _physics_process(delta: float) -> void:
 	if _menu():
 		queue_redraw()
 		return
-	if results > 0.0:
+	# Players keep moving while the result shows; nothing scores.
+	var scoring := results <= 0.0
+	if not scoring:
 		results -= delta
 		if results <= 0.0:
 			_new_round()
-		queue_redraw()
-		return
-	clock -= delta
+			queue_redraw()
+			return
+	else:
+		clock -= delta
 	for i in players.size():
 		var p: Dictionary = players[i]
 		var move: Vector2 = moves[i]
@@ -288,6 +291,9 @@ func _physics_process(delta: float) -> void:
 		if not p.bot and move != Vector2.ZERO and frame % 30 == 0:
 			_trace("moved " + p.name)
 	_collide()
+	if not scoring:
+		queue_redraw()
+		return
 	for p in players:
 		for i in orbs.size():
 			if p.pos.distance_to(orbs[i]) < RADIUS + 14.0:

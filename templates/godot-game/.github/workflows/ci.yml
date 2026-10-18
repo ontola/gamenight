@@ -12,7 +12,10 @@ on:
 permissions:
   contents: read
 env:
+  # From the release's SHA512-SUMS.txt; change all three together.
   GODOT_VERSION: 4.5
+  GODOT_SHA512: b5bd5d8a4dd3f44de1d123361beabaafa4825dd05b5e20fd2bfa540f32594f81d82e7c4e86fae420f4faee77d9def573b570f8b156e9c84a4dc2d5123d09e852
+  TEMPLATES_SHA512: 1643140ac56ba8e6d18be34eb27788ec6a216e4a3f45dbcc3e01caf2b28ae9c8229832061e30200e296a1be46cec61e2b54c6d9df190b921ea1d0ad5f3f25ed1
 jobs:
   gamenight-sdk:
     uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
@@ -28,8 +31,10 @@ jobs:
         run: |
           base=https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable
           curl -sSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          echo "$GODOT_SHA512  godot.zip" | sha512sum --check
           unzip -q godot.zip && mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$RUNNER_TEMP/godot" && rm godot.zip
           curl -sSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          echo "$TEMPLATES_SHA512  templates.tpz" | sha512sum --check
           dir="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
           mkdir -p "$dir"
           unzip -q -j templates.tpz templates/version.txt templates/windows_release_x86_64.exe templates/windows_release_x86_64_console.exe -d "$dir"

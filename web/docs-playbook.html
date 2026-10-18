@@ -116,7 +116,20 @@ thing. A clock, a score per player and clear shapes and colours read from the
 sofa; menus and explanations do not. Controls hints belong in the Start menu.</li>
 <li><strong>Rounds keep going.</strong> Show the result briefly, call <code>notify_finished</code>,
 then start the next round. Players leave with Back, not with a game over
-screen.</li>
+screen. Let players keep moving while the result shows.</li>
+<li><strong>A calm camera.</strong> Everyone shares one screen: keep the camera still or
+slow, keep players leashed together so nobody leaves the frame, and snap
+(don't glide) when someone teleports or respawns.</li>
+<li><strong>Punish the failure, not the action.</strong> Trying something should never hurt;
+missing it may. Keep the visible causes of failure to a few that everyone
+can read at a glance.</li>
+<li><strong>Fewer, clearer mechanics.</strong> Cut mechanics that look alike but behave
+differently; simple spatial rules win.</li>
+<li><strong>Start sparse.</strong> Effects, screen shake and audio beds were toned down in
+every playtest. Add spectacle when a playtest asks for it.</li>
+<li><strong>Asymmetric games:</strong> private information goes to each player's phone
+(see Phone screens in the <a href="/docs/protocol">protocol</a>), shared state stays on
+the TV, and the TV shows what the phone players chose.</li>
 <li><strong>Bots fill empty seats.</strong> The host can seat AI players, so a game works with
 one person. The same bots run your sim and your store clip.</li>
 <li><strong>Controllers follow seats.</strong> Read <code>GameNight.frame_for_seat(seat)</code> when
@@ -162,9 +175,23 @@ pinned copy of <code>ontola/gamenight</code> and run its <code>scripts/gamenight
 Start cuts at frame 20 or later.</li>
 <li>A big level needs the camera close enough to read on a phone; check the clip
 at phone size.</li>
+<li>Test the exported build, not only the project: files under <code>tests/</code> are left
+out of exports, and game code that loads them breaks only there. The
+template's CI runs the lifecycle test against the exported pack.</li>
+<li>On Windows, a test host that reads Godot through <code>stdout=PIPE</code> can stall the
+game once the pipe fills. Write the output to a file (the template does), and
+pick a free port instead of a fixed one.</li>
+<li><code>secrets: inherit</code> does not pass secrets to a reusable workflow in another
+organisation. Pass each secret by name.</li>
+<li>Build versions are immutable: give every preview upload a unique version,
+such as one with the CI run id.</li>
+<li>TVs often run at 120 Hz: turn on physics interpolation
+(<code>physics/common/physics_interpolation</code>), or motion judders.</li>
+<li>Prewarm shaders and particles during Prepare, before <code>notify_ready</code>, so the
+first seconds of play don't stutter.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="8cce94c34872717504c5bf783d4333707b235cf2c9e7e66393aad91d4dc0e5f8">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="44b606dc84aa9517e9524e5cc99017981d5afe8bf93324c510cc540d1ef00f12">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

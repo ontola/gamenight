@@ -28,6 +28,7 @@ enabled=PackedStringArray("res://addons/gamenight/plugin.cfg")
 [physics]
 
 common/physics_ticks_per_second=60
+common/physics_interpolation=true
 
 [rendering]
 
