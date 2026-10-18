@@ -255,7 +255,9 @@
       renderRoomCode();return joinRoom();
     });
     roomForm.addEventListener('submit',event=>{
-      event.preventDefault();return joinRoom();
+      event.preventDefault();
+      if(!/^[A-Z2-9]{6}$/.test(roomInput.value.trim().toUpperCase())){window.showToast('Enter the six-character code on the TV.');roomInput.focus();return;}
+      return joinRoom();
     });
     roomCancel.addEventListener('click',async()=>{
       roomCancel.disabled=true;
