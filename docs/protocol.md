@@ -49,7 +49,7 @@ A connection announces itself with its first message, a `hello`:
 |---|---|---|---|
 | `game` | a game process (via an SDK) | `ready` (mandatory), `finished` + `declare_settings` + `set_setting` (its own) + `declare_companion` + `companion_message` (optional) | session lifecycle commands, `controller_frame`, `setting_changed`, `companion_message`, `companion_presence` |
 | `overlay` | party UI / controller surface / LLM (via `gamenight-mcp`) | party commands | `party_state` snapshots |
-| `lobby` | selected replacement lobby executable | party commands, `lobby_ready`, `quit_party`, `apply_update` | full snapshots, `lobby_focus`, runtime controller frames |
+| `lobby` | selected replacement lobby executable | party commands, `lobby_ready`, `quit_party`, `apply_update`, `switch_lobby` | full snapshots, `lobby_focus`, runtime controller frames |
 
 The replacement lobby role requires the configured lobby ID and launch token,
 including on reconnect. Declare `GAMENIGHT_LOBBY_API=1` in its launch environment
@@ -58,7 +58,9 @@ hello. Send `lobby_ready` after initial rendering; `quit_party` explicitly ends
 the runtime. A disconnect alone preserves players and bindings. When the
 packaged host has downloaded an update, snapshots carry `update_ready` (its
 version); `apply_update` between games saves the party, restarts into that
-version and restores players, seats, controllers, phone links and the queue. See
+version and restores players, seats, controllers, phone links and the queue.
+Snapshots also list the host's `lobbies`; `switch_lobby {lobby}` between games
+restarts into another one the same way. See
 [Build a lobby](site/lobbies.md) for the lifecycle, example and current limits.
 
 ```json

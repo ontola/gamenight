@@ -212,7 +212,7 @@ impl Updates {
             append_log(&self.log, "Restart requested but no update is pending.");
             return false;
         };
-        if let Err(error) = spawn_splash(&self.files.splash) {
+        if let Err(error) = spawn_splash(&self.files.splash, "Updating GameNight\u{2026}") {
             append_log(&self.log, &format!("Update cover unavailable: {error}"));
         }
         // Silent: the cover is the progress, and nobody is at a keyboard.
@@ -250,7 +250,7 @@ impl Updates {
 }
 /// Run a copy of this executable from outside the install directory, which
 /// the updater is about to replace, as a full-screen cover.
-fn spawn_splash(flag: &Path) -> io::Result<()> {
+pub fn spawn_splash(flag: &Path, text: &str) -> io::Result<()> {
     use std::os::windows::process::CommandExt;
     let exe = std::env::current_exe()?;
     let source = exe
@@ -274,6 +274,7 @@ fn spawn_splash(flag: &Path) -> io::Result<()> {
     std::process::Command::new(copy)
         .arg("--update-cover")
         .arg(flag)
+        .arg(text)
         .current_dir(&target)
         // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP: outlive this launcher.
         .creation_flags(0x0000_0008 | 0x0000_0200)
@@ -282,10 +283,12 @@ fn spawn_splash(flag: &Path) -> io::Result<()> {
 }
 
 static COVER_FLAG: std::sync::OnceLock<(PathBuf, std::time::Instant)> = std::sync::OnceLock::new();
+static COVER_TEXT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
-/// A borderless black window over every screen saying GameNight is updating.
-/// It goes when the new lobby removes `flag`, or after two minutes at most.
-pub fn show_update_cover(flag: PathBuf) {
+/// A borderless black window over every screen saying what GameNight is
+/// doing (updating, opening another lobby). It goes when the new lobby
+/// removes `flag`, or after two minutes at most.
+pub fn show_update_cover(flag: PathBuf, text: String) {
     use windows_sys::Win32::{
         Graphics::Gdi::{CreateSolidBrush, UpdateWindow},
         System::LibraryLoader::GetModuleHandleW,
@@ -298,6 +301,7 @@ pub fn show_update_cover(flag: PathBuf) {
         },
     };
     let _ = COVER_FLAG.set((flag, std::time::Instant::now()));
+    let _ = COVER_TEXT.set(text);
     let class: Vec<u16> = "GameNightUpdateCover\0".encode_utf16().collect();
     let title: Vec<u16> = "GameNight\0".encode_utf16().collect();
     unsafe {
@@ -395,7 +399,11 @@ unsafe extern "system" fn cover_proc(
             let previous = SelectObject(dc, font);
             SetBkMode(dc, TRANSPARENT as i32);
             SetTextColor(dc, 0x00f8_f1f2);
-            let mut text: Vec<u16> = "Updating GameNight\u{2026}".encode_utf16().collect();
+            let mut text: Vec<u16> = COVER_TEXT
+                .get()
+                .map_or("Updating GameNight\u{2026}", String::as_str)
+                .encode_utf16()
+                .collect();
             DrawTextW(
                 dc,
                 text.as_mut_ptr(),

@@ -726,6 +726,19 @@ pub struct PartySnapshot {
     /// with `apply_update` between games. The value is its version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub update_ready: Option<String>,
+    /// Lobbies this host can switch to with `switch_lobby`, the running one
+    /// marked `current`. Empty when the host cannot switch (development runs).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lobbies: Vec<LobbyChoice>,
+}
+
+/// A lobby the host can run: bundled with the app or installed locally.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LobbyChoice {
+    pub id: GameId,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub current: bool,
 }
 
 /// A game's own phone screen: a small web page that GameNight serves to the
@@ -834,6 +847,11 @@ pub enum ClientMessage {
     /// Restart the host into the update named by `update_ready`, keeping the
     /// party. Lobby only, and only between games.
     ApplyUpdate,
+    /// Make `lobby` (one of the party's `lobbies`) the host's lobby and
+    /// restart into it, keeping the party. Local lobby UI only, between games.
+    SwitchLobby {
+        lobby: GameId,
+    },
     /// Only the authenticated lobby may publish physical input.
     ControllerFrame {
         controllers: Vec<ControllerState>,

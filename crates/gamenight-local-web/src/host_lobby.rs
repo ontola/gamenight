@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use futures_util::{SinkExt, StreamExt};
-use gamenight_protocol::{ClientMessage, GameMeta, Role, ServerMessage};
+use gamenight_protocol::{ClientMessage, GameId, GameMeta, LobbyChoice, Role, ServerMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{net::SocketAddr, path::Path};
@@ -64,7 +64,7 @@ fn native(peer: SocketAddr, headers: &HeaderMap) -> bool {
             .and_then(|v| v.to_str().ok())
             == Some("1")
 }
-type Paths = (
+pub type Paths = (
     std::path::PathBuf,
     std::path::PathBuf,
     Option<std::path::PathBuf>,
@@ -80,29 +80,74 @@ fn paths() -> Result<Paths, StatusCode> {
         std::env::var_os("GAMENIGHT_BUNDLED_LOBBIES").map(Into::into),
     ))
 }
+/// Lobbies the host offers: bundled ones, the Clubhouse, then installed
+/// ones, with the one that runs now marked `current`.
+pub fn list(config: &Path, registrations: &Path, bundled: Option<&Path>) -> Vec<LobbyChoice> {
+    let current = selected(config, registrations, bundled)
+        .map(|m| m.id.0)
+        .unwrap_or_else(|| "lobby".into());
+    let mut entries: Vec<(String, String)> = bundled
+        .map(choices)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|m| (m.id.0, m.title))
+        .collect();
+    entries.push(("lobby".into(), "Clubhouse".into()));
+    for m in available(registrations, None) {
+        if !entries.iter().any(|(id, _)| *id == m.id.0) {
+            entries.push((m.id.0, m.title));
+        }
+    }
+    entries
+        .into_iter()
+        .map(|(id, title)| LobbyChoice {
+            current: id == current,
+            id: GameId::new(id),
+            title,
+        })
+        .collect()
+}
+/// Remember `id` as the lobby to run from the next start. False when it is
+/// not a lobby this host has.
+pub fn save(
+    config: &Path,
+    registrations: &Path,
+    bundled: Option<&Path>,
+    id: &str,
+) -> std::io::Result<bool> {
+    if id != "lobby"
+        && !available(registrations, bundled)
+            .iter()
+            .any(|m| m.id.0 == id)
+    {
+        return Ok(false);
+    }
+    std::fs::write(config, json!({ "id": id }).to_string())?;
+    Ok(true)
+}
+/// The launcher's lobby files, when this host was started by the launcher.
+pub fn host_paths() -> Option<Paths> {
+    paths().ok()
+}
 pub async fn get(ConnectInfo(peer): ConnectInfo<SocketAddr>) -> Result<Json<Value>, StatusCode> {
     if !peer.ip().is_loopback() {
         return Err(StatusCode::FORBIDDEN);
     }
     let (config, registrations, bundled) = paths()?;
-    let bundled = bundled.as_deref();
-    let mut entries: Vec<Value> = bundled
-        .map(choices)
-        .unwrap_or_default()
+    let lobbies = list(&config, &registrations, bundled.as_deref());
+    let current = lobbies.iter().find(|l| l.current).map(|l| l.id.0.clone());
+    let entries: Vec<Value> = lobbies
         .into_iter()
-        .map(|m| json!({"id":m.id,"title":m.title}))
+        .map(|l| {
+            let title = if l.id.0 == "lobby" {
+                "Clubhouse (platformer)".into()
+            } else {
+                l.title
+            };
+            json!({"id":l.id,"title":title})
+        })
         .collect();
-    entries.push(json!({"id":"lobby","title":"Clubhouse (platformer)"}));
-    entries.extend(
-        available(&registrations, None)
-            .into_iter()
-            .filter(|m| !entries.iter().any(|e| e["id"] == m.id.0))
-            .map(|m| json!({"id":m.id,"title":m.title}))
-            .collect::<Vec<_>>(),
-    );
-    Ok(Json(
-        json!({"selected":selected(&config,&registrations,bundled).map(|m|m.id.0).unwrap_or("lobby".into()),"choices":entries}),
-    ))
+    Ok(Json(json!({"selected":current,"choices":entries})))
 }
 #[derive(Deserialize)]
 pub struct Selection {
@@ -117,16 +162,11 @@ pub async fn select(
         return Err(StatusCode::FORBIDDEN);
     }
     let (config, registrations, bundled) = paths()?;
-    if request.id != "lobby"
-        && !available(&registrations, bundled.as_deref())
-            .iter()
-            .any(|m| m.id.0 == request.id)
-    {
-        return Err(StatusCode::BAD_REQUEST);
+    match save(&config, &registrations, bundled.as_deref(), &request.id) {
+        Ok(true) => Ok(StatusCode::NO_CONTENT),
+        Ok(false) => Err(StatusCode::BAD_REQUEST),
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
-    std::fs::write(config, json!({"id":request.id}).to_string())
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(StatusCode::NO_CONTENT)
 }
 #[derive(Deserialize)]
 pub struct Recovery {

@@ -209,6 +209,8 @@ pub struct GameNightBridge {
     /// snapshot — `None` whenever there's no music on, which is most nights
     /// and is why the lobby's jukebox only exists some of the time.
     now_playing: Option<gamenight_protocol::NowPlaying>,
+    /// Lobbies the host can switch to, from the party snapshot.
+    lobbies: Vec<gamenight_protocol::LobbyChoice>,
     /// What the targeted player looked like when the pad was aimed at them.
     ///
     /// Compared against each incoming party snapshot: once that player's
@@ -638,6 +640,7 @@ pub fn game_plugin(game: &mut Game) {
         active_session: None,
         hide_while_warm: false,
         now_playing: None,
+        lobbies: Vec::new(),
         claim_seat: None,
         claim_mark: None,
         exit_requests: Vec::new(),
@@ -753,6 +756,7 @@ fn gamenight_bridge_system(
         bridge.latest_installs = party.installs;
         bridge.active_session = party.active_session;
         bridge.now_playing = party.now_playing;
+        bridge.lobbies = party.lobbies;
         bridge.release_claim_if_taken();
     }
 
@@ -1307,6 +1311,8 @@ struct GlobalInput {
     /// by `sync_player_menus_system` — deliberately not a bones session, so it
     /// never touches `Session::active` and the match keeps running under it.
     open_menus: std::collections::HashMap<PlayerId, PlayerMenuState>,
+    /// `GameNightBridge::lobbies`, mirrored for the menus each frame.
+    lobbies: Vec<gamenight_protocol::LobbyChoice>,
     /// Every gamepad button event bones saw this frame, snapshotted by
     /// `gate_gamepad_input_system` (`PreUpdate`) before it strips the
     /// events of any pad whose player has an open menu from the live
@@ -1369,7 +1375,8 @@ struct PlayerMenuState {
 #[derive(Clone)]
 enum MenuAction {
     Assistant,
-    ChooseLobby,
+    /// Restart the host into another lobby, keeping the party.
+    SwitchLobby(GameId, String),
     /// Detach the phone profile while keeping the controller seated.
     Unlink,
     Leave,
@@ -1381,8 +1388,10 @@ enum MenuAction {
     Quit,
 }
 
-fn menu_actions(linked: bool, has_inactive: bool) -> Vec<MenuAction> {
-    let mut actions = vec![MenuAction::Leave, MenuAction::ChooseLobby];
+fn menu_actions(linked: bool, has_inactive: bool, lobbies: &[gamenight_protocol::LobbyChoice]) -> Vec<MenuAction> {
+    let mut actions = vec![MenuAction::Leave];
+    actions.extend(lobbies.iter().filter(|l| !l.current)
+        .map(|l| MenuAction::SwitchLobby(l.id.clone(), l.title.clone())));
     if assistant::url().is_some() { actions.insert(0, MenuAction::Assistant); }
     if has_inactive { actions.push(MenuAction::PruneInactive); }
     actions.push(MenuAction::Quit);
@@ -1394,7 +1403,7 @@ impl MenuAction {
     fn label(&self) -> String {
         match self {
             MenuAction::Assistant => "Session assistant".to_string(),
-            MenuAction::ChooseLobby => "Select other lobby".to_string(),
+            MenuAction::SwitchLobby(_, title) => format!("Switch to {title}"),
             MenuAction::Unlink => "Unlink".to_string(),
             MenuAction::Leave => "Leave".to_string(),
             MenuAction::PruneInactive => "Remove inactive players".to_string(),
@@ -1536,7 +1545,7 @@ impl GlobalInput {
 
     fn move_highlight(&mut self, player_id: PlayerId, delta: isize, linked: bool) {
         if let Some(state) = self.open_menus.get_mut(&player_id) {
-            let len = menu_actions(linked, state.has_inactive).len() as isize;
+            let len = menu_actions(linked, state.has_inactive, &self.lobbies).len() as isize;
             state.highlight = (((state.highlight as isize) + delta).rem_euclid(len)) as usize;
         }
     }
@@ -1583,6 +1592,7 @@ pub fn install_global_input(app: &mut bevy::app::App) {
         pad_player: default(),
         pressed_buttons: default(),
         open_menus: default(),
+        lobbies: default(),
         frame_button_events: default(),
         frame_axis_events: default(),
         prune_countdown: None,
@@ -1816,6 +1826,9 @@ fn global_input_system(
         // in; Bevy has the list. Mirror it so the attract overlay can be honest.
         let mut bridge = bones_game.0.shared_resource_mut::<GameNightBridge>();
         bridge.pads_connected = gamepads.iter().count();
+        if input.lobbies != bridge.lobbies {
+            input.lobbies = bridge.lobbies.clone();
+        }
     }
     let (seated, join_tx): (Vec<Player>, async_channel::Sender<ClientMessage>) = {
         let bridge = bones_game.0.shared_resource::<GameNightBridge>();
@@ -2142,11 +2155,14 @@ fn global_input_system(
                 if let Some(&player_id) = input.pad_player.get(&id) {
                     let highlight = input.open_menus.get(&player_id).map(|s| s.highlight);
                     if let Some(highlight) = highlight {
-                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)), input.open_menus.get(&player_id).is_some_and(|m| m.has_inactive));
+                        let actions = menu_actions(links.snapshot().is_some_and(|s| s.linked.contains(&player_id)), input.open_menus.get(&player_id).is_some_and(|m| m.has_inactive), &input.lobbies);
                         if let Some(action) = actions.get(highlight.min(actions.len() - 1)).cloned() {
                             match action {
                                 MenuAction::Assistant => { assistant::open(); input.open_menus.remove(&player_id); }
-                                MenuAction::ChooseLobby => { assistant::open_lobby_chooser(); input.open_menus.remove(&player_id); }
+                                MenuAction::SwitchLobby(lobby, _) => {
+                                    let _ = join_tx.try_send(ClientMessage::SwitchLobby { lobby });
+                                    input.open_menus.clear();
+                                }
                                 MenuAction::Unlink => {
                                     links.unlink(player_id);
                                     if let Some(menu) = input.open_menus.get_mut(&player_id) { menu.highlight = 0; }
@@ -2310,8 +2326,9 @@ fn sync_player_menus_system(
             } else if !linked {
                 parent.spawn(TextBundle::from_section("Connecting to sign-in…", TextStyle { font: font.clone(), font_size: 16.0, color: Color::WHITE }));
             }
-            for (i, action) in menu_actions(linked, state.has_inactive).iter().enumerate() {
-                let highlighted = i == state.highlight.min(menu_actions(linked, state.has_inactive).len() - 1);
+            let actions = menu_actions(linked, state.has_inactive, &input.lobbies);
+            for (i, action) in actions.iter().enumerate() {
+                let highlighted = i == state.highlight.min(actions.len() - 1);
                 // Every row is an action now, so every row looks alike; the
                 // highlight is the only thing that distinguishes them.
                 let base = Color::rgb(0.25, 0.25, 0.25);
@@ -4275,6 +4292,7 @@ mod next_game_status_tests {
             active_session: None,
             hide_while_warm: false,
             now_playing: None,
+            lobbies: Vec::new(),
             claim_seat: None,
             claim_mark: None,
             exit_requests: Vec::new(),

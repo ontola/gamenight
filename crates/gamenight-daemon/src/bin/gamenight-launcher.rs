@@ -241,8 +241,20 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
     #[cfg(windows)]
     if updates.files().resume.exists() {
-        // The party asked for the new version and is waiting for it.
+        // The party asked for the new version or another lobby, and is
+        // waiting for it.
+        let splash = updates.files().splash.clone();
+        let lobby = fs::read(&updates.files().resume)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+            .and_then(|resume| resume["lobby"].as_str().map(str::to_owned));
         if !updates.restart_into_update() {
+            // A plain restart: cover the desktop until the lobby is back.
+            let text = match lobby {
+                Some(title) => format!("Opening {title}\u{2026}"),
+                None => "Restarting GameNight\u{2026}".into(),
+            };
+            let _ = windows::spawn_splash(&splash, &text);
             drop(lock);
             Command::new(&executable).spawn()?;
         }
@@ -268,7 +280,10 @@ fn main() {
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some("--update-cover") {
         if let Some(flag) = std::env::args_os().nth(2) {
-            windows::show_update_cover(flag.into());
+            let text = std::env::args()
+                .nth(3)
+                .unwrap_or_else(|| "Updating GameNight\u{2026}".into());
+            windows::show_update_cover(flag.into(), text);
         }
         return;
     }

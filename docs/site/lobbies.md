@@ -111,7 +111,7 @@ Existing overlay connections retain their [trusted local scope](../../SECURITY.m
 
 The lobby receives `party_state`, `lobby_focus`, `controller_frame` and `error`.
 It may issue the existing [party commands](../protocol.md#party-commands-overlay-daemon),
-plus `lobby_ready`, `quit_party` and `apply_update`. It cannot report another game's session
+plus `lobby_ready`, `quit_party`, `apply_update` and `switch_lobby`. It cannot report another game's session
 lifecycle or publish physical controller frames.
 
 | Request | Meaning |
@@ -127,6 +127,7 @@ lifecycle or publish physical controller frames.
 | `set_setting {game,key,value}` | Apply a setting validated by the runtime |
 | `quit_party` | Explicitly shut down the runtime and its children |
 | `apply_update` | Restart into the downloaded host update named by `update_ready`, keeping the party; refused while a game is played |
+| `switch_lobby {lobby}` | Make one of `party_state.lobbies` the host's lobby and restart into it, keeping the party; refused while a game is played |
 
 On the packaged Windows host, `party_state.update_ready` holds the version of a
 host update that finished downloading. Offer it between games. After
@@ -318,11 +319,14 @@ path and an absolute existing `cwd` when supplied:
 }}]
 ```
 
-Both bundled lobbies have **Select other lobby** in their Start menu. In Living
-Room, press Start on a controller, M on a keyboard, or click **Start · Menu**.
-The platformer uses the player's existing Start menu. The chooser opens on the
-host computer and lists each installed lobby by name. Saving does not interrupt
-the current game: the selected lobby is used the next time GameNight starts.
+In the installed app, `party_state.lobbies` lists the lobbies the host can run
+(bundled, the Clubhouse platformer, then registered ones), the running one
+marked `current`. Game Room has **Switch lobby** in its Start menu, a page that
+lists them; the Clubhouse lists **Switch to …** for each other lobby. Picking
+one sends `switch_lobby`: between games the host saves the choice, covers the
+screen and restarts into that lobby with the same players, seats, controllers,
+phone links and queue. During a game it is refused. A host that cannot
+restart itself saves the choice for its next start.
 
 Living Room shows **Current game** and **Up next** side by side, or stacked in a
 narrow window. Current game shows the game's screenshot and **Resume**, even

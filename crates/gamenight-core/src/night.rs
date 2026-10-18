@@ -954,6 +954,7 @@ impl GameNight {
             game_issues: Vec::new(),
             companions: Vec::new(),
             update_ready: None,
+            lobbies: Vec::new(),
             presence: self.presence_snapshot(),
             players: self.players.clone(),
             seats: self.seats.clone(),

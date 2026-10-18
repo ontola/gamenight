@@ -526,28 +526,53 @@ func update_ready() -> String:
 	return "" if version == null else str(version)
 
 func menu_items(id: String) -> Array:
+	if menus.get(id, {}).get("page", "") == "lobbies": return lobby_items()
 	var items := [{"label": "Close menu", "action": "close"}, {"label": "Leave the party", "action": "leave"}]
 	# The host restarts into the new version and brings the party back.
 	if not update_ready().is_empty(): items.push_front({"label": "Update GameNight now", "action": "update"})
 	if links.get("linked", {}).has(id): items.insert(1, {"label": "Unlink my phone profile", "action": "unlink"})
-	items.append({"label": "Select other lobby", "action": "chooser"})
+	if party.get("lobbies", []).size() > 1: items.append({"label": "Switch lobby", "action": "lobbies"})
 	items.append({"label": "Quit GameNight", "action": "quit"})
+	return items
+
+## The host's lobbies, as a page of the Start menu. Picking one restarts
+## the host into it with everyone still seated.
+func lobby_items() -> Array:
+	var items := []
+	for lobby in party.get("lobbies", []):
+		var current: bool = lobby.get("current", false)
+		var title := str(lobby.get("title", lobby.get("id", "")))
+		items.append({"label": title + ("  (here now)" if current else ""), "action": "lobby",
+			"lobby": str(lobby.get("id", "")), "title": title, "current": current})
+	items.append({"label": "Back", "action": "back"})
 	return items
 
 func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 	var menu: Dictionary = menus[id]
 	var items := menu_items(id)
+	menu.index = clampi(menu.index, 0, items.size() - 1)
 	var up: bool = pressed & World.BTN_UP or (stick.y < -0.6 and not menu.get("stick", false))
 	var down: bool = pressed & World.BTN_DOWN or (stick.y > 0.6 and not menu.get("stick", false))
 	menu["stick"] = absf(stick.y) > 0.6
 	if up: menu.index = posmod(menu.index - 1, items.size()); menu.confirm = false
 	if down: menu.index = posmod(menu.index + 1, items.size()); menu.confirm = false
 	if pressed & World.BTN_B:
-		menus.erase(id)
+		if menu.get("page", "") == "lobbies": _menu_page(menu, "")
+		else: menus.erase(id)
 	elif pressed & World.BTN_A:
-		var action: String = items[menu.index].action
+		var item: Dictionary = items[menu.index]
+		var action: String = item.action
 		match action:
 			"close": menus.erase(id)
+			"lobbies": _menu_page(menu, "lobbies")
+			"back": _menu_page(menu, "")
+			"lobby":
+				if item.current:
+					toast("You're already in the %s." % item.title, DIM)
+				else:
+					menus.clear()
+					toast("Opening the %s… everyone stays in the party." % item.title, GREEN)
+					client._command({"type": "switch_lobby", "lobby": item.lobby})
 			"update":
 				menus.erase(id)
 				toast("Updating GameNight… everyone stays in the party.", GREEN)
@@ -559,17 +584,21 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 				menus.erase(id)
 				if not _links_base.is_empty():
 					_pickup.request(_links_base + "/api/player-links/" + id + "/unlink", ["X-GameNight-Local-Pickup: 1"], HTTPClient.METHOD_POST)
-			"chooser":
-				var url := OS.get_environment("GAMENIGHT_LOBBY_CHOOSER_URL")
-				if not url.begins_with("http://127.0.0.1:"): url = "http://127.0.0.1:7913/host/lobby"
-				_open_chooser(url)
-				menus.erase(id)
 			"quit":
 				if menu.confirm:
 					if client.connected: client.quit_party()
 					else: get_tree().quit()
 				else: menu.confirm = true
 	hud.queue_redraw()
+
+func _menu_page(menu: Dictionary, page: String) -> void:
+	menu.page = page
+	menu.confirm = false
+	menu.index = 0
+	if page == "lobbies":
+		var lobbies: Array = party.get("lobbies", [])
+		for i in lobbies.size():
+			if lobbies[i].get("current", false): menu.index = i
 
 # ---------------------------------------------------------------- phone links
 
@@ -1155,7 +1184,8 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	rect.position.y = maxf(rect.position.y, 16)
 	canvas.draw_rect(rect, Color(0.04, 0.035, 0.08, 0.95))
 	canvas.draw_rect(rect, Color(VIOLET, 0.9), false, 3)
-	_text(canvas, _name(id).to_upper(), rect.position + Vector2(24, size + 14), int(size * 0.7), AMBER)
+	var heading := "CHOOSE A LOBBY" if menu.get("page", "") == "lobbies" else _name(id).to_upper()
+	_text(canvas, heading, rect.position + Vector2(24, size + 14), int(size * 0.7), AMBER)
 	for i in items.size():
 		var y := rect.position.y + 50 + i * line
 		var selected: bool = i == menu.index
@@ -1164,14 +1194,3 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4), Color(VIOLET, 0.35))
 		_text(canvas, label, Vector2(rect.position.x + 32, y + size), size, TEXT if selected else DIM)
 
-## Packaged hosts run lobbies in a kill-on-close job, where a browser started
-## from here never shows up, so the launcher opens the chooser instead.
-func _open_chooser(url: String) -> void:
-	var request := OS.get_environment("GAMENIGHT_BROWSER_REQUEST")
-	if not request.is_empty():
-		var file := FileAccess.open(request, FileAccess.WRITE)
-		if file:
-			file.store_string(url)
-			file.close()
-			return
-	OS.shell_open(url)

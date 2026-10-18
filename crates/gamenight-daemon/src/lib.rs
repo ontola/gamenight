@@ -118,6 +118,9 @@ struct Shared {
     update_checked: Option<std::time::Instant>,
     /// Since when nobody has been seated and nothing played, for unattended updates.
     unattended_since: Option<std::time::Instant>,
+    /// The launcher's lobby choice files, and the lobbies they offer.
+    lobby_paths: Option<gamenight_local_web::host_lobby::Paths>,
+    lobbies: Vec<gamenight_protocol::LobbyChoice>,
 }
 
 /// The update handoff with the desktop launcher. The launcher downloads in
@@ -152,6 +155,9 @@ pub struct Resume {
     pub party: PartyCarry,
     #[serde(default)]
     pub web: Option<serde_json::Value>,
+    /// Set when restarting into another lobby: its title, for the cover.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lobby: Option<String>,
 }
 
 impl Resume {
@@ -224,6 +230,8 @@ impl Shared {
             update_ready: None,
             update_checked: None,
             unattended_since: None,
+            lobby_paths: None,
+            lobbies: Vec::new(),
         }
     }
 
@@ -242,6 +250,7 @@ impl Shared {
         party.companions = self.companions.values().cloned().collect();
         party.companions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.update_ready = self.update_ready.clone();
+        party.lobbies = self.lobbies.clone();
         party
     }
 
@@ -271,24 +280,91 @@ impl Shared {
     /// Restart into the downloaded update if nothing is being played. The
     /// party is written for the next process; the launcher does the rest.
     fn restart_for_update(&mut self) -> Result<(), String> {
-        let Some(update) = &self.update else {
+        if self.update.is_none() {
             return Err("this host cannot update itself".into());
-        };
+        }
         if self.update_ready.is_none() {
             return Err("no update is ready".into());
         }
         if !self.night.between_games() {
             return Err("finish the current game before updating".into());
         }
+        self.restart_with_party(None)?;
+        info!("restarting into a host update; party saved");
+        Ok(())
+    }
+
+    /// Stop so the launcher starts the host again, with this party.
+    fn restart_with_party(&mut self, lobby: Option<String>) -> Result<(), String> {
+        let Some(update) = &self.update else {
+            return Err("this host cannot restart itself".into());
+        };
         let resume = Resume {
             party: self.night.carry(),
             web: None,
+            lobby,
         };
         resume
             .write(&update.resume)
             .map_err(|error| format!("could not save the party: {error}"))?;
-        info!("restarting into a host update; party saved");
         self.shutdown_requested = true;
+        Ok(())
+    }
+
+    /// Re-read which lobbies the launcher offers; the running one is current.
+    fn refresh_lobbies(&mut self) {
+        let Some((config, registrations, bundled)) = &self.lobby_paths else {
+            return;
+        };
+        let mut lobbies =
+            gamenight_local_web::host_lobby::list(config, registrations, bundled.as_deref());
+        for lobby in &mut lobbies {
+            lobby.current = self.lobby_game.as_ref() == Some(&lobby.id);
+        }
+        // One lobby is nothing to switch between.
+        if lobbies.len() < 2 {
+            lobbies.clear();
+        }
+        if lobbies != self.lobbies {
+            self.lobbies = lobbies;
+            self.broadcast_party();
+        }
+    }
+
+    /// Make `lobby` the host's lobby and restart into it with the party.
+    /// A host that cannot restart itself uses it from its next start.
+    fn switch_lobby(&mut self, lobby: &GameId) -> Result<(), String> {
+        self.refresh_lobbies();
+        let Some((config, registrations, bundled)) = &self.lobby_paths else {
+            return Err("this host cannot switch lobbies".into());
+        };
+        let Some(choice) = self.lobbies.iter().find(|l| &l.id == lobby).cloned() else {
+            return Err("that lobby is not installed".into());
+        };
+        if choice.current {
+            return Ok(());
+        }
+        if !self.night.between_games() {
+            return Err("finish the current game before switching lobbies".into());
+        }
+        let saved = gamenight_local_web::host_lobby::save(
+            config,
+            registrations,
+            bundled.as_deref(),
+            &lobby.0,
+        )
+        .map_err(|error| format!("could not save the lobby: {error}"))?;
+        if !saved {
+            return Err("that lobby is not installed".into());
+        }
+        if self.update.is_none() {
+            return Err(format!(
+                "{} opens the next time you start GameNight",
+                choice.title
+            ));
+        }
+        self.restart_with_party(Some(choice.title))?;
+        info!(%lobby, "restarting into another lobby; party saved");
         Ok(())
     }
 
@@ -1476,6 +1552,7 @@ async fn run_inner(
         let mut s = shared.lock().await;
         s.exit_with_lobby = true;
         s.update = desktop.update;
+        s.lobby_paths = gamenight_local_web::host_lobby::host_paths();
         if let Some(carry) = desktop.carry {
             info!(players = carry.players.len(), "party restored after update");
             let fx = s.night.restore(carry);
@@ -1493,6 +1570,7 @@ async fn run_inner(
         let mut s = shared.lock().await;
         s.night.set_lobby_game(Some(lobby_game.clone()));
         s.lobby_game = Some(lobby_game.clone());
+        s.refresh_lobbies();
         // Declare the new contract in the launch spec so even a crash before
         // hello is treated as a plugin failure, not "quit the whole party".
         if s.launch_specs
@@ -1929,6 +2007,21 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::SwitchLobby { lobby } = &parsed {
+                let mut s = shared.lock().await;
+                let result = if matches!(
+                    registration,
+                    Registration::Lobby(_) | Registration::Overlay(_)
+                ) {
+                    s.switch_lobby(lobby)
+                } else {
+                    Err("only the lobby can switch lobbies".into())
+                };
+                if let Err(message) = result {
+                    send(&tx, &ServerMessage::Error { message });
+                }
+                continue;
+            }
             if matches!(parsed, ClientMessage::ApplyUpdate) {
                 let mut s = shared.lock().await;
                 let result = if matches!(registration, Registration::Lobby(_)) {
@@ -2180,7 +2273,8 @@ fn message_to_command(
         ClientMessage::LobbyReady
         | ClientMessage::QuitParty
         | ClientMessage::RetryLobby
-        | ClientMessage::ApplyUpdate => {
+        | ClientMessage::ApplyUpdate
+        | ClientMessage::SwitchLobby { .. } => {
             return Err("lobby lifecycle requires dedicated routing".into())
         }
         ClientMessage::DownloadGrants { .. } | ClientMessage::Playtests { .. } => {
@@ -3077,6 +3171,54 @@ mod update_restart_tests {
             None,
         );
         id
+    }
+
+    #[test]
+    fn switching_lobby_saves_the_choice_and_restarts_with_the_party() {
+        let update = host_update();
+        let dir = update.resume.parent().unwrap().to_path_buf();
+        let (config, registrations, bundled) = (
+            dir.join("selected-lobby.json"),
+            dir.join("local-games.json"),
+            dir.join("bundled-lobbies.json"),
+        );
+        let exe = std::env::current_exe().unwrap();
+        std::fs::write(
+            &bundled,
+            serde_json::json!([{"id":"game-room","title":"Game Room",
+            "launch":{"command":exe,"env":{"GAMENIGHT_LOBBY_API":"1"}}}])
+            .to_string(),
+        )
+        .unwrap();
+        std::fs::write(&registrations, "[]").unwrap();
+        let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        s.lobby_game = Some(GameId::new("game-room"));
+        s.lobby_paths = Some((config.clone(), registrations, Some(bundled)));
+        s.refresh_lobbies();
+        let lobbies = s.snapshot().lobbies;
+        assert_eq!(
+            lobbies
+                .iter()
+                .map(|l| (l.id.0.as_str(), l.current))
+                .collect::<Vec<_>>(),
+            [("game-room", true), ("lobby", false)]
+        );
+        assert!(s.switch_lobby(&GameId::new("missing")).is_err());
+        s.switch_lobby(&GameId::new("game-room")).unwrap();
+        assert!(!s.shutdown_requested, "the running lobby needs no restart");
+        let error = s.switch_lobby(&GameId::new("lobby")).unwrap_err();
+        assert!(error.contains("next time"), "{error}");
+        s.update = Some(update.clone());
+        join(&mut s, "Ada", "xinput:0");
+        s.switch_lobby(&GameId::new("lobby")).unwrap();
+        assert!(s.shutdown_requested);
+        assert_eq!(
+            std::fs::read_to_string(&config).unwrap(),
+            r#"{"id":"lobby"}"#
+        );
+        let resume = Resume::take(&update.resume).expect("fresh resume file");
+        assert_eq!(resume.lobby.as_deref(), Some("Clubhouse"));
+        assert_eq!(resume.party.players.len(), 1);
     }
 
     #[test]
