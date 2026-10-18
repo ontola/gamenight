@@ -356,6 +356,20 @@ class CloudApi {
     }
   }
 
+  /// A one-time link that opens [path] on the website already signed in as
+  /// this account, so the browser does not ask for another email code.
+  /// Null when there is nothing to hand over (signed out, or the web app,
+  /// which shares the website's cookies already).
+  Future<Uri?> webHandoff(String path) async {
+    if (browserCookies || token == null) return null;
+    final data =
+        await _send('POST', '/v1/me/web-handoff', body: {'return_to': path});
+    final url = data is Map ? data['url'] : null;
+    if (url is! String) return null;
+    final uri = Uri.parse(url);
+    return uri.origin == base.origin ? uri : null;
+  }
+
   Future<void> signOut() async {
     try {
       if (token != null) await _send('DELETE', '/v1/session');

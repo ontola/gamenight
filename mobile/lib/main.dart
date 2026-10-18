@@ -185,10 +185,21 @@ class _GameNightAppState extends State<GameNightApp> {
                       trailing: const Icon(Icons.open_in_new),
                       onTap: () {
                         Navigator.pop(context);
-                        launchUrl(Uri.parse('$hostedOrigin${entry.$1}'));
+                        _openWebsite(entry.$1);
                       }),
               ]),
             ));
+  }
+
+  /// Opens a website page in the browser, signed in like the app when it is.
+  Future<void> _openWebsite(String path) async {
+    Uri? url;
+    try {
+      url = await widget.state.cloud.webHandoff(path);
+    } catch (_) {
+      // Fall back to the plain page; it offers its own sign-in.
+    }
+    await launchUrl(url ?? Uri.parse('$hostedOrigin$path'));
   }
 
   void _selectDestination(int tab) {
@@ -261,8 +272,7 @@ class _GameNightAppState extends State<GameNightApp> {
                   leading: Icon(entry.$3, size: 21),
                   title: Text(entry.$2),
                   trailing: const Icon(Icons.open_in_new, size: 16),
-                  onTap: () =>
-                      launchUrl(Uri.parse('$hostedOrigin${entry.$1}'))),
+                  onTap: () => _openWebsite(entry.$1)),
           ],
         ),
       );
