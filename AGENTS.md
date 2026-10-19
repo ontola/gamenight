@@ -42,3 +42,11 @@ Keep game source outside this repository. LÖVE games live in
 CI uses the revision in `game-sources.json`. For development, explicitly set
 `GAMENIGHT_GAMES_DIR` to the game checkout. Push game changes before updating
 the pin and regenerating the docs. Never overwrite a dirty game checkout.
+
+# Cloud sessions
+
+Claude Code cloud containers run `scripts/cloud-setup.sh` as the environment's
+setup script: `godot` (4.5.2), `godot-4.6`, `godot-4.7`, `flutter` 3.47.6, LÖVE,
+Bevy build deps, ffmpeg, and Vulkan on llvmpipe for headless screenshots
+(`xvfb-run -a godot --path GAME`). Check `command -v godot` before installing
+anything yourself. Keep the script and the environment setting in sync.
