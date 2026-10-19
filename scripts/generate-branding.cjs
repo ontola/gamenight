@@ -27,7 +27,6 @@ if(process.argv.includes('--check')){
   const ico=Buffer.concat([header,...frames]);
   write('web/favicon.ico',ico);write('web/apple-touch-icon.png',await sharp(svg).resize(180,180).png().toBuffer());
   write('site/icon.svg',svg);write('mobile/assets/icon.svg',svg);write('site/icon.png',png);write('site/favicon.ico',ico);
-  write('crates/lobby/branding/gamenight.ico',ico);write('lobbies/game-room/assets/gamenight.ico',ico);
-  write('crates/lobby/branding/icon-64.rgba',await sharp(svg).resize(64,64).ensureAlpha().raw().toBuffer());
+  write('crates/gamenight-daemon/branding/gamenight.ico',ico);write('lobbies/game-room/assets/gamenight.ico',ico);
   fs.writeFileSync(path.join(root,manifest),JSON.stringify({source,sha256:hashes},null,2)+'\n');
 })().catch(error=>{console.error(error);process.exit(1);});}

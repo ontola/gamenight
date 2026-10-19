@@ -1,6 +1,4 @@
 /target/
-/crates/lobby/target/
-/vendor/bones/target/
 .local/
 .env
 .env.*

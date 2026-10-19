@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--target', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--profile', choices=['dev', 'ci', 'release'], default='dev')
-    parser.add_argument('--game-room', type=Path, help='Exported Game Room lobby (GameRoom.exe + GameRoom.pck)')
+    parser.add_argument('--game-room', type=Path, required=True, help='Exported Game Room lobby (GameRoom.exe + GameRoom.pck)')
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
     profile_dir = 'debug' if args.profile == 'dev' else args.profile
@@ -20,8 +20,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=False)
     stage = args.output / 'gamenight-windows-preview'
     (stage / 'bin').mkdir(parents=True)
-    for name in ['gamenight-daemon.exe', 'lobby.exe']:
-        shutil.copy2(args.target / profile_dir / name, stage / 'bin' / name)
+    shutil.copy2(args.target / profile_dir / 'gamenight-daemon.exe', stage / 'bin/gamenight-daemon.exe')
     shutil.copy2(args.target / profile_dir / 'gamenight-launcher.exe', stage / 'GameNight.exe')
     # Rust/MSVC binaries dynamically import these DLLs. App-local deployment
     # supports a clean Windows account without installing a machine-wide runtime.
@@ -35,23 +34,16 @@ def main():
         'Redistributed under the Microsoft Visual Studio license terms.\n'
         'https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files\n', encoding='utf-8')
 
-    for name in ['assets', 'packs', 'licenses']:
-        shutil.copytree(repo / 'crates/lobby' / name, stage / 'lobby' / name)
-    for name in ['LICENSE', 'CREDITS.md']:
-        shutil.copy2(repo / 'crates/lobby' / name, stage / 'lobby' / name)
-    shutil.copytree(repo / 'vendor/bones/licenses', stage / 'notices/bones')
-    shutil.copy2(repo / 'crates/lobby/tools/reskin/ASSET-SOURCES.md', stage / 'notices')
-    if args.game_room:
-        # The default lobby. The launcher falls back to the Clubhouse without it.
-        room = stage / 'lobbies/game-room'
-        room.mkdir(parents=True)
-        for name in ['GameRoom.exe', 'GameRoom.pck']:
-            shutil.copy2(args.game_room / name, room / name)
-        fonts = repo / 'lobbies/game-room/assets/fonts'
-        (stage / 'notices/game-room').mkdir(parents=True)
-        for notice in fonts.glob('*LICENSE*.txt'):
-            shutil.copy2(notice, stage / 'notices/game-room' / notice.name)
-        shutil.copy2(repo / 'lobbies/game-room/GODOT-LICENSE.txt', stage / 'notices/game-room/godot.txt')
+    # The lobby: Godot's editor binary running the exported Game Room pack.
+    room = stage / 'lobbies/game-room'
+    room.mkdir(parents=True)
+    for name in ['GameRoom.exe', 'GameRoom.pck']:
+        shutil.copy2(args.game_room / name, room / name)
+    fonts = repo / 'lobbies/game-room/assets/fonts'
+    (stage / 'notices/game-room').mkdir(parents=True)
+    for notice in fonts.glob('*LICENSE*.txt'):
+        shutil.copy2(notice, stage / 'notices/game-room' / notice.name)
+    shutil.copy2(repo / 'lobbies/game-room/GODOT-LICENSE.txt', stage / 'notices/game-room/godot.txt')
     for name in ['LICENSE', 'THIRD_PARTY.md']:
         shutil.copy2(repo / name, stage / name)
     shutil.copy2(repo / 'docs/windows-preview.md', stage / 'README.md')

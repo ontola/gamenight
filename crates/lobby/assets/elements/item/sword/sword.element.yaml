@@ -1,5 +1,0 @@
-name: Sword
-category: Weapons
-editor:
-  grab_size: [70, 20]
-data: sword.yaml

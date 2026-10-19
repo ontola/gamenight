@@ -1,4 +1,0 @@
-image: ./flappy_jellyfish.png
-tile_size: [34, 46]
-rows: 1
-columns: 3

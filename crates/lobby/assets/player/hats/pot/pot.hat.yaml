@@ -1,5 +1,0 @@
-name: Pot Hat
-atlas: ./pot.atlas.yaml
-
-offset: [-2, 36]
-body_size: [38, 40]

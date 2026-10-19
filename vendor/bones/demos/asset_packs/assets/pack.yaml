@@ -1,4 +1,0 @@
-# This is the core asset pack file. It's only job is to specify
-# the path to the root asset.
-
-root: ./game.yaml

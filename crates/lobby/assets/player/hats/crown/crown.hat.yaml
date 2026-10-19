@@ -1,5 +1,0 @@
-name: Crown Hat
-atlas: ./crown.atlas.yaml
-
-offset: [-4, 31]
-body_size: [32, 28]

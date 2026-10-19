@@ -846,14 +846,16 @@ async fn serve_session_qr(Path(session_id): Path<String>) -> Response {
         .into_response()
 }
 
-// Embed the lobby assets so installed/offline studios use the same artwork.
+// Embed the character bodies so installed/offline studios work without a
+// network. The living-room body is the plain-headed one the phone app also
+// bundles (mobile/lib/character.dart); web/characters keeps the hosted copies.
 async fn serve_character(Path(theme): Path<String>) -> Response {
     let png: &'static [u8] = match theme.as_str() {
-        "living-room" => include_bytes!("../../lobby/assets/player/skins/fishy/fishy-body.png"),
-        "underwater" => include_bytes!("../../lobby/assets/themes/underwater/fishy/body.png"),
-        "sky" => include_bytes!("../../lobby/assets/themes/sky/fishy/body.png"),
-        "school" => include_bytes!("../../lobby/assets/themes/school/fishy/body.png"),
-        "gameroom" => include_bytes!("../../lobby/assets/themes/gameroom/fishy/body.png"),
+        "living-room" => include_bytes!("../assets/living-room-body.png"),
+        "underwater" => include_bytes!("../../../web/characters/underwater.png"),
+        "sky" => include_bytes!("../../../web/characters/sky.png"),
+        "school" => include_bytes!("../../../web/characters/school.png"),
+        "gameroom" => include_bytes!("../../../web/characters/gameroom.png"),
         _ => return StatusCode::NOT_FOUND.into_response(),
     };
     (

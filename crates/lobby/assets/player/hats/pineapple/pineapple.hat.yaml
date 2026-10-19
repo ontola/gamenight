@@ -1,5 +1,0 @@
-name: Pineapple Hat
-atlas: ./pineapple.atlas.yaml
-
-offset: [-4, 40]
-body_size: [34, 39]

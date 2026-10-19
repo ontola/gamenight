@@ -1,3 +1,0 @@
-# This is our root asset file, which corresponds to our `PackMeta` struct.
-
-items: [10, 11, 12]

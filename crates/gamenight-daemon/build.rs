@@ -1,9 +1,9 @@
 fn main() {
-    println!("cargo:rerun-if-changed=../lobby/branding/gamenight.ico");
+    println!("cargo:rerun-if-changed=branding/gamenight.ico");
     #[cfg(windows)]
     {
         winres::WindowsResource::new()
-            .set_icon("../lobby/branding/gamenight.ico")
+            .set_icon("branding/gamenight.ico")
             .set("ProductName", "GameNight")
             .set("FileDescription", "GameNight")
             .set("InternalName", "GameNight")

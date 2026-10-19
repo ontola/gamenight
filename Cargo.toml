@@ -12,7 +12,6 @@ members = [
     "crates/gamenight-local-web",
     "examples/demo-game",
 ]
-exclude = ["crates/lobby", "vendor/bones"]
 
 [workspace.package]
 version = "0.1.0"

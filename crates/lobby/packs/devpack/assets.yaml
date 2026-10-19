@@ -1,6 +1,0 @@
-maps:
-  - ./maps/devlevel_1.map.yaml
-player_hats:
-  - ./hats/pink_pirate.hat.yaml
-map_elements:
-  - ./items/blunderbass/element.yaml

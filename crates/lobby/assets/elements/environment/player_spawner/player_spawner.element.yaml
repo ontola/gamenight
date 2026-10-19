@@ -1,5 +1,0 @@
-name: Player Spawner
-category: Map
-editor:
-  grab_size: [32, 48]
-data: player_spawner.yaml

@@ -6,7 +6,7 @@ param(
     [ValidateSet('dev', 'ci', 'release')][string]$BuildProfile = 'release',
     [string]$SigningMetadata,
     [string]$Vpk = 'vpk',
-    [string]$Godot
+    [Parameter(Mandatory=$true)][string]$Godot
 )
 $ErrorActionPreference = 'Stop'
 if ($Version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$') { throw 'Invalid release version' }
@@ -19,7 +19,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Preview staging failed' }
 $stage = Join-Path $OutputDir 'package/gamenight-windows-preview'
 & (Join-Path $PSScriptRoot 'test-windows-branding.ps1') -Executable (Join-Path $stage 'GameNight.exe')
 $releaseDir = Join-Path $OutputDir 'releases'
-$icon = Join-Path (Split-Path -Parent $PSScriptRoot) 'crates/lobby/branding/gamenight.ico'
+$icon = Join-Path (Split-Path -Parent $PSScriptRoot) 'crates/gamenight-daemon/branding/gamenight.ico'
 if (!(Test-Path -LiteralPath $icon)) { throw 'GameNight installer icon is missing' }
 $packId = if ($Channel -eq 'stable') { 'Ontola.GameNight' } else { 'Ontola.GameNight.Preview' }
 $title = if ($Channel -eq 'stable') { 'GameNight' } else { 'GameNight Preview' }

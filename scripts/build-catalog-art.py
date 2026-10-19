@@ -45,7 +45,7 @@ def main():
  ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--captures',type=Path);ap.add_argument('--embed',action='store_true')
  ap.add_argument('--sources',type=Path,help='folder with <game>/{cover,icon}-illustrated-source.png masters (GameNight project archive: archive/gamenight/catalog/art); re-exports the illustrated art from them');a=ap.parse_args()
  if not a.captures and not a.embed:ap.error('supply --captures or --embed')
- font=ImageFont.truetype(str(ROOT/'crates/lobby/assets/ui/FairfaxSM.ttf'),22)
+ font=ImageFont.truetype(str(ROOT/'scripts/fonts/FairfaxSM.ttf'),22)
  for game,source in SOURCES.items():
   meta_path=ROOT/'catalog/games'/f'{game}.json'
   if not meta_path.exists():print(f'{game}: no catalog/games/{game}.json, skipped');continue

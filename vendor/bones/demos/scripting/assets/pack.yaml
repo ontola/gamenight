@@ -1,4 +1,0 @@
-root: game.yaml
-schemas:
-  - schemas/DemoSprite.yaml
-  - schemas/ScriptingDemoData.yaml

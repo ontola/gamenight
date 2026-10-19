@@ -9,9 +9,7 @@ on:
       - 'crates/gamenight-installer/**'
       - 'crates/gamenight-catalog/**'
       - 'catalog/**'
-      - 'crates/lobby/**'
       - 'lobbies/game-room/**'
-      - 'vendor/bones/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
   workflow_call:
@@ -82,9 +80,7 @@ jobs:
           dotnet-version: '8.0.x'
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            . -> target
-            crates/lobby -> target
+          workspaces: . -> target
           key: windows-installer
       - name: Install pinned Godot 4.5.2 for the Game Room lobby
         uses: ./.github/actions/setup-godot

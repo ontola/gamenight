@@ -18,11 +18,6 @@
       "first_party": true,
       "claims": []
     },
-    "lobby": {
-      "first_party": true,
-      "claims": [],
-      "role": "host"
-    },
     "neon-siege": {
       "first_party": true,
       "claims": []

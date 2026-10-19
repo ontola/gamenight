@@ -36,7 +36,7 @@ class CharacterSprite {
 
   /// The living-room idle cell bundled with the app, so the body guide and the
   /// preview work before the phone has joined a GameNight. It is the first
-  /// cell of `crates/lobby/assets/player/skins/fishy/fishy-body.png`, which is
+  /// cell of `crates/gamenight-local-web/assets/living-room-body.png`, which is
   /// what hosts serve at `/assets/characters/living-room`.
   static Future<ui.Image?> bundled() => _atlas.putIfAbsent('bundled', () async {
         try {
