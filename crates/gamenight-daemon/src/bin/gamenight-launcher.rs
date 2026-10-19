@@ -149,6 +149,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let shelf_path = local.join("shelf.json");
     fs::write(&shelf_path, serde_json::to_vec_pretty(&shelf)?)?;
+    // Keep the previous session's logs: a restart (an update, a crash) is
+    // usually exactly when someone needs to read what happened before it.
+    for name in ["daemon", "daemon-errors"] {
+        let _ = fs::rename(
+            local.join(format!("{name}.log")),
+            local.join(format!("{name}.prev.log")),
+        );
+    }
     let mut command = Command::new(daemon);
     command
         .current_dir(&root)
