@@ -128,14 +128,8 @@ class RoomScreenState extends State<RoomScreen> {
               : state.session?.linked ?? false;
           if (!linked) return details;
           return Column(children: [
-            if (state.sessionError case final String error)
-              Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(children: [
-                    const Icon(Icons.wifi_off, color: GnColors.warn),
-                    const SizedBox(width: 8),
-                    Expanded(child: Hint(error))
-                  ])),
+            // Hidden, never removed: the game page below must keep its state.
+            Visibility(visible: !state.companionFullscreen, child: _roomBar()),
             Expanded(
                 child: IndexedStack(index: _section, children: [
               GameScreen(
@@ -160,6 +154,87 @@ class RoomScreenState extends State<RoomScreen> {
                   )),
           ]);
         });
+  }
+
+  /// Always on top while in a room, whichever section shows: where you are
+  /// and the way out.
+  Widget _roomBar() {
+    final hosted = state.inHostedRoom;
+    final code = hosted ? state.hostedRoom?.code : null;
+    final error = state.sessionError;
+    final title = code != null
+        ? 'Room $code'
+        : hosted
+            ? 'Your room'
+            : 'GameNight at ${state.host?.authority ?? ''}';
+    final name = hosted ? state.name : state.session?.playerName ?? state.name;
+    return ContentWidth(
+      child: Container(
+        key: const ValueKey('room-bar'),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+        decoration: BoxDecoration(
+          color: GnColors.card,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: GnColors.border),
+        ),
+        child: Row(children: [
+          Icon(error != null ? Icons.wifi_off : Icons.circle,
+              size: error != null ? 20 : 10,
+              color: error != null ? GnColors.warn : GnColors.ok),
+          const SizedBox(width: 12),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(error ?? 'Playing as $name',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: error != null ? GnColors.warn : GnColors.muted)),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _leave,
+            icon: const Icon(Icons.logout, size: 18),
+            label: const Text('Leave room'),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Future<void> _leave() async {
+    final sure = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+              title: const Text('Leave this room?'),
+              content: const Text(
+                  'Your player and faces stay on this phone. Scan the QR or enter the room code to come back.'),
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Stay')),
+                FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Leave room')),
+              ],
+            ));
+    if (sure != true) return;
+    setState(() => _section = 0);
+    await _run(() async {
+      if (state.inHostedRoom) {
+        await state.leaveHostedRoom();
+      } else {
+        await state.disconnect();
+      }
+      return 'You left the room. Your player is kept.';
+    });
   }
 
   Widget _codeField() => Semantics(
@@ -295,20 +370,21 @@ class RoomScreenState extends State<RoomScreen> {
         ]),
       if (room != null && room.none)
         Section(title: 'Room code', children: [_codeField(), _rememberBox()]),
-      Section(children: [
-        OutlinedButton.icon(
-          onPressed: _busy
-              ? null
-              : () => _run(() async {
-                    await state.leaveHostedRoom();
-                    return waiting
-                        ? 'Pickup cancelled.'
-                        : 'You left the room. Your player is kept.';
-                  }),
-          icon: const Icon(Icons.logout, size: 18),
-          label: Text(waiting ? 'Cancel pickup' : 'Leave room'),
-        ),
-      ]),
+      if (!connected)
+        Section(children: [
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                      await state.leaveHostedRoom();
+                      return waiting
+                          ? 'Pickup cancelled.'
+                          : 'You left the room. Your player is kept.';
+                    }),
+            icon: const Icon(Icons.logout, size: 18),
+            label: Text(waiting ? 'Cancel pickup' : 'Leave room'),
+          ),
+        ]),
     ];
   }
 

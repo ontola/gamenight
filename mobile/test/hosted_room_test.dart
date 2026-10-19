@@ -165,4 +165,37 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     state.dispose();
   });
+
+  test('leaving always works; a room that ended disappears by itself',
+      () async {
+    SharedPreferences.setMockInitialValues(
+        {'cloud_token': 'test-only', 'hosted_room': true});
+    var status = roomFixture();
+    final client = MockClient((request) async {
+      if (request.url.path == '/v1/rooms/status') {
+        return http.Response(jsonEncode(status), 200);
+      }
+      if (request.url.path == '/v1/pairing/unlink') {
+        return http.Response('', 404);
+      }
+      return http.Response('', 204);
+    });
+    final state = AppState(await SharedPreferences.getInstance(),
+        cloud: CloudApi(client: client));
+    addTearDown(state.dispose);
+    await state.refreshHostedRoom();
+    expect(state.hostedRoom?.connected, isTrue);
+    await state.leaveHostedRoom();
+    expect(state.inHostedRoom, isFalse);
+    expect(state.prefs.getBool('hosted_room'), isNull);
+    expect(state.signedIn, isTrue);
+
+    await state.prefs.setBool('hosted_room', true);
+    final again = AppState(state.prefs, cloud: CloudApi(client: client));
+    addTearDown(again.dispose);
+    status = {'status': 'none'};
+    await again.refreshHostedRoom();
+    expect(again.inHostedRoom, isFalse);
+    expect(again.hostedRoom, isNull);
+  });
 }

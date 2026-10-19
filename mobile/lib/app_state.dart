@@ -859,6 +859,13 @@ class AppState extends ChangeNotifier {
       final token = cloud.roomIdentity;
       final room = await cloud.roomStatus();
       if (!inHostedRoom || token != cloud.roomIdentity || _disposed) return;
+      if (room.none && !isGuest) {
+        // The room ended or let us go: drop it instead of showing a dead one.
+        _forgetHostedRoom();
+        await prefs.remove('hosted_room');
+        notifyListeners();
+        return;
+      }
       hostedRoom = room;
       sessionError = null;
       companionError = null;
@@ -900,25 +907,39 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Always leaves on this phone, also when the room is already gone and
+  /// the server answers 401 or 404: there is nothing left to leave there.
   Future<void> leaveHostedRoom() async {
     final room = hostedRoom;
-    if (isGuest) {
-      try {
+    final guest = isGuest;
+    try {
+      if (guest) {
         await cloud.leaveGuest();
-      } on GuestRoomExpired {/* Already revoked. */}
-      await _forgetGuestRoom();
-    } else if (room != null && room.waiting) {
-      await cloud.cancelPickup();
-    } else {
-      await cloud.leaveRoom();
+      } else if (room != null && room.waiting) {
+        await cloud.cancelPickup();
+      } else {
+        await cloud.leaveRoom();
+      }
+    } on GuestRoomExpired {
+      // Already revoked.
+    } on SignedOut {
+      await _forgetAccount();
+    } on ApiError {
+      // Unreachable or gone; the room is forgotten here either way.
     }
-    hostedRoom = null;
-    companion = null;
-    companionError = null;
-    inHostedRoom = false;
+    if (guest) await _forgetGuestRoom();
+    _forgetHostedRoom();
     await prefs.remove('hosted_room');
     if (_api == null) _poll?.cancel();
     notifyListeners();
+  }
+
+  void _forgetHostedRoom() {
+    hostedRoom = null;
+    companion = null;
+    companionError = null;
+    sessionError = null;
+    inHostedRoom = false;
   }
 
   Future<void> setHostedRemember(bool value) async {
