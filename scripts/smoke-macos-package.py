@@ -36,14 +36,18 @@ def lobby_connected():
 
 
 def diagnose():
-    # Run the helper on its own, verbosely, so a failed run says whether
-    # Godot found the pack and started the Game Room's scripts.
+    # Run the helper on its own, verbosely and with a window as the launcher
+    # starts it, so a failed run shows how far Godot got with the Game Room.
     helper = app / "Contents/Helpers/GameNight.app/Contents"
-    result = subprocess.run([str(helper / "MacOS/GameNight"), "--headless", "--verbose", "--main-pack",
-                             str(helper / "Resources/GameNight.pck"), "--quit-after", "120"],
-                            env=dict(os.environ, GAMENIGHT_ADDR="127.0.0.1:9"), capture_output=True,
-                            text=True, timeout=60)
-    print("\n".join((result.stdout + result.stderr).splitlines()[-80:]))
+    command = [str(helper / "MacOS/GameNight"), "--verbose", "--main-pack", str(helper / "Resources/GameNight.pck")]
+    try:
+        result = subprocess.run(command, env=dict(os.environ, GAMENIGHT_ADDR="127.0.0.1:9"),
+                                capture_output=True, text=True, timeout=40)
+        text = result.stdout + result.stderr
+    except subprocess.TimeoutExpired as stopped:
+        text = "".join(part.decode(errors="replace") if isinstance(part, bytes) else (part or "")
+                       for part in (stopped.stdout, stopped.stderr))
+    print("\n".join(text.splitlines()[-100:]))
 
 
 with (output / "launcher.log").open("w") as log:
