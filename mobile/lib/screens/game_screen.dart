@@ -300,8 +300,10 @@ class _AppCardState extends State<AppCard> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final name = widget.app.name;
-    final canInstall =
-        Apps.supported && !Apps.playStore && package != null && widget.download != null;
+    final canInstall = Apps.supported &&
+        !Apps.playStore &&
+        package != null &&
+        widget.download != null;
     final Widget action;
     String hint;
     switch (step) {

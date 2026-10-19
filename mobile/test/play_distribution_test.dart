@@ -53,17 +53,17 @@ void main() {
           ),
         );
         Widget card() => MaterialApp(
-          home: Scaffold(
-            body: AppCard(
-              key: UniqueKey(),
-              app: const CompanionApp(
-                name: 'Test companion',
-                android: 'test.game',
+              home: Scaffold(
+                body: AppCard(
+                  key: UniqueKey(),
+                  app: const CompanionApp(
+                    name: 'Test companion',
+                    android: 'test.game',
+                  ),
+                  download: Uri.parse('https://example.test/game.apk'),
+                ),
               ),
-              download: Uri.parse('https://example.test/game.apk'),
-            ),
-          ),
-        );
+            );
         await tester.pumpWidget(card());
         await tester.pumpAndSettle();
         expect(

@@ -96,6 +96,42 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('tapping a tag never focuses the search field', (tester) async {
+    Catalog.instance = Catalog(
+        client: MockClient((_) async => http.Response(jsonEncode(games), 200)));
+    await tester.pumpWidget(MaterialApp(
+        theme: gameNightTheme(),
+        home: const Scaffold(
+            body: SingleChildScrollView(child: CatalogSection()))));
+    await tester.pumpAndSettle();
+    final search = find.byKey(const ValueKey('catalog-search'));
+    bool searchFocused() => tester
+        .widget<EditableText>(
+            find.descendant(of: search, matching: find.byType(EditableText)))
+        .focusNode
+        .hasFocus;
+    await tester.enterText(search, 'moon');
+    await tester.pumpAndSettle();
+    expect(searchFocused(), isTrue);
+    await tester.tap(find.byType(GameCard).first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.widgetWithText(ActionChip, 'party').first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ActionChip, 'party').first);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(InputChip, 'party'), findsOneWidget);
+    expect(searchFocused(), isFalse);
+    expect(find.text('moon'), findsNothing);
+
+    await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilterChip, 'cards'));
+    await tester.tap(find.text('Show 2 games'));
+    await tester.pumpAndSettle();
+    expect(searchFocused(), isFalse);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
       'failed personal data never becomes an empty history; tags still work',
       (tester) async {

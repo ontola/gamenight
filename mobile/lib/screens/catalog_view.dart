@@ -141,19 +141,25 @@ class _CatalogSectionState extends State<CatalogSection> {
     }
   }
 
-  void _open(CatalogGame game) => Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => GameDetailScreen(
-            game: game,
-            games: _visible,
-            onTagSelected: (tag) {
-              setState(() => _filter = CatalogFilter(tags: {tag}));
-              Navigator.of(context).pop();
-              Scrollable.ensureVisible(context,
-                  duration: const Duration(milliseconds: 250));
-            },
-            host: _inRoom && _host.isNotEmpty ? _host : null,
-            onAdd: _inRoom ? _add : null,
-          )));
+  void _open(CatalogGame game) {
+    // Popping back restores the catalog's last focus; without this the
+    // search field grabs focus (and the keyboard) again.
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => GameDetailScreen(
+              game: game,
+              games: _visible,
+              onTagSelected: (tag) {
+                _search.clear();
+                setState(() => _filter = CatalogFilter(tags: {tag}));
+                Navigator.of(context).pop();
+                Scrollable.ensureVisible(context,
+                    duration: const Duration(milliseconds: 250));
+              },
+              host: _inRoom && _host.isNotEmpty ? _host : null,
+              onAdd: _inRoom ? _add : null,
+            )));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -377,6 +383,7 @@ class _CatalogSectionState extends State<CatalogSection> {
       _sorted((_games ?? const []).where(_filter.matches).toList());
 
   Future<void> _showFilters() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final filter = await showModalBottomSheet<CatalogFilter>(
         context: context,
         isScrollControlled: true,
