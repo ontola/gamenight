@@ -1,0 +1,2730 @@
+{
+  "$defs": {
+    "ClientMessage": {
+      "oneOf": [
+        {
+          "description": "Replacement lobby has rendered its first usable frame.",
+          "properties": {
+            "type": {
+              "const": "lobby_ready",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Explicitly end the desktop party; a lobby disconnect is not a quit.",
+          "properties": {
+            "type": {
+              "const": "quit_party",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Retry the configured replacement lobby after a crash. Trusted local UI only.",
+          "properties": {
+            "type": {
+              "const": "retry_lobby",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Restart the host into the update named by `update_ready`, keeping the\nparty. Lobby only, and only between games.",
+          "properties": {
+            "type": {
+              "const": "apply_update",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Make `lobby` (one of the party's `lobbies`) the host's lobby and\nrestart into it, keeping the party. Local lobby UI only, between games.",
+          "properties": {
+            "lobby": {
+              "$ref": "#/$defs/GameId"
+            },
+            "type": {
+              "const": "switch_lobby",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "lobby"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The players whose phone is linked, replacing the previous list. Sent\nby the host's web server, which pairs phones with players.",
+          "properties": {
+            "players": {
+              "items": {
+                "$ref": "#/$defs/PlayerId"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "set_phones",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "players"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Only the authenticated lobby may publish physical input.",
+          "properties": {
+            "controllers": {
+              "items": {
+                "$ref": "#/$defs/ControllerState"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "controller_frame",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "controllers"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Opt into presence and live roster notifications for this prepared session.",
+          "properties": {
+            "instant_join": {
+              "type": "boolean"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "participation",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "instant_join"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Meaningful human input (deadzone filtered, at most once a second per device).\nGames must supply their active session. Overlays omit it.",
+          "properties": {
+            "controller": {
+              "type": "string"
+            },
+            "session": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SessionId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "type": {
+              "const": "controller_input",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "controller"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Must be the first message on every connection.",
+          "properties": {
+            "game": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GameId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "For `Role::Game`: which title this process runs."
+            },
+            "role": {
+              "$ref": "#/$defs/Role"
+            },
+            "token": {
+              "description": "The launch token from `GAMENIGHT_TOKEN`. Required when the daemon\nlaunched this process; omitted for manually started ones.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "hello",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Walk in, grab a controller, press A. First free seat is yours — or ask\nfor a specific one with `seat` (falls back to the first free seat if\nit's taken).",
+          "properties": {
+            "avatar": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "library": {
+              "items": {
+                "$ref": "#/$defs/GameId"
+              },
+              "type": "array"
+            },
+            "name": {
+              "type": "string"
+            },
+            "seat": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "join_party",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Add a player who plays on their phone and holds no controller. Takes\na free seat, or adds one past the controller seats (up to eight).",
+          "properties": {
+            "avatar": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "color": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "join_phone_player",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "leave_party",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Change how a seated player's name reads everywhere (overlay, games\nthat show `players[].name`).",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "rename_player",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "name"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Change a player's accent-color hint (see [`Player::color`]).",
+          "properties": {
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "skin_color": {
+              "type": "string"
+            },
+            "type": {
+              "const": "set_player_skin_color",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "skin_color"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "color": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "set_player_color",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "color"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Update a player's custom character pixel art avatar.",
+          "properties": {
+            "avatar": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "set_player_avatar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "avatar"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "occupant": {
+              "$ref": "#/$defs/SeatOccupant"
+            },
+            "seat": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "assign_seat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "seat",
+            "occupant"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Two people trade controllers: swap whoever sits in these two seats.",
+          "properties": {
+            "a": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "b": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "swap_seats",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "a",
+            "b"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Physical gamepad's ordinal in the host's connected-controller list.",
+          "properties": {
+            "controller": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "bind_controller",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "controller"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "entries": {
+              "items": {
+                "$ref": "#/$defs/PlaylistEntry"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "set_playlist",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "entries"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Move an existing entry without interrupting play. Reject stale snapshots.",
+          "properties": {
+            "expected": {
+              "$ref": "#/$defs/PlaylistSnapshot"
+            },
+            "from": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "to": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "move_playlist_entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "expected",
+            "from",
+            "to"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Remove one occurrence only, guarded against concurrent playlist edits.",
+          "properties": {
+            "expected": {
+              "$ref": "#/$defs/PlaylistSnapshot"
+            },
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "remove_playlist_entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "expected",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Skip to the warm session right now, no vote.",
+          "properties": {
+            "type": {
+              "const": "next",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Make this game the next one up: it starts warming immediately\n(inserted into the playlist after the current entry if needed).",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "type": {
+              "const": "play_next",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Change the upcoming game without starting or resuming gameplay.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "type": {
+              "const": "queue_next",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Add a new occurrence at the end, or first among upcoming games. Never starts play.",
+          "properties": {
+            "first": {
+              "type": "boolean"
+            },
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "type": {
+              "const": "queue_game",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "first"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "pause",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "resume",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The party overlay came up: the active game pauses.",
+          "properties": {
+            "type": {
+              "const": "open_overlay",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The overlay went away: resume, if it was the overlay that paused.",
+          "properties": {
+            "type": {
+              "const": "close_overlay",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A player moves their avatar onto an option.",
+          "properties": {
+            "option": {
+              "$ref": "#/$defs/VoteOption"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "vote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "option"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Pause, resume or skip the host's background music (see\n[`NowPlaying`]). Ignored when nothing is playing — there is nothing\nfor the daemon to talk to.",
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/MediaAction"
+            },
+            "type": {
+              "const": "media_control",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "action"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Change a match setting. `game` defaults to the active game, so\n\"disable items\" mid-match needs no lookup. The daemon validates the\nvalue against the declared spec and pushes the change to the game.",
+          "properties": {
+            "game": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GameId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "key": {
+              "type": "string"
+            },
+            "type": {
+              "const": "set_setting",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SettingValue"
+            }
+          },
+          "required": [
+            "type",
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Atomically validate a settings batch against a live session and revision.\nUndo restores the last batch. Keep discards that undo snapshot.",
+          "properties": {
+            "action": {
+              "$ref": "#/$defs/SettingsAction"
+            },
+            "expected_revision": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "control_settings",
+              "type": "string"
+            },
+            "values": {
+              "additionalProperties": {
+                "$ref": "#/$defs/SettingValue"
+              },
+              "default": {},
+              "type": "object"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "session",
+            "expected_revision",
+            "player_id",
+            "action"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Trusted local web server only: the complete current set of download\ngrants from the cloud, game id to token, for paid games someone\nseated owns. Replaces the previous set; an empty map revokes all.\nTokens are secrets: never log or display them.",
+          "properties": {
+            "grants": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "type": "object"
+            },
+            "type": {
+              "const": "download_grants",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Trusted local web server only: preview builds the cloud lets this\ntable play, because someone seated owns or tests the game. The daemon\ninstalls each one and puts it on the shelf as a playtest.",
+          "properties": {
+            "playtests": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/Playtest"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "playtests",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Assets loaded, controllers mapped — the session can start instantly.",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "ready",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A round ended. Informational: keep playing; no focus or playlist change.",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "finished",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Optional factual diagnostics, without accounts or recommendation data.",
+          "properties": {
+            "sample": {
+              "$ref": "#/$defs/PerformanceSample"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "performance",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "sample"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Optional: how far along warming is, so screens can show something\ntruthful while the party waits. Send as often as is useful; the\ndaemon keeps the latest. A game that loads instantly need never send\nthis — \"loading\" without a number is still a legitimate state.",
+          "properties": {
+            "label": {
+              "description": "Optional human-readable step (\"generating arena\").",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "percent": {
+              "description": "Whole percent, 0 to 100. Clamped by the daemon.",
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "progress",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "percent"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "\"Get me back to the party.\" Sent by a game when the player asks for\nthe lobby (a Back button, Backspace...). The daemon pauses this\nsession and gives the lobby the screen.\n\nGames are not allowed to drive the party in general — this is the one\nthing they may ask for, because a player stuck inside a game with no\nway out is the one failure the party cannot recover from themselves.",
+          "properties": {
+            "type": {
+              "const": "request_overlay",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "\"Somebody just asked for me.\" Sent by a game when a player reaches for\nit directly rather than through the party — on the desktop that means\nCmd+Tab, a Dock click, a click on the window.\n\nThe pair to `request_overlay`, and the same bargain: the game reports\nwhat the human did, the daemon decides what it means. Warm session ->\nstart it. Paused active session -> resume it. Anything else -> nothing\nhappens, and no harm done.\n\nFocus is the one thing the party can always express and GameNight\ncannot override — the window server has the final say. Taking it as a\nstatement of intent turns that from a fight into an instruction: the\ngame the party switched to is, by definition, the game they want.",
+          "properties": {
+            "type": {
+              "const": "request_start",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Declare the match settings this game exposes. Send once after\n`welcome` (and again after every reconnect). Replaces any previous\ndeclaration; values the party already changed persist where they are\nstill valid under the new specs.",
+          "properties": {
+            "settings": {
+              "items": {
+                "$ref": "#/$defs/SettingSpec"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "declare_settings",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "settings"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Offer a phone screen for this game (see [`CompanionScreen`]). Send\nafter `welcome`, and again after every reconnect. `root` must be an\nabsolute directory; `entry` is the page inside it. Declare a page,\nan `app`, or both.",
+          "properties": {
+            "app": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/CompanionApp"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "entry": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "root": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "declare_companion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Opaque JSON between a game and phone screens. From a game, `player_id`\naddresses one phone and its absence addresses every phone. From a\ntrusted overlay (the local web server), `game` names the recipient and\n`player_id` the phone that sent it.",
+          "properties": {
+            "data": true,
+            "game": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GameId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "player_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PlayerId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "const": "companion_message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Overlay only: a player's phone screen for `game` connected or left.",
+          "properties": {
+            "connected": {
+              "type": "boolean"
+            },
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "companion_presence",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "connected"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "CompanionApp": {
+      "description": "A native phone app for a game, for phone sides a web page can't carry\n(a full 3D view, say). The GameNight app offers to install and open it;\nconnecting to the game is the app's own business.",
+      "properties": {
+        "android": {
+          "description": "Android package to launch, e.g. `io.ontola.godgame`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "download": {
+          "description": "Where to get the app: an `https://` URL, or a file inside `root`\n(such as `god.apk`), which the host then serves on the LAN.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Shown on the phone, e.g. \"The Voice and the Will\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "CompanionScreen": {
+      "description": "A game's own phone screen: a small web page that GameNight serves to the\nphones of seated players while that game is active, a native phone app,\nor both. Games that support asymmetric play (a hidden hand of cards, a\ngod's-eye map) declare one with `declare_companion`; pages talk to the\ngame with `companion_message`, native apps use their own connection.",
+      "properties": {
+        "app": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CompanionApp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entry": {
+          "description": "Page to open, relative to `root`, e.g. `phone/index.html`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "root": {
+          "description": "Absolute directory the local web server serves files from. Only\ntrusted local UIs see it; it is stripped from lobby snapshots.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "game"
+      ],
+      "type": "object"
+    },
+    "ControllerState": {
+      "description": "Physical input sampled by the lobby. Controller IDs are opaque host IDs,\nnever indexes into another process's device enumeration.",
+      "properties": {
+        "axes": {
+          "description": "left x/y, right x/y, left/right trigger; signed values / 32767.",
+          "items": {
+            "format": "int16",
+            "maximum": 32767,
+            "minimum": -32768,
+            "type": "integer"
+          },
+          "maxItems": 6,
+          "minItems": 6,
+          "type": "array"
+        },
+        "buttons": {
+          "description": "A B X Y LB RB Back Start LS RS Up Down Left Right (bits 0..13).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "controller": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "controller",
+        "axes",
+        "buttons"
+      ],
+      "type": "object"
+    },
+    "GameId": {
+      "description": "Identifies a game *title* (e.g. `\"towerfall\"`), not a running instance.",
+      "type": "string"
+    },
+    "GameIssue": {
+      "properties": {
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "kind": {
+          "$ref": "#/$defs/GameIssueKind"
+        }
+      },
+      "required": [
+        "game",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "GameIssueKind": {
+      "description": "A stopped game process. Exit codes cannot reliably distinguish a forced\nclose from a crash; only label a known unsuccessful exit as unexpected.",
+      "enum": [
+        "closed",
+        "disconnected",
+        "exited_unexpectedly",
+        "failed_to_start",
+        "startup_timeout"
+      ],
+      "type": "string"
+    },
+    "GameMeta": {
+      "description": "Presentation metadata for a title in the game library — everything an\noverlay needs to sell the next game: cover art and all that.",
+      "properties": {
+        "best_players": {
+          "description": "The count the game shines at, used to break ties between games that\nall merely fit.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "color": {
+          "description": "Accent color (`#rrggbb`) for generated covers and highlights.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cover": {
+          "description": "Portrait cover: PNG data URI, or a shelf-relative PNG resolved by the\ndaemon. Web clients also support HTTPS artwork URLs.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "emoji": {
+          "description": "Icon for generated covers.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "icon": {
+          "description": "Square game icon (favicon), used on case spines.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/GameId"
+        },
+        "launch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LaunchSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "How to start this game. Absent = the daemon waits for the process to\nshow up on its own (dev mode / externally managed)."
+        },
+        "max_players": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "min_phones": {
+          "description": "Phones the game needs at the least among its players, for games where\nonly some play on a phone (one god on a phone, the rest on controllers).",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "min_players": {
+          "description": "Human participants this game supports. Solo play with game-managed AI\nis advertised with a minimum of one; a higher minimum does not imply\nbot support. The daemon uses these bounds to warm\nsomething that actually fits the party, so a shelf entry without them\nis treated as \"fits anything\" rather than being skipped — an unknown\nrange should not make a game unplayable.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "play_with": {
+          "$ref": "#/$defs/PlayWith",
+          "description": "What each player holds to play: a controller (the default), a phone,\nboth, or either. The player range above counts only the party members\nwho hold what this asks for."
+        },
+        "players": {
+          "description": "Human-readable player range, e.g. `\"2–4\"`. Display only — the daemon\npicks games by `min_players`/`max_players`, never by parsing this.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenshot": {
+          "description": "Gameplay screenshot, displayed on the lobby TV.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tagline": {
+          "description": "One-line pitch shown under the title.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "type": "object"
+    },
+    "GameSettings": {
+      "description": "A game's declared settings plus their current values, as broadcast in\nevery [`PartySnapshot`]. Values are effective (defaults merged in) and\nsurvive the game process reconnecting.",
+      "properties": {
+        "can_undo": {
+          "default": false,
+          "type": "boolean"
+        },
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "revision": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "specs": {
+          "items": {
+            "$ref": "#/$defs/SettingSpec"
+          },
+          "type": "array"
+        },
+        "values": {
+          "additionalProperties": {
+            "$ref": "#/$defs/SettingValue"
+          },
+          "type": "object"
+        }
+      },
+      "required": [
+        "game",
+        "specs",
+        "values"
+      ],
+      "type": "object"
+    },
+    "InstallState": {
+      "description": "Where a background install has got to. Distinct from `SessionPhase` on\npurpose: a game being fetched has no process and no session, so none of\nthe session lifecycle applies to it — it isn't warming, it isn't loading,\nit isn't on the shelf yet. It's arriving.",
+      "oneOf": [
+        {
+          "const": "queued",
+          "description": "In the queue, nothing happening yet.",
+          "type": "string"
+        },
+        {
+          "const": "downloading",
+          "description": "Bytes are moving. This is the only state with a meaningful `percent`.",
+          "type": "string"
+        },
+        {
+          "const": "verifying",
+          "description": "Downloaded; checking it against the catalogue's sha256.",
+          "type": "string"
+        },
+        {
+          "const": "extracting",
+          "description": "Hash matched; unpacking it into place.",
+          "type": "string"
+        },
+        {
+          "const": "installed",
+          "description": "Playable. The shelf entry appears in the same snapshot.",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Gave up. `label` carries why, because a party staring at a stalled\nbar deserves to know whether to wait or pick something else.",
+          "type": "string"
+        }
+      ]
+    },
+    "InstallStatus": {
+      "description": "One game arriving in the background, for any screen that wants to show\nthe party what's on its way.\n\nProgress lives here rather than on `SessionInfo` because a download\nhappens *before* there is anything to have a session about — the process\ndoesn't exist, so it cannot report on itself the way a warming game does.",
+      "properties": {
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "label": {
+          "description": "Human-readable detail — the failure reason, or a step's name.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "percent": {
+          "description": "Whole percent of the download, 0 to 100. Only `Downloading` sets it:\nverifying and extracting are fast and their duration is unknowable,\nso a bar for them would be a lie.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/InstallState"
+        },
+        "title": {
+          "description": "The catalogue title, so a screen can name it without a shelf entry —\nwhich by definition doesn't exist yet while this is downloading.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "game",
+        "title",
+        "state"
+      ],
+      "type": "object"
+    },
+    "LaunchSpec": {
+      "description": "How the daemon starts a game process. The handshake context (address,\ngame id, launch token) is passed via the `GAMENIGHT_*` environment\nvariables, not arguments, so unmodified binaries launch cleanly.",
+      "properties": {
+        "args": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "Executable path (absolute, or relative to the daemon's working dir).",
+          "type": "string"
+        },
+        "cwd": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Extra environment for the process (the `GAMENIGHT_*` vars are added on\ntop and cannot be overridden here).",
+          "type": "object"
+        }
+      },
+      "required": [
+        "command"
+      ],
+      "type": "object"
+    },
+    "LobbyChoice": {
+      "description": "A lobby the host can run: bundled with the app or installed locally.",
+      "properties": {
+        "current": {
+          "type": "boolean"
+        },
+        "id": {
+          "$ref": "#/$defs/GameId"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title"
+      ],
+      "type": "object"
+    },
+    "MediaAction": {
+      "description": "What a player can ask of the host's music. Deliberately the three things\na room full of people actually shout about — no volume (that's the amp's\njob and the host's call), no seeking, no library browsing.",
+      "oneOf": [
+        {
+          "enum": [
+            "next_track",
+            "previous_track"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "play_pause",
+          "description": "Pause if playing, resume if paused — one pad, both jobs, because the\nparty can see which it is from the same card the pad sits under.",
+          "type": "string"
+        },
+        {
+          "const": "resume",
+          "description": "Start whatever the host played last, like the keyboard's Play key —\nfor the jukebox when nothing is on yet. Never pauses.",
+          "type": "string"
+        }
+      ]
+    },
+    "NowPlaying": {
+      "description": "Music playing on the host machine, from whatever the person who's hosting\nalready had on — Spotify, Apple Music — read straight off the OS.\n\nThe party's music is part of the evening, not part of any game: somebody\nputs a record on before the first match and it runs all night. Showing it\nin the lobby (and letting anyone with a controller skip a track they hate)\nmeans nobody has to walk to the host's laptop, which is the only reason\nthat laptop's owner ends up being the evening's DJ.\n\nAbsent from the snapshot entirely when nothing is on — see\n`PartySnapshot::now_playing`.",
+      "properties": {
+        "artist": {
+          "description": "Empty when the source doesn't know one (a podcast, a local file with\nno tags) — screens should just show the title alone.",
+          "type": "string"
+        },
+        "playing": {
+          "description": "Whether it's actually making sound right now. A paused track still\nappears, so the pad that paused it is also the pad that resumes it.",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "Which app it's coming from (\"Spotify\"), so a screen can say where to\ngo when the party wants something this control surface can't do.",
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "playing",
+        "source"
+      ],
+      "type": "object"
+    },
+    "PartySnapshot": {
+      "description": "The one big object overlays render from. Sent whenever anything changes.",
+      "properties": {
+        "active_session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "companions": {
+          "description": "Phone screens declared by connected games (see [`CompanionScreen`]).",
+          "items": {
+            "$ref": "#/$defs/CompanionScreen"
+          },
+          "type": "array"
+        },
+        "connected_games": {
+          "default": [],
+          "description": "Titles whose process is currently connected (playable right now).",
+          "items": {
+            "$ref": "#/$defs/GameId"
+          },
+          "type": "array"
+        },
+        "game_issues": {
+          "description": "Stopped processes awaiting an explicit retry. Takes precedence over\nwarming/loading hints. Runtime-owned, including failures before hello.",
+          "items": {
+            "$ref": "#/$defs/GameIssue"
+          },
+          "type": "array"
+        },
+        "history": {
+          "description": "Games already played tonight, oldest first.",
+          "items": {
+            "$ref": "#/$defs/GameId"
+          },
+          "type": "array"
+        },
+        "installs": {
+          "description": "Games arriving in the background right now, most interesting first\n(whatever is actually downloading leads). Empty once everything the\nparty might want is on disk.\n\nSeparate from `library`: these aren't playable yet, and showing them\nas shelf entries would offer the party something it can't have.",
+          "items": {
+            "$ref": "#/$defs/InstallStatus"
+          },
+          "type": "array"
+        },
+        "library": {
+          "default": [],
+          "description": "The game shelf: every title the daemon knows, with cover art metadata.",
+          "items": {
+            "$ref": "#/$defs/GameMeta"
+          },
+          "type": "array"
+        },
+        "lobbies": {
+          "description": "Lobbies this host can switch to with `switch_lobby`, the running one\nmarked `current`. Empty when the host cannot switch (development runs).",
+          "items": {
+            "$ref": "#/$defs/LobbyChoice"
+          },
+          "type": "array"
+        },
+        "next_game_index": {
+          "description": "Exact upcoming playlist occurrence, including while its process launches.\nOlder hosts omit this; game IDs alone cannot distinguish duplicate entries.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "now_playing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NowPlaying"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the host has on in the background, if anything.\n\n`None` is the normal case — most nights nobody has music running, and\na lobby that shows an empty music card on those nights is worse than\none that shows none at all. Screens render this only when it's `Some`."
+        },
+        "onboarding_error": {
+          "description": "Host-owned failure of a requested first game. Cleared when resolved or\nanother game is chosen; never creates a synthetic library entry.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "overlay_open": {
+          "default": false,
+          "description": "Whether the party overlay is up. Opening it pauses the active game;\nserver-authoritative so every screen agrees.",
+          "type": "boolean"
+        },
+        "phones": {
+          "description": "Players with a phone linked to them, whichever way it joined. Games\nthat need phones count these (see [`PlayWith`]). A seat with a phone\nand no controller is a phone-only player.",
+          "items": {
+            "$ref": "#/$defs/PlayerId"
+          },
+          "type": "array"
+        },
+        "players": {
+          "items": {
+            "$ref": "#/$defs/Player"
+          },
+          "type": "array"
+        },
+        "playlist": {
+          "$ref": "#/$defs/PlaylistSnapshot"
+        },
+        "presence": {
+          "items": {
+            "$ref": "#/$defs/PlayerPresence"
+          },
+          "type": "array"
+        },
+        "seats": {
+          "items": {
+            "$ref": "#/$defs/Seat"
+          },
+          "type": "array"
+        },
+        "settings": {
+          "description": "Match settings per game: what each title lets the party tweak, and\nthe current values. Only games that declared settings appear.",
+          "items": {
+            "$ref": "#/$defs/GameSettings"
+          },
+          "type": "array"
+        },
+        "update_ready": {
+          "description": "A newer version of the host app is downloaded and can be applied\nwith `apply_update` between games. The value is its version.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vote": {
+          "$ref": "#/$defs/VoteSnapshot"
+        },
+        "warm_session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionInfo"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "warming": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlaylistEntry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The game the daemon intends to have warm next, even before a session\nfor it exists — while its process is still launching, say.\n\nWithout this a screen can only see `warm_session`, so \"still starting\"\nand \"nothing to play\" look identical, and guessing from the playlist\ngets it wrong: the obvious guess is the first entry, which may be the\ngame that's already running."
+        }
+      },
+      "required": [
+        "players",
+        "seats",
+        "playlist",
+        "history",
+        "vote"
+      ],
+      "type": "object"
+    },
+    "PerformanceSample": {
+      "description": "Optional cumulative application-frame diagnostics for this session.\nMeasure active frames only. Never send serial numbers, paths or machine names.",
+      "properties": {
+        "cpu": {
+          "default": "",
+          "type": "string"
+        },
+        "elapsed_us": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "frames": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "gpu": {
+          "default": "",
+          "type": "string"
+        },
+        "height": {
+          "default": 0,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max_frame_us": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "memory_mib": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "os": {
+          "default": "",
+          "type": "string"
+        },
+        "slow_frames": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "width": {
+          "default": 0,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "frames",
+        "elapsed_us",
+        "slow_frames",
+        "max_frame_us"
+      ],
+      "type": "object"
+    },
+    "PlayWith": {
+      "description": "What a player needs in hand to play a game. A phone counts once its owner\nhas linked it to their player (`PartySnapshot::phones`).",
+      "oneOf": [
+        {
+          "const": "controller",
+          "description": "A controller. Phones may still open the game's phone screen.",
+          "type": "string"
+        },
+        {
+          "const": "phone",
+          "description": "A phone; controllers are not needed (cards, trading, private choices).",
+          "type": "string"
+        },
+        {
+          "const": "controller_and_phone",
+          "description": "A controller and a phone each.",
+          "type": "string"
+        },
+        {
+          "const": "controller_or_phone",
+          "description": "Either: asymmetric games where some play on a phone, the rest on a\ncontroller. Pair with `min_phones`.",
+          "type": "string"
+        }
+      ]
+    },
+    "Player": {
+      "properties": {
+        "avatar": {
+          "description": "Pixel art the player drew for themselves in the studio.\n\nOpaque on the wire so the encoding can evolve without a protocol\nbump — decode it with [`Avatar::parse`] rather than reading the\nstring directly, and games get RGBA they can upload as a texture.\nSee the [`avatar`] module for the format.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "color": {
+          "description": "Game-controlled clothing/team colour (`#rrggbb`). Games may override\nit without changing the personal `skin_color` preference.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/PlayerId"
+        },
+        "library": {
+          "description": "Games owned in this player's profile library, shared with the party.",
+          "items": {
+            "$ref": "#/$defs/GameId"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "skin_color": {
+          "description": "Personal skin colour (#rrggbb), independent of game/team clothing colours.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "PlayerId": {
+      "description": "A player in the party. Stable for the lifetime of the party, across games.",
+      "type": "string"
+    },
+    "PlayerPresence": {
+      "properties": {
+        "player_id": {
+          "$ref": "#/$defs/PlayerId"
+        },
+        "state": {
+          "$ref": "#/$defs/PresenceState"
+        }
+      },
+      "required": [
+        "player_id",
+        "state"
+      ],
+      "type": "object"
+    },
+    "PlaylistEntry": {
+      "properties": {
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "game",
+        "title"
+      ],
+      "type": "object"
+    },
+    "PlaylistSnapshot": {
+      "properties": {
+        "current": {
+          "description": "Index of the entry the *active* session is playing, if any.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/PlaylistEntry"
+          },
+          "type": "array"
+        },
+        "queued": {
+          "default": 0,
+          "description": "How many entries right after `current` players queued themselves, in\nthe order they asked. Everything after those is autoplay: games the\nhost recommends so the queue never runs dry.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "entries"
+      ],
+      "type": "object"
+    },
+    "Playtest": {
+      "description": "One game's playtest, as the cloud's room poll hands it to a host.",
+      "properties": {
+        "entry": {
+          "description": "The catalogue entry for the preview build, downloads included."
+        },
+        "grant": {
+          "description": "Unlocks this game's preview downloads. A secret: never log it.",
+          "type": "string"
+        },
+        "versions": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "The preview's version on each platform, for the shelf.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "entry",
+        "grant"
+      ],
+      "type": "object"
+    },
+    "PresenceState": {
+      "description": "Presence is separate from identity: sleeping never releases a seat.",
+      "enum": [
+        "active",
+        "warning",
+        "sleeping"
+      ],
+      "type": "string"
+    },
+    "Role": {
+      "description": "The role a connection announces in its `hello`.",
+      "oneOf": [
+        {
+          "const": "game",
+          "description": "A game process (via an SDK). Receives session lifecycle commands.",
+          "type": "string"
+        },
+        {
+          "const": "lobby",
+          "description": "The configured replacement lobby. Uses one authenticated connection\nfor party commands, snapshots, focus and runtime-owned input.",
+          "type": "string"
+        },
+        {
+          "const": "overlay",
+          "description": "An overlay / controller UI. Receives party snapshots, sends commands.",
+          "type": "string"
+        }
+      ]
+    },
+    "Seat": {
+      "description": "A playable position. Seat indices are stable across games so player 2 stays\nplayer 2 all night.",
+      "properties": {
+        "controller": {
+          "description": "Opaque platform hint (e.g. `\"xinput:0\"`). Games should not need it; the\ndaemon owns input routing.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "index": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "occupant": {
+          "$ref": "#/$defs/SeatOccupant"
+        }
+      },
+      "required": [
+        "index",
+        "occupant"
+      ],
+      "type": "object"
+    },
+    "SeatOccupant": {
+      "description": "Who (or what) fills a seat. Games receive seats, never raw controller ids.",
+      "oneOf": [
+        {
+          "description": "A player on this machine.",
+          "properties": {
+            "kind": {
+              "const": "local",
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            }
+          },
+          "required": [
+            "kind",
+            "player_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A player connected over the network (future phase, already on the wire).",
+          "properties": {
+            "kind": {
+              "const": "remote",
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            }
+          },
+          "required": [
+            "kind",
+            "player_id"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A bot fills the seat.",
+          "properties": {
+            "kind": {
+              "const": "ai",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nobody. Games may hide or skip empty seats.",
+          "properties": {
+            "kind": {
+              "const": "empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ServerMessage": {
+      "oneOf": [
+        {
+          "description": "Full controller snapshot, including neutral/released state.",
+          "properties": {
+            "controllers": {
+              "items": {
+                "$ref": "#/$defs/ControllerState"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "controller_frame",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "controllers"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Full authoritative roster/presence for an opted-in session. Apply without\nresetting the match. Unknown fields/messages remain optional for old games.",
+          "properties": {
+            "players": {
+              "items": {
+                "$ref": "#/$defs/Player"
+              },
+              "type": "array"
+            },
+            "presence": {
+              "items": {
+                "$ref": "#/$defs/PlayerPresence"
+              },
+              "type": "array"
+            },
+            "seats": {
+              "items": {
+                "$ref": "#/$defs/Seat"
+              },
+              "type": "array"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "party_updated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "seats",
+            "players",
+            "presence"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Reply to `hello`.",
+          "properties": {
+            "godot_sdk": {
+              "default": 0,
+              "description": "The Godot addon version this host ships; older copies warn.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "party": {
+              "$ref": "#/$defs/PartySnapshot"
+            },
+            "protocol_version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "welcome",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "protocol_version",
+            "party"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Broadcast to overlays whenever party state changes.",
+          "properties": {
+            "party": {
+              "$ref": "#/$defs/PartySnapshot"
+            },
+            "type": {
+              "const": "party_state",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "party"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Warm up: load assets, map the given seats, then reply `ready`.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "players": {
+              "items": {
+                "$ref": "#/$defs/Player"
+              },
+              "type": "array"
+            },
+            "seats": {
+              "items": {
+                "$ref": "#/$defs/Seat"
+              },
+              "type": "array"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "prepare",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "game",
+            "seats",
+            "players"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Become the active game *now*. Sent only after `ready`.",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "start",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "pause",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "resume",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Tear everything down; the session id will never be used again.",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "dispose",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sent only to the requesting overlay after an accepted settings batch.\nA host acknowledgement, not proof that a next-round change is in play.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "revision": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "type": {
+              "const": "settings_accepted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "session",
+            "revision"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A match setting changed; sent to the game that declared it. Apply it\nlive if a match is running, otherwise from the next match. Also sent\nafter `declare_settings` for every value the party had already\nchanged from its default (reconnect re-hydration).",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "key": {
+              "type": "string"
+            },
+            "type": {
+              "const": "setting_changed",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SettingValue"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Sent to the persistent lobby game specifically (see\n`GameNight::set_lobby_game`) — `active: false` the moment some other\ngame actually starts, so the lobby can mute itself and step out of\nthe way; `true` once the party's back with nothing else running. Not\nsession-scoped: the lobby never has a tracked session of its own to\nhang this off of.",
+          "properties": {
+            "active": {
+              "type": "boolean"
+            },
+            "type": {
+              "const": "lobby_focus",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "active"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Phone screen traffic. To a game: `player_id` is the phone that sent\n`data`. To overlays: `game` sent it, and `player_id` is the phone it is\nfor (absent means every phone showing that game).",
+          "properties": {
+            "data": true,
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "player_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PlayerId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "const": "companion_message",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "To a game: a player's phone screen connected or went away. A game\nsends that player its current view when `connected` is true.",
+          "properties": {
+            "connected": {
+              "type": "boolean"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "companion_presence",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "connected"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Something was rejected. Informational; connections stay open.",
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "type": {
+              "const": "error",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "message"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SessionDiagnostics": {
+      "properties": {
+        "active_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "paused_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "performance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PerformanceSample"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rounds_reported": {
+          "description": "Number of `finished` reports received, not proof every round was reported.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "active_ms",
+        "paused_ms",
+        "rounds_reported"
+      ],
+      "type": "object"
+    },
+    "SessionId": {
+      "description": "A single playable game instance. Sessions are disposable; ids are not reused.",
+      "type": "string"
+    },
+    "SessionInfo": {
+      "properties": {
+        "diagnostics": {
+          "$ref": "#/$defs/SessionDiagnostics",
+          "default": {
+            "active_ms": 0,
+            "paused_ms": 0,
+            "rounds_reported": 0
+          },
+          "description": "Host lifecycle counters for status displays and diagnostics. Not a rating."
+        },
+        "game": {
+          "$ref": "#/$defs/GameId"
+        },
+        "id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "phase": {
+          "$ref": "#/$defs/SessionPhase"
+        },
+        "progress": {
+          "description": "How far along loading is, 0 to 100, if the game bothers to say.\nOptional on purpose: a game that loads instantly has nothing to\nreport, and screens must stay honest without it (see `Progress`).\n\nWhole percent rather than a fraction — it's what screens display, and\nit keeps every type on the wire comparable.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "progress_label": {
+          "description": "What it's doing right now (\"generating arena\"), if the game says.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "game",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "SessionPhase": {
+      "description": "Session lifecycle. Legal transitions are enforced by `gamenight-core`.",
+      "enum": [
+        "created",
+        "preparing",
+        "ready",
+        "running",
+        "paused",
+        "finished",
+        "disposed"
+      ],
+      "type": "string"
+    },
+    "SettingKind": {
+      "description": "What kind of knob a setting is, its default, and what values it accepts.\nFlattened into [`SettingSpec`] on the wire (`\"kind\": \"toggle\"`, …).",
+      "oneOf": [
+        {
+          "description": "On/off.",
+          "properties": {
+            "default": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "toggle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "default"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An integer in `min..=max` (stock count, time limit, score cap).",
+          "properties": {
+            "default": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "const": "number",
+              "type": "string"
+            },
+            "max": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "min": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "default",
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One of a fixed set of options (arena, game mode).",
+          "properties": {
+            "default": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "choice",
+              "type": "string"
+            },
+            "options": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "default",
+            "options"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SettingSpec": {
+      "description": "One knob a game exposes to the party.",
+      "oneOf": [
+        {
+          "description": "On/off.",
+          "properties": {
+            "default": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "toggle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "default"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An integer in `min..=max` (stock count, time limit, score cap).",
+          "properties": {
+            "default": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "kind": {
+              "const": "number",
+              "type": "string"
+            },
+            "max": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "min": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "kind",
+            "default",
+            "min",
+            "max"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One of a fixed set of options (arena, game mode).",
+          "properties": {
+            "default": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "choice",
+              "type": "string"
+            },
+            "options": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "default",
+            "options"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "description": {
+          "description": "What the knob does — worth writing well: this is what overlays show\nand what an LLM reads to map \"disable items\" onto a key.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key": {
+          "description": "Stable identifier (`\"items\"`, `\"stock\"`). Unique within the game.",
+          "type": "string"
+        },
+        "label": {
+          "description": "Human-readable name (`\"Items\"`, `\"Stock count\"`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "label"
+      ],
+      "type": "object"
+    },
+    "SettingValue": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "format": "int64",
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A match-setting value on the wire: plain JSON scalars, no tagging."
+    },
+    "SettingsAction": {
+      "enum": [
+        "set",
+        "undo",
+        "keep"
+      ],
+      "type": "string"
+    },
+    "VoteOption": {
+      "description": "End-of-game options players stand on with their avatars.",
+      "enum": [
+        "replay",
+        "skip",
+        "next_game",
+        "quit"
+      ],
+      "type": "string"
+    },
+    "VoteSnapshot": {
+      "properties": {
+        "decided": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VoteOption"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set once consensus is reached; cleared when the next vote opens."
+        },
+        "open": {
+          "default": false,
+          "description": "Whether the party is currently being asked to choose.\n\nWithout this, a screen cannot tell \"waiting for you to vote\" from\n\"nothing happening\": after a game finishes the night stops until the\nseated players pick, and a lobby with no way to say so just looks\nstuck.",
+          "type": "boolean"
+        },
+        "positions": {
+          "description": "Which option each player currently stands on.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "$ref": "#/$defs/PlayerId"
+              },
+              {
+                "$ref": "#/$defs/VoteOption"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "positions"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://github.com/ontola/gamenight/blob/main/contract/protocol.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/ClientMessage"
+    },
+    {
+      "$ref": "#/$defs/ServerMessage"
+    }
+  ],
+  "description": "One JSON object per WebSocket text frame, tagged by \"type\". Generated from crates/gamenight-protocol; do not edit.",
+  "title": "GameNight wire protocol",
+  "x-gamenight-constants": {
+    "artwork": {
+      "ARTWORK_MAX_DIMENSION": 1024,
+      "ARTWORK_MAX_PNG_BYTES": 262144,
+      "ARTWORK_PNG_PREFIX": "data:image/png;base64,"
+    },
+    "avatar": {
+      "AVATAR_FORMAT_VERSION": 1,
+      "AVATAR_HEAD_RADIUS": 12,
+      "AVATAR_HEAD_X": 24,
+      "AVATAR_HEAD_Y": 28,
+      "AVATAR_LEGACY_TRANSPARENT": "#0f172a",
+      "AVATAR_MAX_SIDE": 256,
+      "AVATAR_SIZE": 48,
+      "GUEST_COLORS": [
+        "#4daf7c",
+        "#e36c76",
+        "#648cdd",
+        "#d7ad43",
+        "#a67bdd",
+        "#49b8bc",
+        "#d88950",
+        "#cf7aaf"
+      ],
+      "GUEST_SKINS": [
+        "#f5e9be",
+        "#efc39a",
+        "#d99b72",
+        "#bf855b",
+        "#905c40",
+        "#654332"
+      ]
+    },
+    "env": {
+      "ENV_ADDR": "GAMENIGHT_ADDR",
+      "ENV_GAMENIGHT": "GAMENIGHT",
+      "ENV_GAME_ID": "GAMENIGHT_GAME_ID",
+      "ENV_OVERLAY_URL": "GAMENIGHT_OVERLAY_URL",
+      "ENV_TOKEN": "GAMENIGHT_TOKEN"
+    },
+    "protocol": {
+      "DEFAULT_ADDR": "127.0.0.1:7912",
+      "DEFAULT_WEB_PORT": 7913,
+      "GODOT_SDK_VERSION": 2,
+      "PROTOCOL_VERSION": 1
+    }
+  },
+  "x-gamenight-messages": {
+    "client": {
+      "$ref": "#/$defs/ClientMessage"
+    },
+    "server": {
+      "$ref": "#/$defs/ServerMessage"
+    }
+  }
+}

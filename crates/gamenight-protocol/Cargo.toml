@@ -6,8 +6,18 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+# Derives JSON Schema for every wire type. contract/protocol.schema.json is
+# built from it, and scripts/build-protocol.py builds the SDK bindings from that.
+schema = ["dep:schemars"]
+
 [dependencies]
 base64 = "0.22"
+schemars = { version = "1.2.1", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }
+
+[dev-dependencies]
+# Tests always see the schema, so the committed copy is checked by `cargo test`.
+gamenight-protocol = { path = ".", features = ["schema"] }

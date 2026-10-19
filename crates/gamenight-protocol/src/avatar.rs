@@ -41,13 +41,25 @@ pub struct Avatar {
     pub pixels: Vec<Option<[u8; 3]>>,
 }
 
+/// The `v` the current encoding writes.
+pub const FORMAT_VERSION: u32 = 1;
+
+/// The studio canvas: avatars are drawn at this size (older 16 and 32 px art
+/// is centred into it by [`Avatar::head_layout`]).
+pub const SIZE: u32 = 48;
+
 /// The colour the original studio build used for "empty". Retained only to
 /// decode avatars saved before transparency was explicit.
-const LEGACY_TRANSPARENT: &str = "#0f172a";
+pub const LEGACY_TRANSPARENT: &str = "#0f172a";
 
 /// Guard against a hostile or corrupt payload allocating unbounded memory.
 /// Avatars are hand-drawn in a small grid; anything larger is not one.
-const MAX_SIDE: u32 = 256;
+pub const MAX_SIDE: u32 = 256;
+
+/// Where the head sits on the [`SIZE`] canvas, and its radius, in pixels.
+pub const HEAD_X: u32 = 24;
+pub const HEAD_Y: u32 = 28;
+pub const HEAD_RADIUS: u32 = 12;
 
 #[derive(Serialize, Deserialize)]
 struct Encoded {
@@ -72,14 +84,14 @@ impl Avatar {
         let offset = |size: u32, small: f32| match size {
             32 => small,
             16 => small + 8.0,
-            _ => (48.0 - size as f32) / 2.0,
+            _ => (SIZE as f32 - size as f32) / 2.0,
         };
         HeadLayout {
             center: [
-                24.0 - offset(self.width, 14.0),
-                28.0 - offset(self.height, 15.0),
+                HEAD_X as f32 - offset(self.width, 14.0),
+                HEAD_Y as f32 - offset(self.height, 15.0),
             ],
-            radius: 12.0,
+            radius: HEAD_RADIUS as f32,
         }
     }
 
@@ -96,7 +108,7 @@ impl Avatar {
 
     fn parse_v1(data: &str) -> Option<Self> {
         let enc: Encoded = serde_json::from_str(data).ok()?;
-        if enc.v != 1 {
+        if enc.v != FORMAT_VERSION {
             return None;
         }
         Self::build(enc.w, enc.h, enc.px.iter().map(|p| p.as_deref()))
@@ -150,7 +162,7 @@ impl Avatar {
     /// Encode in the current format.
     pub fn encode(&self) -> String {
         let enc = Encoded {
-            v: 1,
+            v: FORMAT_VERSION,
             w: self.width,
             h: self.height,
             px: self

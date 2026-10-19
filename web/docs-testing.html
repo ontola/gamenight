@@ -174,7 +174,16 @@ with FakeHost(&quot;godot&quot;, game_id=&quot;my-game&quot;, path=&quot;.&quot;
     host.hold(frame(BUTTON_A), 0.1)
     host.saw(&quot;jump Ada&quot;)   # a line your game printed with GAME_TRACE=1
 </code></pre></div>
-<p>Pass <code>pack=</code> to run the exported game.</p>
+<p>Pass <code>pack=</code> to run the exported game, or <code>command=</code> to start it another
+way (a packaged <code>.exe</code>, a launcher, a window). <code>host.disconnect()</code> plays a
+GameNight that goes away; <code>host.exit_code()</code> then checks the game quit
+cleanly. <code>HostClient</code> connects to a real GameNight as the overlay does.</p>
+</li>
+<li>
+<p><strong>Install Godot the same way everywhere.</strong> In GitHub Actions use
+<code>ontola/gamenight/.github/actions/setup-godot@main</code> with your project's
+<code>version</code>; it verifies the download's sha256, works on Linux and Windows,
+and with <code>export-templates</code> installs the templates an export needs.</p>
 </li>
 <li>
 <p><strong>Keep sending frames.</strong> Input older than 250 ms counts as released, so a
@@ -211,7 +220,7 @@ connection order, a pad unplugged and plugged back in, repeated Back and
 Resume, and several game switches. Tuning against bots alone misses how the
 controls feel.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="ec40c7afd5cdd4e40f6f8206ee688152c9c5b7249d305cf45c9eededad47cc7f">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="5acc80b28f5c052a64960060033edff2e96b6ba1a7aa3545bdbc95c574c07f6e">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/performance"><small>Previous</small>Performance</a><a href="/docs/publishing"><small>Next</small>Publish a game</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a><a href="#your-games-own-tests">Your game&#x27;s own tests</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

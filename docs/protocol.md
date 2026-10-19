@@ -10,6 +10,16 @@ lifecycle in build order and links the checks and runnable examples. The
 canonical type definitions live in
 [`crates/gamenight-protocol`](../crates/gamenight-protocol/src/lib.rs).
 
+The same types, as one machine-readable JSON Schema with every message tag,
+field, enum value and protocol constant, are in
+[`contract/protocol.schema.json`](../contract/protocol.schema.json). The SDK
+bindings are generated from it by `scripts/build-protocol.py`: `GN_MSG_*` in
+`sdk/c/gamenight.h`, `protocol.gd` in the Godot addon,
+[`sdk/js/protocol.mjs`](../sdk/js/protocol.mjs),
+[`sdk/python/gamenight_protocol.py`](../sdk/python/gamenight_protocol.py) and
+`mobile/lib/protocol.g.dart`. Use one of them, or the schema, rather than
+retyping tag strings.
+
 ## Transport
 
 The daemon listens on one port (default `127.0.0.1:7912`) and accepts two

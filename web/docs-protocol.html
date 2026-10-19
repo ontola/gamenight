@@ -18,6 +18,15 @@ start with <a href="/docs/lifecycle">Integrating your game</a></strong> — it w
 lifecycle in build order and links the checks and runnable examples. The
 canonical type definitions live in
 <a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs"><code>crates/gamenight-protocol</code></a>.</p>
+<p>The same types, as one machine-readable JSON Schema with every message tag,
+field, enum value and protocol constant, are in
+<a href="https://github.com/ontola/gamenight/blob/main/contract/protocol.schema.json"><code>contract/protocol.schema.json</code></a>. The SDK
+bindings are generated from it by <code>scripts/build-protocol.py</code>: <code>GN_MSG_*</code> in
+<code>sdk/c/gamenight.h</code>, <code>protocol.gd</code> in the Godot addon,
+<a href="https://github.com/ontola/gamenight/blob/main/sdk/js/protocol.mjs"><code>sdk/js/protocol.mjs</code></a>,
+<a href="https://github.com/ontola/gamenight/blob/main/sdk/python/gamenight_protocol.py"><code>sdk/python/gamenight_protocol.py</code></a> and
+<code>mobile/lib/protocol.g.dart</code>. Use one of them, or the schema, rather than
+retyping tag strings.</p>
 <h2 id="transport">Transport</h2>
 <p>The daemon listens on one port (default <code>127.0.0.1:7912</code>) and accepts two
 framings of the same protocol. It tells them apart from the first four bytes
@@ -954,7 +963,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="1afd2beb1b2b70a5a0e478dbc155e64d27a8729767dc3c628cbe38d518934777">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="d4bdac85ed55a9cced828f3731d2f8841c407f454d655159140b10bbafd849ba">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

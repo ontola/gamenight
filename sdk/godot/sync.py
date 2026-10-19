@@ -10,8 +10,9 @@ differs, so a game's CI notices the moment the SDK moves on.
     python sdk/godot/sync.py --check path/to/game    # fail if it differs
     python sdk/godot/sync.py --all path/to/game      # also add optional files
 
-`gamenight.gd` is required. The other scripts are optional: a game that only
-vendors `gamenight.gd` keeps it that way unless --all is given. A game's own
+`gamenight.gd` and `protocol.gd` (its message tags and constants, generated
+by scripts/build-protocol.py) are required. The other scripts are optional: a
+game that only vendors those keeps it that way unless --all is given. A game's own
 `.uid` files are kept, because its scenes and autoloads may refer to them.
 """
 import argparse
@@ -20,7 +21,7 @@ import sys
 from pathlib import Path
 
 SDK = Path(__file__).resolve().parent / "addons" / "gamenight"
-REQUIRED = ["gamenight.gd"]
+REQUIRED = ["gamenight.gd", "protocol.gd"]
 OPTIONAL = ["screen.gd", "lobby.gd", "face.gd", "artwork.gd", "plugin.gd", "plugin.cfg", "fake_host.py"]
 
 

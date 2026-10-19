@@ -1,6 +1,8 @@
 extends Node
 ## Public client for a runtime-selected lobby. No game autoload is needed.
 ## The daemon supplies controller frames and owns players, sessions and input.
+const PROTOCOL := preload("protocol.gd")
+
 signal party_changed(party: Dictionary)
 signal focus_changed(active: bool)
 signal controllers_changed(controllers: Array)
@@ -17,8 +19,8 @@ var _retry_at := 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if not OS.get_environment("GAMENIGHT_GAME_ID").is_empty():
-		lobby_id = OS.get_environment("GAMENIGHT_GAME_ID")
+	if not OS.get_environment(PROTOCOL.ENV_GAME_ID).is_empty():
+		lobby_id = OS.get_environment(PROTOCOL.ENV_GAME_ID)
 	_open()
 
 func _open() -> void:
@@ -27,8 +29,8 @@ func _open() -> void:
 	_socket.inbound_buffer_size = 16 * 1024 * 1024
 	_socket.max_queued_packets = 256
 	_hello = false
-	var address := OS.get_environment("GAMENIGHT_ADDR")
-	if address.is_empty(): address = "127.0.0.1:7912"
+	var address := OS.get_environment(PROTOCOL.ENV_ADDR)
+	if address.is_empty(): address = PROTOCOL.DEFAULT_ADDR
 	if not address.begins_with("ws://") and not address.begins_with("wss://"):
 		address = "ws://" + address
 	_socket.connect_to_url(address)
@@ -41,8 +43,8 @@ func _process(_delta: float) -> void:
 	if _socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
 		if not _hello:
 			_hello = true
-			_send({"type": "hello", "role": "lobby", "game": lobby_id,
-				"token": OS.get_environment("GAMENIGHT_TOKEN")})
+			_send({"type": PROTOCOL.MSG_HELLO, "role": PROTOCOL.ROLE_LOBBY, "game": lobby_id,
+				"token": OS.get_environment(PROTOCOL.ENV_TOKEN)})
 		while _socket.get_available_packet_count() > 0:
 			var message: Variant = JSON.parse_string(_socket.get_packet().get_string_from_utf8())
 			if message is Dictionary: _handle(message)
@@ -57,22 +59,22 @@ func _process(_delta: float) -> void:
 
 func _handle(message: Dictionary) -> void:
 	match message.get("type", ""):
-		"welcome":
+		PROTOCOL.MSG_WELCOME:
 			connected = true
 			connection_changed.emit(true)
 			party = message.get("party", {})
 			party_changed.emit(party)
 			# Let the view build its first frame before accepting screen ownership.
 			await get_tree().process_frame
-			_send({"type": "lobby_ready"})
-		"party_state":
+			_send({"type": PROTOCOL.MSG_LOBBY_READY})
+		PROTOCOL.MSG_PARTY_STATE:
 			party = message.get("party", {})
 			party_changed.emit(party)
-		"lobby_focus":
+		PROTOCOL.MSG_LOBBY_FOCUS:
 			active = message.get("active", false)
 			focus_changed.emit(active)
-		"controller_frame": controllers_changed.emit(message.get("controllers", []))
-		"error": rejected.emit(message.get("message", "The request could not be completed."))
+		PROTOCOL.MSG_CONTROLLER_FRAME: controllers_changed.emit(message.get("controllers", []))
+		PROTOCOL.MSG_ERROR: rejected.emit(message.get("message", "The request could not be completed."))
 
 func _send(message: Dictionary) -> void:
 	if _socket != null and _socket.get_ready_state() == WebSocketPeer.STATE_OPEN:
@@ -86,12 +88,12 @@ func _command(message: Dictionary) -> void:
 	# must echo the host's integer cursor, otherwise serde rejects e.g. 3.0.
 	# Copy only this command payload; never mutate the received party state or
 	# coerce unrelated numeric game settings.
-	if message.get("type") in ["remove_playlist_entry", "move_playlist_entry"]:
+	if message.get("type") in [PROTOCOL.MSG_REMOVE_PLAYLIST_ENTRY, PROTOCOL.MSG_MOVE_PLAYLIST_ENTRY]:
 		message = message.duplicate(true)
 		var expected: Dictionary = message.get("expected", {})
 		if expected.get("current") != null:
 			expected["current"] = int(expected["current"])
-	if message.get("type") in ["next", "play_next", "close_overlay"]: _allow_game_foreground()
+	if message.get("type") in [PROTOCOL.MSG_NEXT, PROTOCOL.MSG_PLAY_NEXT, PROTOCOL.MSG_CLOSE_OVERLAY]: _allow_game_foreground()
 	_send(message)
 
 ## Windows keeps a background process from taking focus unless the foreground
@@ -105,39 +107,39 @@ func _allow_game_foreground() -> void:
 	OS.execute(helper, ["--allow-foreground"])
 
 func join_guest(name: String) -> void:
-	_command({"type": "join_party", "name": name})
+	_command({"type": PROTOCOL.MSG_JOIN_PARTY, "name": name})
 
 func leave(player_id: String) -> void:
-	_command({"type": "leave_party", "player_id": player_id})
+	_command({"type": PROTOCOL.MSG_LEAVE_PARTY, "player_id": player_id})
 
 func play(game_id: String) -> void:
-	_command({"type": "play_next", "game": game_id})
+	_command({"type": PROTOCOL.MSG_PLAY_NEXT, "game": game_id})
 
 func queue_game(game_id: String, first: bool = false) -> void:
-	_command({"type": "queue_game", "game": game_id, "first":first})
+	_command({"type": PROTOCOL.MSG_QUEUE_GAME, "game": game_id, "first":first})
 
 func start_next() -> void:
-	_command({"type":"next"})
+	_command({"type":PROTOCOL.MSG_NEXT})
 
 func resume_game() -> void:
 	# Close only the pause caused by opening the lobby.
-	_command({"type": "close_overlay"})
+	_command({"type": PROTOCOL.MSG_CLOSE_OVERLAY})
 
 func open_lobby() -> void:
-	_command({"type": "open_overlay"})
+	_command({"type": PROTOCOL.MSG_OPEN_OVERLAY})
 
 func quit_party() -> void:
-	_command({"type": "quit_party"})
+	_command({"type": PROTOCOL.MSG_QUIT_PARTY})
 
 func set_setting(game_id: String, key: String, value: Variant) -> void:
-	_command({"type": "set_setting", "game": game_id, "key": key, "value": value})
+	_command({"type": PROTOCOL.MSG_SET_SETTING, "game": game_id, "key": key, "value": value})
 
 func media_control(action: String) -> void:
 	if action in ["play_pause", "previous_track", "next_track", "resume"]:
-		_command({"type":"media_control", "action":action})
+		_command({"type":PROTOCOL.MSG_MEDIA_CONTROL, "action":action})
 
 func remove_from_queue(index: int) -> void:
-	_command({"type":"remove_playlist_entry", "expected":party.get("playlist", {}), "index":index})
+	_command({"type":PROTOCOL.MSG_REMOVE_PLAYLIST_ENTRY, "expected":party.get("playlist", {}), "index":index})
 
 func move_in_queue(from: int, to: int) -> void:
-	_command({"type":"move_playlist_entry", "expected":party.get("playlist", {}), "from":from, "to":to})
+	_command({"type":PROTOCOL.MSG_MOVE_PLAYLIST_ENTRY, "expected":party.get("playlist", {}), "from":from, "to":to})

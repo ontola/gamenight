@@ -6,19 +6,27 @@
 import 'dart:convert';
 import 'dart:math';
 
-const int gridSize = 48;
+import 'protocol.g.dart' as protocol;
+
+const int gridSize = protocol.avatarSize;
 
 /// Head anchor shared with `Avatar::head_layout` and shared/face.lua.
-const int headX = 24, headY = 28, headRadius = 12;
+const int headX = protocol.avatarHeadX,
+    headY = protocol.avatarHeadY,
+    headRadius = protocol.avatarHeadRadius;
 
-const String _legacyTransparent = '#0f172a';
+const String _legacyTransparent = protocol.avatarLegacyTransparent;
 
 typedef Pixels = List<String?>;
 
 Pixels emptyFace() => List<String?>.filled(gridSize * gridSize, null);
 
-String encodeAvatar(Pixels px) =>
-    jsonEncode({'v': 1, 'w': gridSize, 'h': gridSize, 'px': px});
+String encodeAvatar(Pixels px) => jsonEncode({
+      'v': protocol.avatarFormatVersion,
+      'w': gridSize,
+      'h': gridSize,
+      'px': px,
+    });
 
 /// Decodes any avatar the studio ever saved, centring older 16px and 32px
 /// drawings the same way the web studio does. Returns null when unreadable.
@@ -30,7 +38,7 @@ Pixels? decodeAvatar(String? text) {
       return _normalize(
           o.map((c) => c == _legacyTransparent ? null : c as String?).toList());
     }
-    if (o is Map && o['v'] == 1) {
+    if (o is Map && o['v'] == protocol.avatarFormatVersion) {
       final px = (o['px'] as List).map((c) => c as String?).toList();
       return _normalize(px, o['w'] as int?, o['h'] as int?);
     }

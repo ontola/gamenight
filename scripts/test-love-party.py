@@ -7,6 +7,10 @@ import socket
 import subprocess
 import time
 import select
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "sdk/python"))
+import gamenight_protocol as P  # noqa: E402  (generated from contract/protocol.schema.json)
 
 
 def main():
@@ -27,9 +31,9 @@ def main():
             server.bind(("127.0.0.1", 0))
             server.listen()
             server.settimeout(5)
-            env = {**os.environ, "GAMENIGHT": "1", "GAMENIGHT_GAME_ID": game,
-                   "GAMENIGHT_TOKEN": "fixture-token", "GNLOVE_HEADLESS": "1",
-                   "GAMENIGHT_ADDR": f"127.0.0.1:{server.getsockname()[1]}"}
+            env = {**os.environ, P.ENV_GAMENIGHT: "1", P.ENV_GAME_ID: game,
+                   P.ENV_TOKEN: "fixture-token", "GNLOVE_HEADLESS": "1",
+                   P.ENV_ADDR: f"127.0.0.1:{server.getsockname()[1]}"}
             env.pop("GNLOVE_TEST", None)
             if args.continuous: env["GNLOVE_MATCH_SECONDS"] = "1"
             child = subprocess.Popen([args.love, str((args.pack / f"{game}.love").resolve())],
@@ -39,42 +43,42 @@ def main():
                     peer.settimeout(5)
                     with peer.makefile("rwb", buffering=0) as stream:
                         hello = json.loads(stream.readline())
-                        assert hello["type"] == "hello" and hello["game"] == game and hello["token"] == "fixture-token"
-                        stream.write((json.dumps({"type": "welcome", "protocol_version": 1})+"\n").encode())
+                        assert hello["type"] == P.MSG_HELLO and hello["game"] == game and hello["token"] == "fixture-token"
+                        stream.write((json.dumps({"type": P.MSG_WELCOME, "protocol_version": P.PROTOCOL_VERSION})+"\n").encode())
                         declaration = json.loads(stream.readline())
-                        assert declaration.get("type") == "declare_settings" and declaration.get("settings"), declaration
+                        assert declaration.get("type") == P.MSG_DECLARE_SETTINGS and declaration.get("settings"), declaration
                         specs = declaration["settings"]
                         assert len({s["key"] for s in specs}) == len(specs), "duplicate setting keys"
                         for spec in specs:
-                            value = (not spec["default"] if spec["kind"] == "toggle" else
-                                     spec["options"][-1] if spec["kind"] == "choice" else spec["min"])
-                            stream.write((json.dumps({"type":"setting_changed", "key":spec["key"], "value":value})+"\n").encode())
-                        stream.write((json.dumps({"type": "prepare", "game": game, "session": "session-one",
-                                                   "seats": [{"index": 0, "occupant": {"kind": "ai"}},
-                                                             {"index": 2, "occupant": {"kind": "ai"}}], "players": []})+"\n").encode())
+                            value = (not spec["default"] if spec["kind"] == P.SETTING_KIND_TOGGLE else
+                                     spec["options"][-1] if spec["kind"] == P.SETTING_KIND_CHOICE else spec["min"])
+                            stream.write((json.dumps({"type": P.MSG_SETTING_CHANGED, "key":spec["key"], "value":value})+"\n").encode())
+                        stream.write((json.dumps({"type": P.MSG_PREPARE, "game": game, "session": "session-one",
+                                                   "seats": [{"index": 0, "occupant": {"kind": P.SEAT_OCCUPANT_AI}},
+                                                             {"index": 2, "occupant": {"kind": P.SEAT_OCCUPANT_AI}}], "players": []})+"\n").encode())
                         reply = json.loads(stream.readline())
-                        while reply.get("type") in ("participation", "declare_settings"):
-                            if reply["type"] == "participation": assert reply["session"] == "session-one"
+                        while reply.get("type") in (P.MSG_PARTICIPATION, P.MSG_DECLARE_SETTINGS):
+                            if reply["type"] == P.MSG_PARTICIPATION: assert reply["session"] == "session-one"
                             reply = json.loads(stream.readline())
-                        assert reply == {"type": "ready", "session": "session-one"}, reply
-                        stream.write(b'{"type":"start","session":"session-one"}\n')
+                        assert reply == {"type": P.MSG_READY, "session": "session-one"}, reply
+                        stream.write((json.dumps({"type": P.MSG_START, "session": "session-one"})+"\n").encode())
                         if args.continuous:
                             def round_finished():
                                 deadline = time.monotonic() + 10
                                 while time.monotonic() < deadline:
                                     peer.settimeout(max(.1, deadline - time.monotonic()))
                                     message = json.loads(stream.readline())
-                                    if message["type"] == "finished":
+                                    if message["type"] == P.MSG_FINISHED:
                                         assert message["session"] == "session-one"
                                         return
-                                    assert message["type"] == "controller_input", message
+                                    assert message["type"] == P.MSG_CONTROLLER_INPUT, message
                                 raise AssertionError("round did not finish")
                             round_finished()
-                            stream.write(b'{"type":"pause","session":"session-one"}\n')
+                            stream.write((json.dumps({"type": P.MSG_PAUSE, "session": "session-one"})+"\n").encode())
                             # Longer than results + another round: paused games must not loop.
                             time.sleep(4.5)
                             assert not select.select([peer], [], [], 0)[0], "game advanced while paused"
-                            stream.write(b'{"type":"resume","session":"session-one"}\n')
+                            stream.write((json.dumps({"type": P.MSG_RESUME, "session": "session-one"})+"\n").encode())
                             round_finished()
                             round_finished()
                             print(f"PASS {game}: three rounds in one session; results pause/resume")

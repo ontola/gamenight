@@ -187,7 +187,8 @@
     "group": "Reference",
     "source": "docs/protocol.md",
     "watch": [
-      "crates/gamenight-protocol/src/lib.rs"
+      "crates/gamenight-protocol/src/lib.rs",
+      "contract/protocol.schema.json"
     ]
   }
 ]

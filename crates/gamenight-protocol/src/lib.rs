@@ -14,6 +14,8 @@ use uuid::Uuid;
 
 pub mod avatar;
 pub mod guest_face;
+#[cfg(feature = "schema")]
+pub mod schema;
 pub use avatar::Avatar;
 
 /// Bumped only on breaking changes. Additive changes (new message types, new
@@ -93,8 +95,9 @@ pub const ENV_OVERLAY_URL: &str = "GAMENIGHT_OVERLAY_URL";
 
 /// A player in the party. Stable for the lifetime of the party, across games.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
-pub struct PlayerId(pub Uuid);
+pub struct PlayerId(#[cfg_attr(feature = "schema", schemars(with = "String"))] pub Uuid);
 
 impl PlayerId {
     pub fn new() -> Self {
@@ -110,8 +113,9 @@ impl Default for PlayerId {
 
 /// A single playable game instance. Sessions are disposable; ids are not reused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
-pub struct SessionId(pub Uuid);
+pub struct SessionId(#[cfg_attr(feature = "schema", schemars(with = "String"))] pub Uuid);
 
 impl SessionId {
     pub fn new() -> Self {
@@ -127,6 +131,7 @@ impl Default for SessionId {
 
 /// Identifies a game *title* (e.g. `"towerfall"`), not a running instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct GameId(pub String);
 
@@ -147,6 +152,7 @@ impl std::fmt::Display for GameId {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Player {
     pub id: PlayerId,
     pub name: String,
@@ -172,6 +178,7 @@ pub struct Player {
 
 /// Presence is separate from identity: sleeping never releases a seat.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PresenceState {
     Active,
@@ -180,6 +187,7 @@ pub enum PresenceState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlayerPresence {
     pub player_id: PlayerId,
     pub state: PresenceState,
@@ -187,6 +195,7 @@ pub struct PlayerPresence {
 
 /// Who (or what) fills a seat. Games receive seats, never raw controller ids.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SeatOccupant {
     /// A player on this machine.
@@ -217,6 +226,7 @@ impl SeatOccupant {
 /// A playable position. Seat indices are stable across games so player 2 stays
 /// player 2 all night.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Seat {
     pub index: u8,
     pub occupant: SeatOccupant,
@@ -232,6 +242,7 @@ pub struct Seat {
 
 /// Session lifecycle. Legal transitions are enforced by `gamenight-core`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SessionPhase {
     Created,
@@ -244,6 +255,7 @@ pub enum SessionPhase {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionInfo {
     pub id: SessionId,
     pub game: GameId,
@@ -265,6 +277,7 @@ pub struct SessionInfo {
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SessionDiagnostics {
     pub active_ms: u64,
     pub paused_ms: u64,
@@ -277,6 +290,7 @@ pub struct SessionDiagnostics {
 /// Optional cumulative application-frame diagnostics for this session.
 /// Measure active frames only. Never send serial numbers, paths or machine names.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PerformanceSample {
     pub frames: u64,
     pub elapsed_us: u64,
@@ -313,6 +327,7 @@ impl PerformanceSample {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlaylistEntry {
     pub game: GameId,
     pub title: String,
@@ -323,6 +338,7 @@ pub struct PlaylistEntry {
 /// the session lifecycle applies to it — it isn't warming, it isn't loading,
 /// it isn't on the shelf yet. It's arriving.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum InstallState {
     /// In the queue, nothing happening yet.
@@ -347,6 +363,7 @@ pub enum InstallState {
 /// happens *before* there is anything to have a session about — the process
 /// doesn't exist, so it cannot report on itself the way a warming game does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct InstallStatus {
     pub game: GameId,
     /// The catalogue title, so a screen can name it without a shelf entry —
@@ -375,6 +392,7 @@ pub struct InstallStatus {
 /// Absent from the snapshot entirely when nothing is on — see
 /// `PartySnapshot::now_playing`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct NowPlaying {
     pub title: String,
     /// Empty when the source doesn't know one (a podcast, a local file with
@@ -393,6 +411,7 @@ pub struct NowPlaying {
 /// a room full of people actually shout about — no volume (that's the amp's
 /// job and the host's call), no seeking, no library browsing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum MediaAction {
     /// Pause if playing, resume if paused — one pad, both jobs, because the
@@ -406,6 +425,7 @@ pub enum MediaAction {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PlaylistSnapshot {
     pub entries: Vec<PlaylistEntry>,
     /// Index of the entry the *active* session is playing, if any.
@@ -439,6 +459,7 @@ impl PlaylistSnapshot {
 /// game id, launch token) is passed via the `GAMENIGHT_*` environment
 /// variables, not arguments, so unmodified binaries launch cleanly.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LaunchSpec {
     /// Executable path (absolute, or relative to the daemon's working dir).
     pub command: String,
@@ -455,6 +476,7 @@ pub struct LaunchSpec {
 /// Presentation metadata for a title in the game library — everything an
 /// overlay needs to sell the next game: cover art and all that.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GameMeta {
     pub id: GameId,
     pub title: String,
@@ -513,6 +535,7 @@ pub struct GameMeta {
 /// What a player needs in hand to play a game. A phone counts once its owner
 /// has linked it to their player (`PartySnapshot::phones`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PlayWith {
     /// A controller. Phones may still open the game's phone screen.
@@ -654,6 +677,7 @@ impl GameMeta {
 
 /// A match-setting value on the wire: plain JSON scalars, no tagging.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(untagged)]
 pub enum SettingValue {
     Toggle(bool),
@@ -674,6 +698,7 @@ impl std::fmt::Display for SettingValue {
 /// What kind of knob a setting is, its default, and what values it accepts.
 /// Flattened into [`SettingSpec`] on the wire (`"kind": "toggle"`, …).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum SettingKind {
     /// On/off.
@@ -737,6 +762,7 @@ impl SettingKind {
 
 /// One knob a game exposes to the party.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct SettingSpec {
     /// Stable identifier (`"items"`, `"stock"`). Unique within the game.
     pub key: String,
@@ -751,6 +777,7 @@ pub struct SettingSpec {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SettingsAction {
     Set,
@@ -762,6 +789,7 @@ pub enum SettingsAction {
 /// every [`PartySnapshot`]. Values are effective (defaults merged in) and
 /// survive the game process reconnecting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GameSettings {
     pub game: GameId,
     #[serde(default)]
@@ -775,6 +803,7 @@ pub struct GameSettings {
 /// A stopped game process. Exit codes cannot reliably distinguish a forced
 /// close from a crash; only label a known unsuccessful exit as unexpected.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum GameIssueKind {
     Closed,
@@ -785,6 +814,7 @@ pub enum GameIssueKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct GameIssue {
     pub game: GameId,
     pub kind: GameIssueKind,
@@ -792,6 +822,7 @@ pub struct GameIssue {
 
 /// The one big object overlays render from. Sent whenever anything changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct PartySnapshot {
     /// Host-owned failure of a requested first game. Cleared when resolved or
     /// another game is chosen; never creates a synthetic library entry.
@@ -875,6 +906,7 @@ pub struct PartySnapshot {
 
 /// A lobby the host can run: bundled with the app or installed locally.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct LobbyChoice {
     pub id: GameId,
     pub title: String,
@@ -888,6 +920,7 @@ pub struct LobbyChoice {
 /// god's-eye map) declare one with `declare_companion`; pages talk to the
 /// game with `companion_message`, native apps use their own connection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CompanionScreen {
     pub game: GameId,
     /// Page to open, relative to `root`, e.g. `phone/index.html`.
@@ -905,6 +938,7 @@ pub struct CompanionScreen {
 /// (a full 3D view, say). The GameNight app offers to install and open it;
 /// connecting to the game is the app's own business.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct CompanionApp {
     /// Shown on the phone, e.g. "The Voice and the Will".
     pub name: String,
@@ -923,6 +957,7 @@ pub struct CompanionApp {
 
 /// End-of-game options players stand on with their avatars.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum VoteOption {
     Replay,
@@ -932,6 +967,7 @@ pub enum VoteOption {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct VoteSnapshot {
     /// Whether the party is currently being asked to choose.
     ///
@@ -954,6 +990,7 @@ pub struct VoteSnapshot {
 
 /// The role a connection announces in its `hello`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     /// A game process (via an SDK). Receives session lifecycle commands.
@@ -968,6 +1005,7 @@ pub enum Role {
 /// Physical input sampled by the lobby. Controller IDs are opaque host IDs,
 /// never indexes into another process's device enumeration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct ControllerState {
     pub controller: String,
     /// left x/y, right x/y, left/right trigger; signed values / 32767.
@@ -977,6 +1015,7 @@ pub struct ControllerState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ClientMessage {
     /// Replacement lobby has rendered its first usable frame.
@@ -1265,6 +1304,7 @@ pub enum ClientMessage {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
     /// Full controller snapshot, including neutral/released state.
@@ -1378,6 +1418,7 @@ impl ClientMessage {
 
 /// One game's playtest, as the cloud's room poll hands it to a host.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct Playtest {
     /// The catalogue entry for the preview build, downloads included.
     pub entry: serde_json::Value,

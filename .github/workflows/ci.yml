@@ -152,6 +152,8 @@ jobs:
           node-version: 22
       - name: Check shared browser scripts
         run: for file in web/*.js; do node --check "$file"; done
+      - name: Check the generated protocol module and the JavaScript example
+        run: node --check sdk/js/protocol.mjs && node --check examples/tiny-game.mjs
 
   documentation:
     runs-on: ubuntu-latest
@@ -166,6 +168,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: python -m pip install -r docs/site/requirements.txt
       - run: python scripts/build-docs.py --check
+      - name: Check protocol bindings match contract/protocol.schema.json
+        run: python scripts/build-protocol.py --check
       - run: python scripts/test-docs.py
       - run: cargo check --locked -p gamenight-sdk --example docs_lifecycle
       - run: cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/docs-c-game examples/c-game.c
