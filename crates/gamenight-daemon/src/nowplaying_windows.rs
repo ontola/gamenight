@@ -107,7 +107,10 @@ pub(super) async fn resume_last() {
     match result {
         Ok(Ok(true)) => debug!("resumed the last media session"),
         result => {
-            debug!(?result, "no media session took play; pressing the media key");
+            debug!(
+                ?result,
+                "no media session took play; pressing the media key"
+            );
             press_play_key();
         }
     }
@@ -120,10 +123,22 @@ fn press_play_key() {
     let key = |flags| INPUT {
         r#type: INPUT_KEYBOARD,
         Anonymous: INPUT_0 {
-            ki: KEYBDINPUT { wVk: VK_MEDIA_PLAY_PAUSE, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+            ki: KEYBDINPUT {
+                wVk: VK_MEDIA_PLAY_PAUSE,
+                wScan: 0,
+                dwFlags: flags,
+                time: 0,
+                dwExtraInfo: 0,
+            },
         },
     };
     let inputs = [key(0), key(KEYEVENTF_KEYUP)];
-    let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
+    let sent = unsafe {
+        SendInput(
+            inputs.len() as u32,
+            inputs.as_ptr(),
+            std::mem::size_of::<INPUT>() as i32,
+        )
+    };
     debug!(sent, "media play key pressed");
 }
