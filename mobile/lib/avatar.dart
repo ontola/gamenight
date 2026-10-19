@@ -380,8 +380,9 @@ int _lastRecipe = -1;
 Pixels randomFace([Random? random]) {
   final rng = random ?? Random();
   var i = rng.nextInt(_recipes.length);
-  if (i == _lastRecipe)
+  if (i == _lastRecipe) {
     i = (i + 1 + rng.nextInt(_recipes.length - 1)) % _recipes.length;
+  }
   _lastRecipe = i;
   return _dress(_recipes[i](), rng);
 }

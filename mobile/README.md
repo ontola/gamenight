@@ -56,6 +56,40 @@ flutter build apk      # Android (CI publishes the signed one, see below)
 flutter build ipa      # iOS, needs a Mac and signing (CI uploads to TestFlight, see below)
 ```
 
+### Google Play internal testing
+
+The `play` job builds a signed Android App Bundle after the Android checks pass
+on main. Download the `gamenight-play` artifact for the first manual upload to
+Play Console (`io.ontola.gamenight`). Activate an internal testing release and
+select the GameNight tester list. This does not publish to production.
+
+Enable the Google Play Android Developer API in a Google Cloud project. Grant a
+service account access to **GameNight only**, with app read access and permission
+to release to testing tracks. Store its JSON key as the repository secret
+`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`; never commit it. After the first manual
+release, subsequent mobile workflow runs upload to the `internal` track.
+`GAMENIGHT_KEYSTORE_BASE64` and `GAMENIGHT_KEYSTORE_PASSWORD` sign the AAB using
+the existing `gamenight` key. The versionCode is the same workflow run number as
+the APK. Use a new workflow run for a new upload, not a rerun of an uploaded build.
+
+Play builds use `--dart-define=GAMENIGHT_PLAY_STORE=true`. This single flag also
+selects the Gradle manifest overlay and native guard: no package installation
+permission, no APK self-updates, and no installation of companion APKs from the
+PC. Already installed companion apps can still be opened. Google Play handles
+GameNight updates; the separately downloadable APK keeps its existing updater.
+Test the Play-specific behavior with:
+
+```sh
+flutter test --dart-define=GAMENIGHT_PLAY_STORE=true test/play_distribution_test.dart
+```
+
+When enrolling in Play App Signing, importing the existing app signing key keeps
+updates compatible with sideloaded installs. If Google generates a different app
+signing key, users must uninstall the sideloaded app before switching; also add
+Google Play's **app signing certificate** SHA-256 to the website's
+`/.well-known/assetlinks.json` so app sign-in and room links remain verified.
+The upload certificate is not the certificate used on users' phones.
+
 ### iOS and TestFlight
 
 The `ios` job in `.github/workflows/mobile.yml` builds the app on a macOS

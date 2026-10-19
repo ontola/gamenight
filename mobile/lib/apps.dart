@@ -7,6 +7,10 @@ import 'package:flutter/services.dart';
 class Apps {
   static const _channel = MethodChannel('gamenight/apps');
 
+  /// Play distributes and updates packages itself. This also selects the
+  /// Android manifest overlay and native installer guard in Gradle.
+  static const playStore = bool.fromEnvironment('GAMENIGHT_PLAY_STORE');
+
   static bool get supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
@@ -24,22 +28,31 @@ class Apps {
 
   /// Whether the player allowed GameNight to install apps.
   static Future<bool> canInstall() async {
-    if (!supported) return false;
+    if (!supported || playStore) return false;
     return await _channel.invokeMethod<bool>('canInstall') ?? false;
   }
 
   /// Opens the Android setting that allows GameNight to install apps.
-  static Future<void> allowInstalls() => _channel.invokeMethod('allowInstalls');
+  static Future<void> allowInstalls() async {
+    if (playStore) throw UnsupportedError('Install apps through Google Play.');
+    await _channel.invokeMethod('allowInstalls');
+  }
 
   /// Downloads the APK at [url] (or reads a `file:` URL) and hands it to
   /// Android. Returns once Android has it; [status] tells how it went from
   /// there. [reopen] opens GameNight again after it replaced itself.
-  static Future<void> install(Uri url, String package, {bool reopen = false}) =>
-      _channel.invokeMethod('install', {
-        'url': url.toString(),
-        'package': package,
-        if (reopen) 'reopen': true
-      });
+  static Future<void> install(
+    Uri url,
+    String package, {
+    bool reopen = false,
+  }) async {
+    if (playStore) throw UnsupportedError('Install apps through Google Play.');
+    await _channel.invokeMethod('install', {
+      'url': url.toString(),
+      'package': package,
+      if (reopen) 'reopen': true,
+    });
+  }
 
   /// Fetches the APK at [url] into the app's cache as [name] and returns
   /// its path. A finished download with that name is reused.
@@ -49,7 +62,7 @@ class Apps {
   /// Whether Android lets GameNight update itself without asking: Android 12
   /// and newer, once GameNight installed its own previous update.
   static Future<bool> silentSelfUpdate() async {
-    if (!supported) return false;
+    if (!supported || playStore) return false;
     return await _channel.invokeMethod<bool>('silentSelfUpdate') ?? false;
   }
 

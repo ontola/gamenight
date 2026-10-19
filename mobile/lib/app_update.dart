@@ -25,7 +25,7 @@ class AppUpdate {
   /// The build number of a newer published APK, or null when this one is
   /// current, unknown, or the check failed.
   static Future<int?> newer({int build = appBuild, http.Client? client}) async {
-    if (build <= 0) return null;
+    if (Apps.playStore || build <= 0) return null;
     try {
       final get = client?.get ?? http.get;
       final response = await get(feed).timeout(const Duration(seconds: 15));

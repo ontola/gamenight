@@ -29,10 +29,12 @@ class CatalogImage {
         return null;
       }
     }
-    if (uri.scheme == 'https' || uri.scheme == 'http')
+    if (uri.scheme == 'https' || uri.scheme == 'http') {
       return CatalogImage(url: uri);
-    if (!uri.hasScheme && value.startsWith('/'))
+    }
+    if (!uri.hasScheme && value.startsWith('/')) {
       return CatalogImage(url: storeBase.resolveUri(uri));
+    }
     return null;
   }
 }
@@ -277,8 +279,9 @@ class CatalogGame {
   }
 
   static Color? _color(Object? hex) {
-    if (hex is! String || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex))
+    if (hex is! String || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)) {
       return null;
+    }
     return Color(int.parse(hex.substring(1), radix: 16) | 0xFF000000);
   }
 }

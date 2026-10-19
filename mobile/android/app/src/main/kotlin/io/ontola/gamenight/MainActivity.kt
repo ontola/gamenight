@@ -27,6 +27,11 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "gamenight/apps")
             .setMethodCallHandler { call, result ->
+                if (BuildConfig.PLAY_STORE && call.method in setOf(
+                        "allowInstalls", "download", "install", "canInstall", "silentSelfUpdate")) {
+                    result.error("play_store", "Install and update apps through Google Play.", null)
+                    return@setMethodCallHandler
+                }
                 when (call.method) {
                     "installed" -> result.success(versionOf(call.argument<String>("package")!!))
                     "open" -> {
