@@ -22,7 +22,7 @@ Open `sdk/godot/project.godot` in the editor to change the example. Start it
 through the runtime to get an authenticated connection. Opening the project
 alone displays a connecting screen, not a synthetic party.
 
-Controls: connected controllers join automatically. LT/RT cycle games; the
+Controls: press A, B, X, Y or Start on a controller to join. LT/RT cycle games; the
 selected game is larger in the centre of its two neighbours. The stick/D-pad
 moves between controls. On a game card, A appends a new occurrence to the queue;
 X inserts it first among upcoming games. Neither action starts gameplay. The
@@ -202,7 +202,9 @@ queue that automatically stops the night.
 
 Replacement lobbies receive runtime-sampled controller frames. Device tokens
 are opaque, and must be matched against `seats[].controller`. The runtime
-joins connected controllers, handles controller activity and Back/Select. It consumes
+joins a controller when A, B, X, Y or Start is pressed on it (a stick or D-pad
+never joins, so a drifting stick cannot bring back a player who just left),
+handles controller activity and Back/Select. It consumes
 an A press held during connection and Back before broadcasting frames so clients cannot accidentally
 start a game while joining or immediately reopen a resumed game.
 
@@ -328,6 +330,13 @@ one sends `switch_lobby`: between games the host saves the choice, covers the
 screen and restarts into that lobby with the same players, seats, controllers,
 phone links and queue. During a game it is refused. A host that cannot
 restart itself saves the choice for its next start.
+
+Game Room only gives a walking character to players with a controller. Phone
+players, and anyone else seated without one, are listed bottom left. When a
+character's controller goes, it sleeps with a countdown and leaves the party
+after 30 seconds in the room, unless the controller comes back; a listed player
+with neither a controller nor a phone counts down the same way. **Remove a
+player** in the Start menu takes anyone else out (press A twice).
 
 Living Room shows **Current game** and **Up next** side by side, or stacked in a
 narrow window. Current game shows the game's screenshot and **Resume**, even

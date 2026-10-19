@@ -35,7 +35,8 @@ Use `"controller_and_phone"` when every player needs both, and
 `"controller_or_phone"` with `"min_phones": 1` when only some players are on a
 phone, like one god among controller players. Two controllers and four phones
 then fit a four-player phone game: people without a controller tap **Play on
-this phone** in the GameNight app and get a seat of their own. See
+this phone** in the GameNight app and get a seat of their own. Such a player
+leaves the party about 10 seconds after their phone leaves the room. See
 [controllers and phones](/docs/protocol#controllers-and-phones).
 
 Phones join late all the time: someone's battery died, someone walked in.
