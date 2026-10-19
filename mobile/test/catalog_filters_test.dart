@@ -139,4 +139,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Show 1 game'), findsOneWidget);
   });
+
+  test('search matches every word; player count fits min and max', () {
+    final list = parseCatalog([
+      {
+        'id': 'a',
+        'title': 'Moon Cards',
+        'tagline': 'Bluff with friends',
+        'players': {'min': 2, 'max': 4}
+      },
+      {
+        'id': 'b',
+        'title': 'Rocket Rally',
+        'players': {'min': 1, 'max': 8}
+      },
+      {'id': 'c', 'title': 'Forest Friends'},
+    ]);
+    ids(CatalogFilter f) => [
+          for (final g in list)
+            if (f.matches(g)) g.id
+        ];
+    expect(ids(const CatalogFilter(query: 'moon BLUFF')), ['a']);
+    expect(ids(const CatalogFilter(query: 'friends')), ['a', 'c']);
+    expect(ids(const CatalogFilter(players: 6)), ['b', 'c']);
+    expect(ids(const CatalogFilter(players: 2, query: 'r')), ['a', 'b', 'c']);
+    expect(
+        const CatalogFilter(players: 3).copyWith(players: () => null).players,
+        isNull);
+  });
 }

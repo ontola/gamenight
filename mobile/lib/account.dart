@@ -97,6 +97,7 @@ class HostedRoom {
   bool get waiting => status == 'waiting';
   bool get choosingPlayer => status == 'choose_player';
   bool get guest => raw['guest'] == true;
+
   /// Asked to play on this phone; the GameNight PC is adding the player.
   bool get phoneSeat => raw['phone_seat'] == true;
   List<Map<String, dynamic>> get seats => (raw['seats'] as List? ?? [])
@@ -527,8 +528,7 @@ class CloudApi {
   /// Play on this phone alone. The GameNight PC adds the player on its next
   /// check-in; older GameNight PCs keep the phone waiting.
   Future<void> phoneSeat() => _send('POST', '/v1/rooms/phone-seat',
-      body: {},
-      errors: {410: 'You are no longer waiting in this room.'});
+      body: {}, errors: {410: 'You are no longer waiting in this room.'});
 
   Future<void> leaveRoom() => _send('POST', '/v1/pairing/unlink', body: {});
 

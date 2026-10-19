@@ -7,25 +7,71 @@ import '../theme.dart';
 class CatalogFilter {
   final bool liked, unplayed;
   final Set<String> tags, likedGames, playedGames;
+
+  /// Words to find in a game's title, tagline, developer or tags.
+  final String query;
+
+  /// Only games that can be played with exactly this many players.
+  final int? players;
   const CatalogFilter(
       {this.liked = false,
       this.unplayed = false,
       this.tags = const {},
       this.likedGames = const {},
-      this.playedGames = const {}});
-  bool get active => liked || unplayed || tags.isNotEmpty;
+      this.playedGames = const {},
+      this.query = '',
+      this.players});
+  bool get active =>
+      liked ||
+      unplayed ||
+      tags.isNotEmpty ||
+      query.trim().isNotEmpty ||
+      players != null;
   bool matches(CatalogGame game) =>
       (!liked || likedGames.contains(game.id)) &&
       (!unplayed || !playedGames.contains(game.id)) &&
-      (tags.isEmpty || tags.any(game.tags.contains));
-  CatalogFilter copyWith({bool? liked, bool? unplayed, Set<String>? tags}) =>
+      (tags.isEmpty || tags.any(game.tags.contains)) &&
+      _fits(game) &&
+      _found(game);
+  bool _fits(CatalogGame game) {
+    final n = players;
+    if (n == null) return true;
+    final min = game.minPlayers ?? game.maxPlayers;
+    final max = game.maxPlayers ?? game.minPlayers;
+    return min == null || max == null || (min <= n && n <= max);
+  }
+
+  bool _found(CatalogGame game) {
+    final text = [game.title, game.tagline, game.developer, ...game.tags]
+        .join(' ')
+        .toLowerCase();
+    return query
+        .toLowerCase()
+        .split(RegExp(r'\s+'))
+        .where((word) => word.isNotEmpty)
+        .every(text.contains);
+  }
+
+  CatalogFilter copyWith(
+          {bool? liked,
+          bool? unplayed,
+          Set<String>? tags,
+          Set<String>? likedGames,
+          Set<String>? playedGames,
+          String? query,
+          int? Function()? players}) =>
       CatalogFilter(
           liked: liked ?? this.liked,
           unplayed: unplayed ?? this.unplayed,
           tags: tags ?? this.tags,
-          likedGames: likedGames,
-          playedGames: playedGames);
+          likedGames: likedGames ?? this.likedGames,
+          playedGames: playedGames ?? this.playedGames,
+          query: query ?? this.query,
+          players: players == null ? this.players : players());
 }
+
+/// The player counts the filters offer.
+const playerCounts = [1, 2, 3, 4, 5, 6, 8];
 
 class CatalogFilters extends StatefulWidget {
   final CatalogFilter filter;
@@ -45,6 +91,7 @@ class CatalogFilters extends StatefulWidget {
 class _CatalogFiltersState extends State<CatalogFilters> {
   late bool _liked = widget.filter.liked, _unplayed = widget.filter.unplayed;
   late final Set<String> _tags = {...widget.filter.tags};
+  late int? _players = widget.filter.players;
   Set<String> _likedGames = {}, _playedGames = {};
   bool _loading = false, _loaded = false;
   String? _error;
@@ -94,7 +141,9 @@ class _CatalogFiltersState extends State<CatalogFilters> {
       unplayed: _unplayed,
       tags: _tags,
       likedGames: _likedGames,
-      playedGames: _playedGames);
+      playedGames: _playedGames,
+      query: widget.filter.query,
+      players: _players);
 
   @override
   Widget build(BuildContext context) {
@@ -117,6 +166,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                   onPressed: () => setState(() {
                         _liked = false;
                         _unplayed = false;
+                        _players = null;
                         _tags.clear();
                       }),
                   child: const Text('Clear')),
@@ -166,6 +216,18 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                     padding: const EdgeInsets.only(top: 8),
                     child: Hint(
                         'Not played uses your recorded play history from the last $_days days.')),
+              const SizedBox(height: 24),
+              const Text('Players',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                for (final n in playerCounts)
+                  ChoiceChip(
+                      label: Text('$n'),
+                      selected: _players == n,
+                      onSelected: (v) =>
+                          setState(() => _players = v ? n : null)),
+              ]),
               const SizedBox(height: 24),
               const Text('Tags', style: TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),

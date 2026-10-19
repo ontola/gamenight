@@ -8,12 +8,14 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
 /// A trimmed sample of `GET /v1/catalog`.
-Object fixture() => jsonDecode(File('test/fixtures/catalog.json').readAsStringSync());
+Object fixture() =>
+    jsonDecode(File('test/fixtures/catalog.json').readAsStringSync());
 
 void main() {
   test('reads games, their covers and player counts from the catalog', () {
     final games = parseCatalog(fixture());
-    expect(games.map((g) => g.id), ['ballkickers', 'growing-guns', 'stack-together'],
+    expect(games.map((g) => g.id),
+        ['ballkickers', 'growing-guns', 'stack-together'],
         reason: 'the lobby and entries without an id are not games to pick');
 
     final ball = games[0];
@@ -25,15 +27,20 @@ void main() {
     expect(ball.coverBytes!.sublist(1, 4), utf8.encode('PNG'));
     expect(ball.coverUrl, isNull);
     expect(ball.color, const Color(0xFFFF7547));
-    expect(ball.page, Uri.parse('https://gamenight.ontola.io/games/ballkickers'));
+    expect(
+        ball.page, Uri.parse('https://gamenight.ontola.io/games/ballkickers'));
 
     final guns = games[1];
     expect(guns.coverBytes, isNull);
     expect(guns.coverUrl, isNull);
-    expect(guns.color, const Color(0xFFFFB454), reason: 'no cover: a tile in its colour');
+    expect(guns.color, const Color(0xFFFFB454),
+        reason: 'no cover: a tile in its colour');
 
     final stack = games[2];
-    expect(stack.coverUrl, Uri.parse('https://gamenight.ontola.io/media/stack-together/cover.png'));
+    expect(
+        stack.coverUrl,
+        Uri.parse(
+            'https://gamenight.ontola.io/media/stack-together/cover.png'));
     expect(stack.players, '2 players');
     expect(stack.color, isNull);
   });
@@ -45,17 +52,21 @@ void main() {
         [MediaKind.video, MediaKind.trailer, MediaKind.image],
         reason: 'looping preview first, images last, insecure videos dropped');
     expect(stack.media[0].preview, isTrue);
-    expect(stack.media[0].poster!.url.toString(), 'https://gamenight.ontola.io/media/stack-together/preview.jpg');
+    expect(stack.media[0].poster!.url.toString(),
+        'https://gamenight.ontola.io/media/stack-together/preview.jpg');
     expect(stack.platformLabel, 'Windows · Linux');
     expect(stack.links.keys, ['homepage'], reason: 'only web links');
     expect(stack.mediaSource, Uri.parse('https://example.org/stack-together'));
 
     final ball = games[0];
-    expect(ball.media.single.image!.url, Uri.parse('https://gamenight.ontola.io/game-images/ballkickers.png'),
+    expect(ball.media.single.image!.url,
+        Uri.parse('https://gamenight.ontola.io/game-images/ballkickers.png'),
         reason: 'the screenshot is a slide');
     expect(ball.matchMinutes, 2);
-    expect(games[1].media, isEmpty, reason: 'nothing to show: the colour tile stands in');
-    expect(ball.similar(games).map((g) => g.id), ['growing-guns'], reason: 'they share tags');
+    expect(games[1].media, isEmpty,
+        reason: 'nothing to show: the colour tile stands in');
+    expect(ball.similar(games).map((g) => g.id), ['growing-guns'],
+        reason: 'they share tags');
   });
 
   test('tolerates odd entries', () {
@@ -73,7 +84,8 @@ void main() {
     expect(games.map((g) => g.id), ['a', 'b']);
     expect(games[0].players, '1 player');
     expect(games[0].color, isNull);
-    expect(games[1].coverUrl, Uri.parse('https://gamenight.ontola.io/media/b.png'));
+    expect(games[1].coverUrl,
+        Uri.parse('https://gamenight.ontola.io/media/b.png'));
     expect(games[1].players, '');
     expect(() => parseCatalog({'games': []}), throwsFormatException);
   });
@@ -84,7 +96,8 @@ void main() {
     final catalog = Catalog(
       client: MockClient((request) async {
         calls++;
-        expect(request.url, Uri.parse('https://gamenight.ontola.io/v1/catalog'));
+        expect(
+            request.url, Uri.parse('https://gamenight.ontola.io/v1/catalog'));
         if (fail) return http.Response('down', 503);
         return http.Response.bytes(utf8.encode(jsonEncode(fixture())), 200);
       }),

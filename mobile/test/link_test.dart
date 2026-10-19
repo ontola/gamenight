@@ -17,13 +17,16 @@ void main() {
   });
 
   test('a bare address gets the default web port', () {
-    expect(parseHostLink('192.168.1.20').base.toString(), 'http://192.168.1.20:7913');
+    expect(parseHostLink('192.168.1.20').base.toString(),
+        'http://192.168.1.20:7913');
     expect(parseHostLink('192.168.1.20:8000').base.port, 8000);
   });
 
   test('recognises hosted rooms and refuses other links', () {
-    expect(parseHostLink('https://gamenight.ontola.io/?r=ABC234').hosted, isTrue);
-    expect(() => parseHostLink('http://example.com/login'), throwsA(isA<LinkError>()));
+    expect(
+        parseHostLink('https://gamenight.ontola.io/?r=ABC234').hosted, isTrue);
+    expect(() => parseHostLink('http://example.com/login'),
+        throwsA(isA<LinkError>()));
     expect(() => parseHostLink('ftp://x'), throwsA(isA<LinkError>()));
   });
 

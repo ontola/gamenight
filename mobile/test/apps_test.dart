@@ -20,7 +20,8 @@ void main() {
     final api = GameNightApi(Uri.parse('http://10.0.0.2:7913/'));
     expect(api.resolve(c.app!.download!).toString(),
         'http://10.0.0.2:7913/play/voice-and-will/god.apk');
-    expect(api.resolve('https://example.com/app').toString(), 'https://example.com/app');
+    expect(api.resolve('https://example.com/app').toString(),
+        'https://example.com/app');
     expect(Companion.fromJson({'game': 'x'}), isNull);
   });
 
@@ -29,7 +30,8 @@ void main() {
     final calls = <String>[];
     String? version;
     var allowed = false;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel,
+        (call) async {
       calls.add(call.method);
       switch (call.method) {
         case 'installed':
@@ -58,7 +60,8 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Install'));
     await tester.pump();
-    expect(calls, contains('allowInstalls'), reason: 'first ask Android to allow installs');
+    expect(calls, contains('allowInstalls'),
+        reason: 'first ask Android to allow installs');
 
     allowed = true;
     await tester.tap(find.text('Install'));

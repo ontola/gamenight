@@ -347,44 +347,62 @@ class RoomScreenState extends State<RoomScreen> {
                   child: const Text('Try again')),
             ],
           ]),
-        Section(title: 'Join a room', children: [
-          FilledButton.icon(
-            style:
-                FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
-            onPressed: _busy ? null : _scan,
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('Scan the QR on the TV'),
-          ),
-          const SizedBox(height: 20),
-          const Center(child: Hint('or enter the room code')),
-          const SizedBox(height: 8),
-          _codeField(),
-        ]),
-        Theme(
-          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-          child: ExpansionTile(
-            tilePadding: const EdgeInsets.symmetric(horizontal: 4),
-            childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
-            title: const Text('Advanced',
-                style: TextStyle(color: GnColors.muted, fontSize: 14)),
-            children: [
-              TextField(
-                controller: _address,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                    labelText: 'GameNight address',
-                    hintText: '192.168.1.20:7913'),
-                onSubmitted: _busy ? null : openLink,
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: _busy ? null : () => openLink(_address.text),
-                child: Text(_busy ? 'Connecting…' : 'Connect'),
-              ),
-              const SizedBox(height: 8),
-              const Hint('The address is printed under the QR in the lobby.'),
-            ],
+        // Bare, narrow block: the code field is 360 wide, so the rest is too.
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 360),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 24),
+                  const Text('Join a room',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(56)),
+                    onPressed: _busy ? null : _scan,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Scan the QR on the TV'),
+                  ),
+                  const SizedBox(height: 20),
+                  const Center(child: Hint('or enter the room code')),
+                  const SizedBox(height: 8),
+                  _codeField(),
+                  const SizedBox(height: 12),
+                  Theme(
+                    data: Theme.of(context)
+                        .copyWith(dividerColor: Colors.transparent),
+                    child: ExpansionTile(
+                      tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+                      childrenPadding: const EdgeInsets.fromLTRB(4, 0, 4, 12),
+                      title: const Text('Advanced',
+                          style:
+                              TextStyle(color: GnColors.muted, fontSize: 14)),
+                      children: [
+                        TextField(
+                          controller: _address,
+                          keyboardType: TextInputType.url,
+                          autocorrect: false,
+                          decoration: const InputDecoration(
+                              labelText: 'GameNight address',
+                              hintText: '192.168.1.20:7913'),
+                          onSubmitted: _busy ? null : openLink,
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed:
+                              _busy ? null : () => openLink(_address.text),
+                          child: Text(_busy ? 'Connecting…' : 'Connect'),
+                        ),
+                        const SizedBox(height: 8),
+                        const Hint(
+                            'The address is printed under the QR in the lobby.'),
+                      ],
+                    ),
+                  ),
+                ]),
           ),
         ),
       ];

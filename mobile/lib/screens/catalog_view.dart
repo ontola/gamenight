@@ -40,6 +40,8 @@ class _CatalogSectionState extends State<CatalogSection> {
   bool _hostLoaded = false;
   CatalogFilter _filter = const CatalogFilter();
   String? _filterAccount;
+  final _search = TextEditingController();
+  bool _personalLoading = false;
 
   bool get _inRoom => widget.controls != null;
 
@@ -57,7 +59,8 @@ class _CatalogSectionState extends State<CatalogSection> {
     if ((old.controls == null) != (widget.controls == null)) _loadHost();
     if (_filterAccount != widget.cloud?.token) {
       _filterAccount = widget.cloud?.token;
-      _filter = CatalogFilter(tags: _filter.tags);
+      _filter = CatalogFilter(
+          tags: _filter.tags, query: _filter.query, players: _filter.players);
     }
     _openRequestedGame();
   }
@@ -65,6 +68,7 @@ class _CatalogSectionState extends State<CatalogSection> {
   @override
   void dispose() {
     _poll?.cancel();
+    _search.dispose();
     super.dispose();
   }
 
@@ -156,43 +160,8 @@ class _CatalogSectionState extends State<CatalogSection> {
     final games = _games;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                  onPressed: games == null ? null : _showFilters,
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: const Text('Filter')),
-              if (_filter.liked)
-                InputChip(
-                    label: const Text('Liked'),
-                    onPressed: () => setState(
-                        () => _filter = _filter.copyWith(liked: false)),
-                    onDeleted: () => setState(
-                        () => _filter = _filter.copyWith(liked: false))),
-              if (_filter.unplayed)
-                InputChip(
-                    label: const Text('Not played'),
-                    onPressed: () => setState(
-                        () => _filter = _filter.copyWith(unplayed: false)),
-                    onDeleted: () => setState(
-                        () => _filter = _filter.copyWith(unplayed: false))),
-              for (final tag in _filter.tags)
-                InputChip(
-                    label: Text(tag),
-                    onPressed: () => setState(() => _filter =
-                        _filter.copyWith(tags: {..._filter.tags}..remove(tag))),
-                    onDeleted: () => setState(() => _filter = _filter.copyWith(
-                        tags: {..._filter.tags}..remove(tag)))),
-              if (_filter.active)
-                Text(
-                    '${_visible.length} ${_visible.length == 1 ? 'game' : 'games'}',
-                    style: const TextStyle(color: GnColors.muted)),
-            ]),
-      ),
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _filterBar(games != null)),
       if (games == null && _error == null)
         const Padding(
           padding: EdgeInsets.all(24),
@@ -209,12 +178,199 @@ class _CatalogSectionState extends State<CatalogSection> {
         Section(children: [
           const Text('No games match these filters.'),
           TextButton(
-              onPressed: () => setState(() => _filter = const CatalogFilter()),
-              child: const Text('Clear filters'))
+              onPressed: _clearFilters, child: const Text('Clear filters'))
         ])
       else
         _grid(_visible),
     ]);
+  }
+
+  void _clearFilters() => setState(() {
+        _search.clear();
+        _filter = const CatalogFilter();
+      });
+
+  void _setFilter(CatalogFilter filter) => setState(() => _filter = filter);
+
+  /// Search always; player count, then Liked and Not played join the bar
+  /// as it gets wider. What does not fit stays in the Filter sheet.
+  Widget _filterBar(bool ready) => LayoutBuilder(builder: (context, box) {
+        final showPlayers = box.maxWidth >= 560;
+        final showPersonal = box.maxWidth >= 820;
+        final search = SizedBox(
+            height: 44,
+            child: TextField(
+              key: const ValueKey('catalog-search'),
+              controller: _search,
+              enabled: ready,
+              textInputAction: TextInputAction.search,
+              onChanged: (v) => _setFilter(_filter.copyWith(query: v)),
+              decoration: InputDecoration(
+                hintText: 'Search games',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _filter.query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () {
+                          _search.clear();
+                          _setFilter(_filter.copyWith(query: ''));
+                        }),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ));
+        final chips = [
+          if (_filter.liked && !showPersonal)
+            InputChip(
+                label: const Text('Liked'),
+                onPressed: () => _setFilter(_filter.copyWith(liked: false)),
+                onDeleted: () => _setFilter(_filter.copyWith(liked: false))),
+          if (_filter.unplayed && !showPersonal)
+            InputChip(
+                label: const Text('Not played'),
+                onPressed: () => _setFilter(_filter.copyWith(unplayed: false)),
+                onDeleted: () => _setFilter(_filter.copyWith(unplayed: false))),
+          if (_filter.players != null && !showPlayers)
+            InputChip(
+                label: Text('${_filter.players} players'),
+                onPressed: () =>
+                    _setFilter(_filter.copyWith(players: () => null)),
+                onDeleted: () =>
+                    _setFilter(_filter.copyWith(players: () => null))),
+          for (final tag in _filter.tags)
+            InputChip(
+                label: Text(tag),
+                onPressed: () => _setFilter(
+                    _filter.copyWith(tags: {..._filter.tags}..remove(tag))),
+                onDeleted: () => _setFilter(
+                    _filter.copyWith(tags: {..._filter.tags}..remove(tag)))),
+          if (_filter.active)
+            Text(
+                '${_visible.length} ${_visible.length == 1 ? 'game' : 'games'}',
+                style: const TextStyle(color: GnColors.muted)),
+        ];
+        return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                if (showPlayers)
+                  ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 320),
+                      child: search)
+                else
+                  Expanded(child: search),
+                if (showPlayers) ...[
+                  const SizedBox(width: 8),
+                  _playersButton(ready),
+                ],
+                if (showPersonal) ...[
+                  const SizedBox(width: 8),
+                  _personalChip('Liked', Icons.thumb_up_outlined, _filter.liked,
+                      (v) => _filter.copyWith(liked: v)),
+                  const SizedBox(width: 8),
+                  _personalChip('Not played', null, _filter.unplayed,
+                      (v) => _filter.copyWith(unplayed: v)),
+                ],
+                if (showPlayers) const Spacer() else const SizedBox(width: 8),
+                OutlinedButton.icon(
+                    onPressed: ready ? _showFilters : null,
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('Filter')),
+              ]),
+              if (chips.isNotEmpty)
+                Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: chips)),
+            ]);
+      });
+
+  Widget _playersButton(bool ready) {
+    final n = _filter.players;
+    return PopupMenuButton<int>(
+      enabled: ready,
+      tooltip: 'Player count',
+      initialValue: n ?? 0,
+      onSelected: (v) =>
+          _setFilter(_filter.copyWith(players: () => v == 0 ? null : v)),
+      itemBuilder: (_) => [
+        const PopupMenuItem(value: 0, child: Text('Any number of players')),
+        for (final count in playerCounts)
+          PopupMenuItem(
+              value: count,
+              child: Text(count == 1 ? '1 player' : '$count players')),
+      ],
+      child: IgnorePointer(
+        child: OutlinedButton.icon(
+          style: n == null
+              ? null
+              : OutlinedButton.styleFrom(
+                  backgroundColor: GnColors.button.withValues(alpha: .35),
+                  side: const BorderSide(color: GnColors.accent)),
+          onPressed: ready ? () {} : null,
+          icon: const Icon(Icons.group_outlined, size: 18),
+          label: Text(n == null
+              ? 'Players'
+              : n == 1
+                  ? '1 player'
+                  : '$n players'),
+        ),
+      ),
+    );
+  }
+
+  /// Liked and Not played need the account's ratings and play history,
+  /// loaded on first use. Signed out, a tap offers sign-in instead.
+  Widget _personalChip(String label, IconData? icon, bool selected,
+          CatalogFilter Function(bool) apply) =>
+      FilterChip(
+        label: Text(label),
+        avatar: icon == null || selected ? null : Icon(icon, size: 18),
+        selected: selected,
+        onSelected: _games == null || _personalLoading
+            ? null
+            : (v) async {
+                if (!v) return _setFilter(apply(false));
+                if (widget.cloud?.signedIn != true) {
+                  await widget.onSignIn?.call();
+                  if (!mounted || widget.cloud?.signedIn != true) return;
+                }
+                final personal = await _loadPersonal();
+                if (personal == null || !mounted) return;
+                _setFilter(apply(true).copyWith(
+                    likedGames: personal.liked, playedGames: personal.played));
+                _filterAccount = widget.cloud?.token;
+              },
+      );
+
+  Future<({Set<String> liked, Set<String> played})?> _loadPersonal() async {
+    final cloud = widget.cloud!, identity = cloud.token;
+    setState(() => _personalLoading = true);
+    try {
+      final results =
+          await Future.wait<Object>([cloud.gameRatings(), cloud.playHistory()]);
+      if (cloud.token != identity) return null;
+      final ratings = results[0] as Map<String, int>;
+      final history = results[1] as ({Set<String> games, int days});
+      return (
+        liked: {
+          for (final entry in ratings.entries)
+            if (entry.value == 1) entry.key
+        },
+        played: history.games
+      );
+    } catch (_) {
+      if (mounted) {
+        toast(context, 'Could not load your likes and play history.');
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _personalLoading = false);
+    }
   }
 
   List<CatalogGame> get _visible =>

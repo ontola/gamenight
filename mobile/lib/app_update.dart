@@ -17,7 +17,8 @@ const appBuild = int.fromEnvironment('GAMENIGHT_BUILD');
 /// `version.json` that names its build number.
 class AppUpdate {
   static const package = 'io.ontola.gamenight';
-  static final _release = Uri.parse('https://github.com/ontola/gamenight/releases/download/app-latest/');
+  static final _release = Uri.parse(
+      'https://github.com/ontola/gamenight/releases/download/app-latest/');
   static final feed = _release.resolve('version.json');
   static final apk = _release.resolve('gamenight.apk');
 
@@ -60,16 +61,21 @@ class UpdateBanner extends StatefulWidget {
     Future<bool> Function()? silent,
     Future<void> Function(Uri apk, {bool reopen})? install,
     this.backgroundDelay = const Duration(seconds: 20),
-  })  : check = check ?? (() => Apps.supported ? AppUpdate.newer() : Future.value(null)),
-        download = download ?? ((build) => Apps.download(AppUpdate.apk, 'gamenight-$build.apk')),
+  })  : check = check ??
+            (() => Apps.supported ? AppUpdate.newer() : Future.value(null)),
+        download = download ??
+            ((build) => Apps.download(AppUpdate.apk, 'gamenight-$build.apk')),
         silent = silent ?? Apps.silentSelfUpdate,
-        install = install ?? ((apk, {reopen = false}) => Apps.install(apk, AppUpdate.package, reopen: reopen));
+        install = install ??
+            ((apk, {reopen = false}) =>
+                Apps.install(apk, AppUpdate.package, reopen: reopen));
 
   @override
   State<UpdateBanner> createState() => _UpdateBannerState();
 }
 
-class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver {
+class _UpdateBannerState extends State<UpdateBanner>
+    with WidgetsBindingObserver {
   static const _recheck = Duration(hours: 6);
   int? _latest;
   Uri? _apk;
@@ -99,7 +105,8 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
     if (s == AppLifecycleState.paused) {
       if (_apk != null && _silent && !_installing) {
         _background?.cancel();
-        _background = Timer(widget.backgroundDelay, () => _install(reopen: false));
+        _background =
+            Timer(widget.backgroundDelay, () => _install(reopen: false));
       }
       return;
     }
@@ -108,7 +115,8 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
     if (_installing) {
       // Back from Android's dialog without updating (cancelled).
       setState(() => _installing = false);
-    } else if (_checked == null || DateTime.now().difference(_checked!) > _recheck) {
+    } else if (_checked == null ||
+        DateTime.now().difference(_checked!) > _recheck) {
       _check();
     }
   }
@@ -150,8 +158,12 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
   Widget build(BuildContext context) {
     if (_latest == null || _dismissed) return const SizedBox.shrink();
     final message = _installing
-        ? (_silent ? 'Updating GameNight…' : 'Updating GameNight. Android asks you to confirm once.')
-        : (_silent ? 'New version ready. It installs when you leave GameNight.' : 'A new version of GameNight is ready.');
+        ? (_silent
+            ? 'Updating GameNight…'
+            : 'Updating GameNight. Android asks you to confirm once.')
+        : (_silent
+            ? 'New version ready. It installs when you leave GameNight.'
+            : 'A new version of GameNight is ready.');
     return Material(
       color: GnColors.button,
       child: Padding(
@@ -160,21 +172,28 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
           children: [
             const Icon(Icons.system_update, color: GnColors.text),
             const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(color: GnColors.text))),
+            Expanded(
+                child: Text(message,
+                    style: const TextStyle(color: GnColors.text))),
             if (_installing)
               const Padding(
                 padding: EdgeInsets.all(12),
-                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)),
               )
             else ...[
               TextButton(
                 onPressed: () => setState(() => _dismissed = true),
-                child: const Text('Later', style: TextStyle(color: GnColors.muted)),
+                child: const Text('Later',
+                    style: TextStyle(color: GnColors.muted)),
               ),
               TextButton(
                 onPressed: () => _install(reopen: true),
                 child: Text(_silent ? 'Restart now' : 'Update',
-                    style: const TextStyle(color: GnColors.text, fontWeight: FontWeight.bold)),
+                    style: const TextStyle(
+                        color: GnColors.text, fontWeight: FontWeight.bold)),
               ),
             ],
           ],

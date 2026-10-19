@@ -24,7 +24,8 @@ void main() {
 
   test('rejects malformed avatars', () {
     expect(decodeAvatar('nope'), isNull);
-    expect(decodeAvatar(jsonEncode({'v': 1, 'w': 300, 'h': 1, 'px': []})), isNull);
+    expect(
+        decodeAvatar(jsonEncode({'v': 1, 'w': 300, 'h': 1, 'px': []})), isNull);
   });
 
   test('random faces have features and differ from the last one', () {

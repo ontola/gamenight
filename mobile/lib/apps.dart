@@ -7,7 +7,8 @@ import 'package:flutter/services.dart';
 class Apps {
   static const _channel = MethodChannel('gamenight/apps');
 
-  static bool get supported => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool get supported =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   /// The installed version, or null when the app is not on this phone.
   static Future<String?> installed(String package) async {
@@ -17,7 +18,8 @@ class Apps {
 
   static Future<bool> open(String package) async {
     if (!supported) return false;
-    return await _channel.invokeMethod<bool>('open', {'package': package}) ?? false;
+    return await _channel.invokeMethod<bool>('open', {'package': package}) ??
+        false;
   }
 
   /// Whether the player allowed GameNight to install apps.
@@ -32,13 +34,17 @@ class Apps {
   /// Downloads the APK at [url] (or reads a `file:` URL) and hands it to
   /// Android. Returns once Android has it; [status] tells how it went from
   /// there. [reopen] opens GameNight again after it replaced itself.
-  static Future<void> install(Uri url, String package, {bool reopen = false}) => _channel.invokeMethod(
-      'install', {'url': url.toString(), 'package': package, if (reopen) 'reopen': true});
+  static Future<void> install(Uri url, String package, {bool reopen = false}) =>
+      _channel.invokeMethod('install', {
+        'url': url.toString(),
+        'package': package,
+        if (reopen) 'reopen': true
+      });
 
   /// Fetches the APK at [url] into the app's cache as [name] and returns
   /// its path. A finished download with that name is reused.
-  static Future<String?> download(Uri url, String name) =>
-      _channel.invokeMethod<String>('download', {'url': url.toString(), 'name': name});
+  static Future<String?> download(Uri url, String name) => _channel
+      .invokeMethod<String>('download', {'url': url.toString(), 'name': name});
 
   /// Whether Android lets GameNight update itself without asking: Android 12
   /// and newer, once GameNight installed its own previous update.
@@ -52,5 +58,6 @@ class Apps {
       _channel.invokeMethod<String>('status', {'package': package});
 
   /// Opens a store page or other link outside GameNight.
-  static Future<void> view(Uri url) => _channel.invokeMethod('view', {'url': url.toString()});
+  static Future<void> view(Uri url) =>
+      _channel.invokeMethod('view', {'url': url.toString()});
 }

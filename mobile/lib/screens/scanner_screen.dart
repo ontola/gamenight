@@ -14,7 +14,8 @@ class ScannerScreen extends StatefulWidget {
 }
 
 class _ScannerScreenState extends State<ScannerScreen> {
-  final _controller = MobileScannerController(formats: const [BarcodeFormat.qrCode]);
+  final _controller =
+      MobileScannerController(formats: const [BarcodeFormat.qrCode]);
   String? _hint;
   bool _done = false;
 
@@ -44,7 +45,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan lobby QR'), backgroundColor: GnColors.card),
+      appBar: AppBar(
+          title: const Text('Scan lobby QR'), backgroundColor: GnColors.card),
       body: Stack(children: [
         MobileScanner(controller: _controller, onDetect: _onDetect),
         Center(
@@ -68,7 +70,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              _hint ?? 'Point your camera at the QR code in the GameNight lobby.',
+              _hint ??
+                  'Point your camera at the QR code in the GameNight lobby.',
               textAlign: TextAlign.center,
             ),
           ),

@@ -17,8 +17,8 @@ Future<AppState> _state([Map<String, Object> prefs = const {}]) async {
 }
 
 FaceCanvasPainter _canvasPainter(WidgetTester tester) => tester
-    .widgetList<CustomPaint>(
-        find.descendant(of: find.byType(FaceEditorScreen), matching: find.byType(CustomPaint)))
+    .widgetList<CustomPaint>(find.descendant(
+        of: find.byType(FaceEditorScreen), matching: find.byType(CustomPaint)))
     .map((p) => p.painter)
     .whereType<FaceCanvasPainter>()
     .single;
@@ -28,7 +28,9 @@ Future<Uint8List> _render(FaceCanvasPainter painter) async {
   final recorder = ui.PictureRecorder();
   painter.paint(Canvas(recorder), const Size(48, 48));
   final image = await recorder.endRecording().toImage(48, 48);
-  return (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
+  return (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!
+      .buffer
+      .asUint8List();
 }
 
 List<int> _pixel(Uint8List rgba, int x, int y) {
@@ -43,7 +45,8 @@ void main() {
     expect(await CharacterSprite.bundled(), isNotNull);
   });
 
-  testWidgets('the You tab opens a full-screen editor and Done returns', (tester) async {
+  testWidgets('the You tab opens a full-screen editor and Done returns',
+      (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
@@ -94,7 +97,8 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('the body guide chip toggles the guide and is remembered', (tester) async {
+  testWidgets('the body guide chip toggles the guide and is remembered',
+      (tester) async {
     final state = await _state();
     await tester.pumpWidget(MaterialApp(home: FaceEditorScreen(state: state)));
     expect(_canvasPainter(tester).guide, isTrue);
@@ -111,11 +115,13 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('the body guide shows without joining a GameNight', (tester) async {
+  testWidgets('the body guide shows without joining a GameNight',
+      (tester) async {
     final state = await _state();
     // Tinting the bundled body happens off the fake clock.
     await tester.runAsync(() async {
-      await tester.pumpWidget(MaterialApp(home: FaceEditorScreen(state: state)));
+      await tester
+          .pumpWidget(MaterialApp(home: FaceEditorScreen(state: state)));
       for (var i = 0; i < 50 && _canvasPainter(tester).body == null; i++) {
         await Future<void>.delayed(const Duration(milliseconds: 20));
         await tester.pump();
@@ -129,8 +135,13 @@ void main() {
     final atlas = (await CharacterSprite.bundled())!;
     final body = await CharacterSprite.tint(atlas, '#ff0000', '#f5e9be');
     FaceCanvasPainter painter(bool guide) => FaceCanvasPainter(
-        grid: emptyFace(), skin: const Color(0xFFF5E9BE), body: body, guide: guide, revision: 0);
-    final on = await _render(painter(true)), off = await _render(painter(false));
+        grid: emptyFace(),
+        skin: const Color(0xFFF5E9BE),
+        body: body,
+        guide: guide,
+        revision: 0);
+    final on = await _render(painter(true)),
+        off = await _render(painter(false));
 
     // Shoulders from the body, in the clothing colour.
     final shoulder = _pixel(on, 20, 44);

@@ -29,8 +29,10 @@ class CatalogImage {
         return null;
       }
     }
-    if (uri.scheme == 'https' || uri.scheme == 'http') return CatalogImage(url: uri);
-    if (!uri.hasScheme && value.startsWith('/')) return CatalogImage(url: storeBase.resolveUri(uri));
+    if (uri.scheme == 'https' || uri.scheme == 'http')
+      return CatalogImage(url: uri);
+    if (!uri.hasScheme && value.startsWith('/'))
+      return CatalogImage(url: storeBase.resolveUri(uri));
     return null;
   }
 }
@@ -49,7 +51,12 @@ class CatalogMedia {
   final bool preview;
 
   const CatalogMedia(
-      {required this.kind, this.url, this.image, this.poster, this.label = '', this.preview = false});
+      {required this.kind,
+      this.url,
+      this.image,
+      this.poster,
+      this.label = '',
+      this.preview = false});
 
   static CatalogMedia? fromJson(Object? j) {
     if (j is! Map) return null;
@@ -57,7 +64,9 @@ class CatalogMedia {
     switch (j['kind']) {
       case 'image':
         final image = CatalogImage.parse(j['url']);
-        return image == null ? null : CatalogMedia(kind: MediaKind.image, image: image, label: label);
+        return image == null
+            ? null
+            : CatalogMedia(kind: MediaKind.image, image: image, label: label);
       case 'video':
       case 'trailer':
         final url = Uri.tryParse(j['url'] is String ? j['url'] as String : '');
@@ -138,7 +147,13 @@ class CatalogGame {
   String get platformLabel => platforms.isEmpty
       ? 'Platform not listed'
       : platforms
-          .map((p) => const {'mac': 'macOS', 'windows': 'Windows', 'linux': 'Linux'}[p] ?? p)
+          .map((p) =>
+              const {
+                'mac': 'macOS',
+                'windows': 'Windows',
+                'linux': 'Linux'
+              }[p] ??
+              p)
           .join(' · ');
 
   /// Where to buy a paid game, like the website's "View price & buy".
@@ -185,7 +200,8 @@ class CatalogGame {
         } on FormatException {
           coverBytes = null;
         }
-      } else if (uri != null && (uri.scheme == 'https' || uri.scheme == 'http')) {
+      } else if (uri != null &&
+          (uri.scheme == 'https' || uri.scheme == 'http')) {
         coverUrl = uri;
       } else if (uri != null && !uri.hasScheme) {
         coverUrl = storeBase.resolveUri(uri);
@@ -203,7 +219,8 @@ class CatalogGame {
           if (CatalogMedia.fromJson(item) case final m?) m,
     ];
     if (CatalogImage.parse(j['screenshot']) case final shot?) {
-      media.add(CatalogMedia(kind: MediaKind.image, image: shot, label: 'Gameplay screenshot'));
+      media.add(CatalogMedia(
+          kind: MediaKind.image, image: shot, label: 'Gameplay screenshot'));
     }
     if (media.isEmpty && (coverUrl != null || coverBytes != null)) {
       media.add(CatalogMedia(
@@ -212,7 +229,8 @@ class CatalogGame {
           label: 'Game artwork'));
     }
     // Looping previews first, then other videos and trailers, then images.
-    int rank(CatalogMedia m) => m.preview ? 0 : (m.kind == MediaKind.image ? 2 : 1);
+    int rank(CatalogMedia m) =>
+        m.preview ? 0 : (m.kind == MediaKind.image ? 2 : 1);
     final seen = <String>{};
     final unique = [
       for (final m in media)
@@ -230,7 +248,8 @@ class CatalogGame {
         }
       }
     }
-    final source = Uri.tryParse(mediaJson['source'] is String ? mediaJson['source'] as String : '');
+    final source = Uri.tryParse(
+        mediaJson['source'] is String ? mediaJson['source'] as String : '');
     return CatalogGame(
       id: id,
       title: title,
@@ -240,7 +259,9 @@ class CatalogGame {
       maxPlayers: count(players['max']),
       bestPlayers: count(players['best']),
       price: j['price']?.toString(),
-      tags: j['tags'] is List ? [for (final t in j['tags'] as List) t.toString()] : const [],
+      tags: j['tags'] is List
+          ? [for (final t in j['tags'] as List) t.toString()]
+          : const [],
       color: _color(j['color']),
       coverUrl: coverUrl,
       coverBytes: coverBytes,
@@ -256,7 +277,8 @@ class CatalogGame {
   }
 
   static Color? _color(Object? hex) {
-    if (hex is! String || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex)) return null;
+    if (hex is! String || !RegExp(r'^#[0-9a-fA-F]{6}$').hasMatch(hex))
+      return null;
     return Color(int.parse(hex.substring(1), radix: 16) | 0xFF000000);
   }
 }
@@ -311,7 +333,8 @@ class Catalog {
   Future<List<CatalogGame>> _fetch() async {
     final client = _client ?? http.Client();
     try {
-      final response = await client.get(url).timeout(const Duration(seconds: 20));
+      final response =
+          await client.get(url).timeout(const Duration(seconds: 20));
       if (response.statusCode != 200) {
         throw const CatalogError('The store did not answer. Try again later.');
       }
@@ -321,7 +344,8 @@ class Catalog {
     } on FormatException {
       throw const CatalogError('The store sent something unexpected.');
     } catch (_) {
-      throw const CatalogError('Could not reach the store. Check your internet connection.');
+      throw const CatalogError(
+          'Could not reach the store. Check your internet connection.');
     } finally {
       if (_client == null) client.close();
     }

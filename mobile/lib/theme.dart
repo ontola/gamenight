@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -103,7 +104,38 @@ ThemeData gameNightTheme() {
       indicatorColor: GnColors.button,
     ),
     snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+    pageTransitionsTheme: PageTransitionsTheme(builders: {
+      for (final platform in TargetPlatform.values)
+        platform: _WidthPageTransitionsBuilder(),
+    }),
   );
+}
+
+/// Next to the desktop sidebar a page grows from the middle of the content
+/// area; a sideways slide there shoves the whole screen past the sidebar.
+/// Phones keep their platform's own transition.
+class _WidthPageTransitionsBuilder extends PageTransitionsBuilder {
+  const _WidthPageTransitionsBuilder();
+  static const _desktop = ZoomPageTransitionsBuilder();
+  static const _cupertino = CupertinoPageTransitionsBuilder();
+  static const _android = FadeForwardsPageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+      PageRoute<T> route,
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child) {
+    final builder = MediaQuery.sizeOf(context).width >= 900
+        ? _desktop
+        : switch (Theme.of(context).platform) {
+            TargetPlatform.iOS || TargetPlatform.macOS => _cupertino,
+            _ => _android,
+          };
+    return builder.buildTransitions(
+        route, context, animation, secondaryAnimation, child);
+  }
 }
 
 /// A titled card, the building block of every screen.

@@ -48,8 +48,16 @@ Pixels? _normalize(Pixels px, [int? w, int? h]) {
       px.length != width * height) {
     return null;
   }
-  final ox = width == 32 ? 14 : width == 16 ? 22 : (gridSize - width) ~/ 2;
-  final oy = height == 32 ? 15 : height == 16 ? 23 : (gridSize - height) ~/ 2;
+  final ox = width == 32
+      ? 14
+      : width == 16
+          ? 22
+          : (gridSize - width) ~/ 2;
+  final oy = height == 32
+      ? 15
+      : height == 16
+          ? 23
+          : (gridSize - height) ~/ 2;
   final out = emptyFace();
   for (var i = 0; i < px.length; i++) {
     out[(oy + i ~/ width) * gridSize + ox + i % width] = px[i];
@@ -372,27 +380,59 @@ int _lastRecipe = -1;
 Pixels randomFace([Random? random]) {
   final rng = random ?? Random();
   var i = rng.nextInt(_recipes.length);
-  if (i == _lastRecipe) i = (i + 1 + rng.nextInt(_recipes.length - 1)) % _recipes.length;
+  if (i == _lastRecipe)
+    i = (i + 1 + rng.nextInt(_recipes.length - 1)) % _recipes.length;
   _lastRecipe = i;
   return _dress(_recipes[i](), rng);
 }
 
 const List<String> drawPalette = [
-  '#ff5555', '#ffaa00', '#ffff55', '#55ff55', '#55ffff', '#5555ff', '#ff55ff',
-  '#ffffff', '#c0c0c0', '#808080', '#404040', '#000000',
-  '#8b4513', '#ffc0cb', '#7ddf64', '#c792ea',
+  '#ff5555',
+  '#ffaa00',
+  '#ffff55',
+  '#55ff55',
+  '#55ffff',
+  '#5555ff',
+  '#ff55ff',
+  '#ffffff',
+  '#c0c0c0',
+  '#808080',
+  '#404040',
+  '#000000',
+  '#8b4513',
+  '#ffc0cb',
+  '#7ddf64',
+  '#c792ea',
 ];
 
 const List<String> skinColors = [
-  '#f5e9be', '#f2cfad', '#dfa67f', '#bc805b', '#925c3b',
-  '#633d2b', '#ffb7c5', '#8dcdaa', '#9ebfee', '#bba2d9',
+  '#f5e9be',
+  '#f2cfad',
+  '#dfa67f',
+  '#bc805b',
+  '#925c3b',
+  '#633d2b',
+  '#ffb7c5',
+  '#8dcdaa',
+  '#9ebfee',
+  '#bba2d9',
 ];
 
 const String defaultSkin = '#f5e9be';
 
 const List<String> funNames = [
-  'Falcon', 'Panda', 'Mango', 'Rocket', 'Disco', 'Waffle', 'Ninja', 'Pickle',
-  'Comet', 'Biscuit', 'Tiger', 'Noodle',
+  'Falcon',
+  'Panda',
+  'Mango',
+  'Rocket',
+  'Disco',
+  'Waffle',
+  'Ninja',
+  'Pickle',
+  'Comet',
+  'Biscuit',
+  'Tiger',
+  'Noodle',
 ];
 
 String randomName([Random? random]) =>
