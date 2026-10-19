@@ -267,7 +267,8 @@ void main() {
           HostedRoom({'status': 'connected', 'players': 2, 'discovery': {}});
       await show(tester);
       expect(find.text('Join a room'), findsNothing);
-      expect(find.textContaining('Nothing is being played'), findsOneWidget);
+      expect(
+          find.text('In the lobby. Phone screens open here.'), findsOneWidget);
 
       state.hostedRoom = HostedRoom({'status': 'waiting'});
       state.notifyListeners();
@@ -285,7 +286,13 @@ void main() {
           linked: true, playerId: 'p1', currentTitle: 'Ballkickers');
       await show(tester);
 
+      // A game's settings open from one button, never as a long list.
+      expect(find.text('Ballkickers settings'), findsNothing);
+      await tester.tap(find.text('Edit game settings'));
+      await tester.pumpAndSettle();
       expect(find.text('Ballkickers settings'), findsOneWidget);
+      await tester.tapAt(const Offset(10, 10));
+      await tester.pumpAndSettle();
       await show(tester, catalogOnly: true);
       expect(find.text('Add to queue'), findsOneWidget,
           reason: 'only for games the host has');
@@ -299,6 +306,8 @@ void main() {
       expect(find.text('Ballkickers is in the queue'), findsOneWidget);
 
       await show(tester);
+      await tester.tap(find.text('Edit game settings'));
+      await tester.pumpAndSettle();
       await tester.tap(find.byType(Switch));
       await tester.pump();
       await tester.pump();

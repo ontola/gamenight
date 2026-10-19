@@ -50,14 +50,19 @@ class GameScreen extends StatelessWidget {
             : state.api!.resolve(url);
         final controls = roomControlsFor(state);
         final session = state.session;
-        final settings = state.isGuest
+        final currentTitle = state.inHostedRoom
+            ? state.hostedRoom?.currentTitle
+            : session?.currentTitle;
+        // Games can have a dozen settings: they open from one button.
+        final Widget settings = state.isGuest || controls == null
             ? const SizedBox.shrink()
-            : SettingsSection(
+            : OutlinedButton.icon(
                 key: const ValueKey('settings'),
-                controls: controls,
-                title: state.inHostedRoom
-                    ? state.hostedRoom?.currentTitle
-                    : session?.currentTitle);
+                onPressed: () => _showSettings(
+                    context, controls, currentTitle ?? 'Game settings'),
+                icon: const Icon(Icons.tune, size: 18),
+                label: const Text('Edit game settings'),
+              );
         final catalog = CatalogSection(
             key: const ValueKey('catalog'),
             cloud: state.cloud,
@@ -187,15 +192,12 @@ class GameScreen extends StatelessWidget {
                   FilledButton(
                       onPressed: onJoin, child: const Text('Join a room')),
                 ] else if (playing != null)
-                  Hint(
-                      '$playing is on the TV. Phone controls appear here when available.')
+                  const Hint('On the TV now.')
                 else
-                  const Hint(
-                      'Nothing is being played right now. Games with a phone screen '
-                      'open here by themselves when they start.'),
+                  const Hint('In the lobby. Phone screens open here.'),
+                if (linked) ...[const SizedBox(height: 12), settings],
               ]),
               if (state.companionError case final String error) Hint(error),
-              settings,
               if (playlist case final playlist?) playlist,
               ...below,
             ]));

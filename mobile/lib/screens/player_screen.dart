@@ -38,6 +38,7 @@ class PlayerScreen extends StatefulWidget {
 
 class _PlayerScreenState extends State<PlayerScreen> {
   late final _name = TextEditingController(text: widget.state.name);
+  final _nameFocus = FocusNode();
   final _body = TintedBody();
 
   AppState get state => widget.state;
@@ -55,6 +56,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     state.removeListener(_onState);
     _body.dispose();
     _name.dispose();
+    _nameFocus.dispose();
     super.dispose();
   }
 
@@ -139,6 +141,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextField(
         controller: _name,
+        focusNode: _nameFocus,
         maxLength: 20,
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
@@ -147,12 +150,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
           hintText: 'Your name',
           prefixIcon: const SizedBox(width: 48),
           suffixIcon: IconButton(
-            tooltip: 'Random name',
-            icon: const Text('🎲', style: TextStyle(fontSize: 20)),
+            tooltip: 'Change name',
+            icon: const Icon(Icons.edit, size: 20, color: GnColors.muted),
             onPressed: () {
-              final n = randomName();
-              _name.text = n;
-              state.setName(n);
+              _nameFocus.requestFocus();
+              _name.selection =
+                  TextSelection(baseOffset: 0, extentOffset: _name.text.length);
             },
           ),
         ),

@@ -147,15 +147,25 @@ class RoomScreenState extends State<RoomScreen> {
                     children: cards));
           }
           // One screen: the game, then the playlist cut short, then the room.
+          final leave = Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: OutlinedButton.icon(
+              onPressed: _busy ? null : _leave,
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Leave room'),
+            ),
+          );
+          final game = GameScreen(
+              state: state,
+              onJoin: () {},
+              playlist: PlaylistPeek(state: state),
+              below: [...cards, leave]);
+          // A game's phone screen fills the page, so the way out stays on top.
+          if (state.companion?.url == null) return game;
           return Column(children: [
             // Hidden, never removed: the game page below must keep its state.
             Visibility(visible: !state.companionFullscreen, child: _roomBar()),
-            Expanded(
-                child: GameScreen(
-                    state: state,
-                    onJoin: () {},
-                    playlist: PlaylistPeek(state: state),
-                    below: cards)),
+            Expanded(child: game),
           ]);
         });
   }
@@ -303,7 +313,8 @@ class RoomScreenState extends State<RoomScreen> {
                       (room == null
                           ? 'Checking your room…'
                           : connected
-                              ? 'Connected as ${state.name}'
+                              ? 'Connected as ${state.name} · '
+                                  '${room.players} ${room.players == 1 ? 'player' : 'players'}'
                               : room.choosingPlayer
                                   ? 'Choose your player above'
                                   : waiting
@@ -314,63 +325,54 @@ class RoomScreenState extends State<RoomScreen> {
                 ),
               ),
             ]),
-            const SizedBox(height: 8),
-            Hint(connected
-                ? 'Your name and face follow you into every game.'
-                : room?.choosingPlayer == true
-                    ? 'No account needed.'
-                    : waiting
-                        ? 'Connect a controller on the TV. Your player will appear here.'
-                        : 'The pickup expired or you left. Enter the room code again.'),
-            if (connected) ...[
-              const SizedBox(height: 12),
-              _Facts(rows: [
-                ('Players in the room', '${room!.players}'),
-                ('Current game', room.current ?? 'In the lobby'),
-                ('Up next', room.next ?? 'No game queued'),
-              ]),
-              if (!room.fresh)
-                const Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child:
-                      Hint('The GameNight PC has not checked in for a moment.'),
+            if (!connected) ...[
+              const SizedBox(height: 8),
+              Hint(room?.choosingPlayer == true
+                  ? 'No account needed.'
+                  : waiting
+                      ? 'Connect a controller on the TV. Your player will appear here.'
+                      : 'The pickup expired or you left. Enter the room code again.'),
+            ],
+            if (connected && !room!.fresh)
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child:
+                    Hint('The GameNight PC has not checked in for a moment.'),
+              ),
+            if (!state.isGuest && room != null && (connected || waiting)) ...[
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                value: room.mainPlayer,
+                onChanged: _busy
+                    ? null
+                    : (v) => _run(() async {
+                          await state.setHostedMainPlayer(v);
+                          return v
+                              ? 'You are the main player on this GameNight.'
+                              : 'Your player will no longer appear automatically.';
+                        }),
+                title: const Text('Main player on this GameNight'),
+                subtitle: const Text('Wait at the door when GameNight starts.'),
+              ),
+              if (!room.mainPlayer)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: room.remembered,
+                  onChanged: _busy
+                      ? null
+                      : (v) => _run(() async {
+                            await state.setHostedRemember(v);
+                            return v
+                                ? 'Your player will be waiting here next time.'
+                                : 'Your player will no longer be remembered here.';
+                          }),
+                  title: const Text('Remember me on this GameNight'),
                 ),
             ],
           ]),
       if (room != null && (waiting || room.choosingPlayer))
         _phoneSeatCard(asked: room.phoneSeat),
-      if (!state.isGuest && room != null && (connected || waiting))
-        Section(children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: room.mainPlayer,
-            onChanged: _busy
-                ? null
-                : (v) => _run(() async {
-                      await state.setHostedMainPlayer(v);
-                      return v
-                          ? 'You are the main player on this GameNight.'
-                          : 'Your player will no longer appear automatically.';
-                    }),
-            title: const Text('Main player on this GameNight'),
-            subtitle: const Text(
-                'Appear at the door on startup, ready for your controller.'),
-          ),
-          if (!room.mainPlayer)
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              value: room.remembered,
-              onChanged: _busy
-                  ? null
-                  : (v) => _run(() async {
-                        await state.setHostedRemember(v);
-                        return v
-                            ? 'Your player will be waiting here next time.'
-                            : 'Your player will no longer be remembered here.';
-                      }),
-              title: const Text('Remember me on this GameNight'),
-            ),
-        ]),
       if (room != null && room.none)
         Section(title: 'Room code', children: [_codeField(), _rememberBox()]),
       if (!connected)
@@ -539,15 +541,15 @@ class RoomScreenState extends State<RoomScreen> {
         const SizedBox(height: 12),
         _Facts(rows: [
           ('Players in the party', s == null ? '—' : '${s.players}'),
-          (
-            'Current game',
-            s == null
-                ? '—'
-                : s.currentTitle == null
-                    ? 'In the lobby'
-                    : '${s.currentTitle} · ${s.currentPhase}'
-          ),
-          ('Up next', s == null ? '—' : s.next ?? 'No game queued'),
+          if (!linked)
+            (
+              'Current game',
+              s == null
+                  ? '—'
+                  : s.currentTitle == null
+                      ? 'In the lobby'
+                      : '${s.currentTitle} · ${s.currentPhase}'
+            ),
         ]),
         if (waiting) ...[
           const SizedBox(height: 12),
@@ -585,8 +587,7 @@ class RoomScreenState extends State<RoomScreen> {
                           : 'Your player will no longer appear automatically.';
                     }),
             title: const Text('Main player on this GameNight'),
-            subtitle: const Text(
-                'Appear at the door on startup, ready for your controller.'),
+            subtitle: const Text('Wait at the door when GameNight starts.'),
           ),
           if (!s.mainPlayer)
             SwitchListTile(
@@ -627,15 +628,17 @@ class RoomScreenState extends State<RoomScreen> {
             onPressed: _busy ? null : _scan,
             child: const Text('Scan again'),
           ),
-          TextButton(
-            onPressed: _busy
-                ? null
-                : () => _run(() async {
-                      await state.disconnect();
-                      return 'Disconnected. Your player is kept on this phone.';
-                    }),
-            child: const Text('Leave'),
-          ),
+          // Linked, Leave room at the bottom does this.
+          if (!linked)
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => _run(() async {
+                        await state.disconnect();
+                        return 'Disconnected. Your player is kept on this phone.';
+                      }),
+              child: const Text('Leave'),
+            ),
         ]),
       ]),
     ];
