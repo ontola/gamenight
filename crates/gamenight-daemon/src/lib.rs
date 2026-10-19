@@ -145,6 +145,55 @@ impl HostUpdate {
     }
 }
 
+/// Whether the window in front belongs to `executable`.
+#[cfg(windows)]
+fn foreground_is(executable: &std::path::Path) -> bool {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::{
+        Foundation::CloseHandle,
+        System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+            PROCESS_QUERY_LIMITED_INFORMATION,
+        },
+        UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
+    };
+    let Ok(wanted) = executable.canonicalize() else {
+        return false;
+    };
+    unsafe {
+        let window = GetForegroundWindow();
+        if window.is_null() {
+            return false;
+        }
+        let mut pid = 0;
+        GetWindowThreadProcessId(window, &mut pid);
+        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+        if process.is_null() {
+            return false;
+        }
+        let mut buffer = [0u16; 1024];
+        let mut length = buffer.len() as u32;
+        let ok = QueryFullProcessImageNameW(
+            process,
+            PROCESS_NAME_WIN32,
+            buffer.as_mut_ptr(),
+            &mut length,
+        );
+        CloseHandle(process);
+        if ok == 0 {
+            return false;
+        }
+        let path =
+            std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length as usize]));
+        path.canonicalize().is_ok_and(|path| path == wanted)
+    }
+}
+
+#[cfg(not(windows))]
+fn foreground_is(_executable: &std::path::Path) -> bool {
+    false
+}
+
 /// How long the lobby waits with everyone asleep (no controller touched for
 /// over a minute) before updating on its own.
 const UNATTENDED_UPDATE_AFTER: std::time::Duration = std::time::Duration::from_secs(60);
@@ -287,7 +336,7 @@ impl Shared {
         if self.update_ready.is_none() {
             return Err("no update is ready".into());
         }
-        if !self.night.between_games() {
+        if !self.lobby_on_screen() {
             return Err("finish the current game before updating".into());
         }
         self.restart_with_party(None)?;
@@ -369,11 +418,28 @@ impl Shared {
         Ok(())
     }
 
+    /// Nobody is pulled out of a game by a restart. The night's own state
+    /// knows when the lobby took over; a game left running behind it (the
+    /// party switched windows, or the game went back without telling us)
+    /// only shows on the desktop, so ask Windows which window is in front.
+    fn lobby_on_screen(&self) -> bool {
+        if self.night.between_games() {
+            return true;
+        }
+        let Some(lobby) = self.lobby_game.as_ref() else {
+            return false;
+        };
+        let Some(spec) = self.launch_specs.get(lobby) else {
+            return false;
+        };
+        foreground_is(std::path::Path::new(&spec.command))
+    }
+
     /// A quiet lobby updates by itself: nobody bothered, party kept.
     fn maybe_update_unattended(&mut self) {
         let idle = self.update_ready.is_some()
             && self.night.couch_idle()
-            && self.night.between_games()
+            && self.lobby_on_screen()
             && !self.shutdown_requested;
         if !idle {
             self.unattended_since = None;
