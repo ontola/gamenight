@@ -17,11 +17,18 @@ frames and wait for what the game sends back or prints:
         host.hold(frame(BUTTON_A), 0.1)
         host.saw("jump Ada")          # a line the game printed (GAME_TRACE=1)
         host.pause(); host.resume(); host.dispose()
+        host.disconnect()             # host loss: a launched game quits
+        assert host.exit_code(10) == 0
 
 Lessons built in: a free port so a real GameNight is never touched, the
 game's output goes to a file (an unread pipe stalls Godot on Windows), and
 `hold` repeats frames because input older than 250 ms counts as released.
 Pass `pack=` to test the exported game, which is where missing files show.
+Pass `command=` to start the game some other way (a packaged .exe, a launcher
+script, a window instead of --headless); the host still provides the port.
+
+`HostClient` is the other side: it connects to a real GameNight daemon the way
+the overlay or a phone does, for tests that drive an installed GameNight.
 """
 from __future__ import annotations
 
@@ -30,6 +37,7 @@ import hashlib
 import json
 import os
 import queue
+import secrets
 import socket
 import struct
 import subprocess
@@ -54,11 +62,13 @@ def frame(*buttons: int, left=(0.0, 0.0), right=(0.0, 0.0), triggers=(0.0, 0.0),
 
 class FakeHost:
     def __init__(self, godot: str, game_id: str, path: str | Path = ".", pack: str = "",
-                 args: list[str] | None = None, env: dict | None = None, timeout: float = 30.0):
+                 args: list[str] | None = None, env: dict | None = None, timeout: float = 30.0,
+                 command: list[str] | None = None, cwd: str | Path | None = None):
         self.game_id = game_id
         self.timeout = timeout
         self.session = ""
         self.inbox: queue.Queue = queue.Queue()
+        self.messages: list[dict] = []  # everything the game sent, in order
         self._server = socket.socket()
         self._server.bind(("127.0.0.1", 0))
         self._server.listen(1)
@@ -69,20 +79,26 @@ class FakeHost:
                       GAMENIGHT_GAME_ID=game_id, GAMENIGHT_TOKEN="fake-host-token", GAME_TRACE="1")
         launch.update(env or {})
         where = ["--main-pack", pack] if pack else ["--path", str(path)]
-        self.process = subprocess.Popen([godot, "--headless", "--audio-driver", "Dummy", *where, *(args or [])],
-                                        env=launch, stdin=subprocess.DEVNULL, stdout=self._log,
-                                        stderr=subprocess.STDOUT)
-        self._server.settimeout(timeout)
-        try:
-            self._peer, _ = self._server.accept()
-        except socket.timeout:
-            raise AssertionError(f"the game never connected; output:\n{self.output()[-2000:]}") from None
-        self._handshake()
+        command = command or [godot, "--headless", "--audio-driver", "Dummy", *where, *(args or [])]
+        self._peer = None
         self._lock = threading.Lock()
-        threading.Thread(target=self._read, daemon=True).start()
-        self.hello = self.expect("hello")
-        assert self.hello.get("game") == game_id, self.hello
-        assert self.hello.get("token") == "fake-host-token", self.hello
+        self.process = subprocess.Popen(command, env=launch, cwd=cwd, stdin=subprocess.DEVNULL,
+                                        stdout=self._log, stderr=subprocess.STDOUT)
+        try:
+            self._server.settimeout(timeout)
+            try:
+                self._peer, _ = self._server.accept()
+            except socket.timeout:
+                raise AssertionError(f"the game never connected; output:\n{self.output()[-2000:]}") from None
+            _accept_handshake(self._peer, timeout)
+            threading.Thread(target=_read_messages, args=(self._peer, self._lock, self._received),
+                             daemon=True).start()
+            self.hello = self.expect("hello")
+            assert self.hello.get("game") == game_id, self.hello
+            assert self.hello.get("token") == "fake-host-token", self.hello
+        except BaseException:
+            self.close()
+            raise
 
     # -- context manager ----------------------------------------------------
 
@@ -93,10 +109,7 @@ class FakeHost:
         self.close()
 
     def close(self) -> None:
-        try:
-            self._peer.close()
-        except OSError:
-            pass
+        self.disconnect()
         self._server.close()
         if self.process.poll() is None:
             self.process.terminate()
@@ -106,7 +119,32 @@ class FakeHost:
                 self.process.kill()
         self._log.close()
 
+    def disconnect(self) -> None:
+        """Drop the connection the way a GameNight that goes away does."""
+        if self._peer is None:
+            return
+        try:
+            self._peer.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self._peer.close()
+
+    def exit_code(self, timeout: float = 10.0) -> int:
+        """Wait for the game to quit and return its exit code."""
+        try:
+            return self.process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            raise AssertionError(f"the game did not quit; output:\n{self.output()[-2000:]}") from None
+
     # -- what the game sends and prints -------------------------------------
+
+    def _received(self, msg: dict) -> None:
+        self.messages.append(msg)
+        self.inbox.put(msg)
+
+    def count(self, kind: str) -> int:
+        """How many messages of this type the game has sent so far."""
+        return sum(1 for m in list(self.messages) if m.get("type") == kind)
 
     def expect(self, kind: str, check=lambda m: True, timeout: float | None = None) -> dict:
         """Wait for a message of this type from the game, skipping others."""
@@ -135,15 +173,7 @@ class FakeHost:
     # -- what the host sends --------------------------------------------------
 
     def send(self, msg: dict) -> None:
-        data = json.dumps(msg).encode()
-        if len(data) < 126:
-            header = bytes([0x81, len(data)])
-        elif len(data) < 65536:
-            header = bytes([0x81, 126]) + struct.pack("!H", len(data))
-        else:
-            header = bytes([0x81, 127]) + struct.pack("!Q", len(data))
-        with self._lock:
-            self._peer.sendall(header + data)
+        _send_text(self._peer, self._lock, json.dumps(msg).encode(), masked=False)
 
     def welcome(self, party: dict | None = None, godot_sdk: int = 0) -> None:
         self.send({"type": "welcome", "protocol_version": 1, "godot_sdk": godot_sdk, "party": party or {}})
@@ -199,58 +229,143 @@ class FakeHost:
         if data is not None:
             self.send({"type": "companion_message", "player_id": player_id, "data": data})
 
-    # -- WebSocket ------------------------------------------------------------
 
-    def _handshake(self) -> None:
-        self._peer.settimeout(self.timeout)
-        request = b""
-        while b"\r\n\r\n" not in request:
-            chunk = self._peer.recv(4096)
+
+class HostClient:
+    """Talks to a real GameNight daemon as the overlay or a phone does.
+
+        client = HostClient(port)
+        client.send({"type": "hello", "role": "overlay"})
+        client.expect("party")
+    """
+
+    def __init__(self, port: int, host: str = "127.0.0.1", timeout: float = 3.0):
+        self.messages: list[dict] = []
+        self.inbox: queue.Queue = queue.Queue()
+        self._lock = threading.Lock()
+        self.peer = socket.create_connection((host, port), timeout=timeout)
+        key = base64.b64encode(secrets.token_bytes(16)).decode()
+        self.peer.sendall((f"GET / HTTP/1.1\r\nHost: {host}:{port}\r\nUpgrade: websocket\r\n"
+                           f"Connection: Upgrade\r\nSec-WebSocket-Key: {key}\r\n"
+                           "Sec-WebSocket-Version: 13\r\n\r\n").encode())
+        response = b""
+        while b"\r\n\r\n" not in response:
+            chunk = self.peer.recv(1)
             if not chunk:
-                raise AssertionError("the game closed the connection during the handshake")
-            request += chunk
-        headers = {k.strip().lower(): v.strip() for k, v in
-                   (line.split(":", 1) for line in request.decode().split("\r\n")[1:] if ":" in line)}
-        accept = base64.b64encode(hashlib.sha1((headers["sec-websocket-key"] +
-                                                "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
-        self._peer.sendall(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
-                            f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode())
-        self._peer.settimeout(None)
+                raise AssertionError("GameNight closed the connection during the handshake")
+            response += chunk
+        assert response.split(b"\r\n", 1)[0].split(b" ")[1:2] == [b"101"], response
+        self.peer.settimeout(None)
+        threading.Thread(target=_read_messages, args=(self.peer, self._lock, self._received, True),
+                         daemon=True).start()
 
-    def _exact(self, count: int) -> bytes:
-        data = b""
-        while len(data) < count:
-            chunk = self._peer.recv(count - len(data))
-            if not chunk:
-                raise EOFError
-            data += chunk
-        return data
+    def _received(self, msg: dict) -> None:
+        self.messages.append(msg)
+        self.inbox.put(msg)
 
-    def _read(self) -> None:
-        message = b""
+    def send(self, msg: dict) -> None:
+        _send_text(self.peer, self._lock, json.dumps(msg).encode(), masked=True)
+
+    def expect(self, kind: str, check=lambda m: True, timeout: float = 30.0) -> dict:
+        end = time.monotonic() + timeout
+        while (left := end - time.monotonic()) > 0:
+            try:
+                msg = self.inbox.get(timeout=left)
+            except queue.Empty:
+                break
+            if msg.get("type") == kind and check(msg):
+                return msg
+        raise AssertionError(f"GameNight never sent {kind}")
+
+    def close(self) -> None:
         try:
-            while True:
-                first, second = self._exact(2)
-                count = second & 127
-                if count == 126:
-                    count = struct.unpack("!H", self._exact(2))[0]
-                elif count == 127:
-                    count = struct.unpack("!Q", self._exact(8))[0]
-                mask = self._exact(4) if second & 128 else b""
-                payload = self._exact(count)
-                if mask:
-                    payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
-                opcode = first & 15
-                if opcode == 8:
-                    break
-                if opcode == 9:
-                    with self._lock:
-                        self._peer.sendall(bytes([0x8A, len(payload)]) + payload)
-                    continue
-                if opcode in (0, 1):
-                    message += payload
-                    if first & 0x80:
-                        self.inbox.put(json.loads(message))
-                        message = b""
-        except (EOFError, OSError, ValueError):
+            self.peer.close()
+        except OSError:
             pass
+
+    def __enter__(self) -> "HostClient":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()
+
+
+# -- WebSocket (RFC 6455, just what GameNight uses) ---------------------------
+
+def _accept_handshake(peer: socket.socket, timeout: float) -> None:
+    peer.settimeout(timeout)
+    request = b""
+    while b"\r\n\r\n" not in request:
+        chunk = peer.recv(4096)
+        if not chunk:
+            raise AssertionError("the game closed the connection during the handshake")
+        request += chunk
+    headers = {k.strip().lower(): v.strip() for k, v in
+               (line.split(":", 1) for line in request.decode().split("\r\n")[1:] if ":" in line)}
+    accept = base64.b64encode(hashlib.sha1((headers["sec-websocket-key"] +
+                                            "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
+    peer.sendall(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                  f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode())
+    peer.settimeout(None)
+
+
+def _send_frame(peer: socket.socket, lock: threading.Lock, opcode: int, data: bytes, masked: bool) -> None:
+    """Servers send unmasked frames; clients must mask theirs."""
+    size = len(data)
+    mask_bit = 0x80 if masked else 0
+    if size < 126:
+        header = bytes([0x80 | opcode, mask_bit | size])
+    elif size < 65536:
+        header = bytes([0x80 | opcode, mask_bit | 126]) + struct.pack("!H", size)
+    else:
+        header = bytes([0x80 | opcode, mask_bit | 127]) + struct.pack("!Q", size)
+    if masked:
+        mask = secrets.token_bytes(4)
+        header += mask
+        data = bytes(b ^ mask[i % 4] for i, b in enumerate(data))
+    with lock:
+        peer.sendall(header + data)
+
+
+def _send_text(peer: socket.socket, lock: threading.Lock, data: bytes, masked: bool) -> None:
+    _send_frame(peer, lock, 0x1, data, masked)
+
+
+def _exact(peer: socket.socket, count: int) -> bytes:
+    data = b""
+    while len(data) < count:
+        chunk = peer.recv(count - len(data))
+        if not chunk:
+            raise EOFError
+        data += chunk
+    return data
+
+
+def _read_messages(peer: socket.socket, lock: threading.Lock, deliver, masked: bool = False) -> None:
+    """Hand each JSON text message to `deliver` until the connection ends."""
+    message = b""
+    try:
+        while True:
+            first, second = _exact(peer, 2)
+            count = second & 127
+            if count == 126:
+                count = struct.unpack("!H", _exact(peer, 2))[0]
+            elif count == 127:
+                count = struct.unpack("!Q", _exact(peer, 8))[0]
+            mask = _exact(peer, 4) if second & 128 else b""
+            payload = _exact(peer, count)
+            if mask:
+                payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+            opcode = first & 15
+            if opcode == 8:
+                break
+            if opcode == 9:
+                _send_frame(peer, lock, 0xA, payload, masked)
+                continue
+            if opcode in (0, 1):
+                message += payload
+                if first & 0x80:
+                    deliver(json.loads(message))
+                    message = b""
+    except (EOFError, OSError, ValueError):
+        pass

@@ -48,7 +48,11 @@ def main() -> int:
             host.resume()
             host.dispose()
             host.saw("disposed")
+            assert host.count("ready") == 1 and host.messages[0]["type"] == "hello", host.messages
             print("ok: pause, resume and dispose")
+            host.disconnect()
+            assert host.exit_code(15) == 0, host.output()
+            print("ok: the game quits when the host goes away")
     print("fake host: all good")
     return 0
 

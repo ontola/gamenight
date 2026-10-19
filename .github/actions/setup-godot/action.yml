@@ -1,0 +1,106 @@
+# Installs a pinned, checksum-verified Godot editor on a Linux or Windows runner,
+# and optionally the export templates a build needs. One place for every
+# GameNight repository's Godot download:
+#
+#   - id: godot
+#     uses: ontola/gamenight/.github/actions/setup-godot@main
+#     with:
+#       version: 4.5.2
+#       export-templates: windows_release_x86_64.exe windows_release_x86_64_console.exe
+#   - run: ${{ steps.godot.outputs.godot }} --headless --path . --script res://tests/x.gd
+#
+# A version missing from the checksum table below fails the step; add its
+# sha256 (from the release's SHA512-SUMS.txt download, re-hashed) to use it.
+name: Set up Godot
+description: Download a pinned Godot editor (and export templates), verified by sha256
+inputs:
+  version:
+    description: Godot stable version, for example 4.5.2 or 4.7
+    default: 4.5.2
+  export-templates:
+    description: Space-separated template files to install from the .tpz (Linux only), for example windows_release_x86_64.exe
+    default: ''
+outputs:
+  godot:
+    description: The editor to run from scripts (on Windows the _console.exe wrapper)
+    value: ${{ steps.linux.outputs.godot || steps.windows.outputs.godot }}
+  godot-gui:
+    description: The editor executable itself (on Windows the .exe without a console wrapper)
+    value: ${{ steps.linux.outputs.godot-gui || steps.windows.outputs.godot-gui }}
+runs:
+  using: composite
+  steps:
+    - id: linux
+      if: runner.os == 'Linux'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TEMPLATES: ${{ inputs.export-templates }}
+      run: |
+        set -euo pipefail
+        sum() {
+          case "$1" in
+            Godot_v4.5.2-stable_linux.x86_64.zip) echo 87f6e6be292929e363d15ed9052f277b2ba4e95ed994e1e099048097be2dfd03 ;;
+            Godot_v4.5.2-stable_export_templates.tpz) echo ea50e5183f057d42b22120d0d0340205b98f51f8ff13c33c70fd4ac9077d2019 ;;
+            Godot_v4.6.2-stable_linux.x86_64.zip) echo 30e6b6d141f0cd5bebd629ad1d0ef1324e60091bb20662d026b402ba58c59937 ;;
+            Godot_v4.6.2-stable_export_templates.tpz) echo 942366dc4e27e7686a99da4d3cfb1b8ae8d3eb9444f6d8217eef16245b599ef2 ;;
+            Godot_v4.7-stable_linux.x86_64.zip) echo 0b1a6c54c2c619c12e169fe9241edda4b81080b519451cec2984bf0d2c6cb73c ;;
+            Godot_v4.7-stable_export_templates.tpz) echo 9714459dc071907c0f3d5f17d608faf69e7cda21331fc5d39c4503ffa4e99eec ;;
+            *) echo "::error::setup-godot has no sha256 for $1; add it to .github/actions/setup-godot/action.yml" >&2; return 1 ;;
+          esac
+        }
+        fetch() {
+          local name="$1" out="$2" expected
+          expected="$(sum "$name")"
+          curl -fsSL --retry 3 --retry-all-errors -o "$out" "https://github.com/godotengine/godot-builds/releases/download/${VERSION}-stable/$name"
+          echo "$expected  $out" | sha256sum -c -
+        }
+        dir="$RUNNER_TEMP/godot-$VERSION"
+        mkdir -p "$dir"
+        fetch "Godot_v${VERSION}-stable_linux.x86_64.zip" "$dir/godot.zip"
+        unzip -q -o "$dir/godot.zip" -d "$dir" && rm "$dir/godot.zip"
+        bin="$dir/Godot_v${VERSION}-stable_linux.x86_64"
+        chmod +x "$bin"
+        if [ -n "$TEMPLATES" ]; then
+          fetch "Godot_v${VERSION}-stable_export_templates.tpz" "$dir/templates.tpz"
+          target="$HOME/.local/share/godot/export_templates/$(unzip -p "$dir/templates.tpz" templates/version.txt | tr -d '[:space:]')"
+          mkdir -p "$target"
+          files=(templates/version.txt)
+          for t in $TEMPLATES; do files+=("templates/$t"); done
+          unzip -q -o -j "$dir/templates.tpz" "${files[@]}" -d "$target"
+          rm "$dir/templates.tpz"
+        fi
+        echo "$dir" >> "$GITHUB_PATH"
+        echo "GODOT=$bin" >> "$GITHUB_ENV"
+        echo "godot=$bin" >> "$GITHUB_OUTPUT"
+        echo "godot-gui=$bin" >> "$GITHUB_OUTPUT"
+        "$bin" --version
+    - id: windows
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        VERSION: ${{ inputs.version }}
+        TEMPLATES: ${{ inputs.export-templates }}
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if ($env:TEMPLATES) { throw 'setup-godot installs export templates on Linux runners only' }
+        $sums = @{
+          'Godot_v4.5.2-stable_win64.exe.zip' = '3766090865330ab2a0ed33594520394b711c620b1378f9223904faeef60f2f14'
+          'Godot_v4.6.2-stable_win64.exe.zip' = '14293422efb54b24a51f79d4cb55ab4001ef3d936e064a6c8af32e1f984024be'
+          'Godot_v4.7-stable_win64.exe.zip' = '02a5312236f4e0209c78bcb2f52135b1963e6b8888c873c9cee81459e60bcd71'
+        }
+        $name = "Godot_v$($env:VERSION)-stable_win64.exe.zip"
+        if (-not $sums.ContainsKey($name)) { throw "setup-godot has no sha256 for $name; add it to .github/actions/setup-godot/action.yml" }
+        $dir = Join-Path $env:RUNNER_TEMP "godot-$($env:VERSION)"
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+        $archive = Join-Path $dir 'godot.zip'
+        Invoke-WebRequest "https://github.com/godotengine/godot-builds/releases/download/$($env:VERSION)-stable/$name" -OutFile $archive
+        if ((Get-FileHash $archive -Algorithm SHA256).Hash -ne $sums[$name]) { throw "Godot checksum mismatch for $name" }
+        Expand-Archive $archive $dir -Force
+        Remove-Item $archive
+        $gui = Join-Path $dir "Godot_v$($env:VERSION)-stable_win64.exe"
+        $console = Join-Path $dir "Godot_v$($env:VERSION)-stable_win64_console.exe"
+        Add-Content -Path $env:GITHUB_PATH -Value $dir
+        Add-Content -Path $env:GITHUB_ENV -Value "GODOT=$console"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "godot=$console"
+        Add-Content -Path $env:GITHUB_OUTPUT -Value "godot-gui=$gui"
