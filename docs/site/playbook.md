@@ -74,6 +74,28 @@ Build flags for everything you would otherwise set up by hand:
 Look at the screenshots yourself after visual changes. Text over characters
 and HUD clutter read badly on a TV; let shapes and colour carry the state.
 
+## Make 3D models
+
+Image-to-3D tools (Tripo, Meshy, Hunyuan3D, Hyper3D) give a quick first shape
+but rarely exactly what you want, and an agent driving Blender tends to lose
+detail. What works better for hard-surface models (props, vehicles, buildings):
+
+1. Generate a rough model from a concept image with one of those tools.
+2. Import it into the Godot project as a reference only.
+3. Have the agent build a new model next to it in Godot itself, from CSG
+   shapes or a `SurfaceTool`/`ArrayMesh` in code, adding the details and
+   proportions you need. No Blender, no plugin or MCP is required.
+4. Render it with `--shot` from a few angles, compare it with the reference
+   and iterate. A second agent that only reviews the screenshots catches more
+   than the builder checking its own work.
+
+Bake CSG into a plain mesh (`CSGShape3D.bake_static_mesh()`) before it ships:
+CSG is slow at runtime. Code-built meshes need no baking and stay easy to
+change; most of our games already build their models this way. Rigged
+characters (bones, weight painting) still need a real modelling tool.
+
+From an [r/aigamedev workflow post](https://www.reddit.com/r/aigamedev/comments/1xa3gju/new_crazy_workflow_for_making_3d_assets/), October 2026.
+
 ## Design for the couch
 
 Players sit on a sofa, a few metres from the TV, holding controllers, and
