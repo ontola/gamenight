@@ -11,7 +11,9 @@ from pathlib import Path
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("app", type=Path)
 parser.add_argument("--output", type=Path, required=True)
-parser.add_argument("--timeout", type=float, default=100)
+# The CI runner's paravirtual GPU compiles Godot's Forward+ shaders slowly on
+# a first start; a real Mac starts the Game Room in seconds.
+parser.add_argument("--timeout", type=float, default=420)
 args = parser.parse_args()
 app = args.app.resolve()
 output = args.output.resolve()
@@ -42,12 +44,14 @@ def diagnose():
     command = [str(helper / "MacOS/GameNight"), "--verbose", "--main-pack", str(helper / "Resources/GameNight.pck")]
     try:
         result = subprocess.run(command, env=dict(os.environ, GAMENIGHT_ADDR="127.0.0.1:9"),
-                                capture_output=True, text=True, timeout=40)
+                                capture_output=True, text=True, timeout=120)
         text = result.stdout + result.stderr
     except subprocess.TimeoutExpired as stopped:
         text = "".join(part.decode(errors="replace") if isinstance(part, bytes) else (part or "")
                        for part in (stopped.stdout, stopped.stderr))
-    print("\n".join(text.splitlines()[-100:]))
+    lines = [line for line in text.splitlines()
+             if not line.startswith(("Loading cache for shader", "Shader '"))]
+    print("\n".join(lines[-100:]))
 
 
 with (output / "launcher.log").open("w") as log:
