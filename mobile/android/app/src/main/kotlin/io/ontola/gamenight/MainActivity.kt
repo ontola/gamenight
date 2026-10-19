@@ -49,9 +49,27 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(null)
                     }
+                    "download" -> {
+                        val url = call.argument<String>("url")!!
+                        val name = call.argument<String>("name")!!
+                        Thread {
+                            try {
+                                val path = download(url, name)
+                                main.post { result.success(path) }
+                            } catch (e: Exception) {
+                                main.post { result.error("download", e.message ?: e.toString(), null) }
+                            }
+                        }.start()
+                    }
+                    "silentSelfUpdate" -> result.success(silentSelfUpdate())
                     "install" -> {
                         val url = call.argument<String>("url")!!
                         val pkg = call.argument<String>("package")!!
+                        val reopen = call.argument<Boolean>("reopen") ?: false
+                        if (pkg == packageName) {
+                            getSharedPreferences(UpdatedReceiver.PREFS, MODE_PRIVATE).edit()
+                                .putBoolean(UpdatedReceiver.REOPEN, reopen).commit()
+                        }
                         Thread {
                             try {
                                 install(url, pkg)
@@ -77,6 +95,34 @@ class MainActivity : FlutterActivity() {
         null
     }
 
+    /// Android 12+ updates an app without asking when the app installed
+    /// itself last time: true after the first update through GameNight.
+    private fun silentSelfUpdate(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false
+        return try {
+            packageManager.getInstallSourceInfo(packageName).installingPackageName == packageName
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /// Fetch an APK ahead of time, so installing it later is instant.
+    private fun download(url: String, name: String): String {
+        val dir = java.io.File(cacheDir, "updates")
+        dir.mkdirs()
+        val target = java.io.File(dir, name)
+        if (target.isFile && target.length() > 0) return target.path
+        dir.listFiles()?.forEach { it.delete() }
+        val partial = java.io.File(dir, "$name.part")
+        val conn = URL(url).openConnection() as HttpURLConnection
+        conn.connectTimeout = 10_000
+        conn.readTimeout = 30_000
+        if (conn.responseCode != 200) throw Exception("download failed: HTTP ${conn.responseCode}")
+        conn.inputStream.use { input -> partial.outputStream().use { input.copyTo(it) } }
+        if (!partial.renameTo(target)) throw Exception("could not keep the download")
+        return target.path
+    }
+
     private fun install(url: String, pkg: String) {
         InstallReceiver.status.remove(pkg)
         val installer = packageManager.packageInstaller
@@ -88,12 +134,15 @@ class MainActivity : FlutterActivity() {
         val id = installer.createSession(params)
         val session = installer.openSession(id)
         try {
-            val conn = URL(url).openConnection() as HttpURLConnection
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 30_000
-            if (conn.responseCode != 200) throw Exception("download failed: HTTP ${conn.responseCode}")
-            val size = conn.contentLengthLong
-            conn.inputStream.use { input ->
+            val file = if (url.startsWith("file:")) java.io.File(Uri.parse(url).path!!) else null
+            val conn = if (file == null) URL(url).openConnection() as HttpURLConnection else null
+            if (conn != null) {
+                conn.connectTimeout = 10_000
+                conn.readTimeout = 30_000
+                if (conn.responseCode != 200) throw Exception("download failed: HTTP ${conn.responseCode}")
+            }
+            val size = file?.length() ?: conn!!.contentLengthLong
+            (file?.inputStream() ?: conn!!.inputStream).use { input ->
                 session.openWrite("game.apk", 0, size).use { out ->
                     input.copyTo(out)
                     session.fsync(out)

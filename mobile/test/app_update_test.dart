@@ -43,9 +43,9 @@ void main() {
     await tester.tap(find.text('Update'));
     await tester.pump();
     expect(installs, [
-      {'url': AppUpdate.apk.toString(), 'package': 'io.ontola.gamenight'}
+      {'url': AppUpdate.apk.toString(), 'package': 'io.ontola.gamenight', 'reopen': true}
     ]);
-    expect(find.textContaining('Android asks you to confirm'), findsOneWidget);
+    expect(find.textContaining('Android asks you to confirm once'), findsOneWidget);
   });
 
   testWidgets('Later hides the banner and no update hides it too', (tester) async {
@@ -58,5 +58,54 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: UpdateBanner(key: UniqueKey(), check: () async => null))));
     await tester.pump();
     expect(find.byType(TextButton), findsNothing);
+  });
+
+  testWidgets('a downloaded update installs by itself after leaving the app', (tester) async {
+    final installs = <(Uri, bool)>[];
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: UpdateBanner(
+      check: () async => 12,
+      download: (build) async => '/cache/updates/gamenight-$build.apk',
+      silent: () async => true,
+      install: (apk, {reopen = false}) async => installs.add((apk, reopen)),
+    ))));
+    await tester.pump();
+    expect(find.text('New version ready. It installs when you leave GameNight.'), findsOneWidget);
+    expect(find.text('Restart now'), findsOneWidget);
+
+    // A quick look at another app does not close GameNight.
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 5));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump(const Duration(seconds: 30));
+    expect(installs, isEmpty);
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump(const Duration(seconds: 21));
+    expect(installs, [(Uri.file('/cache/updates/gamenight-12.apk'), false)]);
+  });
+
+  testWidgets('Restart now installs the downloaded APK and reopens', (tester) async {
+    final installs = <(Uri, bool)>[];
+    await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+            body: UpdateBanner(
+      check: () async => 12,
+      download: (build) async => '/cache/updates/gamenight-$build.apk',
+      silent: () async => true,
+      install: (apk, {reopen = false}) async => installs.add((apk, reopen)),
+    ))));
+    await tester.pump();
+    await tester.tap(find.text('Restart now'));
+    await tester.pump();
+    expect(installs, [(Uri.file('/cache/updates/gamenight-12.apk'), true)]);
+    expect(find.text('Updating GameNight…'), findsOneWidget);
   });
 }

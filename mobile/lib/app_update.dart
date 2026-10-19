@@ -37,12 +37,33 @@ class AppUpdate {
   }
 }
 
-/// A strip above the tabs offering the newer APK. Android shows its own
-/// confirmation, then replaces and closes this app.
+/// A strip above the tabs offering the newer APK. The APK downloads in the
+/// background first. Once GameNight installed its own previous update,
+/// Android 12+ updates it without asking, so it simply installs when the
+/// player leaves the app; reopening starts the new version with the same
+/// room and seat (both are kept in preferences). Before that, Android shows
+/// its own confirmation once.
 class UpdateBanner extends StatefulWidget {
   final Future<int?> Function() check;
-  UpdateBanner({super.key, Future<int?> Function()? check})
-      : check = check ?? (() => Apps.supported ? AppUpdate.newer() : Future.value(null));
+  final Future<String?> Function(int build) download;
+  final Future<bool> Function() silent;
+  final Future<void> Function(Uri apk, {bool reopen}) install;
+
+  /// How long GameNight waits in the background before replacing itself,
+  /// so a quick look at another app does not close it.
+  final Duration backgroundDelay;
+
+  UpdateBanner({
+    super.key,
+    Future<int?> Function()? check,
+    Future<String?> Function(int build)? download,
+    Future<bool> Function()? silent,
+    Future<void> Function(Uri apk, {bool reopen})? install,
+    this.backgroundDelay = const Duration(seconds: 20),
+  })  : check = check ?? (() => Apps.supported ? AppUpdate.newer() : Future.value(null)),
+        download = download ?? ((build) => Apps.download(AppUpdate.apk, 'gamenight-$build.apk')),
+        silent = silent ?? Apps.silentSelfUpdate,
+        install = install ?? ((apk, {reopen = false}) => Apps.install(apk, AppUpdate.package, reopen: reopen));
 
   @override
   State<UpdateBanner> createState() => _UpdateBannerState();
@@ -51,9 +72,12 @@ class UpdateBanner extends StatefulWidget {
 class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver {
   static const _recheck = Duration(hours: 6);
   int? _latest;
+  Uri? _apk;
+  bool _silent = false;
   bool _dismissed = false;
   bool _installing = false;
   DateTime? _checked;
+  Timer? _background;
 
   @override
   void initState() {
@@ -64,6 +88,7 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    _background?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -71,7 +96,15 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
   // Phones keep the app open for days; look again when it comes back.
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.paused) {
+      if (_apk != null && _silent && !_installing) {
+        _background?.cancel();
+        _background = Timer(widget.backgroundDelay, () => _install(reopen: false));
+      }
+      return;
+    }
     if (s != AppLifecycleState.resumed) return;
+    _background?.cancel();
     if (_installing) {
       // Back from Android's dialog without updating (cancelled).
       setState(() => _installing = false);
@@ -84,27 +117,41 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
     _checked = DateTime.now();
     final latest = await widget.check();
     if (!mounted || latest == null || latest == _latest) return;
+    // Fetch it now, so the update itself takes no waiting. A failed download
+    // still offers the update, downloaded on tap.
+    String? path;
+    try {
+      path = await widget.download(latest);
+    } catch (_) {}
+    final silent = path != null && await widget.silent();
+    if (!mounted) return;
     setState(() {
       _latest = latest;
+      _apk = path == null ? null : Uri.file(path);
+      _silent = silent;
       _dismissed = false;
     });
   }
 
-  Future<void> _update() async {
-    if (!await Apps.canInstall()) return Apps.allowInstalls();
+  Future<void> _install({required bool reopen}) async {
+    if (_installing || !mounted) return;
+    if (!_silent && !await Apps.canInstall()) return Apps.allowInstalls();
     setState(() => _installing = true);
     try {
-      await Apps.install(AppUpdate.apk, AppUpdate.package);
+      await widget.install(_apk ?? AppUpdate.apk, reopen: reopen);
     } on PlatformException catch (e) {
       if (!mounted) return;
       setState(() => _installing = false);
-      toast(context, 'Could not update: ${e.message}');
+      if (reopen) toast(context, 'Could not update: ${e.message}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_latest == null || _dismissed) return const SizedBox.shrink();
+    final message = _installing
+        ? (_silent ? 'Updating GameNight…' : 'Updating GameNight. Android asks you to confirm once.')
+        : (_silent ? 'New version ready. It installs when you leave GameNight.' : 'A new version of GameNight is ready.');
     return Material(
       color: GnColors.button,
       child: Padding(
@@ -113,12 +160,7 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
           children: [
             const Icon(Icons.system_update, color: GnColors.text),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _installing ? 'Updating GameNight. Android asks you to confirm.' : 'A new version of GameNight is ready.',
-                style: const TextStyle(color: GnColors.text),
-              ),
-            ),
+            Expanded(child: Text(message, style: const TextStyle(color: GnColors.text))),
             if (_installing)
               const Padding(
                 padding: EdgeInsets.all(12),
@@ -130,8 +172,9 @@ class _UpdateBannerState extends State<UpdateBanner> with WidgetsBindingObserver
                 child: const Text('Later', style: TextStyle(color: GnColors.muted)),
               ),
               TextButton(
-                onPressed: _update,
-                child: const Text('Update', style: TextStyle(color: GnColors.text, fontWeight: FontWeight.bold)),
+                onPressed: () => _install(reopen: true),
+                child: Text(_silent ? 'Restart now' : 'Update',
+                    style: const TextStyle(color: GnColors.text, fontWeight: FontWeight.bold)),
               ),
             ],
           ],
