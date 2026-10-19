@@ -14,13 +14,13 @@ void main() {
     test(
       'never checks the APK feed or requests package installation',
       () async {
-      var contacted = false;
-      final client = MockClient((_) async {
-        contacted = true;
-        throw StateError('APK feed contacted');
-      });
+        var contacted = false;
+        final client = MockClient((_) async {
+          contacted = true;
+          throw StateError('APK feed contacted');
+        });
         expect(await AppUpdate.newer(build: 10, client: client), isNull);
-      expect(contacted, isFalse);
+        expect(contacted, isFalse);
         expect(await Apps.canInstall(), isFalse);
         expect(await Apps.silentSelfUpdate(), isFalse);
         await expectLater(Apps.allowInstalls(), throwsUnsupportedError);
@@ -35,8 +35,6 @@ void main() {
     testWidgets(
       'keeps opening installed companions but offers no APK installs',
       (tester) async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
         const channel = MethodChannel('gamenight/apps');
         var installed = false;
         final calls = <String>[];
@@ -85,6 +83,7 @@ void main() {
         expect(calls, ['installed', 'installed', 'open']);
         expect(find.text('Update from the GameNight computer'), findsNothing);
       },
+      variant: TargetPlatformVariant({TargetPlatform.android}),
     );
   }, skip: !Apps.playStore);
 }
