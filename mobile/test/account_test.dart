@@ -21,6 +21,7 @@ class FakeCloud {
   final calls = <String>[];
   final bodies = <String, dynamic>{};
   int revision = 3;
+  String email = 'joep@example.com';
   Map<String, dynamic>? workspace;
   String status = 'none';
   bool conflictOnce = false;
@@ -58,6 +59,7 @@ class FakeCloud {
         return http.Response(
             jsonEncode({
               'id': 'acc1',
+              'email': email,
               'profile': {
                 'display_name': 'Joep',
                 'skin_color': '#c58c85',
@@ -108,7 +110,14 @@ class FakeCloud {
         status = 'none';
         return http.Response('', 204);
       case 'DELETE /v1/session':
+      case 'DELETE /v1/me':
         return http.Response('', 204);
+      case 'POST /v1/me/email':
+        return http.Response(jsonEncode({'request': 'r' * 64}), 200);
+      case 'POST /v1/me/email/verify':
+        if (bodies[key]['code'] != '87654321') return http.Response('', 403);
+        email = 'new@example.com';
+        return http.Response(jsonEncode({'email': email}), 200);
     }
     return http.Response('', 404);
   });
@@ -243,6 +252,31 @@ void main() {
     await state.prefs.setString('cloud_token', 'd' * 64);
     await state.loadAccount();
     expect(state.signedIn, isFalse);
+    expect(state.prefs.getString('cloud_token'), isNull);
+  });
+
+  test('changing email needs the mailed code; a wrong one keeps the session',
+      () async {
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    expect(state.account?.email, 'joep@example.com');
+    final request = await state.requestEmailChange('new@example.com');
+    expect(cloud.bodies['POST /v1/me/email']['email'], 'new@example.com');
+    await expectLater(state.confirmEmailChange(request, '11111111'),
+        throwsA(isA<Exception>()));
+    expect(state.signedIn, isTrue);
+    await state.confirmEmailChange(request, '87654321');
+    expect(state.account?.email, 'new@example.com');
+    expect(state.prefs.getString('account_email'), 'new@example.com');
+  });
+
+  test('deleting the account signs out and forgets the email', () async {
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    await state.deleteAccount();
+    expect(cloud.calls, contains('DELETE /v1/me'));
+    expect(state.signedIn, isFalse);
+    expect(state.accountEmail, isNull);
     expect(state.prefs.getString('cloud_token'), isNull);
   });
 }

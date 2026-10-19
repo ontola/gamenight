@@ -17,11 +17,15 @@ import 'diagnostics.dart';
 class Account {
   final String id;
   final String? displayName;
-  const Account({required this.id, this.displayName});
+
+  /// The verified email this account signs in with.
+  final String? email;
+  const Account({required this.id, this.displayName, this.email});
 
   static Account fromJson(Map<String, dynamic> j) => Account(
       id: j['id'] as String,
-      displayName: (j['profile'] as Map?)?['display_name'] as String?);
+      displayName: (j['profile'] as Map?)?['display_name'] as String?,
+      email: j['email'] as String?);
 }
 
 /// `GET /v1/me/studio`: the saved player and every face, in the studio's
@@ -406,6 +410,35 @@ class CloudApi {
   }
 
   Future<Account> me() async => Account.fromJson(await _send('GET', '/v1/me'));
+
+  /// Emails a code to [email]; answers what ties that code to this account.
+  Future<String> requestEmailChange(String email) async {
+    final data = await _send('POST', '/v1/me/email', body: {
+      'email': email.trim()
+    }, errors: const {
+      400: 'That does not look like an email address.',
+      409: 'Another GameNight account already uses this email.',
+      422: 'This is already your email.',
+      502: 'Could not send the email. Try again.',
+    }) as Map;
+    return data['request'] as String;
+  }
+
+  /// Moves the account to the new email; answers that email.
+  Future<String> verifyEmailChange(String request, String code) async {
+    final data = await _send('POST', '/v1/me/email/verify', body: {
+      'request': request,
+      'code': code.trim()
+    }, errors: const {
+      400: 'Enter the 8-digit code from the email.',
+      403: 'That code is wrong or has expired.',
+      409: 'Another GameNight account already uses this email.',
+    }) as Map;
+    return data['email'] as String;
+  }
+
+  /// Deletes the account and everything saved to it.
+  Future<void> deleteAccount() => _send('DELETE', '/v1/me');
 
   Future<StudioDocument> studio() async =>
       StudioDocument.fromJson(await _send('GET', '/v1/me/studio'));

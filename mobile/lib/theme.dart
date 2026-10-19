@@ -15,6 +15,7 @@ class GnColors {
   static const button = Color(0xFF5143AE);
   static const ok = Color(0xFF34D399);
   static const warn = Color(0xFFFBBF24);
+  static const danger = Color(0xFFF87171);
   static const canvas = Color(0xFF0F172A);
 }
 

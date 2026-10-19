@@ -685,6 +685,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Deletes the account online, then forgets it here. The player stays.
+  Future<void> deleteAccount() async {
+    await cloud.deleteAccount();
+    await _forgetAccount();
+    accountEmail = null;
+    await prefs.remove('account_email');
+    notifyListeners();
+  }
+
+  Future<String> requestEmailChange(String email) =>
+      cloud.requestEmailChange(email);
+
+  Future<void> confirmEmailChange(String request, String code) async {
+    accountEmail = await cloud.verifyEmailChange(request, code);
+    await prefs.setString('account_email', accountEmail!);
+    account = await cloud.me();
+    notifyListeners();
+  }
+
   Future<void> _forgetAccount() async {
     cloud.token = null;
     account = null;
