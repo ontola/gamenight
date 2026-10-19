@@ -440,6 +440,31 @@ class CloudApi {
     return {if (data is List) ...data.whereType<String>()};
   }
 
+  /// When this account last played each game, in epoch seconds.
+  Future<Map<String, int>> lastPlayed() async {
+    final Object? data;
+    try {
+      data = await _send('GET', '/v1/me/last-played');
+    } on ApiError {
+      // A server without play dates yet: recent history, undated.
+      return {for (final game in (await playHistory()).games) game: 0};
+    }
+    if (data is! Map) return const {};
+    return {
+      for (final MapEntry(:key, :value) in data.entries)
+        if (key is String && value is num) key: value.toInt()
+    };
+  }
+
+  /// Games this account wants to play next, oldest wish first.
+  Future<List<String>> wantToPlay() async {
+    final data = await _send('GET', '/v1/me/want-to-play');
+    return [if (data is List) ...data.whereType<String>()];
+  }
+
+  Future<void> setWantToPlay(String game, bool want) =>
+      _send('PUT', '/v1/me/want-to-play', body: {'game': game, 'want': want});
+
   /// 1 up, -1 down, 0 takes the vote back.
   Future<void> rateGame(String game, int rating) =>
       _send('PUT', '/v1/me/game-ratings',

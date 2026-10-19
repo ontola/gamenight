@@ -66,6 +66,7 @@ class GameScreen extends StatelessWidget {
         final catalog = CatalogSection(
             key: const ValueKey('catalog'),
             cloud: state.cloud,
+            state: state,
             onSignIn: () async {
               await Navigator.of(context).push(MaterialPageRoute(
                   builder: (_) => SignInScreen(

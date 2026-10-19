@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../account.dart';
+import '../app_state.dart';
 import '../catalog.dart';
 import '../widgets/game_rating.dart';
 import '../report_scope.dart';
@@ -36,6 +37,12 @@ class GameDetailScreen extends StatefulWidget {
   final Set<String> developing;
   final void Function(CatalogGame game)? onManage;
 
+  /// The player's Want to play list; no Want to play button without it.
+  final AppState? state;
+
+  /// Opens a page with every game by this developer.
+  final ValueChanged<String>? onDeveloper;
+
   const GameDetailScreen(
       {super.key,
       required this.game,
@@ -46,6 +53,8 @@ class GameDetailScreen extends StatefulWidget {
       this.developing = const {},
       this.onManage,
       this.cloud,
+      this.state,
+      this.onDeveloper,
       this.share});
 
   @override
@@ -124,6 +133,8 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                       : null,
                   share: widget.share,
                   cloud: widget.cloud,
+                  state: widget.state,
+                  onDeveloper: widget.onDeveloper,
                   onTagSelected: widget.onTagSelected,
                   onOpen: (game) =>
                       _go(_games.indexWhere((entry) => entry.id == game.id)),
@@ -142,6 +153,8 @@ class _GameDetailPage extends StatefulWidget {
       this.onAdd,
       this.onManage,
       this.cloud,
+      this.state,
+      this.onDeveloper,
       this.share,
       this.previous,
       this.onTagSelected,
@@ -156,6 +169,8 @@ class _GameDetailPage extends StatefulWidget {
   final Future<void> Function(CatalogGame)? onAdd;
   final void Function(CatalogGame)? onManage;
   final CloudApi? cloud;
+  final AppState? state;
+  final ValueChanged<String>? onDeveloper;
   final Future<ShareResult> Function(ShareParams)? share;
   @override
   State<_GameDetailPage> createState() => _GameDetailPageState();
@@ -271,6 +286,10 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                                         fontWeight: FontWeight.w800)),
                               ),
                             ]),
+                            if (game.developer.isNotEmpty)
+                              Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: _developer()),
                             if (game.tagline.isNotEmpty) ...[
                               const SizedBox(height: 6),
                               Text(game.tagline,
@@ -296,6 +315,10 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                             ],
                             const SizedBox(height: 16),
                             _action(),
+                            if (_wantButton() case final want?) ...[
+                              const SizedBox(height: 8),
+                              want,
+                            ],
                             if (widget.onManage case final manage?) ...[
                               const SizedBox(height: 8),
                               OutlinedButton.icon(
@@ -322,10 +345,9 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                                   ),
                               ]),
                             ],
-                            const SizedBox(height: 8),
                             _about(),
                             if (similar.isNotEmpty) ...[
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 20),
                               const Text('More like this',
                                   style: TextStyle(
                                       fontSize: 18,
@@ -387,6 +409,10 @@ class _GameDetailPageState extends State<_GameDetailPage> {
         : host == null
             ? 'Join a room to put this game in the queue.'
             : 'This GameNight does not have this game yet.');
+    // Outside a room, Want to play says what happens next.
+    if (host == null && !game.unreviewed && _canWant) {
+      return buy ?? const SizedBox.shrink();
+    }
     if (buy == null) return note;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       buy,
@@ -395,36 +421,84 @@ class _GameDetailPageState extends State<_GameDetailPage> {
     ]);
   }
 
+  bool get _canWant =>
+      widget.state != null && widget.state!.cloud.signedIn && !game.unreviewed;
+
+  /// Saves the game for the next room this player joins.
+  Widget? _wantButton() {
+    final state = widget.state;
+    if (state == null || !_canWant) return null;
+    return ListenableBuilder(
+        listenable: state,
+        builder: (context, _) {
+          final wanted = state.wantToPlay?.contains(game.id) ?? false;
+          return OutlinedButton.icon(
+            key: const ValueKey('want-to-play'),
+            style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+                side: wanted ? const BorderSide(color: GnColors.accent) : null),
+            onPressed: state.wantToPlay == null
+                ? null
+                : () async {
+                    try {
+                      await state.setWantToPlay(game.id, !wanted);
+                      if (context.mounted && !wanted) {
+                        toast(context,
+                            '${game.title} goes in the queue when you join a room.');
+                      }
+                    } catch (_) {
+                      if (context.mounted) {
+                        toast(context, 'Could not save that. Try again.');
+                      }
+                    }
+                  },
+            icon:
+                Icon(wanted ? Icons.bookmark : Icons.bookmark_border, size: 18),
+            label: Text(wanted ? 'On your Want to play list' : 'Want to play'),
+          );
+        });
+  }
+
+  Widget _developer() {
+    final open = widget.onDeveloper;
+    final text = Text('by ${game.developer}',
+        style: TextStyle(
+            fontSize: 15,
+            color: open == null ? GnColors.muted : GnColors.accent,
+            fontWeight: FontWeight.w600));
+    if (open == null) return text;
+    return Semantics(
+        container: true,
+        button: true,
+        child: InkWell(
+            key: const ValueKey('developer'),
+            borderRadius: BorderRadius.circular(6),
+            onTap: () => open(game.developer),
+            child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: text)));
+  }
+
   Widget _about() {
     final links = {
       ...game.links,
       if (game.mediaSource != null) 'Gameplay source': game.mediaSource!
     };
-    if (game.developer.isEmpty && links.isEmpty) return const SizedBox.shrink();
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.only(bottom: 8),
-        expandedCrossAxisAlignment: CrossAxisAlignment.start,
-        title: const Text('About this game',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        children: [
-          if (game.developer.isNotEmpty) Hint('Made by ${game.developer}'),
-          if (links.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final MapEntry(:key, :value) in links.entries)
-                OutlinedButton.icon(
-                  onPressed: () => _launch(context, value),
-                  icon: const Icon(Icons.open_in_new, size: 16),
-                  label: Text(_linkName(key)),
-                ),
-            ]),
-          ],
-        ],
-      ),
-    );
+    if (links.isEmpty) return const SizedBox.shrink();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const SizedBox(height: 20),
+      const Text('Links',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 10),
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final MapEntry(:key, :value) in links.entries)
+          OutlinedButton.icon(
+            onPressed: () => _launch(context, value),
+            icon: const Icon(Icons.open_in_new, size: 16),
+            label: Text(_linkName(key)),
+          ),
+      ]),
+    ]);
   }
 
   static String _linkName(String key) =>
@@ -480,7 +554,8 @@ class _Note extends StatelessWidget {
   final String text;
   const _Note(this.text);
   @override
-  Widget build(BuildContext context) => Center(child: Hint(text));
+  Widget build(BuildContext context) =>
+      Align(alignment: Alignment.centerLeft, child: Hint(text));
 }
 
 class _SimilarTile extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../api.dart';
 import '../account.dart';
+import '../app_state.dart';
 import 'catalog_filters.dart';
 import '../catalog.dart';
 import '../room_controls.dart';
@@ -19,13 +20,21 @@ class CatalogSection extends StatefulWidget {
   final Future<void> Function()? onSignIn;
   final String? requestedGame;
   final VoidCallback? onRequestedGameOpened;
+
+  /// The player's Want to play list and play history; none without it.
+  final AppState? state;
+
+  /// Shows only this developer's games, without the search and filters.
+  final String? developer;
   const CatalogSection(
       {super.key,
       this.controls,
       this.cloud,
       this.onSignIn,
       this.requestedGame,
-      this.onRequestedGameOpened});
+      this.onRequestedGameOpened,
+      this.state,
+      this.developer});
 
   @override
   State<CatalogSection> createState() => _CatalogSectionState();
@@ -45,7 +54,9 @@ class _CatalogSectionState extends State<CatalogSection> {
   List<CatalogGame> _mine = const [];
   Set<String> get _developing => {for (final game in _mine) game.id};
   String? _developingAccount;
-  CatalogFilter _filter = const CatalogFilter();
+  late CatalogFilter _filter = CatalogFilter(developer: widget.developer);
+  CatalogSort _sort = CatalogSort.store;
+  Map<String, ({int up, int down})> _ratings = const {};
   String? _filterAccount;
   final _search = TextEditingController();
   bool _personalLoading = false;
@@ -58,6 +69,7 @@ class _CatalogSectionState extends State<CatalogSection> {
     _loadCatalog();
     _loadHost();
     _loadDeveloping();
+    _loadRatings();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) => _loadHost());
   }
 
@@ -69,7 +81,10 @@ class _CatalogSectionState extends State<CatalogSection> {
     if (_filterAccount != widget.cloud?.token) {
       _filterAccount = widget.cloud?.token;
       _filter = CatalogFilter(
-          tags: _filter.tags, query: _filter.query, players: _filter.players);
+          tags: _filter.tags,
+          query: _filter.query,
+          players: _filter.players,
+          developer: _filter.developer);
     }
     _openRequestedGame();
   }
@@ -118,6 +133,15 @@ class _CatalogSectionState extends State<CatalogSection> {
       }
     } on ApiError {
       // Not a developer, or offline: no Manage buttons.
+    }
+  }
+
+  Future<void> _loadRatings() async {
+    try {
+      final ratings = await widget.cloud?.ratingTotals();
+      if (mounted && ratings != null) setState(() => _ratings = ratings);
+    } catch (_) {
+      // Like ratio sorting falls back to store order.
     }
   }
 
@@ -196,18 +220,47 @@ class _CatalogSectionState extends State<CatalogSection> {
               onAdd: _inRoom ? _add : null,
               developing: _developing,
               cloud: widget.cloud,
+              state: widget.state,
+              onDeveloper: widget.developer == null ? _openDeveloper : null,
               onManage: (game) => openWebsite(widget.cloud!,
                   '/developers#game/${Uri.encodeComponent(game.id)}'),
             )));
   }
 
+  void _openDeveloper(String developer) {
+    Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => Scaffold(
+            appBar: AppBar(title: Text(developer)),
+            body: SafeArea(
+                top: false,
+                child: ListView(padding: const EdgeInsets.all(16), children: [
+                  CatalogSection(
+                      key: ValueKey('developer-$developer'),
+                      cloud: widget.cloud,
+                      controls: widget.controls,
+                      onSignIn: widget.onSignIn,
+                      state: widget.state,
+                      developer: developer),
+                ])))));
+  }
+
   @override
   Widget build(BuildContext context) {
     final games = _games;
+    final developer = widget.developer;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: _filterBar(games != null)),
+      if (developer != null)
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+                games == null
+                    ? 'Games by $developer'
+                    : '${_visible.length} ${_visible.length == 1 ? 'game' : 'games'} by $developer',
+                style: const TextStyle(color: GnColors.muted)))
+      else
+        Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _filterBar(games != null)),
       if (games == null && _error == null)
         const Padding(
           padding: EdgeInsets.all(24),
@@ -233,8 +286,10 @@ class _CatalogSectionState extends State<CatalogSection> {
 
   void _clearFilters() => setState(() {
         _search.clear();
-        _filter = const CatalogFilter();
+        _filter = CatalogFilter(developer: widget.developer);
       });
+
+  Set<String> get _wanted => {...?widget.state?.wantToPlay};
 
   void _setFilter(CatalogFilter filter) => setState(() => _filter = filter);
 
@@ -267,6 +322,28 @@ class _CatalogSectionState extends State<CatalogSection> {
               ),
             ));
         final chips = [
+          if (_wanted.isNotEmpty || _filter.wanted)
+            FilterChip(
+                key: const ValueKey('want-to-play'),
+                avatar: _filter.wanted
+                    ? null
+                    : const Icon(Icons.bookmark_border, size: 18),
+                label: const Text('Want to play'),
+                selected: _filter.wanted,
+                onSelected: (v) => _setFilter(
+                    _filter.copyWith(wanted: v, wantedGames: _wanted))),
+          if (_filter.played)
+            InputChip(
+                label: const Text('Played'),
+                onPressed: () => _setFilter(_filter.copyWith(played: false)),
+                onDeleted: () => _setFilter(_filter.copyWith(played: false))),
+          if (_filter.developer case final developer?)
+            InputChip(
+                label: Text(developer),
+                onPressed: () =>
+                    _setFilter(_filter.copyWith(developer: () => null)),
+                onDeleted: () =>
+                    _setFilter(_filter.copyWith(developer: () => null))),
           if (_mine.isNotEmpty)
             FilterChip(
                 key: const ValueKey('my-games'),
@@ -307,12 +384,14 @@ class _CatalogSectionState extends State<CatalogSection> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(children: [
-                if (showPlayers)
-                  ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 320),
-                      child: search)
-                else
-                  Expanded(child: search),
+                // The search shrinks before the buttons beside it overflow.
+                Expanded(
+                    child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                                maxWidth: showPlayers ? 320 : double.infinity),
+                            child: search))),
                 if (showPlayers) ...[
                   const SizedBox(width: 8),
                   _playersButton(ready),
@@ -325,7 +404,9 @@ class _CatalogSectionState extends State<CatalogSection> {
                   _personalChip('Not played', null, _filter.unplayed,
                       (v) => _filter.copyWith(unplayed: v)),
                 ],
-                if (showPlayers) const Spacer() else const SizedBox(width: 8),
+                const SizedBox(width: 8),
+                _sortButton(ready),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                     onPressed: ready ? _showFilters : null,
                     icon: const Icon(Icons.tune, size: 18),
@@ -341,6 +422,35 @@ class _CatalogSectionState extends State<CatalogSection> {
                         children: chips)),
             ]);
       });
+
+  Widget _sortButton(bool ready) {
+    final signedIn = widget.cloud?.signedIn == true;
+    return PopupMenuButton<CatalogSort>(
+      key: const ValueKey('catalog-sort'),
+      enabled: ready,
+      tooltip: 'Sort games',
+      initialValue: _sort,
+      onSelected: (sort) => setState(() => _sort = sort),
+      itemBuilder: (_) => [
+        for (final sort in CatalogSort.values)
+          if (sort != CatalogSort.lastPlayed || signedIn)
+            PopupMenuItem(value: sort, child: Text(sort.label)),
+      ],
+      child: IgnorePointer(
+        child: _sort == CatalogSort.store
+            ? IconButton.outlined(
+                onPressed: ready ? () {} : null,
+                icon: const Icon(Icons.sort, size: 20))
+            : OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                    backgroundColor: GnColors.button.withValues(alpha: .35),
+                    side: const BorderSide(color: GnColors.accent)),
+                onPressed: ready ? () {} : null,
+                icon: const Icon(Icons.sort, size: 18),
+                label: Text(_sort.short)),
+      ),
+    );
+  }
 
   Widget _playersButton(bool ready) {
     final n = _filter.players;
@@ -405,16 +515,16 @@ class _CatalogSectionState extends State<CatalogSection> {
     setState(() => _personalLoading = true);
     try {
       final results =
-          await Future.wait<Object>([cloud.gameRatings(), cloud.playHistory()]);
+          await Future.wait<Object>([cloud.gameRatings(), cloud.lastPlayed()]);
       if (cloud.token != identity) return null;
       final ratings = results[0] as Map<String, int>;
-      final history = results[1] as ({Set<String> games, int days});
+      final played = results[1] as Map<String, int>;
       return (
         liked: {
           for (final entry in ratings.entries)
             if (entry.value == 1) entry.key
         },
-        played: history.games
+        played: played.keys.toSet()
       );
     } catch (_) {
       if (mounted) {
@@ -449,7 +559,8 @@ class _CatalogSectionState extends State<CatalogSection> {
             filter: _filter,
             games: _games!,
             cloud: widget.cloud,
-            onSignIn: widget.onSignIn));
+            onSignIn: widget.onSignIn,
+            wantedGames: _wanted));
     if (mounted && filter != null) {
       setState(() {
         _filter = filter;
@@ -458,8 +569,50 @@ class _CatalogSectionState extends State<CatalogSection> {
     }
   }
 
-  /// In a room, games the host can play first; otherwise store order.
+  /// The chosen order; in store order, games the room's host can play
+  /// come first.
   List<CatalogGame> _sorted(List<CatalogGame> games) {
+    final played = widget.state?.lastPlayed ?? const <String, int>{};
+    double ratio(CatalogGame g) {
+      final r = _ratings[g.id];
+      final votes = (r?.up ?? 0) + (r?.down ?? 0);
+      return votes == 0 ? -1 : r!.up / votes;
+    }
+
+    int votes(CatalogGame g) =>
+        (_ratings[g.id]?.up ?? 0) + (_ratings[g.id]?.down ?? 0);
+    int by<T extends Comparable<Object>>(
+            T? Function(CatalogGame) key, CatalogGame a, CatalogGame b) =>
+        switch ((key(a), key(b))) {
+          (null, null) => 0,
+          (null, _) => 1,
+          (_, null) => -1,
+          (final x?, final y?) => y.compareTo(x),
+        };
+    final order = switch (_sort) {
+      CatalogSort.store => null,
+      CatalogSort.newest => (CatalogGame a, CatalogGame b) =>
+          by((g) => g.added, a, b),
+      CatalogSort.updated => (CatalogGame a, CatalogGame b) =>
+          by((g) => g.updated, a, b),
+      CatalogSort.lastPlayed => (CatalogGame a, CatalogGame b) =>
+          by((g) => played[g.id], a, b),
+      CatalogSort.title => (CatalogGame a, CatalogGame b) =>
+          a.title.toLowerCase().compareTo(b.title.toLowerCase()),
+      CatalogSort.liked => (CatalogGame a, CatalogGame b) {
+          final r = ratio(b).compareTo(ratio(a));
+          return r != 0 ? r : votes(b).compareTo(votes(a));
+        },
+    };
+    if (order != null) {
+      // A stable sort keeps store order between equals.
+      final indexed = [for (var i = 0; i < games.length; i++) (i, games[i])];
+      indexed.sort((a, b) {
+        final c = order(a.$2, b.$2);
+        return c != 0 ? c : a.$1.compareTo(b.$1);
+      });
+      return [for (final e in indexed) e.$2];
+    }
     if (!_inRoom || _host.isEmpty) return games;
     final playable = [
       for (final g in games)

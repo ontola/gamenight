@@ -37,13 +37,19 @@ void main() {
         client: MockClient((r) async => http.Response(
             jsonEncode(r.url.path.endsWith('game-ratings')
                 ? {'a': 1, 'b': -1, 'c': 1}
-                : {
-                    'window_days': 90,
-                    'games': [
-                      {'game': 'a', 'active_ms': 2000, 'rounds_reported': 0},
-                      {'game': 'c', 'active_ms': 0, 'rounds_reported': 0}
-                    ]
-                  }),
+                : r.url.path.endsWith('last-played')
+                    ? {'a': 1700000000}
+                    : {
+                        'window_days': 90,
+                        'games': [
+                          {
+                            'game': 'a',
+                            'active_ms': 2000,
+                            'rounds_reported': 0
+                          },
+                          {'game': 'c', 'active_ms': 0, 'rounds_reported': 0}
+                        ]
+                      }),
             200)));
     addTearDown(cloud.close);
     await tester.pumpWidget(MaterialApp(
@@ -180,6 +186,14 @@ void main() {
     expect(find.text('moon'), findsNothing);
 
     await tester.tap(find.text('Filter'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+        find.widgetWithText(FilterChip, 'cards'), 100,
+        scrollable: find
+            .descendant(
+                of: find.byType(CatalogFilters),
+                matching: find.byType(Scrollable))
+            .first);
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilterChip, 'cards'));
     await tester.tap(find.text('Show 2 games'));

@@ -16,6 +16,7 @@ import 'api.dart';
 import 'avatar.dart';
 import 'faces.dart';
 import 'link.dart';
+import 'room_controls.dart';
 
 enum SyncState { idle, saving, savedLocally, synced, joined, warning }
 
@@ -603,6 +604,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString('cloud_token', cloud.token!);
     try {
       account = await cloud.me();
+      unawaited(loadPlayLists());
       final doc = await cloud.studio();
       final adopted = _adoptStudio(doc);
       await _pushAccount();
@@ -733,6 +735,8 @@ class AppState extends ChangeNotifier {
   Future<void> _forgetAccount() async {
     cloud.token = null;
     account = null;
+    wantToPlay = null;
+    lastPlayed = const {};
     _accountProfileLoaded = false;
     if (!isGuest) {
       hostedRoom = null;
@@ -764,6 +768,7 @@ class AppState extends ChangeNotifier {
         return;
       }
       account = await cloud.me();
+      unawaited(loadPlayLists());
       if (!_accountProfileLoaded && !isGuest) {
         _adoptStudio(await cloud.studio());
         _accountProfileLoaded = true;
@@ -982,12 +987,88 @@ class AppState extends ChangeNotifier {
     await refreshHostedRoom();
   }
 
+  // ---- Want to play and play history ---------------------------------
+
+  /// Games this account wants to play next, oldest wish first. Null until
+  /// loaded, or when signed out.
+  List<String>? wantToPlay;
+
+  /// When this account last played each game, in epoch seconds.
+  Map<String, int> lastPlayed = const {};
+  Object? _wantQueuedFor;
+
+  Future<void> loadPlayLists() async {
+    final account = cloud.token;
+    if (account == null) {
+      wantToPlay = null;
+      lastPlayed = const {};
+      return;
+    }
+    try {
+      final results =
+          await Future.wait<Object>([cloud.wantToPlay(), cloud.lastPlayed()]);
+      if (cloud.token != account) return;
+      wantToPlay = results[0] as List<String>;
+      lastPlayed = results[1] as Map<String, int>;
+      notifyListeners();
+    } catch (_) {
+      // Offline or signed out: the lists stay as they were.
+    }
+  }
+
+  /// Saves or forgets that the player wants to play [game] next time.
+  Future<void> setWantToPlay(String game, bool want) async {
+    final before = wantToPlay ?? const <String>[];
+    wantToPlay = want
+        ? [...before.where((g) => g != game), game]
+        : [...before.where((g) => g != game)];
+    notifyListeners();
+    try {
+      await cloud.setWantToPlay(game, want);
+    } catch (_) {
+      wantToPlay = before;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// On joining a room, the games the player wants to play go to the front
+  /// of its queue, oldest wish first. Once per room.
+  void _queueWantedOnJoin() {
+    final wanted = wantToPlay;
+    if (wanted == null) return;
+    final controls = roomControlsFor(this);
+    if (controls == null || controls.target == _wantQueuedFor) return;
+    _wantQueuedFor = controls.target;
+    if (wanted.isNotEmpty) unawaited(_queueWanted(controls, wanted));
+  }
+
+  Future<void> _queueWanted(RoomControls controls, List<String> wanted) async {
+    try {
+      final host = {for (final g in await controls.games()) g.id};
+      final games = [
+        for (final g in wanted)
+          if (host.isEmpty || host.contains(g)) g
+      ];
+      // An online room only takes one pick as its next game.
+      final picks = controls is CloudRoomControls ? games.take(1) : games;
+      for (final game in picks) {
+        await controls.addToQueue(game);
+      }
+    } catch (_) {
+      // The room can still be played; the list stays for next time.
+    }
+  }
+
   bool _disposed = false;
 
   @override
   void notifyListeners() {
     if (_fullscreenCompanion != companion?.url) _fullscreenCompanion = null;
-    if (!_disposed) super.notifyListeners();
+    if (!_disposed) {
+      _queueWantedOnJoin();
+      super.notifyListeners();
+    }
   }
 
   @override

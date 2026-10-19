@@ -5,11 +5,14 @@ import '../catalog.dart';
 import '../theme.dart';
 
 class CatalogFilter {
-  final bool liked, unplayed;
+  final bool liked, unplayed, played, wanted;
+
+  /// Only games by this developer, as the store names them.
+  final String? developer;
 
   /// Only games this account develops, in the store or not.
   final bool mine;
-  final Set<String> tags, likedGames, playedGames, mineGames;
+  final Set<String> tags, likedGames, playedGames, mineGames, wantedGames;
 
   /// Words to find in a game's title, tagline, developer or tags.
   final String query;
@@ -19,6 +22,10 @@ class CatalogFilter {
   const CatalogFilter(
       {this.liked = false,
       this.unplayed = false,
+      this.played = false,
+      this.wanted = false,
+      this.wantedGames = const {},
+      this.developer,
       this.mine = false,
       this.mineGames = const {},
       this.tags = const {},
@@ -29,6 +36,9 @@ class CatalogFilter {
   bool get active =>
       liked ||
       unplayed ||
+      played ||
+      wanted ||
+      developer != null ||
       mine ||
       tags.isNotEmpty ||
       query.trim().isNotEmpty ||
@@ -36,6 +46,9 @@ class CatalogFilter {
   bool matches(CatalogGame game) =>
       (!liked || likedGames.contains(game.id)) &&
       (!unplayed || !playedGames.contains(game.id)) &&
+      (!played || playedGames.contains(game.id)) &&
+      (!wanted || wantedGames.contains(game.id)) &&
+      (developer == null || game.developer == developer) &&
       (mine ? mineGames.contains(game.id) : !game.unreviewed) &&
       (tags.isEmpty || tags.any(game.tags.contains)) &&
       _fits(game) &&
@@ -62,6 +75,10 @@ class CatalogFilter {
   CatalogFilter copyWith(
           {bool? liked,
           bool? unplayed,
+          bool? played,
+          bool? wanted,
+          Set<String>? wantedGames,
+          String? Function()? developer,
           bool? mine,
           Set<String>? mineGames,
           Set<String>? tags,
@@ -72,6 +89,10 @@ class CatalogFilter {
       CatalogFilter(
           liked: liked ?? this.liked,
           unplayed: unplayed ?? this.unplayed,
+          played: played ?? this.played,
+          wanted: wanted ?? this.wanted,
+          wantedGames: wantedGames ?? this.wantedGames,
+          developer: developer == null ? this.developer : developer(),
           mine: mine ?? this.mine,
           mineGames: mineGames ?? this.mineGames,
           tags: tags ?? this.tags,
@@ -79,6 +100,20 @@ class CatalogFilter {
           playedGames: playedGames ?? this.playedGames,
           query: query ?? this.query,
           players: players == null ? this.players : players());
+}
+
+/// How the store orders its games.
+enum CatalogSort {
+  store('Featured', 'Featured'),
+  newest('Newest', 'Newest'),
+  updated('Recently updated', 'Updated'),
+  lastPlayed('Last played by you', 'Last played'),
+  title('A to Z', 'A–Z'),
+  liked('Most liked', 'Liked');
+
+  /// In the menu, and on the sort button once chosen.
+  final String label, short;
+  const CatalogSort(this.label, this.short);
 }
 
 /// The player counts the filters offer.
@@ -89,24 +124,30 @@ class CatalogFilters extends StatefulWidget {
   final List<CatalogGame> games;
   final CloudApi? cloud;
   final Future<void> Function()? onSignIn;
+
+  /// The games this player wants to play, when known.
+  final Set<String> wantedGames;
   const CatalogFilters(
       {super.key,
       required this.filter,
       required this.games,
       this.cloud,
-      this.onSignIn});
+      this.onSignIn,
+      this.wantedGames = const {}});
   @override
   State<CatalogFilters> createState() => _CatalogFiltersState();
 }
 
 class _CatalogFiltersState extends State<CatalogFilters> {
-  late bool _liked = widget.filter.liked, _unplayed = widget.filter.unplayed;
+  late bool _liked = widget.filter.liked,
+      _unplayed = widget.filter.unplayed,
+      _played = widget.filter.played,
+      _wanted = widget.filter.wanted;
   late final Set<String> _tags = {...widget.filter.tags};
   late int? _players = widget.filter.players;
   Set<String> _likedGames = {}, _playedGames = {};
   bool _loading = false, _loaded = false;
   String? _error;
-  int _days = 90;
   bool get _signedIn => widget.cloud?.signedIn == true;
 
   @override
@@ -125,17 +166,16 @@ class _CatalogFiltersState extends State<CatalogFilters> {
     try {
       final cloud = widget.cloud!, identity = widget.cloud!.token;
       final results =
-          await Future.wait<Object>([cloud.gameRatings(), cloud.playHistory()]);
+          await Future.wait<Object>([cloud.gameRatings(), cloud.lastPlayed()]);
       if (!mounted || cloud.token != identity) return;
       final ratings = results[0] as Map<String, int>;
-      final history = results[1] as ({Set<String> games, int days});
+      final played = results[1] as Map<String, int>;
       setState(() {
         _likedGames = {
           for (final entry in ratings.entries)
             if (entry.value == 1) entry.key
         };
-        _playedGames = history.games;
-        _days = history.days;
+        _playedGames = played.keys.toSet();
         _loaded = true;
       });
     } catch (_) {
@@ -150,6 +190,12 @@ class _CatalogFiltersState extends State<CatalogFilters> {
   CatalogFilter get _selection => CatalogFilter(
       liked: _liked,
       unplayed: _unplayed,
+      played: _played,
+      wanted: _wanted,
+      wantedGames: widget.wantedGames,
+      developer: widget.filter.developer,
+      mine: widget.filter.mine,
+      mineGames: widget.filter.mineGames,
       tags: _tags,
       likedGames: _likedGames,
       playedGames: _playedGames,
@@ -160,7 +206,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
   Widget build(BuildContext context) {
     final tags = widget.games.expand((game) => game.tags).toSet().toList()
       ..sort();
-    final ready = !(_liked || _unplayed) || _loaded;
+    final ready = !(_liked || _unplayed || _played) || _loaded;
     return SafeArea(
         child: SizedBox(
       height: MediaQuery.sizeOf(context).height * .75,
@@ -177,6 +223,8 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                   onPressed: () => setState(() {
                         _liked = false;
                         _unplayed = false;
+                        _played = false;
+                        _wanted = false;
                         _players = null;
                         _tags.clear();
                       }),
@@ -193,10 +241,29 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                     onSelected:
                         _loaded ? (v) => setState(() => _liked = v) : null),
                 FilterChip(
+                    label: const Text('Want to play'),
+                    avatar: const Icon(Icons.bookmark_border, size: 18),
+                    selected: _wanted,
+                    onSelected:
+                        _signedIn ? (v) => setState(() => _wanted = v) : null),
+                FilterChip(
+                    label: const Text('Played'),
+                    selected: _played,
+                    onSelected: _loaded
+                        ? (v) => setState(() {
+                              _played = v;
+                              if (v) _unplayed = false;
+                            })
+                        : null),
+                FilterChip(
                     label: const Text('Not played'),
                     selected: _unplayed,
-                    onSelected:
-                        _loaded ? (v) => setState(() => _unplayed = v) : null),
+                    onSelected: _loaded
+                        ? (v) => setState(() {
+                              _unplayed = v;
+                              if (v) _played = false;
+                            })
+                        : null),
               ]),
               if (_loading)
                 const Padding(
@@ -222,11 +289,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                     alignment: Alignment.centerLeft,
                     child: TextButton(
                         onPressed: _load, child: const Text('Try again'))),
-              ] else if (_loaded)
-                Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Hint(
-                        'Not played uses your recorded play history from the last $_days days.')),
+              ],
               const SizedBox(height: 24),
               const Text('Players',
                   style: TextStyle(fontWeight: FontWeight.w700)),

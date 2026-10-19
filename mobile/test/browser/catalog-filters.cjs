@@ -31,6 +31,7 @@ games[0].tags=['party','action'];games[1].tags=['co-op','party'];games[2].tags=[
     '/v1/me/studio':{revision:0,profile:{display_name:'Test player'}},
     '/v1/me/game-ratings':{'blast-party':1,'bubble-buddies':1,'ricochet-club':-1},
     '/v1/me/play-profile':{window_days:90,games:[{game:'blast-party',active_ms:2000,rounds_reported:0}]},
+    '/v1/me/last-played':{'blast-party':1700000000},
     '/v1/rooms/status':{status:'none'},
    }[p] ?? {};
    return route.fulfill({json:data});

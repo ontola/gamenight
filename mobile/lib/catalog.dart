@@ -124,6 +124,9 @@ class CatalogGame {
   /// playtest.
   final bool unreviewed;
 
+  /// When the game joined the store and last changed, in epoch seconds.
+  final int? added, updated;
+
   const CatalogGame({
     required this.id,
     required this.title,
@@ -144,6 +147,8 @@ class CatalogGame {
     this.links = const {},
     this.matchMinutes,
     this.unreviewed = false,
+    this.added,
+    this.updated,
   });
 
   bool get free => price == null || price == 'free';
@@ -281,6 +286,8 @@ class CatalogGame {
       links: links,
       matchMinutes: count(j['match_minutes']),
       unreviewed: j['unreviewed'] == true,
+      added: count(j['added']),
+      updated: count(j['updated']),
     );
   }
 
