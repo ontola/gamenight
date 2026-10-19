@@ -1,7 +1,8 @@
 # Pixel-stable base character
 
 `master.png` is the single reviewed 96 by 80 source drawing, cropped from the
-original generated atlas. The generated archive remains as provenance only.
+original generated atlas. That atlas (`generated-atlas.png`) is provenance only and
+is kept in the GameNight project archive (`archive/gamenight/docs/art/bald-character/`).
 `build_character.py` never reads any other generated frame.
 
 The runtime atlas is 672 by 80, with seven 96 by 80 cells:

@@ -1,7 +1,7 @@
 # PixelLab benchmark: living-room lobby
 
 Generated 2026-09-10 using PixelLab's official v2 API, from our own
-`../lobby-concepts/03-living-room.png` concept. These are review drafts, not runtime
+`lobby-concepts/03-living-room.png` concept (now in the GameNight project archive, `archive/gamenight/docs/art/lobby-concepts/`). These are review drafts, not runtime
 assets. No current lobby files were replaced. Prompts and reference-crop settings
 are in `brief.json`; billed usage is in `usage.json` (101 generation units total).
 Credentials are read locally and are not stored here.

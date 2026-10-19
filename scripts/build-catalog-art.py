@@ -2,7 +2,10 @@
 
 Usage: python scripts/build-catalog-art.py --captures <LOVE save directory>
 The checked-in PNGs are the source for republishing; --embed refreshes metadata.
-Illustrated masters are exported to runtime sizes when present; screenshots stay real.
+The checked-in *-illustrated.png exports are embedded as they are. The full-size
+AI masters (*-illustrated-source.png) are not in the repository: they live in the
+GameNight project archive (archive/gamenight/catalog/art/). Pass that folder as
+--sources to re-export the illustrated covers and icons from them; screenshots stay real.
 Requires Pillow. Outputs fit the protocol's 256 KiB / 1024px artwork limits.
 """
 import argparse, base64, json
@@ -39,11 +42,14 @@ def icon(game):
  return im.resize((64,64),Image.Resampling.NEAREST)
 
 def main():
- ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--captures',type=Path);ap.add_argument('--embed',action='store_true');a=ap.parse_args()
+ ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--captures',type=Path);ap.add_argument('--embed',action='store_true')
+ ap.add_argument('--sources',type=Path,help='folder with <game>/{cover,icon}-illustrated-source.png masters (GameNight project archive: archive/gamenight/catalog/art); re-exports the illustrated art from them');a=ap.parse_args()
  if not a.captures and not a.embed:ap.error('supply --captures or --embed')
  font=ImageFont.truetype(str(ROOT/'crates/lobby/assets/ui/FairfaxSM.ttf'),22)
  for game,source in SOURCES.items():
-  meta_path=ROOT/'catalog/games'/f'{game}.json';meta=json.loads(meta_path.read_text(encoding="utf-8"));out=ROOT/'catalog/art'/game;out.mkdir(parents=True,exist_ok=True)
+  meta_path=ROOT/'catalog/games'/f'{game}.json'
+  if not meta_path.exists():print(f'{game}: no catalog/games/{game}.json, skipped');continue
+  meta=json.loads(meta_path.read_text(encoding="utf-8"));out=ROOT/'catalog/art'/game;out.mkdir(parents=True,exist_ok=True)
   if a.captures:
    shot=Image.open(a.captures/source).convert('RGB');shot.thumbnail((512,320));shot.save(out/'screenshot.png',optimize=True)
    cover=ImageOps.fit(shot,(216,288),method=Image.Resampling.LANCZOS)
@@ -58,9 +64,16 @@ def main():
    cover.save(out/'cover.png',optimize=True);icon(game).save(out/'icon.png',optimize=True)
   for field in ('cover','icon','screenshot'):
    asset=out/f'{field}.png'
-   master=out/f'{field}-illustrated-source.png'
-   if field != 'screenshot' and master.exists():
-    asset=out/f'{field}-illustrated.png'
+   illustrated=out/f'{field}-illustrated.png'
+   master=a.sources/game/f'{field}-illustrated-source.png' if a.sources else None
+   if field != 'screenshot' and master and not master.exists() and illustrated.exists():
+    raise SystemExit(f'{game}: --sources has no {master.name}; it is needed to re-export {illustrated.relative_to(ROOT)}. '
+                     'The masters are in the GameNight project archive (archive/gamenight/catalog/art/<game>/). '
+                     'Omit --sources to embed the checked-in export.')
+   if field != 'screenshot' and illustrated.exists() and not (master and master.exists()):
+    asset=illustrated
+   if field != 'screenshot' and master and master.exists():
+    asset=illustrated
     size=(288,384) if field=='cover' else (64,64)
     with Image.open(master) as original:
      exported=ImageOps.contain(original.convert('RGB'),size,method=Image.Resampling.LANCZOS)

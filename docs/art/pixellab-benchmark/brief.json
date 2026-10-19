@@ -1,6 +1,6 @@
 {
   "provider": "PixelLab",
-  "reference": "../lobby-concepts/03-living-room.png",
+  "reference": "lobby-concepts/03-living-room.png (GameNight project archive: archive/gamenight/docs/art/lobby-concepts/)",
   "seed": 231,
   "requests": [
     {
