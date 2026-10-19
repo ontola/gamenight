@@ -24,8 +24,8 @@ def package(repo, binaries, game_room, output, version, binary_revision=None):
     helper = contents / "Helpers/GameNight.app/Contents"
     for folder in [contents / "MacOS", resources / "bin", helper / "MacOS", helper / "Resources"]:
         folder.mkdir(parents=True, exist_ok=False)
-    # The lobby helper is Godot's universal binary; it runs the same-named
-    # Game Room PCK from its bundle's Resources.
+    # The lobby helper is Godot's universal binary; the launcher runs it with
+    # --main-pack on the Game Room PCK in the helper's Resources.
     for source, target in [(binaries / "gamenight-launcher", contents / "MacOS/GameNight"),
                            (binaries / "gamenight-daemon", resources / "bin/gamenight-daemon"),
                            (game_room / "GameNight", helper / "MacOS/GameNight")]:

@@ -69,15 +69,30 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
         .canonicalize()?;
     #[cfg(target_os = "macos")]
     let game_room_command = game_room.join("../MacOS/GameNight").canonicalize()?;
+    // Name the pack: Godot's own lookup in the helper bundle's Resources
+    // did not find it on CI, while an explicit pack always runs the game.
+    #[cfg(target_os = "macos")]
+    let game_room_pack = game_room.join("GameNight.pck");
+    #[cfg(target_os = "macos")]
+    let game_room_args = vec![
+        "--main-pack".to_string(),
+        game_room_pack.display().to_string(),
+    ];
     #[cfg(not(target_os = "macos"))]
     let daemon = root.join("bin/gamenight-daemon.exe");
     #[cfg(not(target_os = "macos"))]
     let game_room = root.join("lobbies/game-room");
     #[cfg(not(target_os = "macos"))]
     let game_room_command = game_room.join("GameRoom.exe");
+    // The editor runs the same-named GameRoom.pck next to it.
+    #[cfg(not(target_os = "macos"))]
+    let game_room_pack = game_room.join("GameRoom.pck");
+    #[cfg(not(target_os = "macos"))]
+    let game_room_args: Vec<String> = Vec::new();
     for path in [
         &daemon,
         &game_room_command,
+        &game_room_pack,
         &root.join("catalog/games/blast-party.json"),
     ] {
         if !path.is_file() {
@@ -131,7 +146,8 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     let mut shelf = serde_json::json!([
         {"id":"game-room", "title":"Game Room", "players":"1-8",
          "min_players":1, "max_players":8, "emoji":"", "color":"#7c5cff",
-         "launch":{"command":game_room_command, "cwd":game_room, "env":{"GAMENIGHT_LOBBY_API":"1"}}}
+         "launch":{"command":game_room_command, "args":game_room_args, "cwd":game_room,
+                   "env":{"GAMENIGHT_LOBBY_API":"1"}}}
     ]);
     fs::write(&bundled_lobbies, serde_json::to_vec_pretty(&shelf)?)?;
     data::merge_local_games(&mut shelf, &local)?;

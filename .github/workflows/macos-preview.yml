@@ -99,8 +99,8 @@ jobs:
           mkdir game-room
           "$GODOT" --headless --path lobbies/game-room --editor --import --quit
           "$GODOT" --headless --path lobbies/game-room --export-pack macOS "$PWD/game-room/GameNight.pck"
-          # The universal editor runs the same-named PCK from its bundle's
-          # Resources, so no export templates are needed (as on Windows).
+          # The universal editor runs the pack (the launcher passes
+          # --main-pack), so no export templates are needed (as on Windows).
           cp "$GODOT" game-room/GameNight
           lipo game-room/GameNight -verify_arch arm64 x86_64
       - name: Import Developer ID certificate
