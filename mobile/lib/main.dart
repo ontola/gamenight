@@ -214,7 +214,7 @@ class _GameNightAppState extends State<GameNightApp> {
           padding: const EdgeInsets.fromLTRB(12, 24, 12, 20),
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(8, 0, 8, 32),
+              padding: EdgeInsets.fromLTRB(10, 0, 8, 28),
               child: Row(children: [
                 GameNightLogo(size: 28),
                 SizedBox(width: 9),
@@ -227,51 +227,45 @@ class _GameNightAppState extends State<GameNightApp> {
               ]),
             ),
             for (final entry in [
-              (0, 'Room', const Icon(Icons.meeting_room_outlined)),
-              (1, 'Games', const Icon(Icons.sports_esports_outlined)),
-              (
-                2,
-                'You',
-                PlayerFaceIcon(
-                    face: widget.state.face, skin: widget.state.skinColor)
-              )
+              (0, 'Room', Icons.meeting_room_outlined, Icons.meeting_room),
+              (1, 'Games', Icons.sports_esports_outlined, Icons.sports_esports),
             ])
-              ListTile(
+              _SidebarItem(
                 key: ValueKey('desktop-tab-${entry.$1}'),
+                label: entry.$2,
+                icon: Icon(_selectedTab == entry.$1 ? entry.$4 : entry.$3),
                 selected: _selectedTab == entry.$1,
-                selectedTileColor: GnColors.button.withValues(alpha: .35),
-                selectedColor: GnColors.text,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                leading: entry.$3,
-                title: Text(entry.$2),
                 onTap: () => _selectDestination(entry.$1),
               ),
-            const SizedBox(height: 20),
-            ListTile(
-                leading: const Icon(Icons.auto_awesome),
-                title: const Text('Assistant'),
+            _SidebarItem(
+              key: const ValueKey('desktop-tab-2'),
+              label: 'You',
+              icon: FittedBox(
+                  child: PlayerFaceIcon(
+                      face: widget.state.face, skin: widget.state.skinColor)),
+              selected: _selectedTab == 2,
+              onTap: () => _selectDestination(2),
+            ),
+            const _SidebarHeading('Help'),
+            _SidebarItem(
+                label: 'Assistant',
+                icon: const Icon(Icons.auto_awesome_outlined),
                 onTap: _assistant),
             if (widget.reports != null)
-              ListTile(
-                  leading: const Icon(Icons.mic_none),
-                  title: const Text('Feedback'),
+              _SidebarItem(
+                  label: 'Feedback',
+                  icon: const Icon(Icons.mic_none),
                   onTap: _feedback),
-            const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(color: GnColors.border)),
+            const _SidebarHeading('Website'),
             for (final entry in const [
               ('/developers', 'Developer portal', Icons.code),
               ('/docs', 'Documentation', Icons.menu_book_outlined),
               ('/host', 'Host a room', Icons.tv),
             ])
-              ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  minLeadingWidth: 24,
-                  horizontalTitleGap: 12,
-                  leading: Icon(entry.$3, size: 21),
-                  title: Text(entry.$2),
-                  trailing: const Icon(Icons.open_in_new, size: 16),
+              _SidebarItem(
+                  label: entry.$2,
+                  icon: Icon(entry.$3),
+                  external: true,
                   onTap: () => _openWebsite(entry.$1)),
           ],
         ),
@@ -601,6 +595,96 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       },
+    );
+  }
+}
+
+/// Small caps label above a group of sidebar items.
+class _SidebarHeading extends StatelessWidget {
+  final String text;
+  const _SidebarHeading(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(14, 24, 14, 8),
+        child: Text(text.toUpperCase(),
+            style: const TextStyle(
+                color: GnColors.muted,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2)),
+      );
+}
+
+/// One sidebar button. Every item shares the same height, padding, icon
+/// slot and rounded highlight, whether it is a tab, an action or a link.
+class _SidebarItem extends StatelessWidget {
+  final String label;
+  final Widget icon;
+  final VoidCallback onTap;
+  final bool selected;
+  final bool external;
+  const _SidebarItem(
+      {super.key,
+      required this.label,
+      required this.icon,
+      required this.onTap,
+      this.selected = false,
+      this.external = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = selected ? Colors.white : GnColors.text;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: Material(
+          color: selected ? GnColors.button : Colors.transparent,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                  color: selected
+                      ? GnColors.accent.withValues(alpha: .6)
+                      : Colors.transparent)),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            hoverColor: Colors.white.withValues(alpha: .06),
+            focusColor: Colors.white.withValues(alpha: .1),
+            highlightColor: Colors.white.withValues(alpha: .08),
+            splashColor: GnColors.accent.withValues(alpha: .25),
+            child: SizedBox(
+              height: 46,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(children: [
+                  IconTheme.merge(
+                    data: IconThemeData(
+                        size: 22,
+                        color: selected ? Colors.white : GnColors.muted),
+                    child: SizedBox.square(dimension: 24, child: icon),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                      child: Text(label,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: foreground,
+                              fontSize: 15,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500))),
+                  if (external)
+                    const Icon(Icons.open_in_new,
+                        size: 15, color: GnColors.muted),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

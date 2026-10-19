@@ -83,7 +83,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(FaceEditorScreen), findsOneWidget);
     expect(sidebar.hitTestable(), findsOneWidget);
-    await tester.tap(find.widgetWithText(ListTile, 'Feedback'));
+    await tester
+        .tap(find.descendant(of: sidebar, matching: find.text('Feedback')));
     await tester.pumpAndSettle();
     expect(find.byType(FeedbackScreen), findsOneWidget);
     expect(sidebar.hitTestable(), findsOneWidget);
