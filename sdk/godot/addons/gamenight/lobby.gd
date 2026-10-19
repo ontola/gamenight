@@ -133,7 +133,7 @@ func set_setting(game_id: String, key: String, value: Variant) -> void:
 	_command({"type": "set_setting", "game": game_id, "key": key, "value": value})
 
 func media_control(action: String) -> void:
-	if action in ["play_pause", "previous_track", "next_track"]:
+	if action in ["play_pause", "previous_track", "next_track", "resume"]:
 		_command({"type":"media_control", "action":action})
 
 func remove_from_queue(index: int) -> void:

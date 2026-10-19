@@ -461,8 +461,12 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 	elif pressed & (BTN_LB | BTN_RB):
 		_skip_music(id, -1 if pressed & BTN_LB else 1)
 
+func _has_track() -> bool:
+	var track: Variant = party.get("now_playing")
+	return track is Dictionary and not track.is_empty()
+
 func _skip_music(id: String, direction: int) -> void:
-	if station_for(id).get("kind") != "music": return
+	if station_for(id).get("kind") != "music" or not _has_track(): return
 	var action := "previous_track" if direction < 0 else "next_track"
 	var station_id := "music0" if direction < 0 else "music2"
 	var key := "%s:%s" % [station_id, action]
@@ -507,8 +511,11 @@ func station_for(id: String) -> Dictionary:
 			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
 	if x >= Layout.UP_NEXT.x and x <= Layout.UP_NEXT.y:
 		return queue_station()
-	var track: Variant = party.get("now_playing")
-	if track is Dictionary and not track.is_empty() and absf(x - Layout.JUKEBOX) <= 0.85:
+	if absf(x - Layout.JUKEBOX) <= 0.85:
+		# Nothing on yet: Y starts the host's last media player, like the Play key.
+		if not _has_track():
+			return {"id": "music1", "kind": "music", "label": "Play music", "action": "resume", "enabled": true, "extra": ""}
+		var track: Dictionary = party.now_playing
 		return {"id": "music1", "kind": "music", "label": "Pause music" if track.get("playing", false) else "Play music",
 			"action": "play_pause", "enabled": true, "extra": "LB previous RB next"}
 	if absf(x - Layout.EXIT_DOOR) <= 0.6:
@@ -839,7 +846,8 @@ func _update_prompts() -> void:
 	room.set_prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
 	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = occupied.has("shelf") and shelf_games().size() > 1
 	var playing: bool = party.get("now_playing", {}).get("playing", false) if party.get("now_playing") is Dictionary else false
-	room.set_prompt("music", [["LB", "Previous"], ["Y", "Pause" if playing else "Play"], ["RB", "Next"]], true, occupied.has("music1"))
+	var music_buttons := [["LB", "Previous"], ["Y", "Pause" if playing else "Play"], ["RB", "Next"]] if _has_track() else [["Y", "Play"]]
+	room.set_prompt("music", music_buttons, true, occupied.has("music1"))
 	room.set_prompt("exit", [["Y", "Leave"]], true, occupied.has("exit"))
 	for i in Layout.PROFILE_DOORS.size():
 		var key := "door%d" % i

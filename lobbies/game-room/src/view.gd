@@ -125,7 +125,7 @@ func update(world, delta: float) -> void:
 			var breath := (sin(_time * 1.8 + actor.order) + 1.0) * 0.5
 			sprite.rotation.z = side * PI * 0.5
 			sprite.scale = Vector3(1.0 + breath * 0.025, 1.0, 1.0)
-			sprite.position = Vector3(0.0 if p.carried_by != "" else side * 0.94, 0.52 + breath * 0.012, 0)
+			sprite.position = Vector3(side * (1.16 if p.carried_by != "" else 0.94), 0.52 + breath * 0.012, 0)
 			body.rotation.z = PI * 0.5
 			body.scale = Vector3(0.65, 0.9, 1.0)
 			body.position = Vector3(0, 0.3, -0.42)

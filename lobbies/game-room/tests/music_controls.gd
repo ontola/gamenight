@@ -59,9 +59,13 @@ func _run() -> void:
 	check(recorder.commands.is_empty(), "Open menu prevents music commands")
 	main.menus.clear()
 	main.party.now_playing = null
-	check(main.station_for("p0").is_empty(), "No music hint without a media session")
+	check(main.station_for("p0").action == "resume", "Without a media session Y starts the last player")
 	press(main, main.BTN_RB)
-	check(recorder.commands.is_empty(), "No music command without a media session")
+	check(recorder.commands.is_empty(), "No skipping without a media session")
+	press(main, main.World.BTN_Y)
+	check(recorder.commands == [{"type": "media_control", "action": "resume"}], "Y sends resume")
+	recorder.commands.clear()
+	main._station_cooldown.clear()
 	main.party.now_playing = {"title": "Demo track", "artist": "Test artist", "playing": false}
 	check(main.station_for("p0").label == "Play music", "Paused session offers play")
 	p.x = main.Layout.stand_x(main.Layout.GAME_SHELF.x + 0.2)

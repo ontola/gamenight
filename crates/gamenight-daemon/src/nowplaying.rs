@@ -61,6 +61,13 @@ pub async fn control(source: &str, action: MediaAction) {
     platform::control(source, action).await
 }
 
+/// Put music on when nothing is showing: start the player the host used
+/// last, the way the keyboard's Play key does. Best effort — a host who never
+/// played anything has nothing to resume.
+pub async fn resume_last() {
+    platform::resume_last().await
+}
+
 /// What the party should actually see, given a fresh reading and what they're
 /// seeing now.
 ///
@@ -165,6 +172,7 @@ mod platform {
             MediaAction::PlayPause => "playpause",
             MediaAction::NextTrack => "next track",
             MediaAction::PreviousTrack => "previous track",
+            MediaAction::Resume => "play",
         };
         debug!(app, verb, "controlling the host's music");
         output(
@@ -172,6 +180,18 @@ mod platform {
             &["-e", &format!("tell application \"{app}\" to {verb}")],
         )
         .await;
+    }
+
+    /// The first player that's running gets told to play. A player that isn't
+    /// running stays closed: launching apps on the host's Mac is not ours.
+    pub(super) async fn resume_last() {
+        for app in PLAYERS {
+            if is_running(app).await {
+                control(app, MediaAction::Resume).await;
+                return;
+            }
+        }
+        debug!("no music player running to resume");
     }
 
     /// Whether the app is up, asked of the process table rather than of the
@@ -288,9 +308,15 @@ mod platform {
             MediaAction::PlayPause => "play-pause",
             MediaAction::NextTrack => "next",
             MediaAction::PreviousTrack => "previous",
+            MediaAction::Resume => "play",
         };
         debug!(source, verb, "controlling the host's music");
         output("playerctl", &["-p", source, verb]).await;
+    }
+
+    /// `playerctl` with no `-p` picks the player that was active last.
+    pub(super) async fn resume_last() {
+        output("playerctl", &["play"]).await;
     }
 
     fn parse(raw: &str) -> Option<NowPlaying> {
@@ -344,6 +370,8 @@ mod platform {
     }
 
     pub(super) async fn control(_source: &str, _action: MediaAction) {}
+
+    pub(super) async fn resume_last() {}
 }
 
 #[cfg(test)]

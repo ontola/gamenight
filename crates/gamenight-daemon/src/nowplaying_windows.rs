@@ -75,6 +75,7 @@ pub(super) async fn control(source: &str, action: MediaAction) {
                 MediaAction::PlayPause => session.TryTogglePlayPauseAsync()?.get()?,
                 MediaAction::NextTrack => session.TrySkipNextAsync()?.get()?,
                 MediaAction::PreviousTrack => session.TrySkipPreviousAsync()?.get()?,
+                MediaAction::Resume => session.TryPlayAsync()?.get()?,
             };
             debug!(accepted, "Windows media command completed");
             break;
@@ -85,4 +86,44 @@ pub(super) async fn control(source: &str, action: MediaAction) {
     if !matches!(result, Ok(Ok(()))) {
         debug!(?result, "Windows media command failed");
     }
+}
+/// The session Windows itself would hand the Play key to (the one used
+/// last), else any session there is. With no session at all, press the media
+/// key anyway: a player that is open but never registered may still answer.
+pub(super) async fn resume_last() {
+    let result = tokio::task::spawn_blocking(|| -> windows::core::Result<bool> {
+        let _apartment = Apartment::new()?;
+        let manager = Manager::RequestAsync()?.get()?;
+        let mut sessions: Vec<Session> = manager.GetCurrentSession().into_iter().collect();
+        sessions.extend(manager.GetSessions()?);
+        for session in sessions {
+            if session.TryPlayAsync()?.get()? {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    })
+    .await;
+    match result {
+        Ok(Ok(true)) => debug!("resumed the last media session"),
+        result => {
+            debug!(?result, "no media session took play; pressing the media key");
+            press_play_key();
+        }
+    }
+}
+
+fn press_play_key() {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_MEDIA_PLAY_PAUSE,
+    };
+    let key = |flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: VK_MEDIA_PLAY_PAUSE, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+        },
+    };
+    let inputs = [key(0), key(KEYEVENTF_KEYUP)];
+    let sent = unsafe { SendInput(inputs.len() as u32, inputs.as_ptr(), std::mem::size_of::<INPUT>() as i32) };
+    debug!(sent, "media play key pressed");
 }

@@ -400,6 +400,9 @@ pub enum MediaAction {
     PlayPause,
     NextTrack,
     PreviousTrack,
+    /// Start whatever the host played last, like the keyboard's Play key —
+    /// for the jukebox when nothing is on yet. Never pauses.
+    Resume,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -24,7 +24,7 @@ use tracing::{debug, info, warn};
 
 use gamenight_core::{Command, Effect, GameCommand, GameNight, PartyCarry};
 use gamenight_protocol::{
-    ClientMessage, GameId, GameMeta, LaunchSpec, Role, ServerMessage, SessionId, ENV_ADDR,
+    ClientMessage, GameId, GameMeta, LaunchSpec, MediaAction, Role, ServerMessage, SessionId, ENV_ADDR,
     ENV_GAMENIGHT, ENV_GAME_ID, ENV_OVERLAY_URL, ENV_TOKEN, GODOT_SDK_VERSION, PROTOCOL_VERSION,
 };
 
@@ -670,6 +670,9 @@ impl Shared {
                     // there's nobody left to send it to.
                     if let Some(source) = self.night.now_playing().map(|t| t.source.clone()) {
                         tokio::spawn(async move { nowplaying::control(&source, action).await });
+                    } else if action == MediaAction::Resume {
+                        // Nothing on yet: start the player the host used last.
+                        tokio::spawn(nowplaying::resume_last());
                     }
                 }
                 Effect::PartyOver => {

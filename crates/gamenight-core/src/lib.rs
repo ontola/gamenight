@@ -2140,6 +2140,15 @@ mod night_tests {
                 action: MediaAction::PlayPause,
             })
             .is_empty());
+        // Except Resume: that's how the jukebox puts music on to begin with.
+        assert_eq!(
+            night.handle(Command::MediaControl {
+                action: MediaAction::Resume,
+            }),
+            vec![Effect::MediaControl {
+                action: MediaAction::Resume
+            }]
+        );
 
         night.handle(Command::NowPlaying {
             track: Some(gamenight_protocol::NowPlaying {

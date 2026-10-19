@@ -1738,11 +1738,22 @@ impl GameNight {
     /// half a second is a pad people stand on twice — and two play/pauses are
     /// no play/pause at all. Skips get no such treatment: what the next track
     /// is called is not ours to guess, and the poll knows within the second.
+    ///
+    /// Resume is the one control that needs no card: it's how the party puts
+    /// music on in the first place, so the daemon finds the player itself.
     fn on_media_control(&mut self, action: MediaAction, fx: &mut Vec<Effect>) {
         let Some(track) = &mut self.now_playing else {
+            if action == MediaAction::Resume {
+                fx.push(Effect::MediaControl { action });
+            }
             return;
         };
-        if action == MediaAction::PlayPause {
+        if action == MediaAction::Resume {
+            if !track.playing {
+                track.playing = true;
+                fx.push(Effect::StateChanged);
+            }
+        } else if action == MediaAction::PlayPause {
             track.playing = !track.playing;
             fx.push(Effect::StateChanged);
         }

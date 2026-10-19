@@ -290,7 +290,7 @@ role; the runtime supplies its controller stream.
 | `open_overlay` / `close_overlay` | the party overlay came up / went away (see below) |
 | `vote {player_id, option}` | stand on `replay` \| `skip` \| `next_game` \| `quit` |
 | `set_setting {game?, key, value}` | change a match setting; `game` defaults to the active game (see [Match settings](#match-settings)) |
-| `media_control {action}` | `play_pause` \| `next_track` \| `previous_track` on the host's background music (see [The host's music](#the-hosts-music)) |
+| `media_control {action}` | `play_pause` \| `next_track` \| `previous_track` \| `resume` on the host's background music; `resume` also works with nothing showing and starts the player the host used last (see [The host's music](#the-hosts-music)) |
 
 `download_grants {grants}` is for the trusted local web server only: it hands the
 daemon the cloud's current download grants (game id to token) for paid games
