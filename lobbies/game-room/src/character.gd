@@ -20,8 +20,9 @@ const HATS := ["none", "cap", "crown", "party", "tophat", "beanie", "headphones"
 static func frame_index(name: String) -> int:
 	return maxi(0, FRAMES.find(name))
 
-## Returns an ImageTexture atlas with FRAMES.size() columns.
-static func build(player: Dictionary, face: Dictionary, hat: String = "none") -> ImageTexture:
+## Returns an ImageTexture atlas with FRAMES.size() columns. With phone, the
+## back hand holds a phone with a lit screen (players who joined on one).
+static func build(player: Dictionary, face: Dictionary, hat: String = "none", phone := false) -> ImageTexture:
 	var sheet := Image.create(W * FRAMES.size(), H, false, Image.FORMAT_RGBA8)
 	sheet.fill(Color.TRANSPARENT)
 	var cloth := Color.from_string(str(player.get("color", "")), Color("7c5cff"))
@@ -29,12 +30,12 @@ static func build(player: Dictionary, face: Dictionary, hat: String = "none") ->
 	for i in FRAMES.size():
 		var frame := Image.create(W, H, false, Image.FORMAT_RGBA8)
 		frame.fill(Color.TRANSPARENT)
-		_draw_frame(frame, FRAMES[i], cloth, skin, face, hat)
+		_draw_frame(frame, FRAMES[i], cloth, skin, face, hat, phone)
 		_outline(frame)
 		sheet.blit_rect(frame, Rect2i(0, 0, W, H), Vector2i(i * W, 0))
 	return ImageTexture.create_from_image(sheet)
 
-static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, face: Dictionary, hat: String) -> void:
+static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, face: Dictionary, hat: String, phone := false) -> void:
 	var bob := 0
 	var legs := [0, 0]   # forward offset of left/right foot
 	var lift := [0, 0]   # how far each foot is raised
@@ -132,6 +133,18 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 		_rect(img, Rect2i(hx - 4, hy - 6, 7, 1), skin.lightened(0.14))
 		_rect(img, Rect2i(hx + 4, hy - 5, 7, 1), skin.lightened(0.14))
 	_hat(img, hat, head, cloth)
+	if phone and not sleeping: _phone(img, arms[0], torso.position.y + 1, skin)
+
+## A phone upright in the back hand, fingers wrapped over its lower edge.
+static func _phone(img: Image, arm: String, y: int, skin: Color) -> void:
+	var hand: Vector2i = {"down": Vector2i(6, y + 9), "up": Vector2i(6, y - 10), "out": Vector2i(1, y), "forward": Vector2i(29, y + 4)}.get(arm, Vector2i(6, y + 9))
+	var at := hand + Vector2i(-2, -5)
+	var shell := Color("24273a")
+	_rect(img, Rect2i(at.x, at.y, 5, 7), shell)
+	_rect(img, Rect2i(at.x + 1, at.y + 1, 3, 4), Color("a8e6ff"))
+	_px(img, at.x + 1, at.y + 1, Color("e4f6ff"))
+	_px(img, at.x + 2, at.y + 6, Color("4a4f6a"))
+	_rect(img, Rect2i(hand.x - 1, hand.y, 4, 2), skin)
 
 static func _hat(img: Image, hat: String, head: Vector2, cloth: Color) -> void:
 	var x := int(head.x)

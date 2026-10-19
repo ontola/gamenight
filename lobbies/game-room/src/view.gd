@@ -11,9 +11,10 @@ var faces = Face.new()
 var actors: Dictionary = {}    # player id -> {node, sprite, light, zzz, key}
 var item_nodes: Dictionary = {}
 var shot_nodes: Array = []
-## Players with a linked phone; they get a small glowing phone by their head.
+## Players with a linked phone; their sprite holds a phone in one hand.
 var phones: Array = []
 var _time := 0.0
+var _delta := 0.0
 var _next_order := 0
 
 func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
@@ -24,7 +25,8 @@ func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
 	for id in sim_players:
 		var profile: Dictionary = profiles.get(id, {})
 		var hat: String = sim_players[id].hat
-		var key := "%s|%s|%s|%s" % [profile.get("color", ""), profile.get("skin_color", ""), str(profile.get("avatar", "")).hash(), hat]
+		var phone := phones.has(id)
+		var key := "%s|%s|%s|%s|%s" % [profile.get("color", ""), profile.get("skin_color", ""), str(profile.get("avatar", "")).hash(), hat, phone]
 		if not actors.has(id):
 			actors[id] = _make_actor(profile)
 			actors[id].order = _next_order
@@ -32,7 +34,7 @@ func sync_profiles(profiles: Dictionary, sim_players: Dictionary) -> void:
 		var actor: Dictionary = actors[id]
 		if actor.key != key:
 			actor.key = key
-			actor.sprite.texture = Character.build(profile, Character.decode_face(faces, profile), hat)
+			actor.sprite.texture = Character.build(profile, Character.decode_face(faces, profile), hat, phone)
 			var color := Color.from_string(str(profile.get("color", "")), Color("7c5cff"))
 			actor.light.light_color = color
 
@@ -76,21 +78,7 @@ func _make_actor(_profile: Dictionary) -> Dictionary:
 	zzz.position = Vector3(0.6, 1.8, 0.1)
 	zzz.visible = false
 	node.add_child(zzz)
-	var phone := MeshInstance3D.new()
-	var slab := BoxMesh.new()
-	slab.size = Vector3(0.16, 0.28, 0.03)
-	phone.mesh = slab
-	var glow := StandardMaterial3D.new()
-	glow.albedo_color = Color("1b1f2e")
-	glow.emission_enabled = true
-	glow.emission = Color("7cc7ff")
-	glow.emission_energy_multiplier = 1.6
-	phone.material_override = glow
-	phone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	phone.position = Vector3(-0.55, 1.75, 0.1)
-	phone.visible = false
-	node.add_child(phone)
-	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "phone": phone, "key": "", "depth": 0.0, "order": 0}
+	return {"node": node, "sprite": sprite, "body": body, "light": light, "zzz": zzz, "key": "", "depth": 0.0, "order": 0}
 
 ## The z a player is drawn at: the surface they stand on (couch, shelf) so
 ## they sit on it, plus a small per-player step so overlapping sprites never
@@ -101,6 +89,7 @@ func depth(id: String) -> float:
 
 func update(world, delta: float) -> void:
 	_time += delta
+	_delta = delta
 	for id in world.players:
 		if not actors.has(id): continue
 		var p: Dictionary = world.players[id]
@@ -108,6 +97,8 @@ func update(world, delta: float) -> void:
 		# Ease towards the depth of the surface below, so landing on the couch
 		# or a shelf slides the sprite back instead of popping.
 		var target := Layout.depth_at(p.x, p.y)
+		# Carried overhead: just in front of the carrier, not on the shelf behind.
+		if p.carried_by != "" and actors.has(p.carried_by): target = actors[p.carried_by].depth + 0.06
 		actor.depth = lerpf(actor.depth, target, 1.0 - exp(-delta * 12.0))
 		actor.node.position = Vector3(p.x, p.y, depth(id))
 		var sprite: Sprite3D = actor.sprite
@@ -126,8 +117,6 @@ func update(world, delta: float) -> void:
 		body.position = Vector3(0, 0.85 * body.scale.y, -0.42)
 		sprite.rotation.z = sin(_time * 30) * 0.15 if p.stun > 0 else 0.0
 		actor.zzz.visible = p.sleeping
-		actor.phone.visible = phones.has(id) and not p.sleeping
-		actor.phone.position.y = 1.75 + sin(_time * 2.0 + actor.order) * 0.04
 		if p.sleeping:
 			# Rotate the whole pose, including the player's drawing and hat.
 			# Centre the curled body over its resting spot, with its cheek on
@@ -136,7 +125,7 @@ func update(world, delta: float) -> void:
 			var breath := (sin(_time * 1.8 + actor.order) + 1.0) * 0.5
 			sprite.rotation.z = side * PI * 0.5
 			sprite.scale = Vector3(1.0 + breath * 0.025, 1.0, 1.0)
-			sprite.position = Vector3(side * 0.94, 0.52 + breath * 0.012, 0)
+			sprite.position = Vector3(0.0 if p.carried_by != "" else side * 0.94, 0.52 + breath * 0.012, 0)
 			body.rotation.z = PI * 0.5
 			body.scale = Vector3(0.65, 0.9, 1.0)
 			body.position = Vector3(0, 0.3, -0.42)
@@ -154,6 +143,7 @@ func _frame(p: Dictionary) -> String:
 	if p.cheer > 0: return "cheer"
 	if p.punch > 0.08: return "throw"
 	if not p.grounded: return "jump" if p.vy > 0 else "fall"
+	if p.carrying != "": return "cheer"
 	if p.item >= 0: return "carry"
 	if absf(p.vx) > 0.4: return "walk%d" % (int(p.walk_phase * 2.2) % 4)
 	return "idle%d" % (int(_time * 1.6 + p.x) % 2)
@@ -179,6 +169,16 @@ func _update_items(world) -> void:
 			var players: Dictionary = world.players
 			var facing: float = players[item.holder].facing if players.has(item.holder) else 1.0
 			node.rotation.y = 0 if facing > 0 else PI
+			if item.kind == "saber":
+				# Swing over the top while the slash lasts: wind up behind the
+				# head, sweep down through the front, then ease back to rest.
+				var swing: float = players[item.holder].punch if players.has(item.holder) else 0.0
+				var blade: Node3D = node.get_meta("blade")
+				if swing > 0:
+					var t := 1.0 - swing / 0.24
+					blade.rotation.z = lerpf(1.4, -2.3, ease(t, 0.4))
+				else:
+					blade.rotation.z = lerpf(blade.rotation.z, -0.5, 1.0 - exp(-_delta * 14.0))
 		# Blink before an unheld item disappears.
 		node.visible = not (item.holder == "" and item.age > world.ITEM_LIFE - 3 and int(_time * 8) % 2 == 0 and item.kind != "ball")
 	for id in item_nodes.keys():
@@ -234,6 +234,7 @@ func _make_item(item: Dictionary) -> Node3D:
 			var saber := Node3D.new()
 			saber.rotation.z = -0.5
 			node.add_child(saber)
+			node.set_meta("blade", saber)
 			room.cylinder(0.05, 0.26, Vector3(0, 0.0, 0), room.mat(Color("c9c4d8"), 0.25, 0.8), saber)
 			room.cylinder(0.035, 1.05, Vector3(0, 0.65, 0), room.mat(blade.lightened(0.6), 0.2, 0, blade, 6.0), saber)
 			var glow := OmniLight3D.new()

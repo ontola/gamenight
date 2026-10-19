@@ -720,9 +720,19 @@ func set_links(data: Dictionary) -> void:
 		qr = null
 		var image := Image.new()
 		if not source.is_empty() and source.length() < 200000 and image.load_svg_from_string(source, 6.0) == OK:
-			qr = ImageTexture.create_from_image(image)
+			qr = ImageTexture.create_from_image(_inverted_qr(image))
 	_sync_doors()
 	room.redraw("plaque")
+
+## The daemon renders black modules on white; the plaque shows white modules
+## on its own dark background, so light only comes from the modules.
+static func _inverted_qr(image: Image) -> Image:
+	image.convert(Image.FORMAT_RGBA8)
+	for y in image.get_height():
+		for x in image.get_width():
+			var c := image.get_pixel(x, y)
+			image.set_pixel(x, y, Color.WHITE if c.a > 0.5 and c.get_luminance() < 0.5 else Color.TRANSPARENT)
+	return image
 
 func _sync_doors() -> void:
 	var pending := pending_profiles()
@@ -779,6 +789,11 @@ func _physics_process(delta: float) -> void:
 	while _accumulator >= World.DT:
 		_accumulator -= World.DT
 		world.step()
+	# Carried to the exit and thrown out: an away player leaves the party.
+	for id in world.ejected:
+		toast("%s was thrown out of the party." % _name(id), DIM)
+		client.leave(id)
+	world.ejected.clear()
 
 func _process(delta: float) -> void:
 	_time += delta
@@ -1122,23 +1137,22 @@ func _draw_jukebox(canvas: Control) -> void:
 	_text(canvas, artist, Vector2(0, 128), _fit(artist, 24, width - 40, 16), Color("8a2e3c"), size.x, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _draw_plaque(canvas: Control) -> void:
+	# Only the code itself: white modules on black (the dark wall around it is
+	# the quiet zone, so inverted readers still scan it), the room code below.
 	var size := canvas.size
 	canvas.draw_rect(Rect2(Vector2.ZERO, size), Color("0c0a16"))
-	_text(canvas, "SCAN TO JOIN", Vector2(0, 42), 32, AMBER, size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var room_info: Dictionary = links.get("room", {})
-	var side := 216.0
-	var qr_rect := Rect2((size.x - side) / 2, 70, side, side)
+	var side := 264.0
+	var qr_rect := Rect2((size.x - side) / 2, 20, side, side)
 	if qr != null:
-		canvas.draw_rect(qr_rect.grow(14), Color.WHITE)
 		canvas.draw_texture_rect(qr, qr_rect, false)
 	else:
-		canvas.draw_rect(qr_rect, Color("1a1730"))
 		_text(canvas, "Phone joining", Vector2(qr_rect.position.x, qr_rect.get_center().y - 6), 16, DIM, qr_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 		_text(canvas, "starts with GameNight", Vector2(qr_rect.position.x, qr_rect.get_center().y + 18), 16, DIM, qr_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var code := str(room_info.get("room_code", room_info.get("code", "")))
 	if code == "<null>": code = ""
-	_text(canvas, code if not code.is_empty() else "· · · ·", Vector2(0, size.y - 18), 48, TEXT, size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	_text(canvas, "ROOM CODE", Vector2(0, size.y - 66), 16, DIM, size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if code.is_empty(): code = "· · · ·"
+	canvas.draw_string(room.wordmark, Vector2(0, size.y - 34), code, HORIZONTAL_ALIGNMENT_CENTER, size.x, 52, TEXT)
 
 # ---------------------------------------------------------------- HUD
 

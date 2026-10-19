@@ -48,6 +48,7 @@ var players: Dictionary = {}   # id -> state dictionary
 var items: Array = []
 var shots: Array = []
 var events: Array = []         # consumed by the view each frame
+var ejected: Array = []        # players thrown out the exit, consumed by main
 var time := 0.0
 var _drop_at := 4.0
 var _next_item := 1
@@ -64,7 +65,8 @@ func ensure_player(id: String, slot: int) -> Dictionary:
 		"pressed": 0, "stick": Vector2.ZERO, "coyote": 0.0, "buffer": 0.0,
 		"drop": 0.0, "item": -1, "hat": "none", "punch": 0.0, "punch_cd": 0.0,
 		"stun": 0.0, "fire_cd": 0.0, "last_input": time, "sleeping": false,
-		"walk_phase": 0.0, "land": 0.0, "spawn": 0.6, "cheer": 0.0}
+		"walk_phase": 0.0, "land": 0.0, "spawn": 0.6, "cheer": 0.0,
+		"carrying": "", "carried_by": "", "flung": 0.0}
 	players[id] = p
 	events.append({"type": "spawn", "x": p.x, "y": p.y, "player": id})
 	return p
@@ -72,6 +74,7 @@ func ensure_player(id: String, slot: int) -> Dictionary:
 func remove_player(id: String) -> void:
 	if not players.has(id): return
 	_drop_item(players[id], false)
+	_release(players[id])
 	players.erase(id)
 
 ## held: button bitmask, stick: x right, y down (SDL convention), -1..1.
@@ -79,7 +82,10 @@ func set_input(id: String, held: int, stick: Vector2) -> void:
 	if not players.has(id): return
 	var p: Dictionary = players[id]
 	p.pressed |= held & ~int(p.held)
-	if held != 0 or stick.length() > 0.3: p.last_input = time
+	if held != 0 or stick.length() > 0.3:
+		p.last_input = time
+		# Carrying is for players who are away: any input wriggles free.
+		if p.carried_by != "": _release(p)
 	p.held = held
 	p.stick = stick
 
@@ -102,6 +108,10 @@ func _down(p: Dictionary) -> bool:
 	return p.stick.y > 0.6 or (p.held & BTN_DOWN) != 0
 
 func _step_player(p: Dictionary) -> void:
+	if p.carried_by != "":
+		_follow_carrier(p)
+		return
+	p.flung = maxf(0, p.flung - DT)
 	p.spawn = maxf(0, p.spawn - DT)
 	p.land = maxf(0, p.land - DT)
 	p.cheer = maxf(0, p.cheer - DT)
@@ -149,6 +159,11 @@ func _step_player(p: Dictionary) -> void:
 	if p.wall != 0 and p.vy < -WALL_SLIDE and axis == p.wall: p.vy = -WALL_SLIDE
 	_move_body(p)
 	if p.grounded and absf(p.vx) > 0.2: p.walk_phase += absf(p.vx) * DT * 1.6
+	if p.flung > 0 and absf(p.x - Layout.EXIT_DOOR) <= 0.7 and p.y < 2.6:
+		p.flung = 0.0
+		ejected.append(p.id)
+		events.append({"type": "ejected", "x": p.x, "y": p.y + 0.8, "player": p.id})
+	elif p.grounded: p.flung = 0.0
 	_actions(p, stunned)
 
 func _on_platform(p: Dictionary) -> bool:
@@ -196,9 +211,13 @@ func _landing(x: float, half: float, old_y: float, new_y: float, dropping: bool)
 func _actions(p: Dictionary, stunned: bool) -> void:
 	if stunned or p.sleeping: return
 	var item := _item(int(p.item))
+	if p.carrying != "":
+		if p.pressed & BTN_B: _throw_player(p)
+		return
 	if p.pressed & BTN_B:
 		if not item.is_empty(): _drop_item(p, true)
-		else: _grab(p)
+		elif not pickup_target(p).is_empty(): _grab(p)
+		else: _grab_player(p)
 	# The minigun fires while X is held; everything else once per press.
 	if not item.is_empty() and item.kind == "minigun" and p.held & BTN_X:
 		_fire(p, item)
@@ -228,6 +247,64 @@ func _grab(p: Dictionary) -> void:
 	p.item = item.id
 	if item.kind == "bomb" and item.fuse < 0: item.fuse = 3.2
 	events.append({"type": "grab", "x": item.x, "y": item.y, "player": p.id})
+
+## The player B lifts when no item is in reach: someone close by who is not
+## already carrying or being carried.
+func carry_target(p: Dictionary) -> Dictionary:
+	if p.sleeping or p.stun > 0 or p.carrying != "" or p.carried_by != "" or not _item(int(p.item)).is_empty(): return {}
+	for id in players:
+		var other: Dictionary = players[id]
+		if other == p or other.carrying != "" or other.carried_by != "" or other.spawn > 0: continue
+		if absf(other.x - p.x) < 1.1 and absf(other.y - p.y) < 0.9: return other
+	return {}
+
+func _grab_player(p: Dictionary) -> void:
+	var other := carry_target(p)
+	if other.is_empty(): return
+	_drop_item(other, false)
+	p.carrying = other.id
+	other.carried_by = p.id
+	_follow_carrier(other)
+	events.append({"type": "grab", "x": other.x, "y": other.y, "player": p.id})
+
+## A carried player lies across the carrier's raised arms.
+func _follow_carrier(p: Dictionary) -> void:
+	var carrier: Dictionary = players.get(p.carried_by, {})
+	if carrier.is_empty() or carrier.carrying != p.id:
+		p.carried_by = ""
+		return
+	p.x = carrier.x
+	p.y = carrier.y + HEIGHT * 0.85
+	p.vx = carrier.vx
+	p.vy = carrier.vy
+	p.grounded = false
+
+## Lets go of whoever this player carries or is carried by.
+func _release(p: Dictionary) -> void:
+	var carried: Dictionary = players.get(p.carrying, {})
+	if not carried.is_empty():
+		carried.carried_by = ""
+		carried.vy = 3.0
+	var carrier: Dictionary = players.get(p.carried_by, {})
+	if not carrier.is_empty():
+		carrier.carrying = ""
+		p.vy = 3.0
+	p.carrying = ""
+	p.carried_by = ""
+
+## Throws the carried player; landing in the exit door takes them out.
+func _throw_player(p: Dictionary) -> void:
+	var other: Dictionary = players.get(p.carrying, {})
+	p.carrying = ""
+	if other.is_empty(): return
+	other.carried_by = ""
+	other.x = p.x + p.facing * 0.5
+	other.vx = p.facing * 12.0 + p.vx * 0.5
+	other.vy = 7.0
+	other.grounded = false
+	other.stun = 0.5
+	other.flung = 1.4
+	events.append({"type": "throw", "x": other.x, "y": other.y, "player": p.id})
 
 func _drop_item(p: Dictionary, thrown: bool) -> void:
 	var item := _item(int(p.item))
@@ -320,6 +397,7 @@ func _use_ammo(p: Dictionary, item: Dictionary) -> void:
 
 func _knock(p: Dictionary, vx: float, vy: float, stun: float) -> void:
 	_drop_item(p, false)
+	if p.carrying != "": _release(p)
 	p.vx = vx
 	p.vy = maxf(p.vy, vy)
 	p.grounded = false

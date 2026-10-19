@@ -133,6 +133,7 @@ jobs:
       - run: /tmp/godot/Godot_v4.5.2-stable_linux.x86_64 --headless --path lobbies/game-room --script res://tests/lobby_switch.gd -- --demo
       - run: /tmp/godot/Godot_v4.5.2-stable_linux.x86_64 --headless --path lobbies/game-room --script res://tests/bench.gd -- --demo --scene=phones
       - run: /tmp/godot/Godot_v4.5.2-stable_linux.x86_64 --headless --path lobbies/game-room --script res://tests/weapons.gd
+      - run: /tmp/godot/Godot_v4.5.2-stable_linux.x86_64 --headless --path lobbies/game-room --script res://tests/carry.gd
       - run: /tmp/godot/Godot_v4.5.2-stable_linux.x86_64 --headless --path lobbies/game-room --script res://tests/queue.gd -- --demo --scene=stations
       - run: python3 scripts/test-lobby-recovery.py
       - run: python3 scripts/test-host-lobby.py

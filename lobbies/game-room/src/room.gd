@@ -850,13 +850,10 @@ func _plaque() -> void:
 	box(Vector3(2.3, 2.75, 0.1), c + Vector3(0, 0, -0.02), mat(Color("0e0c18"), 0.4))
 	var texture := screen("plaque", Vector2i(320, 380), func(_canvas): pass)
 	screens.plaque.canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp QR modules
-	# Bright enough to read as white after tone mapping: QR codes need contrast.
-	var m := screen_material(texture, 1.7)
+	# White enough to read after tone mapping, low enough not to bloom.
+	var m := screen_material(texture, 1.15)
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	quad(Vector2(2.2, 2.63), c + Vector3(0, 0, 0.04), m)
-	for p in [[Vector2(-1.15, -1.37), Vector2(1.15, -1.37)], [Vector2(-1.15, 1.37), Vector2(1.15, 1.37)],
-			[Vector2(-1.15, -1.37), Vector2(-1.15, 1.37)], [Vector2(1.15, -1.37), Vector2(1.15, 1.37)]]:
-		neon_line(c + Vector3(p[0].x, p[0].y, 0.08), c + Vector3(p[1].x, p[1].y, 0.08), AMBER, 3.0, 0.05)
 
 func _ceiling_lights() -> void:
 	# Fixed spots that paint coloured cones through the haze. They hang in
