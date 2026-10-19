@@ -111,9 +111,15 @@ def run(godot, capture_dir=None):
                         if time.monotonic() > deadline: raise
                         time.sleep(0.05)
                 # No art: the host hands out its own guest faces and colours.
-                for name in ("Nora", "Jamal", "Bo"):
+                # Each holds a (synthetic) controller: the room only gives a
+                # character to players with one.
+                for index, name in enumerate(("Nora", "Jamal", "Bo")):
                     overlay.send({"type": "join_party", "name": name})
-                    overlay.until(lambda p, n=name: any(player["name"] == n for player in p["players"]))
+                    party = overlay.until(lambda p, n=name: any(player["name"] == n for player in p["players"]))
+                    player = next(player["id"] for player in party["players"] if player["name"] == name)
+                    overlay.send({"type": "bind_controller", "player_id": player, "controller": f"test:{index}"})
+                    overlay.until(lambda p, i=player: any(
+                        seat.get("controller") and seat["occupant"].get("player_id") == i for seat in p["seats"]))
                 for game_id, _, _ in games:
                     threading.Thread(target=game_loop, args=(port, game_id, stop), daemon=True).start()
                 # A phone profile waiting in the local room, as the studio page would send it.

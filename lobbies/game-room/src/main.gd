@@ -42,6 +42,13 @@ var controllers: Dictionary = {}    # controller token -> player id
 var held: Dictionary = {}           # player id -> button bitmask
 var _input_blocked: Dictionary = {} # after a focus transition, wait for neutral input
 var menus: Dictionary = {}          # player id -> {index, confirm}
+## Seated players who never had a controller here (phone players, a stale
+## web join). They cannot walk, so they get a line on the HUD instead.
+var bench: Array = []
+## Player id -> _time their controller went (or, on the bench, since they
+## have neither a controller nor a phone). Gone for LOST_SECONDS, they leave.
+var lost_since: Dictionary = {}
+const LOST_SECONDS := 30.0
 var shelf_offset := 0
 var toasts: Array = []
 var links: Dictionary = {}          # /api/player-links response
@@ -237,13 +244,23 @@ func set_party(snapshot: Dictionary) -> void:
 		var id := str(occupant.player_id)
 		slots[id] = int(seat.get("index", 0))
 		if seat.get("controller") != null: controllers[str(seat.controller)] = id
+	var walkers: Array = controllers.values()
+	var phones: Array = party.get("phones", [])
+	# A character whose controller went keeps standing, asleep and marked,
+	# until it comes back or the player is taken out. A phone player sits.
+	bench = profiles.keys().filter(func(id): return not walkers.has(id) and (phones.has(id) or not world.players.has(id)))
 	for id in world.players.keys():
-		if not profiles.has(id):
+		if not profiles.has(id) or bench.has(id):
 			world.remove_player(id)
 			menus.erase(id)
+	for id in profiles:
+		if walkers.has(id) or phones.has(id): lost_since.erase(id)
+		elif not lost_since.has(id): lost_since[id] = _time
+	for id in lost_since.keys():
+		if not profiles.has(id): lost_since.erase(id)
 	var i := 0
 	for id in profiles:
-		world.ensure_player(id, slots.get(id, i))
+		if walkers.has(id): world.ensure_player(id, slots.get(id, i))
 		i += 1
 	view.phones = party.get("phones", [])
 	view.sync_profiles(profiles, world.players)
@@ -348,7 +365,24 @@ func _update_sleep() -> void:
 	for id in world.players:
 		var p: Dictionary = world.players[id]
 		var quiet: bool = world.time - float(p.last_input) > 1.0
-		p.sleeping = sleeping.has(id) and quiet
+		p.sleeping = (sleeping.has(id) and quiet) or lost_since.has(id)
+
+## Takes out players whose controller (and phone) stayed gone. Only counts
+## while the room is on screen, so a game in progress never removes anyone.
+func _remove_lost(delta: float) -> void:
+	for id in lost_since.keys():
+		if not _accepts_input():
+			lost_since[id] += delta
+			continue
+		if _time - float(lost_since[id]) < LOST_SECONDS: continue
+		lost_since.erase(id)
+		toast("%s left the party: no controller." % _name(id), DIM)
+		client.leave(id)
+
+## Seconds left before a player without a controller leaves.
+func lost_left(id: String) -> int:
+	if not lost_since.has(id): return -1
+	return maxi(0, ceili(LOST_SECONDS - (_time - float(lost_since[id]))))
 
 # ---------------------------------------------------------------- input
 
@@ -566,12 +600,29 @@ func update_ready() -> String:
 
 func menu_items(id: String) -> Array:
 	if menus.get(id, {}).get("page", "") == "lobbies": return lobby_items()
+	if menus.get(id, {}).get("page", "") == "remove": return remove_items(id)
 	var items := [{"label": "Close menu", "action": "close"}, {"label": "Leave the party", "action": "leave"}]
 	# The host restarts into the new version and brings the party back.
 	if not update_ready().is_empty(): items.push_front({"label": "Update GameNight now", "action": "update"})
 	if links.get("linked", {}).has(id): items.insert(1, {"label": "Unlink my phone profile", "action": "unlink"})
+	if profiles.size() > 1: items.append({"label": "Remove a player", "action": "remove_page"})
 	if party.get("lobbies", []).size() > 1: items.append({"label": "Switch lobby", "action": "lobbies"})
 	items.append({"label": "Quit GameNight", "action": "quit"})
+	return items
+
+## Everyone else in the party, as a page of the Start menu, so a player who
+## left without leaving (a phone, a web join, someone gone home) can be
+## taken out. Players without a controller come first.
+func remove_items(id: String) -> Array:
+	var items := []
+	for other in bench + world.players.keys():
+		if other == id or not profiles.has(other): continue
+		var label := _short(_name(other), 18)
+		if bench.has(other): label += "  (phone)" if party.get("phones", []).has(other) else "  (no controller)"
+		elif lost_since.has(other): label += "  (no controller)"
+		elif world.players[other].sleeping: label += "  (away)"
+		items.append({"label": label, "action": "remove", "player": other, "name": _name(other)})
+	items.append({"label": "Back", "action": "back"})
 	return items
 
 ## The host's lobbies, as a page of the Start menu. Picking one restarts
@@ -596,7 +647,7 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 	if up: menu.index = posmod(menu.index - 1, items.size()); menu.confirm = false
 	if down: menu.index = posmod(menu.index + 1, items.size()); menu.confirm = false
 	if pressed & World.BTN_B:
-		if menu.get("page", "") == "lobbies": _menu_page(menu, "")
+		if menu.get("page", "") != "": _menu_page(menu, "")
 		else: menus.erase(id)
 	elif pressed & World.BTN_A:
 		var item: Dictionary = items[menu.index]
@@ -604,6 +655,13 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 		match action:
 			"close": menus.erase(id)
 			"lobbies": _menu_page(menu, "lobbies")
+			"remove_page": _menu_page(menu, "remove")
+			"remove":
+				if menu.confirm:
+					_menu_page(menu, "")
+					toast("%s left the party." % item.name, DIM)
+					client.leave(item.player)
+				else: menu.confirm = true
 			"back": _menu_page(menu, "")
 			"lobby":
 				if item.current:
@@ -725,6 +783,7 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	if demo != null: demo.tick(delta)
+	_remove_lost(delta)
 	_update_sleep()
 	view.sync_profiles(profiles, world.players)
 	view.update(world, delta)
@@ -1107,7 +1166,14 @@ func _draw_hud(canvas: Control) -> void:
 		var width := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		canvas.draw_string_outline(font, at + Vector2(-width / 2, 0), name, HORIZONTAL_ALIGNMENT_LEFT, -1, size, maxi(4, int(5 * scale)), Color(BG, 0.85))
 		_text(canvas, name, at + Vector2(-width / 2, 0), size, color.lightened(0.35))
+		if lost_since.has(id):
+			var lost := "Controller lost · leaves in %ds" % lost_left(id)
+			var small := int(16 * scale)
+			var lw := font.get_string_size(lost, HORIZONTAL_ALIGNMENT_LEFT, -1, small).x
+			canvas.draw_string_outline(font, at + Vector2(-lw / 2, -size - 4 * scale), lost, HORIZONTAL_ALIGNMENT_LEFT, -1, small, maxi(4, int(5 * scale)), Color(BG, 0.85))
+			_text(canvas, lost, at + Vector2(-lw / 2, -size - 4 * scale), small, AMBER)
 		if menus.has(id): _draw_menu(canvas, id, at + Vector2(0, -size - 10 * scale), int(22 * scale))
+	_draw_bench(canvas, scale)
 	# Toasts, bottom centre.
 	var y := canvas.size.y - 40 * scale
 	for i in range(toasts.size() - 1, -1, -1):
@@ -1135,10 +1201,43 @@ func _draw_hud(canvas: Control) -> void:
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, 24 + size + 6), size, AMBER)
 	if profiles.is_empty() and (demo != null or client.connected):
 		var size := int(28 * scale)
-		var msg := "Press any button on a controller to jump in"
+		var msg := "Press A on a controller to jump in"
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, canvas.size.y * 0.42, w, size + 28), Color(0.03, 0.03, 0.06, 0.85))
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, canvas.size.y * 0.42 + size + 6), size, TEXT)
+
+## Players without a controller, bottom left: a coloured dot, the name, and
+## a small phone for those who play on one.
+func _draw_bench(canvas: Control, scale: float) -> void:
+	if bench.is_empty(): return
+	var size := int(19 * scale)
+	var line := size + 14 * scale
+	var phones: Array = party.get("phones", [])
+	var w := font.get_string_size("ON PHONES", HORIZONTAL_ALIGNMENT_LEFT, -1, int(size * 0.75)).x
+	for id in bench: w = maxf(w, font.get_string_size(_short(_name(id), 16) + "  no controller", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 44 * scale)
+	w += 36 * scale
+	var h := line * bench.size() + 44 * scale
+	var rect := Rect2(24 * scale, canvas.size.y - h - 24 * scale, w, h)
+	canvas.draw_rect(rect, Color(0.03, 0.03, 0.06, 0.82))
+	canvas.draw_rect(Rect2(rect.position, Vector2(4 * scale, rect.size.y)), VIOLET)
+	var heading := "ON PHONES" if bench.all(func(id): return phones.has(id)) else "NO CONTROLLER"
+	_text(canvas, heading, rect.position + Vector2(18, 26) * scale, int(size * 0.75), AMBER)
+	for i in bench.size():
+		var id: String = bench[i]
+		var y := rect.position.y + 40 * scale + i * line
+		var color := Color.from_string(str(profiles.get(id, {}).get("color", "")), VIOLET)
+		var phone := phones.has(id)
+		var icon := Rect2(rect.position.x + 20 * scale, y + 2 * scale, 12 * scale, 20 * scale)
+		if phone:
+			canvas.draw_rect(icon, color.lightened(0.2))
+			canvas.draw_rect(icon.grow(-2.5 * scale), Color(BG, 0.9))
+		else:
+			canvas.draw_circle(icon.get_center(), 6 * scale, Color(color, 0.45))
+		var label := _short(_name(id), 16)
+		_text(canvas, label, Vector2(rect.position.x + 44 * scale, y + size), size, color.lightened(0.35) if phone else DIM)
+		if not phone:
+			var x := rect.position.x + 44 * scale + font.get_string_size(label + "  ", HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+			_text(canvas, "leaves in %ds" % lost_left(id), Vector2(x, y + size), int(size * 0.8), AMBER)
 
 ## One badge per reachable item, even when several players stand beside it.
 func pickup_hint_items() -> Dictionary:
@@ -1246,13 +1345,14 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	rect.position.y = maxf(rect.position.y, 16)
 	canvas.draw_rect(rect, Color(0.04, 0.035, 0.08, 0.95))
 	canvas.draw_rect(rect, Color(VIOLET, 0.9), false, 3)
-	var heading := "CHOOSE A LOBBY" if menu.get("page", "") == "lobbies" else _name(id).to_upper()
+	var heading: String = {"lobbies": "CHOOSE A LOBBY", "remove": "REMOVE A PLAYER"}.get(menu.get("page", ""), _name(id).to_upper())
 	_text(canvas, heading, rect.position + Vector2(24, size + 14), int(size * 0.7), AMBER)
 	for i in items.size():
 		var y := rect.position.y + 50 + i * line
 		var selected: bool = i == menu.index
 		var label: String = items[i].label
 		if items[i].action == "quit" and menu.confirm and selected: label = "Press A again to quit"
+		if items[i].action == "remove" and menu.confirm and selected: label = "Press A again to remove %s" % _short(items[i].name, 14)
 		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4), Color(VIOLET, 0.35))
 		_text(canvas, label, Vector2(rect.position.x + 32, y + size), size, TEXT if selected else DIM)
 

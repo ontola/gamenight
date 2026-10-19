@@ -150,12 +150,14 @@ impl FrameFilter {
     }
 }
 
+/// A, B, X, Y and Start: the presses that join an unseated controller.
+const JOIN_BUTTONS: u32 = 1 | 2 | 4 | 8 | 128;
+
 #[derive(Default)]
 struct InputRouter {
     previous: HashMap<String, u32>,
     consumed_join: HashSet<String>,
     activity: HashMap<String, Instant>,
-    joined_connection: HashSet<String>,
 }
 
 impl InputRouter {
@@ -164,7 +166,6 @@ impl InputRouter {
             previous,
             consumed_join,
             activity,
-            joined_connection,
         } = self;
         // Several people may press Back together. It is one party action.
         if controllers
@@ -182,6 +183,7 @@ impl InputRouter {
         }
         for controller in &mut controllers {
             let held = controller.buttons;
+            let pressed = held & !previous.get(&controller.controller).copied().unwrap_or(0);
             previous.insert(controller.controller.clone(), held);
             let snapshot = s.night.snapshot();
             let lobby_active = snapshot.overlay_open || snapshot.active_session.is_none();
@@ -189,7 +191,7 @@ impl InputRouter {
             // press and bounce a just-resumed game into the lobby again.
             controller.buttons &= !(1 << 6);
             if lobby_active
-                && !joined_connection.contains(&controller.controller)
+                && pressed & JOIN_BUTTONS != 0
                 && snapshot
                     .seats
                     .iter()
@@ -199,7 +201,9 @@ impl InputRouter {
                         && seat.occupant.player_id().is_some()
                 })
             {
-                // A connected controller is the join action. Claim
+                // A face button or Start is the join action, never a stick
+                // or D-pad: a drifting stick rejoined a player who had just
+                // left. Claim
                 // their first unbound seat before creating another player.
                 let unbound = snapshot
                     .seats
@@ -235,7 +239,6 @@ impl InputRouter {
                     );
                 }
                 consumed_join.insert(controller.controller.clone());
-                joined_connection.insert(controller.controller.clone());
             }
             if held & 1 == 0 {
                 consumed_join.remove(&controller.controller);
@@ -260,7 +263,6 @@ impl InputRouter {
             }
         }
         previous.retain(|id, _| controllers.iter().any(|c| &c.controller == id));
-        joined_connection.retain(|id| controllers.iter().any(|c| &c.controller == id));
         // Tests exercise the filtered router result. In production frames
         // are published directly by the sampler, independently of this lock.
         #[cfg(test)]
@@ -317,10 +319,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connection_joins_without_buttons_and_explicit_leave_stays_left() {
+    async fn only_a_button_press_joins_and_a_drifting_stick_never_rejoins() {
         let mut s = Shared::new(Vec::new(), "127.0.0.1:0".into(), None);
         let mut router = InputRouter::default();
         router.route(&mut s, frame(0));
+        let mut drift = frame(1 << 12); // D-pad left
+        drift[0].axes[0] = -20000;
+        router.route(&mut s, drift.clone());
+        assert!(
+            s.night.snapshot().players.is_empty(),
+            "connecting or moving is no join"
+        );
+        router.route(&mut s, frame(1));
         let party = s.night.snapshot();
         assert_eq!(party.players.len(), 1);
         assert_eq!(party.seats[0].controller.as_deref(), Some("ordinal:7"));
@@ -331,11 +341,15 @@ mod tests {
             },
             None,
         );
+        // The press that chose Leave is still held, then the stick drifts.
         router.route(&mut s, frame(1));
-        assert!(s.night.snapshot().players.is_empty());
+        router.route(&mut s, frame(0));
+        router.route(&mut s, drift);
         router.route(&mut s, vec![]);
         router.route(&mut s, frame(0));
-        assert_eq!(s.night.snapshot().players.len(), 1);
+        assert!(s.night.snapshot().players.is_empty());
+        router.route(&mut s, frame(128));
+        assert_eq!(s.night.snapshot().players.len(), 1, "Start joins again");
     }
 
     fn frame(buttons: u32) -> Vec<ControllerState> {

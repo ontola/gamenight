@@ -1,7 +1,7 @@
 extends Node
 ## Offline demo: a synthetic party with drawn faces and simple bots, for
 ## screenshots and for trying the room without a GameNight runtime.
-##   godot --path . -- --demo [--scene=action|stations|sleep|empty] [--links=file.json] [--update-ready]
+##   godot --path . -- --demo [--scene=action|stations|sleep|phones|empty] [--links=file.json] [--update-ready]
 
 var main
 var scene := "action"
@@ -41,6 +41,12 @@ func _ready() -> void:
 		"warm_session": {"game": "spaceracer", "phase": "preparing", "progress": 64, "progress_label": "Loading"},
 		"now_playing": {"title": "Midnight City", "artist": "M83", "playing": true, "source": "Spotify"}}
 	if scene == "sleep": party.presence = [{"player_id": "p1", "state": "sleeping"}, {"player_id": "p3", "state": "sleeping"}]
+	# Two players without a controller: one on a phone, one stale web join.
+	if scene == "phones":
+		for i in [4, 5]:
+			players.append({"id": "p%d" % i, "name": NAMES[i], "color": COLORS[i], "skin_color": SKINS[i], "avatar": _face(i)})
+			seats.append({"index": i, "occupant": {"kind": "local", "player_id": "p%d" % i}, "controller": null})
+		party.phones.append("p4")
 	main.set_party(party)
 	# --update-ready: a downloaded host update, with one player's menu open.
 	if OS.get_cmdline_user_args().has("--update-ready"):

@@ -106,6 +106,9 @@ pub struct ServerState {
     #[doc(hidden)]
     pub bindings: HashMap<String, PlayerId>,
     pub link_revisions: HashMap<PlayerId, u64>,
+    /// Players this server seated for a phone alone, and whether that phone
+    /// has linked yet. They leave the party when their phone does.
+    phone_players: HashMap<PlayerId, bool>,
     /// Phone screens of games, relayed between the daemon and phones.
     companions: companion::Hub,
 }
@@ -133,6 +136,7 @@ impl ServerState {
             daemon_addr,
             bindings: HashMap::new(),
             link_revisions: HashMap::new(),
+            phone_players: HashMap::new(),
             companions: companion::Hub::default(),
         }
     }
