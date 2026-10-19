@@ -96,6 +96,40 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets('games you develop get Manage game, others do not',
+      (tester) async {
+    Catalog.instance = Catalog(
+        client: MockClient((_) async => http.Response(jsonEncode(games), 200)));
+    final cloud = CloudApi(
+        token: 'test',
+        client: MockClient((r) async => r.url.path == '/v1/developer/games'
+            ? http.Response(
+                jsonEncode({
+                  'games': [
+                    {'id': 'b', 'metadata': {}, 'approved': true}
+                  ]
+                }),
+                200)
+            : http.Response('{}', 200)));
+    addTearDown(cloud.close);
+    await tester.pumpWidget(MaterialApp(
+        theme: gameNightTheme(),
+        home: Scaffold(
+            body: SingleChildScrollView(child: CatalogSection(cloud: cloud)))));
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byWidgetPredicate((w) => w is GameCard && w.game.id == 'b'));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage game'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester
+        .tap(find.byWidgetPredicate((w) => w is GameCard && w.game.id == 'a'));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage game'), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('tapping a tag never focuses the search field', (tester) async {
     Catalog.instance = Catalog(
         client: MockClient((_) async => http.Response(jsonEncode(games), 200)));

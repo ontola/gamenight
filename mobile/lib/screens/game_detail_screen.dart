@@ -27,6 +27,10 @@ class GameDetailScreen extends StatefulWidget {
   /// Puts a game in the room's queue.
   final Future<void> Function(CatalogGame game)? onAdd;
 
+  /// Games this account develops, and opening one in the developer portal.
+  final Set<String> developing;
+  final void Function(CatalogGame game)? onManage;
+
   const GameDetailScreen(
       {super.key,
       required this.game,
@@ -34,6 +38,8 @@ class GameDetailScreen extends StatefulWidget {
       this.host,
       this.onTagSelected,
       this.onAdd,
+      this.developing = const {},
+      this.onManage,
       this.share});
 
   @override
@@ -107,6 +113,9 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                   active: index == _index,
                   host: widget.host,
                   onAdd: widget.onAdd,
+                  onManage: widget.developing.contains(_games[index].id)
+                      ? widget.onManage
+                      : null,
                   share: widget.share,
                   onTagSelected: widget.onTagSelected,
                   onOpen: (game) =>
@@ -124,6 +133,7 @@ class _GameDetailPage extends StatefulWidget {
       required this.onOpen,
       this.host,
       this.onAdd,
+      this.onManage,
       this.share,
       this.previous,
       this.onTagSelected,
@@ -136,6 +146,7 @@ class _GameDetailPage extends StatefulWidget {
   final void Function(CatalogGame) onOpen;
   final Map<String, HostGame>? host;
   final Future<void> Function(CatalogGame)? onAdd;
+  final void Function(CatalogGame)? onManage;
   final Future<ShareResult> Function(ShareParams)? share;
   @override
   State<_GameDetailPage> createState() => _GameDetailPageState();
@@ -269,6 +280,17 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                             ]),
                             const SizedBox(height: 16),
                             _action(),
+                            if (widget.onManage case final manage?) ...[
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(48)),
+                                onPressed: () => manage(game),
+                                icon:
+                                    const Icon(Icons.build_outlined, size: 18),
+                                label: const Text('Manage game'),
+                              ),
+                            ],
                             if (game.tags.isNotEmpty) ...[
                               const SizedBox(height: 16),
                               Wrap(spacing: 6, runSpacing: 6, children: [

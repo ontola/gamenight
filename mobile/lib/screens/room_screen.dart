@@ -489,7 +489,7 @@ class RoomScreenState extends State<RoomScreen> {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                         minimumSize: const Size.fromHeight(48)),
-                    onPressed: () => openWebsite(state, '/host'),
+                    onPressed: () => openWebsite(state.cloud, '/host'),
                     icon: const Icon(Icons.tv),
                     label: const Text('Host a room'),
                   ),

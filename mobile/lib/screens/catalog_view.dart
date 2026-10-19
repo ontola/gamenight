@@ -9,6 +9,7 @@ import '../catalog.dart';
 import '../room_controls.dart';
 import '../theme.dart';
 import 'game_detail_screen.dart';
+import '../navigation/open_website.dart';
 
 /// The store catalog as a grid of covers. A tap opens the game's page with
 /// its videos and screenshots. In a room, games its host can play get an "Add to queue" button.
@@ -38,6 +39,10 @@ class _CatalogSectionState extends State<CatalogSection> {
   Timer? _poll;
   String? _openedRequest;
   bool _hostLoaded = false;
+
+  /// Games this account develops: they get a Manage game button.
+  Set<String> _developing = const {};
+  String? _developingAccount;
   CatalogFilter _filter = const CatalogFilter();
   String? _filterAccount;
   final _search = TextEditingController();
@@ -50,6 +55,7 @@ class _CatalogSectionState extends State<CatalogSection> {
     super.initState();
     _loadCatalog();
     _loadHost();
+    _loadDeveloping();
     _poll = Timer.periodic(const Duration(seconds: 15), (_) => _loadHost());
   }
 
@@ -57,6 +63,7 @@ class _CatalogSectionState extends State<CatalogSection> {
   void didUpdateWidget(CatalogSection old) {
     super.didUpdateWidget(old);
     if ((old.controls == null) != (widget.controls == null)) _loadHost();
+    _loadDeveloping();
     if (_filterAccount != widget.cloud?.token) {
       _filterAccount = widget.cloud?.token;
       _filter = CatalogFilter(
@@ -82,6 +89,23 @@ class _CatalogSectionState extends State<CatalogSection> {
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
+    }
+  }
+
+  Future<void> _loadDeveloping() async {
+    final cloud = widget.cloud;
+    final account = cloud?.token;
+    if (account == _developingAccount) return;
+    _developingAccount = account;
+    if (cloud == null || account == null) {
+      if (_developing.isNotEmpty) setState(() => _developing = const {});
+      return;
+    }
+    try {
+      final ids = await cloud.developerGames();
+      if (mounted && cloud.token == account) setState(() => _developing = ids);
+    } on ApiError {
+      // Not a developer, or offline: no Manage buttons.
     }
   }
 
@@ -158,6 +182,9 @@ class _CatalogSectionState extends State<CatalogSection> {
               },
               host: _inRoom && _host.isNotEmpty ? _host : null,
               onAdd: _inRoom ? _add : null,
+              developing: _developing,
+              onManage: (game) => openWebsite(widget.cloud!,
+                  '/developers#game/${Uri.encodeComponent(game.id)}'),
             )));
   }
 

@@ -368,6 +368,19 @@ class CloudApi {
   /// this account, so the browser does not ask for another email code.
   /// Null when there is nothing to hand over (signed out, or the web app,
   /// which shares the website's cookies already).
+  /// Ids of the games this account develops, as the developer portal has
+  /// them. Empty when signed out.
+  Future<Set<String>> developerGames() async {
+    if (!signedIn) return const {};
+    final data = await _send('GET', '/v1/developer/games');
+    final games = data is Map ? data['games'] : null;
+    if (games is! List) return const {};
+    return {
+      for (final game in games)
+        if (game is Map && game['id'] is String) game['id'] as String
+    };
+  }
+
   Future<Uri?> webHandoff(String path) async {
     if (browserCookies || token == null) return null;
     final data =

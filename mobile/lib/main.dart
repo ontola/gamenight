@@ -209,7 +209,8 @@ class _GameNightAppState extends State<GameNightApp> {
             ));
   }
 
-  Future<void> _openWebsite(String path) => openWebsite(widget.state, path);
+  Future<void> _openWebsite(String path) =>
+      openWebsite(widget.state.cloud, path);
 
   void _selectDestination(int tab) {
     _navigator.currentState?.popUntil((route) => route.isFirst);
