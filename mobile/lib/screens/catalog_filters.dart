@@ -6,7 +6,10 @@ import '../theme.dart';
 
 class CatalogFilter {
   final bool liked, unplayed;
-  final Set<String> tags, likedGames, playedGames;
+
+  /// Only games this account develops, in the store or not.
+  final bool mine;
+  final Set<String> tags, likedGames, playedGames, mineGames;
 
   /// Words to find in a game's title, tagline, developer or tags.
   final String query;
@@ -16,6 +19,8 @@ class CatalogFilter {
   const CatalogFilter(
       {this.liked = false,
       this.unplayed = false,
+      this.mine = false,
+      this.mineGames = const {},
       this.tags = const {},
       this.likedGames = const {},
       this.playedGames = const {},
@@ -24,12 +29,14 @@ class CatalogFilter {
   bool get active =>
       liked ||
       unplayed ||
+      mine ||
       tags.isNotEmpty ||
       query.trim().isNotEmpty ||
       players != null;
   bool matches(CatalogGame game) =>
       (!liked || likedGames.contains(game.id)) &&
       (!unplayed || !playedGames.contains(game.id)) &&
+      (mine ? mineGames.contains(game.id) : !game.unreviewed) &&
       (tags.isEmpty || tags.any(game.tags.contains)) &&
       _fits(game) &&
       _found(game);
@@ -55,6 +62,8 @@ class CatalogFilter {
   CatalogFilter copyWith(
           {bool? liked,
           bool? unplayed,
+          bool? mine,
+          Set<String>? mineGames,
           Set<String>? tags,
           Set<String>? likedGames,
           Set<String>? playedGames,
@@ -63,6 +72,8 @@ class CatalogFilter {
       CatalogFilter(
           liked: liked ?? this.liked,
           unplayed: unplayed ?? this.unplayed,
+          mine: mine ?? this.mine,
+          mineGames: mineGames ?? this.mineGames,
           tags: tags ?? this.tags,
           likedGames: likedGames ?? this.likedGames,
           playedGames: playedGames ?? this.playedGames,

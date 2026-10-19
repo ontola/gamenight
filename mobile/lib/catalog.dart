@@ -120,6 +120,10 @@ class CatalogGame {
 
   final int? matchMinutes;
 
+  /// Your own game that is not in the store yet: only you see it, to
+  /// playtest.
+  final bool unreviewed;
+
   const CatalogGame({
     required this.id,
     required this.title,
@@ -139,6 +143,7 @@ class CatalogGame {
     this.platforms = const [],
     this.links = const {},
     this.matchMinutes,
+    this.unreviewed = false,
   });
 
   bool get free => price == null || price == 'free';
@@ -275,6 +280,7 @@ class CatalogGame {
           : const [],
       links: links,
       matchMinutes: count(j['match_minutes']),
+      unreviewed: j['unreviewed'] == true,
     );
   }
 

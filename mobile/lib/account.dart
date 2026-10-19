@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 
 import 'api.dart' show ApiError;
+import 'catalog.dart' show CatalogGame;
 import 'link.dart';
 import 'diagnostics.dart';
 
@@ -368,17 +369,27 @@ class CloudApi {
   /// this account, so the browser does not ask for another email code.
   /// Null when there is nothing to hand over (signed out, or the web app,
   /// which shares the website's cookies already).
-  /// Ids of the games this account develops, as the developer portal has
-  /// them. Empty when signed out.
-  Future<Set<String>> developerGames() async {
-    if (!signedIn) return const {};
+  /// The games this account develops, as catalog entries from the developer
+  /// portal, reviewed or not. Empty when signed out.
+  Future<List<CatalogGame>> developerGames() async {
+    if (!signedIn) return const [];
     final data = await _send('GET', '/v1/developer/games');
     final games = data is Map ? data['games'] : null;
-    if (games is! List) return const {};
-    return {
+    if (games is! List) return const [];
+    return [
       for (final game in games)
-        if (game is Map && game['id'] is String) game['id'] as String
-    };
+        if (game is Map && game['id'] is String)
+          if (CatalogGame.fromJson({
+            if (game['metadata'] is Map) ...game['metadata'] as Map,
+            'id': game['id'],
+            if (game['metadata'] is! Map ||
+                game['metadata']['title'] is! String)
+              'title': game['id'],
+            'unreviewed': game['approved'] != true,
+          })
+              case final entry?)
+            entry
+    ];
   }
 
   Future<Uri?> webHandoff(String path) async {

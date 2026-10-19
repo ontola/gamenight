@@ -362,9 +362,15 @@ class _GameDetailPageState extends State<_GameDetailPage> {
             label: const Text('View price & buy'),
           )
         : null;
-    final note = _Note(host == null
-        ? 'Join a room to put this game in the queue.'
-        : 'This GameNight does not have this game yet.');
+    final note = _Note(game.unreviewed
+        ? host == null
+            ? 'Not in the store yet. Join a room to playtest: the GameNight '
+                'gets your preview build while you are there.'
+            : 'Your preview build is not on this GameNight yet. It comes '
+                'with you once one is uploaded and ready.'
+        : host == null
+            ? 'Join a room to put this game in the queue.'
+            : 'This GameNight does not have this game yet.');
     if (buy == null) return note;
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       buy,

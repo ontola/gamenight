@@ -106,7 +106,12 @@ void main() {
             ? http.Response(
                 jsonEncode({
                   'games': [
-                    {'id': 'b', 'metadata': {}, 'approved': true}
+                    {'id': 'b', 'metadata': {}, 'approved': true},
+                    {
+                      'id': 'z',
+                      'metadata': {'title': 'Secret Prototype'},
+                      'approved': false
+                    }
                   ]
                 }),
                 200)
@@ -127,6 +132,23 @@ void main() {
         .tap(find.byWidgetPredicate((w) => w is GameCard && w.game.id == 'a'));
     await tester.pumpAndSettle();
     expect(find.text('Manage game'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // Unreviewed games only show under My games, next to the listed ones.
+    List<String> shown() => tester
+        .widgetList<GameCard>(find.byType(GameCard))
+        .map((c) => c.game.id)
+        .toList();
+    expect(shown(), isNot(contains('z')));
+    await tester.tap(find.byKey(const ValueKey('my-games')));
+    await tester.pumpAndSettle();
+    expect(shown()..sort(), ['b', 'z']);
+    await tester
+        .tap(find.byWidgetPredicate((w) => w is GameCard && w.game.id == 'z'));
+    await tester.pumpAndSettle();
+    expect(find.text('Manage game'), findsOneWidget);
+    expect(find.textContaining('Join a room to playtest'), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
   });
 

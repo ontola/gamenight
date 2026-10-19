@@ -40,8 +40,10 @@ class _CatalogSectionState extends State<CatalogSection> {
   String? _openedRequest;
   bool _hostLoaded = false;
 
-  /// Games this account develops: they get a Manage game button.
-  Set<String> _developing = const {};
+  /// Games this account develops: they get a Manage game button, a My games
+  /// filter, and the unreviewed ones join the list for that filter.
+  List<CatalogGame> _mine = const [];
+  Set<String> get _developing => {for (final game in _mine) game.id};
   String? _developingAccount;
   CatalogFilter _filter = const CatalogFilter();
   String? _filterAccount;
@@ -98,12 +100,22 @@ class _CatalogSectionState extends State<CatalogSection> {
     if (account == _developingAccount) return;
     _developingAccount = account;
     if (cloud == null || account == null) {
-      if (_developing.isNotEmpty) setState(() => _developing = const {});
+      if (_mine.isNotEmpty) {
+        setState(() {
+          _mine = const [];
+          _filter = _filter.copyWith(mine: false, mineGames: const {});
+        });
+      }
       return;
     }
     try {
-      final ids = await cloud.developerGames();
-      if (mounted && cloud.token == account) setState(() => _developing = ids);
+      final games = await cloud.developerGames();
+      if (mounted && cloud.token == account) {
+        setState(() {
+          _mine = games;
+          _filter = _filter.copyWith(mineGames: _developing);
+        });
+      }
     } on ApiError {
       // Not a developer, or offline: no Manage buttons.
     }
@@ -254,6 +266,13 @@ class _CatalogSectionState extends State<CatalogSection> {
               ),
             ));
         final chips = [
+          if (_mine.isNotEmpty)
+            FilterChip(
+                key: const ValueKey('my-games'),
+                label: const Text('My games'),
+                selected: _filter.mine,
+                onSelected: (v) => _setFilter(
+                    _filter.copyWith(mine: v, mineGames: _developing))),
           if (_filter.liked && !showPersonal)
             InputChip(
                 label: const Text('Liked'),
@@ -406,8 +425,17 @@ class _CatalogSectionState extends State<CatalogSection> {
     }
   }
 
-  List<CatalogGame> get _visible =>
-      _sorted((_games ?? const []).where(_filter.matches).toList());
+  List<CatalogGame> get _visible {
+    final store = _games ?? const <CatalogGame>[];
+    final listed = {for (final game in store) game.id};
+    // Unreviewed games are not in the store yet; the filter shows them only
+    // under My games.
+    return _sorted([
+      ...store,
+      for (final game in _mine)
+        if (!listed.contains(game.id)) game,
+    ].where(_filter.matches).toList());
+  }
 
   Future<void> _showFilters() async {
     FocusManager.instance.primaryFocus?.unfocus();
