@@ -25,7 +25,7 @@ class _AssistantScreenState extends State<AssistantScreen>
   final _scroll = ScrollController();
   String _lastHistory = "";
   Timer? _poll;
-  Object? _room;
+  (Object, Object?, Object?)? _room;
   String _lastVoice = '';
   bool _voiceOwned = false, _foreground = true;
   Animation<double>? _cover;
@@ -71,12 +71,22 @@ class _AssistantScreenState extends State<AssistantScreen>
     final room =
         (state.cloud.roomIdentity, state.account?.id, state.hostedRoom?.code);
     if (room == _room) return;
+    // The account loading in after the screen opened is still the same
+    // player at the same table: keep what they already typed.
+    final previous = _room;
+    final keep = previous != null &&
+            previous.$2 == null &&
+            previous.$1 == room.$1 &&
+            previous.$3 == room.$3
+        ? _agent.draft
+        : '';
     _room = room;
     if (_voiceOwned) {
       _voiceOwned = false;
       unawaited(_voice.cancel());
     }
     _agent.reset();
+    if (keep.isNotEmpty) _agent.setDraft(keep);
     if (state.cloud.signedIn) {
       unawaited(_agent.refresh());
       unawaited(_agent.loadPresets());
