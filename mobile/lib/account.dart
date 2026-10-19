@@ -513,7 +513,10 @@ class CloudApi {
   }
 
   /// Deletes the account and everything saved to it.
-  Future<void> deleteAccount() => _send('DELETE', '/v1/me');
+  Future<void> deleteAccount() => _send('DELETE', '/v1/me', errors: const {
+        409:
+            'Your games are still in the GameNight store. Withdraw them in the developer portal first, then delete your account.'
+      });
 
   Future<StudioDocument> studio() async =>
       StudioDocument.fromJson(await _send('GET', '/v1/me/studio'));
