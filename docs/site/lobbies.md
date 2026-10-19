@@ -24,13 +24,13 @@ alone displays a connecting screen, not a synthetic party.
 
 Controls: press A, B, X, Y or Start on a controller to join. LT/RT cycle games; the
 selected game is larger in the centre of its two neighbours. The stick/D-pad
-moves between controls. On a game card, A appends a new occurrence to the queue;
-X inserts it first among upcoming games. Neither action starts gameplay. The
+moves between controls. On a game card, A queues the game after earlier picks;
+X plays it now (it goes on top of the queue and starts once it has loaded). The
 merged queue panel shows its first entry as Up next, with the remaining games
 alongside it. Select Start game to launch the head of the queue. Back returns to
 the lobby or resumes an overlay-paused game. Y leaves that controller's seat.
 
-The controller hint bar shows **X Play next · A Queue · LT Previous · RT Next**
+The controller hint bar shows **X Play now · A Queue · LT Previous · RT Next**
 with Xbox-style face-button and trigger icons. These hints are not selectable;
 focus stays on the game cards and the other lobby controls.
 
@@ -75,11 +75,21 @@ or speech accuracy in a noisy room.
 
 ## Queue behaviour
 
-The lobby sends `queue_game` with `first: false` for A and `first: true` for X.
-This is one atomic host command, so simultaneous additions cannot overwrite each
-other's order. It preserves the current game and its position. `next` starts the
-prepared queue head. The older `play_next` command can start an idle game and is
-not used for either catalog button.
+The queue works like a music player's. Games players pick form the player
+queue, first come, first played. Behind it the host keeps autoplay picks, so
+the queue never runs dry: games the host can start, not played yet tonight
+first, then the ones played longest ago, preferring games whose best player
+count is closest to the party. Autoplay drops its own entries that no longer fit the party
+and tops up after every change. `playlist.queued` says how many entries after
+`current` players picked; everything after those is autoplay.
+
+The lobby sends `queue_game` with `first: false` for A, and `queue_game` with
+`first: true` followed by `next` for X (Play now). `queue_game` is one atomic
+host command, so simultaneous additions cannot overwrite each other's order. It
+preserves the current game and its position, replaces the game's autoplay entry
+instead of repeating it, and ignores a game that is already in the player queue.
+`next` starts the prepared queue head. The older `play_next` command can start
+an idle game and is not used for either catalog button.
 
 ## Register a replacement lobby
 
@@ -117,9 +127,9 @@ lifecycle or publish physical controller frames.
 | Request | Meaning |
 |---|---|
 | `join_party`, `leave_party`, profile and seat commands | Change runtime-owned players |
-| `queue_next {game}` | Prepare a chosen game without starting it |
+| `queue_next {game}` | Put a chosen game on top of the player queue and prepare it, without starting it |
 | `play_next {game}` | Choose the next game; starts when ready only if no game is active |
-| `queue_game {game,first}` | Append a new occurrence, or insert first among upcoming games; never starts playback |
+| `queue_game {game,first}` | Add a game to the player queue, at the bottom or with `first` on top; never starts playback |
 | `next` | Start the prepared next game, or wait for its preparation |
 | `move_playlist_entry {expected,from,to}` / `remove_playlist_entry {expected,index}` | Edit an occurrence using the latest playlist snapshot; stale edits are rejected |
 | `open_overlay` | Pause the active game and return to the lobby |
@@ -173,10 +183,11 @@ func _ready() -> void:
     add_child(lobby)
 
 func add_to_queue(game_id: String) -> void:
-    lobby.queue_game(game_id)        # A: append
+    lobby.queue_game(game_id)        # A: after earlier picks
 
-func put_first(game_id: String) -> void:
-    lobby.queue_game(game_id, true)  # X: put first, without starting
+func play_now(game_id: String) -> void:
+    lobby.queue_game(game_id, true)  # X: on top of the queue...
+    lobby.start_next()              # ...and switch once it has loaded
 
 func start_queue() -> void:
     lobby.start_next()              # Separate Start action
@@ -186,17 +197,16 @@ This is the connection and queue portion only. A complete lobby must also handle
 `focus_changed` and `controllers_changed` as described below. The runnable scene
 is `sdk/godot/lobby/main.gd`.
 
-Queueing adds an occurrence, so the same game can appear more than once. Use
-playlist indices to move or remove one occurrence; game IDs alone are ambiguous.
+The same game can appear more than once, for example once in the player queue
+and once among the games already played. Use playlist indices to move or remove one occurrence; game IDs alone are ambiguous.
 The `expected` field must contain the full latest `party.playlist` value. On a
 stale-edit error, redraw from the latest snapshot instead of silently retrying.
 The SDK's `move_in_queue` and `remove_from_queue` helpers include this guard.
 
 For loading feedback, read `warm_session.phase`, `progress` and `progress_label`,
 plus `installs` for downloads. An entry being in the queue does not mean it is
-ready. Keep the selected next game's artwork visible while it prepares. The
-runtime's playlist currently wraps when it reaches the end; it is not a finite
-queue that automatically stops the night.
+ready. Keep the selected next game's artwork visible while it prepares. Autoplay
+keeps the queue filled, so it never stops the night by running out.
 
 ## Input and screen ownership
 

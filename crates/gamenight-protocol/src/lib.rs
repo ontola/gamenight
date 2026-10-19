@@ -411,6 +411,28 @@ pub struct PlaylistSnapshot {
     /// Index of the entry the *active* session is playing, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current: Option<usize>,
+    /// How many entries right after `current` players queued themselves, in
+    /// the order they asked. Everything after those is autoplay: games the
+    /// host recommends so the queue never runs dry.
+    #[serde(default)]
+    pub queued: usize,
+}
+
+impl PlaylistSnapshot {
+    /// Where the upcoming games start: right after `current`.
+    pub fn upcoming_start(&self) -> usize {
+        self.current.map_or(0, |c| c + 1)
+    }
+
+    /// Whether players queued `game` themselves (it is not just autoplay).
+    pub fn is_queued(&self, game: &GameId) -> bool {
+        let start = self.upcoming_start();
+        self.entries
+            .iter()
+            .skip(start)
+            .take(self.queued)
+            .any(|e| &e.game == game)
+    }
 }
 
 /// How the daemon starts a game process. The handshake context (address,

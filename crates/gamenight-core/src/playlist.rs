@@ -1,5 +1,7 @@
-//! The queue of games for the night. Wraps around: game night doesn't end
-//! because the playlist did.
+//! The queue of games for the night, like a music player's: what was played,
+//! what plays now, what players queued themselves, then autoplay picks the
+//! host keeps topped up so the queue never runs dry. Still wraps around as a
+//! last resort: game night doesn't end because the playlist did.
 
 use gamenight_protocol::{PlaylistEntry, PlaylistSnapshot};
 
@@ -9,12 +11,15 @@ pub struct Playlist {
     /// Index of the entry the active session plays. `None` until the first
     /// session starts.
     current: Option<usize>,
+    /// How many entries right after `current` players queued themselves.
+    queued: usize,
 }
 
 impl Playlist {
     pub fn set_entries(&mut self, entries: Vec<PlaylistEntry>) {
         self.entries = entries;
         self.current = None;
+        self.queued = 0;
     }
 
     pub fn entries(&self) -> &[PlaylistEntry] {
@@ -32,6 +37,35 @@ impl Playlist {
     pub fn set_current(&mut self, index: usize) {
         debug_assert!(index < self.entries.len());
         self.current = Some(index);
+        self.set_queued(self.queued);
+    }
+
+    /// Start playing entry `index`: the player queue loses whatever entries
+    /// that passes, and nothing else.
+    pub fn advance_to(&mut self, index: usize) {
+        let (start, queue_end) = (self.upcoming_start(), self.upcoming_start() + self.queued);
+        self.current = Some(index);
+        // Wrapping back to an earlier entry leaves the player queue behind.
+        self.queued = if index < start {
+            0
+        } else {
+            queue_end.saturating_sub(index + 1)
+        };
+        self.set_queued(self.queued);
+    }
+
+    /// Index of the first upcoming entry: right after `current`.
+    pub fn upcoming_start(&self) -> usize {
+        self.current.map_or(0, |c| c + 1)
+    }
+
+    /// How many entries after `current` players queued themselves.
+    pub fn queued(&self) -> usize {
+        self.queued
+    }
+
+    pub fn set_queued(&mut self, queued: usize) {
+        self.queued = queued.min(self.entries.len().saturating_sub(self.upcoming_start()));
     }
 
     pub fn get(&self, index: usize) -> Option<&PlaylistEntry> {
@@ -41,14 +75,6 @@ impl Playlist {
     /// Index of the first entry for `game`, if it's queued at all.
     pub fn position_of(&self, game: &gamenight_protocol::GameId) -> Option<usize> {
         self.entries.iter().position(|e| &e.game == game)
-    }
-
-    /// Insert an entry. `index` must be after `current`, so the pointer to
-    /// what's playing never shifts.
-    pub fn insert(&mut self, index: usize, entry: PlaylistEntry) {
-        debug_assert!(index <= self.entries.len());
-        debug_assert!(self.current.is_none_or(|c| index > c));
-        self.entries.insert(index.min(self.entries.len()), entry);
     }
 
     /// The entry that should be warmed next: the one after `current`, wrapping
@@ -67,6 +93,7 @@ impl Playlist {
         PlaylistSnapshot {
             entries: self.entries.clone(),
             current: self.current,
+            queued: self.queued,
         }
     }
 }
@@ -92,6 +119,18 @@ mod tests {
         assert_eq!(p.next_index(), Some(1));
         p.set_current(1);
         assert_eq!(p.next_index(), Some(0));
+    }
+
+    #[test]
+    fn advancing_consumes_the_player_queue_only() {
+        let mut p = Playlist::default();
+        p.set_entries(vec![entry("a"), entry("b"), entry("c"), entry("d")]);
+        p.set_current(0);
+        p.set_queued(2);
+        p.advance_to(1);
+        assert_eq!(p.queued(), 1);
+        p.advance_to(3);
+        assert_eq!(p.queued(), 0);
     }
 
     #[test]

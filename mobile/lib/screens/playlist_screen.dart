@@ -171,9 +171,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   Widget _row(PlaylistView view, int i, int row, {required Key key}) {
     final entry = view.entries[i];
     final playing = view.current == i;
+    final upcoming = (view.current ?? -1) + 1;
     final badges = [
       if (playing) 'Playing',
-      if (view.next == entry.game && !playing) 'Up next'
+      if (view.next == entry.game && !playing) 'Up next',
+      if (!playing) i < upcoming + view.queued ? 'Queued' : 'Autoplay',
     ];
     return Card(
       key: key,
@@ -209,24 +211,29 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
       onTap: () => _open(view, i),
       title: Text(entry.title, style: const TextStyle(color: GnColors.muted)),
       trailing: TextButton(
-        onPressed: _busy ? null : () => _playNext(entry),
-        child: const Text('+ Play next'),
+        onPressed: _busy ? null : () => _play(entry),
+        child: const Text('+ Queue'),
       ),
     );
   }
 
-  Future<void> _playNext(PlaylistEntry entry, {bool start = false}) async {
+  /// Play [entry] now, or add it to the players' queue.
+  Future<void> _play(PlaylistEntry entry, {bool start = false}) async {
     final controls = roomControlsFor(state);
     if (controls == null) return;
     setState(() => _busy = true);
     try {
-      await controls.playNext(entry.game, start: start);
+      if (start) {
+        await controls.playNext(entry.game, start: true);
+      } else {
+        await controls.addToQueue(entry.game);
+      }
       if (mounted) {
         toast(
             context,
             start
                 ? '${entry.title} starts as soon as it has loaded'
-                : '${entry.title} will play next');
+                : '${entry.title} is in the queue');
       }
     } on ApiError catch (e) {
       if (mounted) toast(context, e.message);
@@ -239,13 +246,16 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   void _open(PlaylistView view, int i) {
     final entry = view.entries[i];
     final playing = view.current == i;
+    final upcoming = (view.current ?? -1) + 1;
     final status = playing
         ? EntryStatus.playing
         : view.next == entry.game
             ? EntryStatus.upNext
-            : i < (view.current ?? 0)
+            : i < upcoming
                 ? EntryStatus.played
-                : EntryStatus.queued;
+                : i < upcoming + view.queued
+                    ? EntryStatus.queued
+                    : EntryStatus.autoplay;
     final current = view.current == null ? null : view.entries[view.current!];
     showModalBottomSheet<void>(
       context: context,
@@ -258,13 +268,13 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
         playingTitle: playing ? null : current?.title,
         onStart: () {
           Navigator.of(sheet).pop();
-          _playNext(entry, start: true);
+          _play(entry, start: true);
         },
-        onPlayNext: () {
+        onQueue: () {
           Navigator.of(sheet).pop();
-          _playNext(entry);
+          _play(entry);
         },
-        onRemove: status == EntryStatus.queued || status == EntryStatus.upNext
+        onRemove: status != EntryStatus.playing && status != EntryStatus.played
             ? () {
                 Navigator.of(sheet).pop();
                 _remove(i);
@@ -275,7 +285,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> {
   }
 }
 
-enum EntryStatus { playing, upNext, queued, played }
+/// [queued] games a player picked; [autoplay] ones the host picked.
+enum EntryStatus { playing, upNext, queued, autoplay, played }
 
 /// One game from the playlist: start it now, make it the next game, change
 /// its settings, or open its store page.
@@ -288,7 +299,7 @@ class PlaylistGameSheet extends StatefulWidget {
   final String? playingTitle;
 
   final VoidCallback onStart;
-  final VoidCallback onPlayNext;
+  final VoidCallback onQueue;
   final VoidCallback? onRemove;
 
   const PlaylistGameSheet({
@@ -298,7 +309,7 @@ class PlaylistGameSheet extends StatefulWidget {
     required this.controls,
     this.playingTitle,
     required this.onStart,
-    required this.onPlayNext,
+    required this.onQueue,
     this.onRemove,
   });
 
@@ -317,7 +328,7 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (dialog) => AlertDialog(
-          title: Text('Start ${entry.title} now?'),
+          title: Text('Play ${entry.title} now?'),
           content: Text(
               'This ends $other for everyone as soon as ${entry.title} has loaded.'),
           actions: [
@@ -326,7 +337,7 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
                 child: const Text('Cancel')),
             FilledButton(
                 onPressed: () => Navigator.of(dialog).pop(true),
-                child: const Text('Start now')),
+                child: const Text('Play now')),
           ],
         ),
       );
@@ -381,6 +392,7 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
       EntryStatus.playing => 'Playing now',
       EntryStatus.upNext => 'Up next',
       EntryStatus.queued => 'In the queue',
+      EntryStatus.autoplay => 'Autoplay pick',
       EntryStatus.played => 'Played earlier tonight',
     };
     final emptyHint = switch (status) {
@@ -389,8 +401,7 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
         'No settings to change yet. They show up here once ${entry.title} has loaded, '
             'if it has any.',
       _ =>
-        'Settings can be changed once ${entry.title} is up next and has loaded. '
-            'Choose Play next to load it.',
+        'Settings can be changed once ${entry.title} is up next and has loaded.',
     };
     return SafeArea(
       child: SingleChildScrollView(
@@ -417,17 +428,17 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
                         : _start,
                 icon: const Icon(Icons.play_arrow),
                 label: Text(
-                    status == EntryStatus.playing ? 'Playing' : 'Start now'),
+                    status == EntryStatus.playing ? 'Playing' : 'Play now'),
               ),
             ),
-            if (status == EntryStatus.queued ||
+            if (status == EntryStatus.autoplay ||
                 status == EntryStatus.played) ...[
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: widget.controls == null ? null : widget.onPlayNext,
-                  icon: const Icon(Icons.skip_next),
-                  label: const Text('Play next'),
+                  onPressed: widget.controls == null ? null : widget.onQueue,
+                  icon: const Icon(Icons.queue),
+                  label: const Text('Queue'),
                 ),
               ),
             ],

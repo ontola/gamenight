@@ -359,7 +359,7 @@ void main() {
             controls: controls,
             playingTitle: status == EntryStatus.playing ? null : 'Ballkickers',
             onStart: () => actions.add('start'),
-            onPlayNext: () => actions.add('next'),
+            onQueue: () => actions.add('queue'),
             onRemove: () => actions.add('remove'),
           ),
         ),
@@ -390,25 +390,24 @@ void main() {
       await tester.pumpWidget(const SizedBox());
     });
 
-    testWidgets('a queued game starts after a warning and opens in the store',
+    testWidgets('an autoplay pick plays after a warning and opens in the store',
         (tester) async {
-      final actions = await show(tester, 'growing-guns', EntryStatus.queued);
-      expect(find.text('In the queue'), findsOneWidget);
-      expect(
-          find.textContaining('Choose Play next to load it'), findsOneWidget);
+      final actions = await show(tester, 'growing-guns', EntryStatus.autoplay);
+      expect(find.text('Autoplay pick'), findsOneWidget);
+      expect(find.textContaining('is up next and has loaded'), findsOneWidget);
 
-      await tester.tap(find.text('Start now'));
+      await tester.tap(find.text('Play now'));
       await tester.pumpAndSettle();
       expect(
           find.text(
               'This ends Ballkickers for everyone as soon as Growing Guns has loaded.'),
           findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Start now').last);
+      await tester.tap(find.widgetWithText(FilledButton, 'Play now').last);
       await tester.pumpAndSettle();
       expect(actions, ['start']);
 
-      await tester.tap(find.text('Play next'));
-      expect(actions, ['start', 'next']);
+      await tester.tap(find.text('Queue'));
+      expect(actions, ['start', 'queue']);
 
       await tester.tap(find.text('View in the store'));
       await tester.pump();

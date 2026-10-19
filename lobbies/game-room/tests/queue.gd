@@ -73,9 +73,17 @@ func _run() -> void:
 	p.y = 0.0
 	main.input("p0", 0, Vector2.ZERO)
 	p.x = main.Layout.stand_x(-9.6)
+	var shelf: Array = main.shelf_games()
+	main.shelf_offset = shelf.map(func(g): return str(g.id)).find("spaceracer")
+	main._station_cooldown.clear()
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
-	check(recorder.commands[-1].type == "queue_next", "Selector sets next without starting it")
-	check(main.station_for("p0").label.begins_with("Set "), "Selector label describes queue placement")
+	check(recorder.commands[-1].type == "close_overlay", "Play now on the paused game resumes it")
+	main.input("p0", 0, Vector2.ZERO)
+	main.shelf_offset = (main.shelf_offset + 1) % shelf.size()
+	main._station_cooldown.clear()
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands.slice(-2).map(func(c): return c.type) == ["queue_next", "next"], "Play now puts it on top and switches to it")
+	check(main.station_for("p0").label.ends_with(" now"), "Selector label says it plays now")
 	main.world.players.p1.x = 0.0
 	main.world.players.p1.y = main.Layout.TV_CONSOLE[2]
 	main.world.players.p2.x = main.Layout.stand_x(-4.95)
@@ -85,7 +93,7 @@ func _run() -> void:
 	main._update_prompts()
 	check(main.room._prompts.queue.node.visible, "Queue shows its floating Y action in range")
 	check(main.room._prompts.queue.state.items == [["Y", "Play next"], ["X", "Skip next"]], "Queue shows separate Play next and Skip next actions")
-	check(main.room._prompts.shelf.state.items[0][1] == "Set up next", "Selector prompt does not promise immediate play")
+	check(main.room._prompts.shelf.state.items == [["Y", "Play now"], ["X", "Queue"]], "Selector offers Play now or Queue")
 	await capture(main, "queue-hierarchy")
 	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved."
 	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}

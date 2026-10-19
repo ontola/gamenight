@@ -42,6 +42,12 @@
         if(!cloud)return roomFetch('/api/playlist/next',{profile:local.getItem('gamenight_profile_id'),game,start});
         await roomFetch('/v1/rooms/next',{game,request_id:crypto.randomUUID(),...(start?{start:true}:{})});
       },
+      // Adds a game to the players' queue, after earlier picks and ahead of
+      // autoplay. Online rooms make it the next game instead.
+      async queue(game){
+        if(!cloud)return roomFetch('/api/playlist/queue',{profile:local.getItem('gamenight_profile_id'),game});
+        return window.gamenightStorage.playNext(game);
+      },
       // The settings of a game being played or loaded, or null. Online rooms
       // only report the game on screen.
       async settings(game){

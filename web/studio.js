@@ -875,6 +875,7 @@ let initializing = true;
       history.hidden=start===0;
       playlistView.playlist.entries.forEach((entry, index, entries) => {
         const past=index<start,playing=index===current;
+        const upcoming=current==null?0:current+1,picked=index>=upcoming&&index<upcoming+(playlistView.playlist.queued||0);
         const row = document.createElement('li');
         row.className = 'playlist-row';
         row.dataset.index = index;
@@ -894,7 +895,7 @@ let initializing = true;
         title.setAttribute('aria-label', `Open ${entry.title}`);
         title.onclick = () => openPlaylistGame(index);
         const badge = document.createElement('small');
-        badge.textContent = [playlistView.playlist.current === index ? 'Playing' : '', playlistView.next === entry.game ? 'Up next' : ''].filter(Boolean).join(' · ');
+        badge.textContent = [playlistView.playlist.current === index ? 'Playing' : '', playlistView.next === entry.game ? 'Up next' : '', past||playing ? '' : picked ? 'Queued' : 'Autoplay'].filter(Boolean).join(' · ');
         title.append(badge);
         row.append(title);
         handle.onkeydown=event=>{
@@ -906,12 +907,12 @@ let initializing = true;
         const remove = document.createElement('button');
         remove.type = 'button';
         remove.className = 'remove-entry';
-        remove.textContent = past ? '+ Play next' : '×';
-        remove.setAttribute('aria-label', past ? `Play ${entry.title} next` : `Remove ${entry.title} from playlist`);
+        remove.textContent = past ? '+ Queue' : '×';
+        remove.setAttribute('aria-label', past ? `Queue ${entry.title}` : `Remove ${entry.title} from playlist`);
         remove.disabled = playlistBusy;
         remove.onclick = past ? async()=>{
           remove.disabled=true;
-          try{await storage.playNext(entry.game);window.showToast(`${entry.title} will play next`);await loadPlaylist();}
+          try{await storage.queue(entry.game);window.showToast(`${entry.title} is in the queue`);await loadPlaylist();}
           catch(error){window.showToast(error.message);}
           finally{remove.disabled=false;}
         } : () => updatePlaylist({ from: index, remove: true }, index);
@@ -963,7 +964,9 @@ let initializing = true;
       const current=playlistView.playlist.current;
       if(index===current)return 'playing';
       if(playlistView.next===playlistView.playlist.entries[index].game)return 'next';
-      return index<(current??0)?'played':'queued';
+      const upcoming=current==null?0:current+1;
+      if(index<upcoming)return 'played';
+      return index<upcoming+(playlistView.playlist.queued||0)?'queued':'autoplay';
     }
     function openPlaylistGame(index){
       const entry=playlistView.playlist.entries[index];
@@ -982,15 +985,15 @@ let initializing = true;
       const playing=playlistView.playlist.entries[playlistView.playlist.current];
       document.getElementById('playlist-game-title').textContent=title;
       const label=document.getElementById('playlist-game-status');
-      label.textContent={playing:'Playing now',next:'Up next',queued:'In the queue',played:'Played earlier tonight'}[status];
+      label.textContent={playing:'Playing now',next:'Up next',queued:'In the queue',autoplay:'Autoplay pick',played:'Played earlier tonight'}[status];
       label.classList.toggle('playing',status==='playing');
       const start=document.getElementById('playlist-game-start');
       start.disabled=status==='playing';
-      start.textContent=status==='playing'?'Playing':confirmStart?'▶ Yes, start now':'▶ Start now';
+      start.textContent=status==='playing'?'Playing':confirmStart?'▶ Yes, play now':'▶ Play now';
       const confirm=document.getElementById('playlist-game-confirm');
       confirm.hidden=!confirmStart;
       confirm.textContent=playing?`This ends ${playing.title} for everyone as soon as ${title} has loaded.`:'';
-      document.getElementById('playlist-game-next').hidden=status==='playing'||status==='next';
+      document.getElementById('playlist-game-next').hidden=status==='playing'||status==='queued';
       const store=document.getElementById('playlist-game-store');
       store.href='/catalog#game='+encodeURIComponent(game);
       store.setAttribute('aria-label',`View ${title} in the store`);
@@ -1029,7 +1032,7 @@ let initializing = true;
         hint.textContent=status==='playing'?'This game has no settings to change.'
           :status==='next'?`No settings to change yet. They show up here once ${title} has loaded, if it has any.`
           :storage.cloud?`Settings can be changed while ${title} is on screen.`
-          :`Settings can be changed once ${title} is up next and has loaded. Choose Play next to load it.`;
+          :`Settings can be changed once ${title} is up next and has loaded.`;
         return;
       }
       hint.textContent='';
@@ -1084,8 +1087,8 @@ let initializing = true;
       const buttons=[document.getElementById('playlist-game-start'),document.getElementById('playlist-game-next')];
       buttons.forEach(b=>b.disabled=true);
       try{
-        await storage.playNext(game,start);
-        window.showToast?.(start?`${title} starts as soon as it has loaded`:`${title} will play next`);
+        await (start?storage.playNext(game,true):storage.queue(game));
+        window.showToast?.(start?`${title} starts as soon as it has loaded`:`${title} is in the queue`);
         closeGameDialog();
         await loadPlaylist();
       }catch(error){window.showToast?.(error.message);buttons.forEach(b=>b.disabled=false);}

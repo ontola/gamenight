@@ -182,7 +182,8 @@ mod night_tests {
                 .iter()
                 .map(|e| e.game.0.as_str())
                 .collect::<Vec<_>>(),
-            ["a", "b", "c"]
+            ["a", "b", "c"],
+            "queued after the picks so far, in order"
         );
         night.handle(Command::QueueGame {
             game: GameId::new("b"),
@@ -196,7 +197,8 @@ mod night_tests {
                 .iter()
                 .map(|e| e.game.0.as_str())
                 .collect::<Vec<_>>(),
-            ["b", "a", "b", "c"]
+            ["b", "a", "c"],
+            "first moves it to the top instead of repeating it"
         );
         let warm = night.snapshot().warm_session.unwrap();
         night.handle(Command::SessionReady { session: warm.id });
@@ -219,8 +221,9 @@ mod night_tests {
                 .iter()
                 .map(|e| e.game.0.as_str())
                 .collect::<Vec<_>>(),
-            ["b", "c", "a", "b", "c"]
+            ["b", "c", "a", "b"]
         );
+        assert_eq!(after.playlist.queued, 2);
         assert_eq!(after.warm_session.unwrap().game, GameId::new("c"));
     }
 
@@ -1274,11 +1277,13 @@ mod night_tests {
         let (g, s3) = prepared_session(&fx).expect("g3 warms instead");
         assert_eq!(g, GameId::new("g3"));
 
-        // Skip lands on g3, not g2.
+        // Skip lands on g3, not g2: the pick sits right after g1.
         night.handle(Command::SessionReady { session: s3 });
         let fx = night.handle(Command::Next);
         assert_eq!(started_session(&fx), Some(s3));
-        assert_eq!(night.snapshot().playlist.current, Some(2));
+        let after = night.snapshot().playlist;
+        assert_eq!(after.current, Some(1));
+        assert_eq!(after.entries[1].game, GameId::new("g3"));
     }
 
     #[test]
@@ -2227,7 +2232,14 @@ mod night_tests {
         let mut night = GameNight::default();
         night.set_library(vec![meta("lobby")]);
 
-        let fx = night.add_to_library(meta("growing-guns"));
+        let mut growing_guns = meta("growing-guns");
+        growing_guns.launch = Some(gamenight_protocol::LaunchSpec {
+            command: "/games/growing-guns".into(),
+            args: vec![],
+            cwd: None,
+            env: Default::default(),
+        });
+        let fx = night.add_to_library(growing_guns.clone());
         assert!(fx.contains(&Effect::StateChanged));
 
         let snap = night.snapshot();
@@ -2244,10 +2256,17 @@ mod night_tests {
         );
 
         // A re-install must not produce the game twice.
-        night.add_to_library(meta("growing-guns"));
+        night.add_to_library(growing_guns);
         let snap = night.snapshot();
         assert_eq!(snap.library.len(), 2);
-        assert_eq!(snap.playlist.entries.len(), 2);
+        let queued = |id: &str| {
+            snap.playlist
+                .entries
+                .iter()
+                .filter(|e| e.game == GameId::new(id))
+                .count()
+        };
+        assert_eq!(queued("growing-guns"), 1);
     }
 
     /// Calling up the party overlay mid-match is the way back to the lobby:
@@ -2944,10 +2963,13 @@ mod player_count_fit_tests {
         night.handle(Command::QueueNext {
             game: GameId::new("a"),
         });
+        let after = night.snapshot();
+        let next = after.next_game_index.unwrap();
+        assert_eq!(after.playlist.entries[next].game, GameId::new("a"));
         assert_eq!(
-            night.snapshot().next_game_index,
-            Some(0),
-            "explicit pick identifies first A exactly"
+            next,
+            after.playlist.current.unwrap() + 1,
+            "explicit pick is the entry right after the current one"
         );
     }
 
@@ -2998,5 +3020,170 @@ mod player_count_fit_tests {
             night.snapshot().warm_session.is_some(),
             "warming must not wait for the first join"
         );
+    }
+}
+
+#[cfg(test)]
+mod autoplay_tests {
+    use super::*;
+    use gamenight_protocol::{GameId, GameMeta, PlaylistSnapshot};
+
+    fn game(id: &str, min: u8, max: u8, best: Option<u8>) -> GameMeta {
+        GameMeta {
+            id: GameId::new(id),
+            title: id.to_uppercase(),
+            tagline: None,
+            cover: None,
+            icon: None,
+            screenshot: None,
+            color: None,
+            emoji: None,
+            players: None,
+            min_players: Some(min),
+            max_players: Some(max),
+            best_players: best,
+            play_with: Default::default(),
+            min_phones: None,
+            launch: Some(gamenight_protocol::LaunchSpec {
+                command: format!("/games/{id}"),
+                args: vec![],
+                cwd: None,
+                env: Default::default(),
+            }),
+        }
+    }
+
+    fn join(night: &mut GameNight, name: &str) {
+        night.handle(Command::JoinParty {
+            name: name.into(),
+            seat: None,
+            color: None,
+            avatar: None,
+            library: Vec::new(),
+        });
+    }
+
+    fn upcoming(playlist: &PlaylistSnapshot) -> Vec<&str> {
+        playlist.entries[playlist.upcoming_start()..]
+            .iter()
+            .map(|e| e.game.0.as_str())
+            .collect()
+    }
+
+    /// Start whatever is warm, as if it loaded and the party pressed Next.
+    fn play_next(night: &mut GameNight) -> GameId {
+        let warm = night.snapshot().warm_session.expect("something warms");
+        night.handle(Command::SessionReady { session: warm.id });
+        night.handle(Command::Next);
+        night.snapshot().active_session.unwrap().game
+    }
+
+    fn shelf(night: &mut GameNight, ids: &[&str]) {
+        night.set_library(ids.iter().map(|id| game(id, 1, 4, None)).collect());
+        for id in ids {
+            night.handle(Command::GameConnected {
+                game: GameId::new(*id),
+            });
+        }
+    }
+
+    #[test]
+    fn the_queue_never_runs_dry() {
+        let mut night = GameNight::default();
+        shelf(&mut night, &["a", "b", "c", "d", "e", "f", "g"]);
+        join(&mut night, "Ada");
+        let mut played = Vec::new();
+        for _ in 0..20 {
+            played.push(play_next(&mut night));
+            let playlist = night.snapshot().playlist;
+            assert_eq!(upcoming(&playlist).len(), 5, "five games lined up");
+            assert!(playlist.entries.len() <= 1 + 8 + 5, "played games trimmed");
+        }
+        // Autoplay plays everything before repeating anything.
+        let first_round: std::collections::HashSet<_> = played[..7].iter().collect();
+        assert_eq!(first_round.len(), 7);
+    }
+
+    #[test]
+    fn picks_play_first_in_the_order_players_queued_them() {
+        let mut night = GameNight::default();
+        shelf(&mut night, &["a", "b", "c", "d", "e", "f", "g"]);
+        join(&mut night, "Ada");
+        let playing = play_next(&mut night);
+        for id in ["f", "c", "e"] {
+            night.handle(Command::QueueGame {
+                game: GameId::new(id),
+                first: false,
+            });
+        }
+        let playlist = night.snapshot().playlist;
+        assert_eq!(playlist.queued, 3);
+        assert_eq!(upcoming(&playlist)[..3], ["f", "c", "e"]);
+        assert!(upcoming(&playlist).len() > 3, "autoplay follows the picks");
+        assert!(
+            !upcoming(&playlist)[3..].contains(&"c"),
+            "no repeat as autoplay"
+        );
+        assert_eq!(
+            night.snapshot().warm_session.unwrap().game,
+            GameId::new("f")
+        );
+        // Queuing a game that is already in the player queue changes nothing.
+        night.handle(Command::QueueGame {
+            game: GameId::new("c"),
+            first: false,
+        });
+        assert_eq!(night.snapshot().playlist, playlist);
+
+        assert_eq!(play_next(&mut night), GameId::new("f"));
+        assert_eq!(night.snapshot().playlist.queued, 2);
+        assert_eq!(play_next(&mut night), GameId::new("c"));
+        assert_eq!(play_next(&mut night), GameId::new("e"));
+        assert_eq!(night.snapshot().playlist.queued, 0);
+        assert_ne!(
+            play_next(&mut night),
+            playing,
+            "autoplay prefers unplayed games"
+        );
+    }
+
+    #[test]
+    fn autoplay_recommends_unplayed_games_that_suit_the_party() {
+        let mut night = GameNight::default();
+        join(&mut night, "Ada");
+        join(&mut night, "Bo");
+        night.set_library(vec![
+            game("duel", 2, 2, Some(2)),
+            game("party", 2, 8, Some(6)),
+            game("solo", 1, 1, Some(1)),
+            game("trio", 1, 4, Some(3)),
+        ]);
+        let playlist = night.snapshot().playlist;
+        assert_eq!(upcoming(&playlist), ["duel", "trio", "party"]);
+        // A third player: the duel no longer fits and leaves autoplay.
+        join(&mut night, "Cy");
+        let playlist = night.snapshot().playlist;
+        assert_eq!(upcoming(&playlist), ["trio", "party"]);
+    }
+
+    #[test]
+    fn the_player_queue_survives_a_host_restart() {
+        let mut night = GameNight::default();
+        shelf(&mut night, &["a", "b", "c", "d", "e", "f", "g"]);
+        join(&mut night, "Ada");
+        play_next(&mut night);
+        night.handle(Command::QueueGame {
+            game: GameId::new("g"),
+            first: false,
+        });
+        let carry = night.carry();
+        assert_eq!(carry.playlist[0].game, GameId::new("g"));
+        let mut restarted = GameNight::default();
+        restarted.set_library(night.snapshot().library);
+        restarted.restore(carry);
+        let playlist = restarted.snapshot().playlist;
+        assert_eq!(playlist.queued, 1);
+        assert_eq!(upcoming(&playlist)[0], "g");
+        assert_eq!(upcoming(&playlist).len(), 5);
     }
 }

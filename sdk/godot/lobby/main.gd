@@ -448,8 +448,11 @@ func _activate(action: String, controller: String = "") -> void:
 	elif action in ["play-next", "queue"] and not games.is_empty():
 		var game: Dictionary = games[selected]
 		if not _unavailable(game).is_empty(): return
+		# Play now puts it on top of the queue and switches once it has
+		# loaded; Queue adds it after earlier picks, ahead of autoplay.
 		client.queue_game(str(game.id), action == "play-next")
-		_message = ("%s will play next." if action == "play-next" else "%s added to queue.") % game.get("title", "Game")
+		if action == "play-next": client.start_next()
+		_message = ("%s starts as soon as it has loaded." if action == "play-next" else "%s added to queue.") % game.get("title", "Game")
 		_message_until = Time.get_ticks_msec() + 2500
 	queue_redraw()
 
@@ -518,7 +521,7 @@ func _controller_hints(rect: Rect2) -> void:
 	var compact := rect.size.x < 520
 	var icon := 23.0 if compact else 28.0
 	var text_size := 12 if compact else 16
-	var labels := [["X", "Play next"], ["A", "Queue"], ["LT", "Previous"], ["RT", "Next"]]
+	var labels := [["X", "Play now"], ["A", "Queue"], ["LT", "Previous"], ["RT", "Next"]]
 	var widths: Array[float] = []
 	var total := 0.0
 	for hint in labels:
@@ -742,7 +745,7 @@ func _draw_up_next(rect: Rect2) -> void:
 	var band := Rect2(hero.position+Vector2(0,hero.size.y-116),Vector2(hero.size.x,116))
 	draw_rect(band,Color(0.05,0.12,0.1,0.94))
 	_text(str(game.get("title","Your queue is empty")),band.position+Vector2(18,33),23,PAPER,true,hero.size.x-36)
-	_text(_status(game) if not game.is_empty() else "A adds a game. X puts it first.",band.position+Vector2(18,59),14,PAPER,false,hero.size.x-36)
+	_text(_status(game) if not game.is_empty() else "A queues a game. X plays it now.",band.position+Vector2(18,59),14,PAPER,false,hero.size.x-36)
 	if not game.is_empty(): _button("Retry" if not _game_issue(game).is_empty() else "Start game",Rect2(band.position+Vector2(18,70),Vector2(150,36)),"start",true)
 	if not upcoming.is_empty(): _button("×",Rect2(hero.end.x-40,hero.position.y+5,32,32),"remove:%d" % upcoming[0].index)
 	if list_width > 0:

@@ -507,7 +507,7 @@ func station_for(id: String) -> Dictionary:
 		var game: Dictionary = shelf[shelf_offset % shelf.size()]
 		var reason := _unavailable(game)
 		return {"id": "shelf", "kind": "shelf", "game": game.id, "title": str(game.get("title", "Game")),
-			"label": reason if not reason.is_empty() else "Set %s up next" % str(game.get("title", "game")),
+			"label": reason if not reason.is_empty() else "Play %s now" % str(game.get("title", "game")),
 			"enabled": reason.is_empty(), "extra": "X queue LB RB browse" if shelf.size() > 1 else "X queue"}
 	if x >= Layout.UP_NEXT.x and x <= Layout.UP_NEXT.y:
 		return queue_station()
@@ -549,7 +549,8 @@ func _unavailable(game: Dictionary) -> String:
 	if not client.connected and demo == null: return "Waiting for GameNight"
 	return _shortfall(game)
 
-## Y uses the station; at the shelf, queue (X) adds the box at the end.
+## Y uses the station; at the shelf, queue (X) adds the box to the players'
+## queue, after earlier picks and ahead of the host's autoplay picks.
 func _use_station(id: String, queue := false) -> void:
 	var station := station_for(id)
 	if station.is_empty() or not station.enabled: return
@@ -562,11 +563,15 @@ func _use_station(id: String, queue := false) -> void:
 		"shelf":
 			if queue:
 				client.queue_game(str(station.game), false)
-				toast("%s added to the queue." % station.title, GREEN)
+				toast("%s is in the queue." % station.title, GREEN)
+			elif str(current_game().get("id", "")) == str(station.game):
+				client.resume_game()
 			else:
-				# queue_next makes it next without starting it, unlike play_next.
+				# Play now: put it on top of the queue, then switch as soon as
+				# it has loaded, like the queue's own Play next.
 				client._command({"type": "queue_next", "game": str(station.game)})
-				toast("%s is up next." % station.title, GREEN)
+				client.start_next()
+				toast("%s starts as soon as it has loaded." % station.title, GREEN)
 		"queue":
 			if queue:
 				var entries := upcoming()
@@ -843,7 +848,7 @@ func _update_prompts() -> void:
 	room.set_prompt("queue", [["Y", "Play next"], ["X", "Skip next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
 	room.featured_box.visible = shelf_live and occupied.has("shelf")
-	room.set_prompt("shelf", [["Y", "Set up next"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
+	room.set_prompt("shelf", [["Y", "Play now"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))
 	for side in ["shelf_lb", "shelf_rb"]: room.get_node(side).visible = occupied.has("shelf") and shelf_games().size() > 1
 	var playing: bool = party.get("now_playing", {}).get("playing", false) if party.get("now_playing") is Dictionary else false
 	var music_buttons := [["LB", "Previous"], ["Y", "Pause" if playing else "Play"], ["RB", "Next"]] if _has_track() else [["Y", "Play"]]

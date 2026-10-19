@@ -462,10 +462,28 @@ mod tests {
         assert!(apply(&state, &selection).await);
         // A repeated delivery observes the existing warm target; no restart.
         assert!(apply(&state, &selection).await);
-        let axum::Json(view) = crate::playlist::get(axum::extract::State(state.clone()))
+        // A player's own pick, so removing it changes the playlist even
+        // though autoplay puts the shelf's only game straight back.
+        overlay
+            .send(Message::Text(
+                ClientMessage::QueueGame {
+                    game: GameId::new("target"),
+                    first: false,
+                }
+                .to_json(),
+            ))
             .await
             .unwrap();
-        let view = serde_json::to_value(view).unwrap();
+        let view = loop {
+            let axum::Json(view) = crate::playlist::get(axum::extract::State(state.clone()))
+                .await
+                .unwrap();
+            let view = serde_json::to_value(view).unwrap();
+            if view["playlist"]["queued"] == 1 {
+                break view;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        };
         selection.edit = Some(json!({"expected":view["playlist"],"from":0,"remove":true}));
         assert!(apply(&state, &selection).await);
         // A stale retry must not remove a different entry.

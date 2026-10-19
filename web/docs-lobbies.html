@@ -27,12 +27,12 @@ through the runtime to get an authenticated connection. Opening the project
 alone displays a connecting screen, not a synthetic party.</p>
 <p>Controls: press A, B, X, Y or Start on a controller to join. LT/RT cycle games; the
 selected game is larger in the centre of its two neighbours. The stick/D-pad
-moves between controls. On a game card, A appends a new occurrence to the queue;
-X inserts it first among upcoming games. Neither action starts gameplay. The
+moves between controls. On a game card, A queues the game after earlier picks;
+X plays it now (it goes on top of the queue and starts once it has loaded). The
 merged queue panel shows its first entry as Up next, with the remaining games
 alongside it. Select Start game to launch the head of the queue. Back returns to
 the lobby or resumes an overlay-paused game. Y leaves that controller's seat.</p>
-<p>The controller hint bar shows <strong>X Play next · A Queue · LT Previous · RT Next</strong>
+<p>The controller hint bar shows <strong>X Play now · A Queue · LT Previous · RT Next</strong>
 with Xbox-style face-button and trigger icons. These hints are not selectable;
 focus stays on the game cards and the other lobby controls.</p>
 <h2 id="talk-to-the-assistant">Talk to the assistant</h2>
@@ -69,11 +69,20 @@ The lobby flow tests hold/release ownership and disconnect cancellation with
 simulated controller frames. These tests do not validate a physical microphone
 or speech accuracy in a noisy room.</p>
 <h2 id="queue-behaviour">Queue behaviour</h2>
-<p>The lobby sends <code>queue_game</code> with <code>first: false</code> for A and <code>first: true</code> for X.
-This is one atomic host command, so simultaneous additions cannot overwrite each
-other's order. It preserves the current game and its position. <code>next</code> starts the
-prepared queue head. The older <code>play_next</code> command can start an idle game and is
-not used for either catalog button.</p>
+<p>The queue works like a music player's. Games players pick form the player
+queue, first come, first played. Behind it the host keeps autoplay picks, so
+the queue never runs dry: games the host can start, not played yet tonight
+first, then the ones played longest ago, preferring games whose best player
+count is closest to the party. Autoplay drops its own entries that no longer fit the party
+and tops up after every change. <code>playlist.queued</code> says how many entries after
+<code>current</code> players picked; everything after those is autoplay.</p>
+<p>The lobby sends <code>queue_game</code> with <code>first: false</code> for A, and <code>queue_game</code> with
+<code>first: true</code> followed by <code>next</code> for X (Play now). <code>queue_game</code> is one atomic
+host command, so simultaneous additions cannot overwrite each other's order. It
+preserves the current game and its position, replaces the game's autoplay entry
+instead of repeating it, and ignores a game that is already in the player queue.
+<code>next</code> starts the prepared queue head. The older <code>play_next</code> command can start
+an idle game and is not used for either catalog button.</p>
 <h2 id="register-a-replacement-lobby">Register a replacement lobby</h2>
 <p>Set <code>GAMENIGHT_LOBBY_GAME</code> on the daemon to your shelf entry's ID. Include
 <code>&quot;GAMENIGHT_LOBBY_API&quot;: &quot;1&quot;</code> in that entry's <code>launch.env</code>. This declares runtime
@@ -112,7 +121,7 @@ lifecycle or publish physical controller frames.</p>
 </tr>
 <tr>
 <td><code>queue_next {game}</code></td>
-<td>Prepare a chosen game without starting it</td>
+<td>Put a chosen game on top of the player queue and prepare it, without starting it</td>
 </tr>
 <tr>
 <td><code>play_next {game}</code></td>
@@ -120,7 +129,7 @@ lifecycle or publish physical controller frames.</p>
 </tr>
 <tr>
 <td><code>queue_game {game,first}</code></td>
-<td>Append a new occurrence, or insert first among upcoming games; never starts playback</td>
+<td>Add a game to the player queue, at the bottom or with <code>first</code> on top; never starts playback</td>
 </tr>
 <tr>
 <td><code>next</code></td>
@@ -193,10 +202,11 @@ func _ready() -&gt; void:
     add_child(lobby)
 
 func add_to_queue(game_id: String) -&gt; void:
-    lobby.queue_game(game_id)        # A: append
+    lobby.queue_game(game_id)        # A: after earlier picks
 
-func put_first(game_id: String) -&gt; void:
-    lobby.queue_game(game_id, true)  # X: put first, without starting
+func play_now(game_id: String) -&gt; void:
+    lobby.queue_game(game_id, true)  # X: on top of the queue...
+    lobby.start_next()              # ...and switch once it has loaded
 
 func start_queue() -&gt; void:
     lobby.start_next()              # Separate Start action
@@ -204,16 +214,15 @@ func start_queue() -&gt; void:
 <p>This is the connection and queue portion only. A complete lobby must also handle
 <code>focus_changed</code> and <code>controllers_changed</code> as described below. The runnable scene
 is <code>sdk/godot/lobby/main.gd</code>.</p>
-<p>Queueing adds an occurrence, so the same game can appear more than once. Use
-playlist indices to move or remove one occurrence; game IDs alone are ambiguous.
+<p>The same game can appear more than once, for example once in the player queue
+and once among the games already played. Use playlist indices to move or remove one occurrence; game IDs alone are ambiguous.
 The <code>expected</code> field must contain the full latest <code>party.playlist</code> value. On a
 stale-edit error, redraw from the latest snapshot instead of silently retrying.
 The SDK's <code>move_in_queue</code> and <code>remove_from_queue</code> helpers include this guard.</p>
 <p>For loading feedback, read <code>warm_session.phase</code>, <code>progress</code> and <code>progress_label</code>,
 plus <code>installs</code> for downloads. An entry being in the queue does not mean it is
-ready. Keep the selected next game's artwork visible while it prepares. The
-runtime's playlist currently wraps when it reaches the end; it is not a finite
-queue that automatically stops the night.</p>
+ready. Keep the selected next game's artwork visible while it prepares. Autoplay
+keeps the queue filled, so it never stops the night by running out.</p>
 <h2 id="input-and-screen-ownership">Input and screen ownership</h2>
 <p>Replacement lobbies receive runtime-sampled controller frames. Device tokens
 are opaque, and must be matched against <code>seats[].controller</code>. The runtime
@@ -368,7 +377,7 @@ nonzero exit is “Game exited unexpectedly”. These states describe evidence, 
 user intent. Reconnecting games clear their issue and must prepare again before
 being shown as ready.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="314742476e793503531ad19b0ff06df153ed1a7d90eb7595640c496297d30ede">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="a1cb43a4bbe55be40dca0f5534245f3b1a40ad42c19b5ab6056e4e97fdbd3c7b">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

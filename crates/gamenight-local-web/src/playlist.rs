@@ -102,7 +102,10 @@ async fn exchange(
                 match serde_json::from_str::<ServerMessage>(&text)
                     .map_err(|_| StatusCode::BAD_GATEWAY)?
                 {
-                    ServerMessage::PartyState { party } if party.playlist.entries == target => {
+                    // Autoplay may top the queue up after the edit.
+                    ServerMessage::PartyState { party }
+                        if party.playlist.entries.starts_with(&target) =>
+                    {
                         return Ok(Json(party.into()))
                     }
                     ServerMessage::Error { .. } => return Err(StatusCode::CONFLICT),

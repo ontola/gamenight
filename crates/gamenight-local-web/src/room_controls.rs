@@ -89,7 +89,7 @@ pub struct QueueRequest {
 }
 
 /// `POST /api/playlist/queue`: adds a game this host can play to the end of
-/// the queue. Never starts or interrupts play. Answers with the playlist,
+/// the player queue, ahead of autoplay. Never starts or interrupts play. Answers with the playlist,
 /// like `/api/playlist`.
 pub(crate) async fn queue(
     State(state): State<SharedState>,
@@ -108,15 +108,6 @@ pub(crate) async fn queue(
         return Err(StatusCode::CONFLICT);
     }
     let game = GameId(request.game);
-    let count = |party: &PartySnapshot| {
-        party
-            .playlist
-            .entries
-            .iter()
-            .filter(|e| e.game == game)
-            .count()
-    };
-    let before = count(&party);
     ws.send(Message::Text(
         ClientMessage::QueueGame {
             game: game.clone(),
@@ -132,7 +123,7 @@ pub(crate) async fn queue(
                 continue;
             };
             match serde_json::from_str::<ServerMessage>(&text) {
-                Ok(ServerMessage::PartyState { party }) if count(&party) > before => {
+                Ok(ServerMessage::PartyState { party }) if party.playlist.is_queued(&game) => {
                     let _ = ws.close(None).await;
                     return Ok(Json(party.into()));
                 }
@@ -347,12 +338,13 @@ mod tests {
                 }),
             )
         };
-        let before = daemon::party(&state).await.unwrap().playlist.entries.len();
         let Json(after) = add("phone", "test").await.unwrap();
         let after = serde_json::to_value(after).unwrap();
+        // The pick replaces the game's autoplay entry, first in the queue.
         let entries = after["playlist"]["entries"].as_array().unwrap();
-        assert_eq!(entries.len(), before + 1);
-        assert_eq!(entries.last().unwrap()["game"], "test");
+        assert_eq!(after["playlist"]["queued"], 1);
+        assert_eq!(entries[0]["game"], "test");
+        assert_eq!(entries.iter().filter(|e| e["game"] == "test").count(), 1);
         assert_eq!(
             add("phone", "elsewhere").await.unwrap_err(),
             StatusCode::CONFLICT

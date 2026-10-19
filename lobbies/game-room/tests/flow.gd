@@ -20,11 +20,14 @@ func _run() -> void:
 	var a: String = ids[0]
 	var b: String = ids[1]
 	var shelf: Array = main.shelf_games()
-	# Game shelf: Y plays the box on the stand next, RB browses, X queues.
+	# Game shelf: Y plays the box on the stand now, RB browses, X queues.
 	var first := str(shelf[main.shelf_offset % shelf.size()].id)
 	_place(a, (Layout.GAME_SHELF.x + Layout.GAME_SHELF.y) / 2)
 	await _press(a, World.BTN_Y)
-	if not await _until("Y at the shelf plays its game next", func(): return not main.upcoming().is_empty() and main.upcoming()[0].game == first): return
+	if not await _until("Y at the shelf plays its game now", func(): return _phase(first) == "running"): return
+	main.client.open_lobby()
+	if not await _until("the lobby opens over the game", func(): return _phase(first) == "paused"): return
+	if main.upcoming().size() < 3: return _fail("autoplay keeps games lined up")
 	var start: int = main.shelf_offset
 	await _press(a, main.BTN_RB)
 	if not await _until("RB browses the shelf", func(): return main.shelf_offset == (start + 1) % shelf.size()): return
@@ -34,16 +37,17 @@ func _run() -> void:
 	var second := str(shelf[(start + 1) % shelf.size()].id)
 	await get_tree().create_timer(0.5).timeout  # station cooldown
 	await _press(a, World.BTN_X)
-	if not await _until("X queues the browsed game", func(): return main.upcoming().back().game == second): return
-	if main.upcoming()[0].game != first: return _fail("X keeps the next game in front")
+	if not await _until("X queues the browsed game ahead of autoplay", func(): return main.upcoming()[0].game == second): return
+	if _phase(first) != "paused": return _fail("X never interrupts the paused game")
 	_place(a, 0.0)
 	await _press(a, main.BTN_RB)
 	if main.shelf_offset != (start + 1) % shelf.size(): return _fail("RB away from the shelf does not browse")
 	var head := str(main.upcoming()[0].game)
 	await _capture("queue")
-	# TV: Y starts the head of the queue.
+	# Up next cabinet: Y starts the head of the queue.
+	_place(a, (Layout.UP_NEXT.x + Layout.UP_NEXT.y) / 2)
 	await _press(a, World.BTN_Y)
-	if not await _until("Y at the TV launches the queue head", func(): return _phase(head) == "running"): return
+	if not await _until("Y at the cabinet launches the queue head", func(): return _phase(head) == "running"): return
 	main.client.open_lobby()
 	if not await _until("opening the lobby pauses the game", func(): return _phase(head) == "paused"): return
 	_place(a, 1.5)

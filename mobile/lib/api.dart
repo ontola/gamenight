@@ -156,6 +156,10 @@ class PlaylistView {
   final Map<String, dynamic> snapshot;
   final List<PlaylistEntry> entries;
   final int? current;
+
+  /// How many entries after [current] players queued themselves; the rest
+  /// are the host's autoplay picks.
+  final int queued;
   final String? playing;
   final String? next;
 
@@ -165,6 +169,7 @@ class PlaylistView {
             .map((e) => PlaylistEntry(e as Map<String, dynamic>))
             .toList(),
         current = ((j['playlist'] as Map)['current'] as num?)?.toInt(),
+        queued = ((j['playlist'] as Map)['queued'] as num?)?.toInt() ?? 0,
         playing = j['playing'] as String?,
         next = j['next'] as String?;
 }

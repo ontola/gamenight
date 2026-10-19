@@ -272,8 +272,12 @@ pub struct PartyCarry {
     #[serde(default)]
     pub preferred_colors: HashMap<PlayerId, String>,
     pub seats: Vec<Seat>,
+    /// The games still to come, the player queue first.
     #[serde(default)]
     pub playlist: Vec<PlaylistEntry>,
+    /// How many of `playlist` players queued themselves.
+    #[serde(default)]
+    pub queued: usize,
     #[serde(default)]
     pub history: Vec<GameId>,
     #[serde(default)]
@@ -282,6 +286,10 @@ pub struct PartyCarry {
 
 /// Seats including those added for phone-only players.
 const MAX_SEATS: usize = 8;
+/// How many playable games autoplay keeps lined up after the one on screen.
+const AUTOPLAY_AHEAD: usize = 5;
+/// How many played games stay in the playlist, for "played earlier tonight".
+const PLAYED_KEPT: usize = 8;
 
 #[derive(Debug)]
 pub struct GameNight {
@@ -406,50 +414,30 @@ impl GameNight {
 
     /// Install the game shelf (usually once, at daemon startup).
     ///
-    /// If nobody has built a playlist yet, the whole shelf becomes the
-    /// playlist: there should always be a next game to warm, without asking
-    /// the party to curate one first. Anyone can still `set_playlist` to
-    /// override it.
+    /// Autoplay fills the queue from the shelf right away: there should
+    /// always be a next game to warm, without asking the party to curate one
+    /// first. Warming itself waits for `ensure_warm`.
     pub fn set_library(&mut self, library: Vec<GameMeta>) {
-        if self.playlist.is_empty() {
-            self.playlist.set_entries(
-                library
-                    .iter()
-                    .map(|m| PlaylistEntry {
-                        game: m.id.clone(),
-                        title: m.title.clone(),
-                    })
-                    .collect(),
-            );
-        }
         self.library = library;
+        if let Some(entries) = self.autoplay_entries() {
+            self.apply_entries(entries, self.playlist.queued());
+        }
     }
 
     /// Put one more game on the shelf mid-night — a background install that
     /// just finished, and is playable from this moment rather than after a
     /// restart.
     ///
-    /// Appends to the playlist rather than rebuilding it: the party may have
-    /// curated an order already, and a download landing is no reason to throw
-    /// that away. A game that's somehow already on the shelf updates in place,
-    /// so a re-install can't produce a duplicate shelf entry.
+    /// It becomes a candidate for autoplay; the party's own queue stays as it
+    /// is. A game that's somehow already on the shelf updates in place, so a
+    /// re-install can't produce a duplicate shelf entry.
     pub fn add_to_library(&mut self, meta: GameMeta) -> Vec<Effect> {
-        let entry = PlaylistEntry {
-            game: meta.id.clone(),
-            title: meta.title.clone(),
-        };
         match self.library.iter_mut().find(|m| m.id == meta.id) {
             Some(existing) => *existing = meta,
-            None => {
-                self.library.push(meta);
-                if !self.playlist.entries().iter().any(|e| e.game == entry.game) {
-                    // At the end, which is always after `current` — appending
-                    // can't shift the pointer to what's playing.
-                    self.playlist.insert(self.playlist.entries().len(), entry);
-                }
-            }
+            None => self.library.push(meta),
         }
         let mut fx = vec![Effect::StateChanged];
+        self.refresh_autoplay(&mut fx);
         // A shelf that was empty at boot has nothing warm; the arrival of the
         // first playable game is exactly when that should change.
         self.rewarm_if_misfit(&mut fx);
@@ -464,6 +452,7 @@ impl GameNight {
     /// this once it is ready to act on effects.
     pub fn ensure_warm(&mut self) -> Vec<Effect> {
         let mut fx = Vec::new();
+        self.refresh_autoplay(&mut fx);
         self.maybe_warm(&mut fx);
         fx
     }
@@ -653,6 +642,13 @@ impl GameNight {
                 } else if from == to {
                     fx.push(Effect::StateChanged);
                 } else {
+                    // Which entries players queued themselves, moved along.
+                    let start = self.playlist.upcoming_start();
+                    let queue_end = start + self.playlist.queued();
+                    let mut picked: Vec<bool> = (0..expected.entries.len())
+                        .map(|index| index >= start && index < queue_end)
+                        .collect();
+                    picked.remove(from);
                     let mut entries = expected.entries;
                     let entry = entries.remove(from);
                     entries.insert(to, entry);
@@ -672,6 +668,16 @@ impl GameNight {
                     if let Some(current) = expected.current {
                         self.playlist.set_current(remap(current));
                     }
+                    // A game moved into (or right under) the player queue
+                    // joins it; one moved out of it becomes autoplay.
+                    let start = self.playlist.upcoming_start();
+                    picked.insert(to, true);
+                    let run =
+                        |picked: &[bool]| picked.iter().skip(start).take_while(|p| **p).count();
+                    if to < start || to >= start + run(&picked) {
+                        picked[to] = false;
+                    }
+                    self.playlist.set_queued(run(&picked));
                     if let Some(active) = &mut self.active {
                         active.playlist_index = remap(active.playlist_index);
                     }
@@ -697,6 +703,8 @@ impl GameNight {
                             .into(),
                     });
                 } else {
+                    let start = self.playlist.upcoming_start();
+                    let queued = self.playlist.queued();
                     let mut entries = expected.entries;
                     entries.remove(index);
                     self.dispose_warm(&mut fx);
@@ -705,6 +713,8 @@ impl GameNight {
                     if let Some(current) = expected.current.filter(|current| *current != index) {
                         let current = current - usize::from(current > index);
                         self.playlist.set_current(current);
+                        let in_queue = index >= start && index < start + queued;
+                        self.playlist.set_queued(queued - usize::from(in_queue));
                         if let Some(active) = &mut self.active {
                             active.playlist_index = current;
                         }
@@ -794,6 +804,7 @@ impl GameNight {
                 self.on_set_setting(game, key, value, &mut fx)
             }
         }
+        self.refresh_autoplay(&mut fx);
         if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
             self.presence
                 .retain(|id, _| self.players.iter().any(|p| p.id == *id));
@@ -1082,7 +1093,12 @@ impl GameNight {
             players: self.players.clone(),
             preferred_colors: self.preferred_colors.clone(),
             seats: self.seats.clone(),
-            playlist: self.playlist.entries().to_vec(),
+            playlist: self.playlist.entries()[self
+                .playlist
+                .upcoming_start()
+                .min(self.playlist.entries().len())..]
+                .to_vec(),
+            queued: self.playlist.queued(),
             history: self.history.clone(),
             settings: self.settings.clone(),
         }
@@ -1109,9 +1125,11 @@ impl GameNight {
         self.players = carry.players;
         self.preferred_colors = carry.preferred_colors;
         self.playlist.set_entries(carry.playlist);
+        self.playlist.set_queued(carry.queued);
         self.history = carry.history;
         self.settings = carry.settings;
         let mut fx = vec![Effect::StateChanged];
+        self.refresh_autoplay(&mut fx);
         self.rewarm_if_misfit(&mut fx);
         fx
     }
@@ -1500,6 +1518,9 @@ impl GameNight {
                 self.playlist.set_current(i);
             }
         }
+        // A list someone wrote out is what they picked: autoplay only adds
+        // to it.
+        self.playlist.set_queued(usize::MAX);
         self.maybe_warm(fx);
         fx.push(Effect::StateChanged);
     }
@@ -1517,38 +1538,10 @@ impl GameNight {
             });
             return;
         }
-        let index = match self.playlist.position_of(&game) {
-            Some(i) => i,
-            None => {
-                let insert_at = self
-                    .playlist
-                    .current()
-                    .map(|c| c + 1)
-                    .unwrap_or_else(|| self.playlist.entries().len());
-                // Entries at or after the insertion point shift by one, which
-                // would leave a warm session pointing at the wrong entry.
-                if self
-                    .warm
-                    .as_ref()
-                    .is_some_and(|w| w.playlist_index >= insert_at)
-                {
-                    self.dispose_warm(fx);
-                }
-                let title = self
-                    .library
-                    .iter()
-                    .find(|m| m.id == game)
-                    .map(|m| m.title.clone())
-                    .unwrap_or_else(|| game.0.clone());
-                self.playlist
-                    .insert(insert_at, PlaylistEntry { game, title });
-                insert_at
-            }
-        };
+        self.queue_pick(game, true, fx);
         if !start_if_idle {
             self.pending_transition = false;
         }
-        self.set_next_up(index, fx);
         // Queue-only selection must not start an idle night.
         if start_if_idle && self.active.is_none() {
             self.pending_transition = true;
@@ -1558,38 +1551,237 @@ impl GameNight {
     }
 
     fn enqueue(&mut self, game: GameId, first: bool, fx: &mut Vec<Effect>) {
-        let Some(meta) = self.library.iter().find(|m| m.id == game) else {
+        if !self.library.iter().any(|m| m.id == game) {
             fx.push(Effect::Reject {
                 reason: "unknown game".into(),
             });
             return;
-        };
+        }
         if self.lobby_game.as_ref() == Some(&game) || !self.game_fits_party(&game) {
             fx.push(Effect::Reject {
                 reason: "this game cannot fit everyone in the party".into(),
             });
             return;
         }
-        let entry = PlaylistEntry {
-            game,
-            title: meta.title.clone(),
-        };
-        let index = if first {
-            self.playlist.current().map_or(0, |c| c + 1)
-        } else {
-            self.playlist.entries().len()
-        };
-        if first {
-            self.dispose_warm(fx);
-        }
-        self.playlist.insert(index, entry);
+        self.queue_pick(game, first, fx);
         self.pending_transition = false;
-        if first {
-            self.set_next_up(index, fx);
-        } else {
-            self.maybe_warm(fx);
-        }
         fx.push(Effect::StateChanged);
+    }
+
+    /// A player picked `game`: it joins the player queue, at the bottom
+    /// (first come, first played) or with `first` at the top. It takes the
+    /// place of the same game's autoplay entry instead of repeating it, and
+    /// a game already in the player queue isn't queued twice.
+    fn queue_pick(&mut self, game: GameId, first: bool, fx: &mut Vec<Effect>) {
+        let start = self.playlist.upcoming_start();
+        let queue_end = start + self.playlist.queued();
+        let entries = self.playlist.entries();
+        let in_queue = entries
+            .get(start..queue_end)
+            .and_then(|queue| queue.iter().position(|e| e.game == game));
+        if in_queue.is_some() && !first {
+            return;
+        }
+        let title = self
+            .library
+            .iter()
+            .find(|m| m.id == game)
+            .map(|m| m.title.clone())
+            .unwrap_or_else(|| game.0.clone());
+        let mut next: Vec<(Option<usize>, PlaylistEntry)> = entries
+            .iter()
+            .enumerate()
+            .filter(|(index, e)| *index < start || e.game != game)
+            .map(|(index, e)| (Some(index), e.clone()))
+            .collect();
+        let at = if first {
+            start
+        } else {
+            next.iter()
+                .position(|(old, _)| old.is_some_and(|old| old >= queue_end))
+                .unwrap_or(next.len())
+        };
+        next.insert(at, (None, PlaylistEntry { game, title }));
+        let queued = self.playlist.queued() - usize::from(in_queue.is_some()) + 1;
+        // The player queue decides what is next from here on.
+        self.next_up = None;
+        self.apply_entries(next, queued);
+        self.reconcile_warm(fx);
+    }
+
+    // -- autoplay -------------------------------------------------------------
+
+    /// The playlist as autoplay wants it, or `None` when it already is: past
+    /// games trimmed to the last few, the player queue untouched, autoplay
+    /// entries that no longer fit the party (or repeat an earlier upcoming
+    /// game) dropped, and recommendations appended until enough playable
+    /// games lie ahead.
+    fn autoplay_entries(&self) -> Option<Vec<(Option<usize>, PlaylistEntry)>> {
+        let entries = self.playlist.entries();
+        let start = self.playlist.upcoming_start();
+        let queue_end = start + self.playlist.queued();
+        let keep_from = self
+            .playlist
+            .current()
+            .map_or(0, |current| current.saturating_sub(PLAYED_KEPT));
+        let mut seen = HashSet::new();
+        let mut ahead = 0;
+        let mut kept = Vec::new();
+        for (index, entry) in entries.iter().enumerate().skip(keep_from) {
+            if index >= start {
+                let playable = self.lobby_game.as_ref() != Some(&entry.game)
+                    && self.game_fits_party(&entry.game);
+                let fresh = seen.insert(&entry.game);
+                if index >= queue_end && !(playable && fresh) {
+                    continue;
+                }
+                ahead += usize::from(playable && fresh);
+            }
+            kept.push(index);
+        }
+        // Runs after every command: settle the common case without
+        // allocating a new playlist.
+        if ahead >= AUTOPLAY_AHEAD && kept.len() == entries.len() {
+            return None;
+        }
+        let seen: HashSet<GameId> = seen.into_iter().cloned().collect();
+        let mut next: Vec<_> = kept
+            .into_iter()
+            .map(|index| (Some(index), entries[index].clone()))
+            .collect();
+        for meta in self
+            .recommendations(&seen)
+            .into_iter()
+            .take(AUTOPLAY_AHEAD.saturating_sub(ahead))
+        {
+            next.push((
+                None,
+                PlaylistEntry {
+                    game: meta.id.clone(),
+                    title: meta.title.clone(),
+                },
+            ));
+        }
+        let unchanged = next.len() == entries.len()
+            && next
+                .iter()
+                .enumerate()
+                .all(|(index, (old, _))| *old == Some(index));
+        (!unchanged).then_some(next)
+    }
+
+    /// Shelf games autoplay may queue, best first: games the host can start
+    /// right away before ones it can't launch (yet), then games not played yet
+    /// tonight before ones played longest ago (the game on screen last), then
+    /// games whose sweet spot is closest to how many are seated, then a
+    /// shuffle that changes with every game played, so equal candidates don't
+    /// always come up in shelf order. Only games that fit the party, never
+    /// the lobby, never one in `exclude`.
+    fn recommendations(&self, exclude: &HashSet<GameId>) -> Vec<&GameMeta> {
+        let players = self.seated_count();
+        let playing = self.active.as_ref().map(|a| &a.game);
+        let recency = |game: &GameId| {
+            if playing == Some(game) {
+                usize::MAX
+            } else {
+                self.history
+                    .iter()
+                    .rposition(|g| g == game)
+                    .map_or(0, |position| position + 1)
+            }
+        };
+        let shuffle = |game: &GameId| {
+            // FNV-1a: stable across runs and platforms, unlike std's hasher.
+            let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+            for byte in game.0.bytes().chain(self.history.len().to_le_bytes()) {
+                hash = (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3);
+            }
+            hash
+        };
+        let mut candidates: Vec<&GameMeta> = self
+            .library
+            .iter()
+            .filter(|m| self.lobby_game.as_ref() != Some(&m.id))
+            .filter(|m| !exclude.contains(&m.id) && self.game_fits_party(&m.id))
+            .collect();
+        candidates.sort_by_key(|m| {
+            (
+                !self.can_warm(&m.id),
+                recency(&m.id),
+                m.fit_distance(players),
+                shuffle(&m.id),
+            )
+        });
+        candidates
+    }
+
+    /// Whether the host can get `game` going: its process is connected, or
+    /// the shelf knows how to launch it. Games the shelf doesn't know are
+    /// given the benefit of the doubt.
+    fn can_warm(&self, game: &GameId) -> bool {
+        self.connected_games.contains(game)
+            || self
+                .library
+                .iter()
+                .find(|m| &m.id == game)
+                .is_none_or(|m| m.launch.is_some())
+    }
+
+    /// Keep the queue full; see `autoplay_entries`.
+    fn refresh_autoplay(&mut self, fx: &mut Vec<Effect>) {
+        if let Some(entries) = self.autoplay_entries() {
+            self.apply_entries(entries, self.playlist.queued());
+            self.reconcile_warm(fx);
+            fx.push(Effect::StateChanged);
+        }
+    }
+
+    /// Replace the playlist with `entries`, each tagged with the index it
+    /// had before (`None` for a new one), keeping what plays, what warms and
+    /// any explicit next pick pointed at the same entries.
+    fn apply_entries(&mut self, entries: Vec<(Option<usize>, PlaylistEntry)>, queued: usize) {
+        let mut moved = vec![None; self.playlist.entries().len()];
+        for (new, (old, _)) in entries.iter().enumerate() {
+            if let Some(old) = old {
+                moved[*old] = Some(new);
+            }
+        }
+        let remap = |index: usize| moved.get(index).copied().flatten();
+        let current = self.playlist.current().and_then(remap);
+        self.playlist
+            .set_entries(entries.into_iter().map(|(_, e)| e).collect());
+        if let Some(current) = current {
+            self.playlist.set_current(current);
+        }
+        self.playlist.set_queued(queued);
+        if let Some(active) = &mut self.active {
+            if let Some(index) = remap(active.playlist_index) {
+                active.playlist_index = index;
+            }
+        }
+        if let Some(warm) = &mut self.warm {
+            // Gone from the playlist: `reconcile_warm` re-aims or disposes it.
+            warm.playlist_index = remap(warm.playlist_index).unwrap_or(usize::MAX);
+        }
+        self.next_up = self.next_up.and_then(remap);
+    }
+
+    /// After the playlist changed: keep the warm session if it is still for
+    /// what comes next (re-aimed when that game's entry moved), otherwise
+    /// replace it.
+    fn reconcile_warm(&mut self, fx: &mut Vec<Effect>) {
+        let target = self.warm_target();
+        if let Some(warm) = &self.warm {
+            if Some(warm.playlist_index) != target {
+                let same_game =
+                    target.filter(|&t| self.playlist.get(t).is_some_and(|e| e.game == warm.game));
+                match (same_game, self.warm.as_mut()) {
+                    (Some(index), Some(warm)) => warm.playlist_index = index,
+                    _ => self.dispose_warm(fx),
+                }
+            }
+        }
+        self.maybe_warm(fx);
     }
 
     fn on_pause(&mut self, fx: &mut Vec<Effect>) {
@@ -2104,23 +2296,29 @@ impl GameNight {
     /// Which playlist entry should be (or is being) warmed — skipping the
     /// lobby game if rotation would otherwise land on it.
     fn warm_target(&self) -> Option<usize> {
-        let eligible = |index: usize| {
+        let queue_end = self.playlist.upcoming_start() + self.playlist.queued();
+        let eligible = |index: usize, startable_only: bool| {
             self.is_playable(index)
-                && self
-                    .playlist
-                    .get(index)
-                    .is_some_and(|e| self.game_fits_party(&e.game))
+                && self.playlist.get(index).is_some_and(|e| {
+                    self.game_fits_party(&e.game)
+                        // A player's pick waits for its game; autoplay moves
+                        // on to one the host can start, if there is one.
+                        && (!startable_only || index < queue_end || self.can_warm(&e.game))
+                })
         };
-        if let Some(index) = self.next_up.filter(|&index| eligible(index)) {
+        if let Some(index) = self.next_up.filter(|&index| eligible(index, false)) {
             return Some(index);
         }
         let start = self.playlist.next_index()?;
         let len = self.playlist.entries().len();
         // Preserve playlist order, but never assume a missing human can be
         // replaced by AI. Solo support is advertised by min_players = 1.
-        (0..len)
-            .map(|offset| (start + offset) % len)
-            .find(|&index| eligible(index))
+        let find = |startable_only: bool| {
+            (0..len)
+                .map(|offset| (start + offset) % len)
+                .find(|&index| eligible(index, startable_only))
+        };
+        find(true).or_else(|| find(false))
     }
 
     /// Called whenever the seating changes: re-prepare or replace the warm
@@ -2150,19 +2348,6 @@ impl GameNight {
             self.dispose_warm(fx);
             self.maybe_warm(fx);
         }
-    }
-
-    /// Point the warm slot at `index`, replacing a mismatched warm session.
-    fn set_next_up(&mut self, index: usize, fx: &mut Vec<Effect>) {
-        if self
-            .warm
-            .as_ref()
-            .is_some_and(|w| w.playlist_index != index)
-        {
-            self.dispose_warm(fx);
-        }
-        self.next_up = Some(index);
-        self.maybe_warm(fx);
     }
 
     /// Start preparing the next game if we can: there is a target entry, its
@@ -2281,7 +2466,7 @@ impl GameNight {
                     session: next.id,
                     command: GameCommand::Start,
                 });
-                self.playlist.set_current(next.playlist_index);
+                self.playlist.advance_to(next.playlist_index);
                 self.active = Some(next);
                 self.next_up = None;
                 self.pending_transition = false;
