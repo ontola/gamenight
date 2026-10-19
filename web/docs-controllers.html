@@ -88,11 +88,11 @@ Start and Resume, so the press that started the game does not also act in it.
 Hold-to-confirm (about a second) suits actions that end a round or reset
 progress.</p>
 <h2 id="back-must-toggle-once">Back must toggle once</h2>
-<p>Request the lobby with <code>request_overlay</code>. Use press/release edges and the shared one-second release gate. The same held press must not reopen the game after focus changes. Never issue Resume or <code>request_start</code> from a focus callback.</p>
+<p>Request the lobby with <code>request_overlay</code>. Use press/release edges and the shared one-second release gate. The same held press must not reopen the game after focus changes. Never issue Resume or <code>request_start</code> from a focus callback. When the runtime samples controllers itself it also sees that Back; it treats a press within 600 ms of your request as the same one, so the lobby does not close again.</p>
 <h2 id="check-real-devices">Check real devices</h2>
 <p>Test two different profiles, reversed connection order, unplugging one pad and reconnecting it. Then switch between games. Synthetic frames can check token matching, but they do not prove that a physical controller belongs to the right player on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="2ecd94b0d9abe4c7071c0561610184f2c7f6a7b01e2f0fc745f7317f0f2e07f0">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="c6557bca5f70b014f7e395ab240f51b5377ac8dccd0c8638b84c738617408264">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/other-engines"><small>Previous</small>Unity, Unreal &amp; others</a><a href="/docs/faces"><small>Next</small>Faces &amp; colours</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

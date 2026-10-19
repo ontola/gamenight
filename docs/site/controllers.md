@@ -58,7 +58,7 @@ progress.
 
 ## Back must toggle once
 
-Request the lobby with `request_overlay`. Use press/release edges and the shared one-second release gate. The same held press must not reopen the game after focus changes. Never issue Resume or `request_start` from a focus callback.
+Request the lobby with `request_overlay`. Use press/release edges and the shared one-second release gate. The same held press must not reopen the game after focus changes. Never issue Resume or `request_start` from a focus callback. When the runtime samples controllers itself it also sees that Back; it treats a press within 600 ms of your request as the same one, so the lobby does not close again.
 
 ## Check real devices
 
