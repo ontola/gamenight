@@ -35,11 +35,12 @@ class AppState extends ChangeNotifier {
     name = prefs.getString('player_name') ?? randomName();
     skinColor = prefs.getString('skin_color') ?? defaultSkin;
     clothingColor = prefs.getString('clothing_color') ?? '#55a0ff';
+    final firstRun = prefs.getString('face') == null;
     face = decodeAvatar(prefs.getString('face')) ?? randomFace();
     // Keep the first random name and face, so a restart is still you.
     prefs.setString('player_name', name);
     prefs.setString('face', encodeAvatar(face));
-    _loadArtworks();
+    _loadArtworks(firstRun: firstRun);
     boundPlayer = prefs.getString('bound_player');
     final host = prefs.getString('host');
     if (host != null) _api = this.apiFactory(Uri.parse(host));
@@ -103,7 +104,7 @@ class AppState extends ChangeNotifier {
   final List<Artwork> artworks = [];
   late String currentArtworkId;
 
-  void _loadArtworks() {
+  void _loadArtworks({bool firstRun = false}) {
     try {
       final list = jsonDecode(prefs.getString('artworks') ?? '[]') as List;
       artworks.addAll(list.map(Artwork.fromJson).whereType<Artwork>());
@@ -121,6 +122,24 @@ class AppState extends ChangeNotifier {
           data: List.of(face));
       artworks.add(art);
       currentArtworkId = art.id;
+      // A random face nobody drew yet; signing in drops it for the account's.
+      if (firstRun && artworks.length == 1) {
+        prefs.setString('starter_artwork', art.id);
+      }
+      _saveArtworks();
+    }
+  }
+
+  /// Forgets the untouched random face from the first start once the
+  /// account brought faces of its own, so it never piles up in the account.
+  void _dropStarterFace() {
+    final starter = prefs.getString('starter_artwork');
+    prefs.remove('starter_artwork');
+    if (starter == null || artworks.every((a) => a.id == starter)) return;
+    artworks.removeWhere((a) => a.id == starter);
+    if (currentArtworkId == starter) {
+      selectArtwork(artworks.first.id);
+    } else {
       _saveArtworks();
     }
   }
@@ -251,6 +270,9 @@ class AppState extends ChangeNotifier {
   }
 
   void setFace(Pixels pixels) {
+    if (prefs.getString('starter_artwork') == currentArtworkId) {
+      prefs.remove('starter_artwork');
+    }
     face = pixels;
     prefs.setString('face', encodeAvatar(pixels));
     currentArtwork.data = List.of(pixels);
@@ -611,7 +633,10 @@ class AppState extends ChangeNotifier {
     }
     final workspace = doc.workspace;
     // A new account only has a placeholder name; this phone's player wins.
-    if (workspace == null) return false;
+    if (workspace == null) {
+      prefs.remove('starter_artwork');
+      return false;
+    }
     try {
       importBackup(jsonEncode({
         'username': doc.displayName ?? name,
@@ -619,6 +644,7 @@ class AppState extends ChangeNotifier {
         'preferredColor': doc.preferredColor ?? clothingColor,
         ...workspace,
       }));
+      _dropStarterFace();
       if (doc.displayName != null && doc.displayName!.trim().isNotEmpty) {
         name = doc.displayName!;
         prefs.setString('player_name', name);

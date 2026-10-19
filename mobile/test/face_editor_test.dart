@@ -78,6 +78,40 @@ void main() {
     state.dispose();
   });
 
+  testWidgets('You tab: name first, one colour per row, tap to change',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final state = await _state();
+    await tester.pumpWidget(GameNightApp(state: state));
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    final name = tester.getTopLeft(find.byType(TextField).first).dy;
+    expect(name, lessThan(tester.getTopLeft(find.text('Edit face')).dy));
+    expect(tester.getTopLeft(find.text('Edit face')).dy,
+        lessThan(tester.getTopLeft(find.text('Your faces')).dy));
+    expect(find.text('Backup'), findsNothing);
+    expect(find.byType(ColorSwatches), findsNothing);
+
+    await tester.scrollUntilVisible(find.text('Player colour'), 200,
+        scrollable: find.byType(Scrollable).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Player colour'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('#7ddf64'));
+    await tester.pumpAndSettle();
+    expect(state.clothingColor, '#7ddf64');
+    expect(find.byType(ColorSwatches), findsNothing);
+
+    final before = state.artworks.length;
+    await tester.ensureVisible(find.text('New'));
+    await tester.tap(find.text('New'));
+    await tester.pumpAndSettle();
+    expect(state.artworks.length, before + 1);
+    state.dispose();
+  });
+
   testWidgets('drawing in the editor saves the face', (tester) async {
     final state = await _state();
     await tester.pumpWidget(MaterialApp(home: FaceEditorScreen(state: state)));

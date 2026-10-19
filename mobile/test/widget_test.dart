@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/api.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/main.dart';
+import 'package:gamenight/screens/player_screen.dart';
 import 'package:gamenight/reports.dart';
 import 'package:gamenight/screens/feedback_screen.dart';
 import 'package:gamenight/screens/face_editor_screen.dart';
@@ -103,8 +104,14 @@ void main() {
     await tester.tap(find.text('You'));
     await tester.pumpAndSettle();
     expect(find.byType(TextField), findsWidgets);
-    expect(find.text('Sign in with email').hitTestable(), findsOneWidget,
-        reason: 'sign in is the first thing on the You tab');
+    await tester.scrollUntilVisible(find.text('Sign in with email'), 200,
+        scrollable: find
+            .descendant(
+                of: find.byType(PlayerScreen),
+                matching: find.byType(Scrollable))
+            .first);
+    expect(find.text('Sign in with email'), findsOneWidget,
+        reason: 'signing in lives on the You tab, under the player');
     state.dispose();
   });
 

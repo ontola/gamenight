@@ -3,12 +3,10 @@ import 'package:flutter/foundation.dart'
     show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:url_launcher/url_launcher.dart';
 import '../app_update.dart';
-import 'package:flutter/services.dart';
 
 import '../app_state.dart';
 import '../avatar.dart';
 import '../character.dart';
-import '../faces.dart';
 import '../theme.dart';
 import '../layout.dart';
 import 'account_card.dart';
@@ -29,7 +27,7 @@ const List<String> clothingColors = [
   '#4a5568',
 ];
 
-/// Name, colours and the face editor. Every change saves by itself.
+/// Name, face, saved faces and colours. Every change saves by itself.
 class PlayerScreen extends StatefulWidget {
   final AppState state;
   const PlayerScreen({super.key, required this.state});
@@ -80,31 +78,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) => ContentWidth(
-        maxWidth: 1120,
-        child: LayoutBuilder(
-            builder: (context, box) => ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
-                  children: [
-                    if (kIsWeb &&
-                        defaultTargetPlatform == TargetPlatform.android)
-                      _androidApp(),
-                    AccountCard(state: state),
-                    if (box.maxWidth >= 900)
-                      Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: _identity()),
-                            const SizedBox(width: 20),
-                            Expanded(
-                                child: Column(children: [
-                              _editor(),
-                              _gallery(),
-                              _backup()
-                            ])),
-                          ])
-                    else ...[_identity(), _editor(), _gallery(), _backup()],
-                  ],
-                )),
+        maxWidth: 560,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          children: [
+            if (kIsWeb && defaultTargetPlatform == TargetPlatform.android)
+              _androidApp(),
+            _nameField(),
+            const SizedBox(height: 16),
+            _character(),
+            const SizedBox(height: 24),
+            _faces(),
+            const SizedBox(height: 24),
+            _colors(),
+            const SizedBox(height: 24),
+            AccountCard(state: state),
+          ],
+        ),
       ),
     );
   }
@@ -144,25 +134,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
             label: const Text('Download APK')),
       ]);
 
-  Widget _identity() {
+  Widget _nameField() {
     final warn = state.sync == SyncState.warning;
-    return Section(children: [
-      SizedBox(
-        height: 170,
-        child: CustomPaint(
-          painter: CharacterPainter(
-              body: _body.image,
-              face: state.face,
-              skin: hexColor(state.skinColor),
-              revision: Object.hashAll(state.face)),
-        ),
-      ),
-      const SizedBox(height: 12),
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       TextField(
         controller: _name,
         maxLength: 20,
         textAlign: TextAlign.center,
-        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
         decoration: InputDecoration(
           counterText: '',
           hintText: 'Your name',
@@ -179,7 +158,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         ),
         onChanged: state.setName,
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(
           warn
@@ -187,8 +166,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
               : state.sync == SyncState.saving
                   ? Icons.sync
                   : Icons.check,
-          size: 16,
-          color: warn ? GnColors.warn : GnColors.ok,
+          size: 14,
+          color: warn ? GnColors.warn : GnColors.muted,
         ),
         const SizedBox(width: 6),
         Flexible(
@@ -197,137 +176,214 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ? 'Saved on this device'
                 : state.syncMessage,
             style: TextStyle(
-                color: warn ? GnColors.warn : GnColors.muted, fontSize: 13),
+                color: warn ? GnColors.warn : GnColors.muted, fontSize: 12),
           ),
         ),
       ]),
-      const SizedBox(height: 14),
-      const Hint('Skin colour'),
-      const SizedBox(height: 6),
-      ColorSwatches(
-          colors: skinColors, selected: state.skinColor, onTap: state.setSkin),
-      const SizedBox(height: 12),
-      const Hint('Preferred player colour'),
-      const SizedBox(height: 6),
-      ColorSwatches(
-          colors: clothingColors,
-          selected: state.clothingColor,
-          onTap: state.setClothing),
-      const SizedBox(height: 8),
-      const Hint(
-          'First to join gets first choice. Taken colours get a fallback.'),
     ]);
   }
 
-  /// A preview of the current face. Drawing opens inside the app shell.
-  Widget _editor() {
-    return Section(title: 'Draw your face', children: [
-      const Hint(
-          'Draw anywhere on the head, hats included. Tap the canvas to start.'),
-      const SizedBox(height: 12),
-      Center(
-        child: Semantics(
+  /// Your character as others see it; tapping it draws the face.
+  Widget _character() => Column(children: [
+        Semantics(
           button: true,
           label: 'Edit face',
           child: GestureDetector(
             onTap: _openEditor,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox.square(
-                dimension: 200,
-                child: CustomPaint(
-                  painter: FaceCanvasPainter(
-                    grid: state.face,
-                    skin: hexColor(state.skinColor),
+            child: SizedBox(
+              height: 200,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: CharacterPainter(
                     body: _body.image,
-                    guide: true,
-                    revision: Object.hashAll(state.face),
-                  ),
-                ),
+                    face: state.face,
+                    skin: hexColor(state.skinColor),
+                    revision: Object.hashAll(state.face)),
               ),
             ),
           ),
         ),
-      ),
-      const SizedBox(height: 12),
-      Center(
-        child: FilledButton.icon(
+        const SizedBox(height: 12),
+        FilledButton.icon(
           onPressed: _openEditor,
           icon: const Icon(Icons.brush, size: 18),
           label: const Text('Edit face'),
         ),
+      ]);
+
+  Widget _heading(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: Text(text,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+      );
+
+  /// Every saved face; tap one to wear it, tap the worn one for more.
+  Widget _faces() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _heading('Your faces'),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: state.artworks.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              if (i == state.artworks.length) return _newFaceTile();
+              final art = state.artworks[i];
+              final active = art.id == state.currentArtworkId;
+              final data = active ? state.face : art.data;
+              return Semantics(
+                button: true,
+                selected: active,
+                label: art.name,
+                child: GestureDetector(
+                  onTap: () =>
+                      active ? _faceActions() : state.selectArtwork(art.id),
+                  child: Column(children: [
+                    Container(
+                      width: 72,
+                      height: 72,
+                      decoration: BoxDecoration(
+                        color: GnColors.bg,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: active ? GnColors.accent : GnColors.border,
+                            width: active ? 3 : 1),
+                      ),
+                      child: CustomPaint(
+                          painter: _FaceThumb(data, state.skinColor)),
+                    ),
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      width: 72,
+                      child: Text(art.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: active ? Colors.white : GnColors.muted)),
+                    ),
+                  ]),
+                ),
+              );
+            },
+          ),
+        ),
+      ]);
+
+  Widget _newFaceTile() => Semantics(
+        button: true,
+        label: 'New face',
+        child: GestureDetector(
+          onTap: () => state.newArtwork(),
+          child: Column(children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: GnColors.border),
+              ),
+              child: const Icon(Icons.add, color: GnColors.muted),
+            ),
+            const SizedBox(height: 4),
+            const Text('New',
+                style: TextStyle(fontSize: 12, color: GnColors.muted)),
+          ]),
+        ),
+      );
+
+  Future<void> _faceActions() async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+              leading: const Icon(Icons.brush),
+              title: const Text('Edit'),
+              onTap: () => Navigator.pop(context, 'edit')),
+          ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Make a copy'),
+              onTap: () => Navigator.pop(context, 'copy')),
+          ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Delete'),
+              onTap: () => Navigator.pop(context, 'delete')),
+        ]),
       ),
-    ]);
+    );
+    if (!mounted) return;
+    switch (action) {
+      case 'edit':
+        await _openEditor();
+      case 'copy':
+        state.cloneArtwork(state.currentArtworkId);
+      case 'delete':
+        await _confirmDelete();
+    }
   }
 
-  Widget _gallery() {
-    return Section(title: 'Your faces', children: [
-      const Hint('Keep as many faces as you like. Tap one to wear it.'),
-      const SizedBox(height: 10),
-      SizedBox(
-        height: 96,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: state.artworks.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (_, i) {
-            final art = state.artworks[i];
-            final active = art.id == state.currentArtworkId;
-            final data = active ? state.face : art.data;
-            return Semantics(
-              button: true,
-              selected: active,
-              label: art.name,
-              child: GestureDetector(
-                onTap: () => state.selectArtwork(art.id),
-                child: Column(children: [
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: GnColors.bg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: active ? GnColors.accent : GnColors.border,
-                          width: active ? 3 : 1),
-                    ),
-                    child:
-                        CustomPaint(painter: _FaceThumb(data, state.skinColor)),
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: 72,
-                    child: Text(art.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: active ? Colors.white : GnColors.muted)),
-                  ),
-                ]),
-              ),
-            );
-          },
+  Widget _colors() =>
+      Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _heading('Colours'),
+        _colorRow('Skin', skinColors, state.skinColor, state.setSkin),
+        _colorRow('Player colour', clothingColors, state.clothingColor,
+            state.setClothing,
+            hint: 'First to join gets first choice. '
+                'Taken colours get a fallback.'),
+      ]);
+
+  /// One colour on show; tapping it opens every choice.
+  Widget _colorRow(String label, List<String> colors, String selected,
+          ValueChanged<String> onPick,
+          {String? hint}) =>
+      ListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(label),
+        trailing: Container(
+          key: ValueKey('colour-$label'),
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: hexColor(selected),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: GnColors.border),
+          ),
         ),
-      ),
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        OutlinedButton.icon(
-            onPressed: () => state.newArtwork(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('New face')),
-        OutlinedButton.icon(
-            onPressed: () => state.cloneArtwork(state.currentArtworkId),
-            icon: const Icon(Icons.copy, size: 18),
-            label: const Text('Copy')),
-        OutlinedButton.icon(
-            onPressed: _confirmDelete,
-            icon: const Icon(Icons.delete_outline, size: 18),
-            label: const Text('Delete')),
-      ]),
-    ]);
-  }
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          showDragHandle: true,
+          builder: (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 12),
+                    ColorSwatches(
+                        colors: colors,
+                        selected: selected,
+                        wrap: true,
+                        size: 44,
+                        onTap: (c) {
+                          onPick(c);
+                          Navigator.pop(context);
+                        }),
+                    if (hint != null) ...[
+                      const SizedBox(height: 12),
+                      Hint(hint),
+                    ],
+                  ]),
+            ),
+          ),
+        ),
+      );
 
   Future<void> _confirmDelete() async {
     final art = state.currentArtwork;
@@ -347,64 +403,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
     if (ok == true) state.deleteArtwork(art.id);
-  }
-
-  Widget _backup() {
-    return Section(title: 'Backup', children: [
-      const Hint(
-          'Copy your faces, name and skin as text and keep it in a note. '
-          'Paste it back here on another device to restore.'),
-      const SizedBox(height: 10),
-      Wrap(spacing: 8, runSpacing: 8, children: [
-        FilledButton.tonalIcon(
-          onPressed: () async {
-            await Clipboard.setData(ClipboardData(text: state.exportBackup()));
-            if (mounted) {
-              toast(context, 'Backup copied. Paste it into a note to keep it.');
-            }
-          },
-          icon: const Icon(Icons.content_copy, size: 18),
-          label: const Text('Copy backup'),
-        ),
-        OutlinedButton.icon(
-          onPressed: _restore,
-          icon: const Icon(Icons.restore, size: 18),
-          label: const Text('Restore'),
-        ),
-      ]),
-    ]);
-  }
-
-  Future<void> _restore() async {
-    final field = TextEditingController();
-    final text = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Restore a backup'),
-        content: TextField(
-          controller: field,
-          maxLines: 6,
-          decoration: const InputDecoration(hintText: 'Paste your backup here'),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel')),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, field.text),
-              child: const Text('Restore')),
-        ],
-      ),
-    );
-    field.dispose();
-    if (text == null || text.trim().isEmpty || !mounted) return;
-    try {
-      final added = state.importBackup(text);
-      toast(context,
-          'Imported $added face${added == 1 ? '' : 's'}. Existing faces were kept.');
-    } on BackupError catch (e) {
-      toast(context, e.message);
-    }
   }
 }
 

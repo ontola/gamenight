@@ -138,6 +138,7 @@ void main() {
 
   test('signing in takes the saved player and keeps this phone’s faces',
       () async {
+    state.setFace(randomFace());
     final mine = state.currentArtwork.data;
     final saved = Artwork(id: 'web1', name: 'From the web', data: randomFace());
     cloud.workspace = jsonDecode(encodeBackup(Backup(
@@ -168,6 +169,21 @@ void main() {
     final put = cloud.bodies['PUT /v1/me/studio'] as Map<String, dynamic>;
     expect(put['profile']['display_name'], 'Joep');
     expect((put['workspace']['artworks'] as List).length, 2);
+  });
+
+  test('signing in drops the random face nobody drew', () async {
+    final saved = Artwork(id: 'web1', name: 'From the web', data: randomFace());
+    cloud.workspace = jsonDecode(encodeBackup(Backup(
+        username: 'Joep',
+        skinColor: '#c58c85',
+        activeArtworkId: 'web1',
+        artworks: [saved]))) as Map<String, dynamic>;
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    expect(state.artworks.map((a) => a.name), ['From the web']);
+    expect(state.currentArtworkId, state.artworks.single.id);
+    final put = cloud.bodies['PUT /v1/me/studio'] as Map<String, dynamic>;
+    expect((put['workspace']['artworks'] as List).length, 1);
   });
 
   test('a save that lost a race is retried on the newest revision', () async {

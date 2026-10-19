@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gamenight/account.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/main.dart';
+import 'package:gamenight/screens/player_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'account_test.dart' show FakeCloud;
@@ -22,6 +23,14 @@ void main() {
       addTearDown(links.close);
       await tester.pumpWidget(GameNightApp(state: state, links: links.stream));
       await tester.tap(find.text('You'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Sign in with email'), 200,
+          scrollable: find
+              .descendant(
+                  of: find.byType(PlayerScreen),
+                  matching: find.byType(Scrollable))
+              .first);
+      await tester.drag(find.byType(PlayerScreen), const Offset(0, -300));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Sign in with email'));
       await tester.pumpAndSettle();
