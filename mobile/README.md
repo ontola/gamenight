@@ -53,8 +53,21 @@ flutter pub get
 flutter run            # on a phone on the same Wi-Fi
 flutter test
 flutter build apk      # Android (CI publishes the signed one, see below)
-flutter build ipa      # iOS, needs a Mac and signing
+flutter build ipa      # iOS, needs a Mac and signing (CI uploads to TestFlight, see below)
 ```
+
+### iOS and TestFlight
+
+The `ios` job in `.github/workflows/mobile.yml` builds the app on a macOS
+runner on every push to main. With the `APP_STORE_CONNECT_KEY_ID`,
+`APP_STORE_CONNECT_ISSUER_ID` and `APP_STORE_CONNECT_PRIVATE_KEY` (the `.p8`
+contents) secrets set to an App Store Connect API key with the Admin role, it
+signs the build and uploads it to TestFlight; without them it only checks that
+the iOS build still compiles. `ios/testflight.py` creates a fresh Apple
+Distribution certificate and App Store profile for each run and revokes them
+afterwards, so no signing key is stored. The App Store Connect app record for
+`io.ontola.gamenight` must exist (the API cannot create it). The build number
+is the workflow run number, the same as the APK's.
 
 Android allows plain HTTP for this app (`usesCleartextTraffic`), and iOS
 allows local networking (`NSAllowsLocalNetworking`), because the GameNight PC

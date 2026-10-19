@@ -116,6 +116,65 @@ jobs:
           gh release upload app-latest gamenight.apk --clobber
           gh release upload app-latest version.json --clobber
 
+  # The iOS build goes to TestFlight once the APP_STORE_CONNECT_* secrets hold
+  # an App Store Connect API key (Admin role); without them it only checks
+  # that the app still builds for iOS, unsigned. macOS minutes are dear, so
+  # this runs on main and by hand, not on pull requests.
+  ios:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          cache: true
+      - run: flutter pub get
+      - name: Build unsigned
+        if: env.APP_STORE_CONNECT_PRIVATE_KEY == '' || github.ref != 'refs/heads/main'
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }} --dart-define=GAMENIGHT_BUILD=${{ github.run_number }}
+      - name: Create a certificate and profile for this run
+        id: signing
+        if: env.APP_STORE_CONNECT_PRIVATE_KEY != '' && github.ref == 'refs/heads/main'
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install --quiet 'cryptography>=43'
+          "$RUNNER_TEMP/venv/bin/python" ios/testflight.py prepare "$RUNNER_TEMP/ios-signing"
+          cp "$RUNNER_TEMP/ios-signing/Signing.xcconfig" ios/Flutter/Signing.xcconfig
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p ci "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p ci "$keychain"
+          security import "$RUNNER_TEMP/ios-signing/distribution.p12" -k "$keychain" -P "$(cat "$RUNNER_TEMP/ios-signing/p12-password")" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k ci "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$RUNNER_TEMP/ios-signing"/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+      - name: Build the signed IPA
+        if: steps.signing.outcome == 'success'
+        run: flutter build ipa --release --export-options-plist="$RUNNER_TEMP/ios-signing/ExportOptions.plist" --build-number=${{ github.run_number }} --dart-define=GAMENIGHT_BUILD=${{ github.run_number }}
+      - name: Upload to TestFlight
+        if: steps.signing.outcome == 'success'
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_$APP_STORE_CONNECT_KEY_ID.p8
+          xcrun altool --upload-app --type ios --file build/ios/ipa/*.ipa \
+            --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
+          echo "Build ${{ github.run_number }} is uploaded to TestFlight; it appears there once Apple has processed it." >> "$GITHUB_STEP_SUMMARY"
+      - name: Revoke this run's certificate and profile
+        if: always() && steps.signing.outcome != 'skipped'
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" ios/testflight.py cleanup "$RUNNER_TEMP/ios-signing"
+          security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
   web:
     runs-on: ubuntu-latest
     timeout-minutes: 20
