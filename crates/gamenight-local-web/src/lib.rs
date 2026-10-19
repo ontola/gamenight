@@ -183,6 +183,24 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/docs/:page", get(serve_docs))
         .route("/web/:asset", get(serve_web_asset))
         .route(
+            "/web/fonts/Bungee-Regular.ttf",
+            get(|| async {
+                (
+                    [("content-type", "font/ttf")],
+                    include_bytes!("../../../web/fonts/Bungee-Regular.ttf").as_slice(),
+                )
+            }),
+        )
+        .route(
+            "/web/fonts/Outfit-wght.woff2",
+            get(|| async {
+                (
+                    [("content-type", "font/woff2")],
+                    include_bytes!("../../../web/fonts/Outfit-wght.woff2").as_slice(),
+                )
+            }),
+        )
+        .route(
             "/web/fonts/ark-pixel-16px-latin.ttf",
             get(|| async {
                 (

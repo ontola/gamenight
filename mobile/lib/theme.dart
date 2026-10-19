@@ -44,6 +44,9 @@ ThemeData gameNightTheme() {
   );
   final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
   return ThemeData(
+    // Outfit is the GameNight UI face, shared with the website and the Game
+    // Room lobby. Static weights from web/fonts/Outfit-wght.woff2.
+    fontFamily: 'Outfit',
     colorScheme: scheme,
     scaffoldBackgroundColor: GnColors.bg,
     useMaterial3: true,

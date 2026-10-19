@@ -33,6 +33,8 @@ Future<void> main() async {
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks(
         ['Bungee'], await rootBundle.loadString('assets/fonts/OFL-Bungee.txt'));
+    yield LicenseEntryWithLineBreaks(
+        ['Outfit'], await rootBundle.loadString('assets/fonts/OFL-Outfit.txt'));
   });
   final prefs = await SharedPreferences.getInstance();
   if (kIsWeb) await migrateWebsiteRoom(prefs);

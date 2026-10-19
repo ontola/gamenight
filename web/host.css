@@ -43,7 +43,7 @@
 .host-game-row .host-ready{color:#87dec8}
 .host-progress{height:4px;border-radius:4px;background:#31354e;margin-top:10px;overflow:hidden}.host-progress i{display:block;width:62%;height:100%;background:#a699f6}
 .host-gameplay{border-radius:14px;overflow:hidden;border:1px solid #343b53;background:#171c2e}.host-gameplay img{display:block;width:100%;height:auto}
-.host-copy kbd{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;border:1px solid #dfcb7a;font:700 12px system-ui;color:#f4de84}
+.host-copy kbd{display:inline-grid;place-items:center;width:23px;height:23px;border-radius:50%;border:1px solid #dfcb7a;font:700 12px Outfit,system-ui;color:#f4de84}
 .host-catalog-link{display:inline-flex;align-items:center;gap:22px;margin-top:8px;color:#c3baff;font-weight:650;text-decoration:none;min-height:44px}
 .host-catalog-link:hover{text-decoration:underline}
 .host-footer{border-top:1px solid #343b53;margin:10px 0 0;padding:26px 0 36px;display:flex;justify-content:space-between;gap:20px;color:#9ca4bd;font-size:13px}

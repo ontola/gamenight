@@ -20,7 +20,7 @@ body {
     radial-gradient(100% 60% at 90% 100%, #0e2d29 0%, transparent 50%),
     var(--bg);
   color: var(--text);
-  font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/1.65 Outfit,system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 a { color: inherit; }
 .wrap { max-width: 1020px; margin: 0 auto; padding: 0 24px; }
