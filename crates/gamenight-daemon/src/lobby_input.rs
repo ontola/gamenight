@@ -150,6 +150,10 @@ impl FrameFilter {
     }
 }
 
+/// How long after a game opened the overlay a runtime Back press still counts
+/// as the same press.
+const BACK_ECHO_WINDOW: Duration = Duration::from_millis(600);
+
 /// A, B, X, Y and Start: the presses that join an unseated controller.
 const JOIN_BUTTONS: u32 = 1 | 2 | 4 | 8 | 128;
 
@@ -172,14 +176,24 @@ impl InputRouter {
             .iter()
             .any(|c| c.buttons & !previous.get(&c.controller).copied().unwrap_or(0) & (1 << 6) != 0)
         {
-            s.dispatch(
-                if s.night.snapshot().overlay_open {
-                    Command::OverlayClosed
-                } else {
-                    Command::OverlayOpened
-                },
-                None,
-            );
+            let open = s.night.snapshot().overlay_open;
+            // Games may echo Back as `request_overlay`, and their event often
+            // beats our poll. That press already opened the overlay; toggling
+            // on it again snapped the party straight back into the game.
+            let echoed = open
+                && s.overlay_opened_by_request
+                    .is_some_and(|at| at.elapsed() < BACK_ECHO_WINDOW);
+            if !echoed {
+                s.dispatch(
+                    if open {
+                        Command::OverlayClosed
+                    } else {
+                        Command::OverlayOpened
+                    },
+                    None,
+                );
+            }
+            s.overlay_opened_by_request = None;
         }
         for controller in &mut controllers {
             let held = controller.buttons;
@@ -414,6 +428,21 @@ mod tests {
         router.route(&mut s, frame(0));
         router.route(&mut s, frame(1 << 6));
         assert!(!s.night.snapshot().overlay_open);
+    }
+
+    #[tokio::test]
+    async fn back_echoed_by_the_game_does_not_close_the_overlay_it_opened() {
+        let mut s = Shared::new(Vec::new(), "127.0.0.1:0".into(), None);
+        let (game, _rx) = mpsc::unbounded_channel();
+        let mut router = InputRouter::default();
+        router.route(&mut s, frame(0));
+        // The game's own Back handler reports first, then our poll sees it.
+        s.dispatch(Command::OverlayOpened, Some(&game));
+        router.route(&mut s, frame(1 << 6));
+        assert!(s.night.snapshot().overlay_open, "one press, one action");
+        router.route(&mut s, frame(0));
+        router.route(&mut s, frame(1 << 6));
+        assert!(!s.night.snapshot().overlay_open, "the next press closes");
     }
 
     #[tokio::test]

@@ -103,6 +103,10 @@ struct Shared {
     lobby_token: Option<String>,
     lobby_connections: std::collections::HashSet<GameId>,
     runtime_input: bool,
+    /// When a connection (a game's own Back handler, usually) last opened the
+    /// overlay. The runtime samples the same physical Back press a few frames
+    /// later and must not read it as a second press that closes it again.
+    overlay_opened_by_request: Option<std::time::Instant>,
     shutdown_requested: bool,
     lobby_restarts: u8,
     lobby_recovery_opened: bool,
@@ -271,6 +275,7 @@ impl Shared {
             lobby_token: None,
             lobby_connections: Default::default(),
             runtime_input: false,
+            overlay_opened_by_request: None,
             shutdown_requested: false,
             lobby_restarts: 0,
             lobby_recovery_opened: false,
@@ -537,6 +542,12 @@ impl Shared {
     /// `origin` receives any `Reject` effects.
     fn dispatch(&mut self, command: Command, origin: Option<&Tx>) {
         debug!(?command, "dispatch");
+        if matches!(command, Command::OverlayOpened)
+            && origin.is_some()
+            && !self.night.snapshot().overlay_open
+        {
+            self.overlay_opened_by_request = Some(std::time::Instant::now());
+        }
         if matches!(
             &command,
             Command::PlayNext { .. }
