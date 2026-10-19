@@ -23,9 +23,20 @@ class RoomScreen extends StatefulWidget {
 class RoomScreenState extends State<RoomScreen> {
   final _address = TextEditingController();
   final _code = TextEditingController();
-  late int _section = widget.initialSection;
-  void showCurrentGame() {
-    if (mounted) setState(() => _section = 0);
+
+  /// The game shows first on the one room screen, so nothing to switch.
+  void showCurrentGame() {}
+
+  @override
+  void initState() {
+    super.initState();
+    // A link to the playlist opens the whole playlist over the room.
+    if (widget.initialSection == 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        PlaylistScreen.open(context, state);
+      });
+    }
   }
 
   bool _busy = false;
@@ -112,53 +123,39 @@ class RoomScreenState extends State<RoomScreen> {
     return ListenableBuilder(
         listenable: state,
         builder: (context, _) {
-          final details = ContentWidth(
-              child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-            children: [
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text(_error!,
-                      style: const TextStyle(color: GnColors.warn)),
-                ),
-              if (state.inHostedRoom)
-                ..._hostedCards()
-              else if (!connected)
-                ..._connectCards()
-              else
-                ..._roomCards(),
-            ],
-          ));
+          final cards = [
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child:
+                    Text(_error!, style: const TextStyle(color: GnColors.warn)),
+              ),
+            if (state.inHostedRoom)
+              ..._hostedCards()
+            else if (!connected)
+              ..._connectCards()
+            else
+              ..._roomCards(),
+          ];
           final linked = state.inHostedRoom
               ? state.hostedRoom?.connected ?? false
               : state.session?.linked ?? false;
-          if (!linked) return details;
+          if (!linked) {
+            return ContentWidth(
+                child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    children: cards));
+          }
+          // One screen: the game, then the playlist cut short, then the room.
           return Column(children: [
             // Hidden, never removed: the game page below must keep its state.
             Visibility(visible: !state.companionFullscreen, child: _roomBar()),
             Expanded(
-                child: IndexedStack(index: _section, children: [
-              GameScreen(
-                  state: state, onJoin: () => setState(() => _section = 2)),
-              PlaylistScreen(
-                  state: state, onJoin: () => setState(() => _section = 2)),
-              details,
-            ])),
-            if (!state.companionFullscreen)
-              Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 0, label: Text('Game')),
-                      ButtonSegment(value: 1, label: Text('Playlist')),
-                      ButtonSegment(value: 2, label: Text('Room')),
-                    ],
-                    selected: {_section},
-                    onSelectionChanged: (value) =>
-                        setState(() => _section = value.first),
-                  )),
+                child: GameScreen(
+                    state: state,
+                    onJoin: () {},
+                    playlist: PlaylistPeek(state: state),
+                    below: cards)),
           ]);
         });
   }
@@ -233,7 +230,6 @@ class RoomScreenState extends State<RoomScreen> {
               ],
             ));
     if (sure != true) return;
-    setState(() => _section = 0);
     await _run(() async {
       if (state.inHostedRoom) {
         await state.leaveHostedRoom();

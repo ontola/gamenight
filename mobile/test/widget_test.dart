@@ -143,8 +143,8 @@ void main() {
     await tester.pumpWidget(GameNightApp(state: state));
     await tester.tap(find.widgetWithText(NavigationDestination, 'Room'));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(find.textContaining('unreachable'), findsOneWidget);
-    expect(find.byIcon(Icons.wifi_off), findsOneWidget);
+    expect(find.textContaining('unreachable'), findsWidgets);
+    expect(find.byIcon(Icons.wifi_off), findsWidgets);
     expect(find.byIcon(Icons.check_circle), findsNothing);
     state.dispose();
   });

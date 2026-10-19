@@ -138,16 +138,21 @@ void main() {
     await tester.pumpWidget(RepaintBoundary(
         key: preview, child: GameNightApp(state: state, reports: reports)));
     await tester.pump();
-    await tester.tap(find.text('Playlist').first);
-    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    // Game, playlist and room share one screen; no tabs inside the room.
+    expect(find.byType(SegmentedButton<int>), findsNothing);
+    await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('playlist-peek')), 200,
+        scrollable: find.byType(Scrollable).first);
     expect(find.text('Tonight’s playlist'), findsOneWidget);
     expect(find.text('Neon Siege'), findsOneWidget);
     expect(find.text('Join a room'), findsNothing);
-    expect(find.text('Game'), findsOneWidget);
-    final tabY = tester.getCenter(find.text('Playlist').first).dy;
-    expect(tabY, greaterThan(650));
-    expect(tabY, lessThan(tester.getCenter(find.text('Room').last).dy));
+    await tester.tap(find.byKey(const ValueKey('playlist-peek')));
+    await tester.pumpAndSettle();
+    expect(
+        find.text('Drag to reorder. Tap a game for options.'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     final directory = Platform.environment['ROOM_PREVIEW_DIR'];
     if (directory != null) {
       await tester.pump(const Duration(seconds: 1));
@@ -157,7 +162,7 @@ void main() {
         final image = await boundary.toImage(pixelRatio: 2);
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         await Directory(directory).create(recursive: true);
-        await File('$directory/room-bottom-tabs.png')
+        await File('$directory/room-one-screen.png')
             .writeAsBytes(bytes!.buffer.asUint8List());
         image.dispose();
       });

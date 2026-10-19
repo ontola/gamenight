@@ -19,6 +19,14 @@ class PlaylistScreen extends StatefulWidget {
   final VoidCallback onJoin;
   const PlaylistScreen({super.key, required this.state, required this.onJoin});
 
+  /// The whole playlist as its own page over the room.
+  static Future<void> open(BuildContext context, AppState state) =>
+      Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (context) => Scaffold(
+              appBar: AppBar(),
+              body: PlaylistScreen(
+                  state: state, onJoin: () => Navigator.of(context).pop()))));
+
   @override
   State<PlaylistScreen> createState() => _PlaylistScreenState();
 }
@@ -456,6 +464,142 @@ class _PlaylistGameSheetState extends State<PlaylistGameSheet> {
             ]),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+/// The playlist cut short: what plays now and the next two. A tap opens the
+/// whole playlist to reorder and change it.
+class PlaylistPeek extends StatefulWidget {
+  final AppState state;
+
+  /// One line instead of a card, above a game's phone screen.
+  final bool compact;
+  const PlaylistPeek({super.key, required this.state, this.compact = false});
+
+  @override
+  State<PlaylistPeek> createState() => _PlaylistPeekState();
+}
+
+class _PlaylistPeekState extends State<PlaylistPeek> {
+  PlaylistView? _view;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _timer = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final api = roomControlsFor(widget.state);
+    if (api == null) return;
+    try {
+      final view = await api.playlist();
+      if (mounted) setState(() => _view = view);
+    } on ApiError {
+      // Keep what we showed; the next poll tries again.
+    }
+  }
+
+  Future<void> _openAll() async {
+    await PlaylistScreen.open(context, widget.state);
+    unawaited(_load());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final view = _view;
+    final start = view?.current ?? 0;
+    final shown = view == null
+        ? const <int>[]
+        : [
+            for (var i = start; i < view.entries.length && i < start + 3; i++) i
+          ];
+    final more = view == null ? 0 : view.entries.length - start - shown.length;
+    if (widget.compact) {
+      final titles = [for (final i in shown) view!.entries[i].title];
+      return InkWell(
+        key: const ValueKey('playlist-peek'),
+        onTap: _openAll,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
+          child: Row(children: [
+            const Icon(Icons.queue_music, size: 18, color: GnColors.muted),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                  titles.isEmpty ? 'Playlist' : 'Next: ${titles.join(' · ')}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: GnColors.muted, fontSize: 13)),
+            ),
+            const Icon(Icons.chevron_right, size: 18, color: GnColors.muted),
+          ]),
+        ),
+      );
+    }
+    return Card(
+      key: const ValueKey('playlist-peek'),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _openAll,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            const Row(children: [
+              Expanded(
+                child: Text('Tonight’s playlist',
+                    style:
+                        TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+              ),
+              Icon(Icons.chevron_right, color: GnColors.muted),
+            ]),
+            const SizedBox(height: 6),
+            if (view == null)
+              const Hint('Loading…')
+            else if (shown.isEmpty)
+              const Hint('No games queued yet. Tap to add one.')
+            else
+              for (final i in shown)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(children: [
+                    Icon(
+                        view.current == i
+                            ? Icons.play_circle
+                            : Icons.circle_outlined,
+                        size: 18,
+                        color:
+                            view.current == i ? GnColors.ok : GnColors.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(view.entries[i].title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontWeight: view.current == i
+                                  ? FontWeight.w700
+                                  : FontWeight.w500)),
+                    ),
+                  ]),
+                ),
+            if (more > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Hint('+ $more more'),
+              ),
+          ]),
+        ),
       ),
     );
   }

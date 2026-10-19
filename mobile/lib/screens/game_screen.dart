@@ -12,6 +12,7 @@ import '../room_controls.dart';
 import '../theme.dart';
 import '../layout.dart';
 import 'catalog_view.dart';
+import 'playlist_screen.dart';
 import 'sign_in_screen.dart';
 import 'settings_panel.dart';
 
@@ -24,10 +25,16 @@ class GameScreen extends StatelessWidget {
   final String? requestedGame;
   final VoidCallback? onRequestedGameOpened;
   final VoidCallback onJoin;
+
+  /// The playlist and the room, on the same screen as the game.
+  final Widget? playlist;
+  final List<Widget> below;
   const GameScreen(
       {super.key,
       required this.state,
       required this.onJoin,
+      this.playlist,
+      this.below = const [],
       this.catalogOnly = false,
       this.requestedGame,
       this.onRequestedGameOpened});
@@ -101,6 +108,8 @@ class GameScreen extends StatelessWidget {
                         ),
                     ]),
                   )),
+              if (companion.url != null && playlist != null && !fullscreen)
+                PlaylistPeek(state: state, compact: true),
               if (companion.app != null)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
@@ -122,7 +131,11 @@ class GameScreen extends StatelessWidget {
                 Expanded(
                   child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      children: [settings]),
+                      children: [
+                        settings,
+                        if (playlist case final playlist?) playlist,
+                        ...below,
+                      ]),
                 ),
             ]),
             if (fullscreen)
@@ -183,6 +196,8 @@ class GameScreen extends StatelessWidget {
               ]),
               if (state.companionError case final String error) Hint(error),
               settings,
+              if (playlist case final playlist?) playlist,
+              ...below,
             ]));
       },
     );
