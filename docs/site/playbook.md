@@ -17,7 +17,7 @@ You get a small, working Godot 4 couch game with:
 | Part | What it does |
 | --- | --- |
 | `main.gd` | the game: GameNight lifecycle, seats, faces, settings and a Start menu, bots, dev flags |
-| `gamenight.json` | the game's metadata: title, tagline, players, tags; the only place you edit them |
+| `gamenight.json` | the game's metadata: title, tagline, developer, players, tags; the only place you edit them |
 | `tests/lifecycle.py` | a fake GameNight host drives prepare, start, controller input, pause, resume, dispose |
 | `tools/capture_preview.sh`, `tools/encode_preview.py` | the five-second store clip, frame by frame |
 | `.github/workflows/ci.yml` | tests, Windows export, release, store page |

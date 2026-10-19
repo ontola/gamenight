@@ -14,7 +14,7 @@
 <h2 id="where-your-games-data-lives">Where your game's data lives</h2>
 <p>Keep two things in your repository and let GameNight production hold the rest:</p>
 <ul>
-<li><code>gamenight.json</code> holds the facts about the game: id, title, tagline, players, round length, tags, emoji, colour, requirements and links. Start it with <code>&quot;$schema&quot;: &quot;https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json&quot;</code> so editors check it.</li>
+<li><code>gamenight.json</code> holds the facts about the game: id, title, tagline, developer, players, round length, tags, emoji, colour, requirements and links. Start it with <code>&quot;$schema&quot;: &quot;https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json&quot;</code> so editors check it.</li>
 <li><code>assets/gamenight/</code> holds the store media sources: <code>preview.mp4</code>, <code>preview.jpg</code>, <code>cover.png</code>, <code>icon.png</code>, <code>gameplay.png</code> and an optional <code>screenshots/</code> folder.</li>
 </ul>
 <p>Builds, the store page, ownership and visibility live in production. <code>gamenight-publish.py push</code> (or the GitHub Action) sends builds and <code>gamenight-publish.py store</code> sends <code>gamenight.json</code> and the media. Do not put store text or media anywhere else. Hosts pick up a stable release from the hosted catalog; a new game needs no entry in the GameNight repository.</p>
@@ -174,7 +174,7 @@ releases):</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">GAMENIGHT_API_TOKEN=gn_pub_... python3 gamenight-publish.py store
 </code></pre></div>
 <p>Run it in your game's folder. It reads <code>gamenight.json</code> (title, tagline,
-players, tags, round length, links) and uploads what it finds in
+developer, players, tags, round length, links) and uploads what it finds in
 <code>assets/gamenight/</code>:</p>
 <table>
 <thead>
@@ -248,7 +248,7 @@ another game cannot satisfy this game's requirement.</p>
 <p>Run the <a href="/docs/testing">integration checks</a> against the package players will download. Evidence from a different operating system or build does not count for this release. Missing checks remain untested.</p>
 <p>The integration rating separates smooth play, player personalisation and optional extras. Faces are checked separately from colours and names. Staff review the build and distribution permission before publication; sending a message or submitting a build does not publish it automatically.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="02b50ec88748df7a94ad47629ea31a582e8c37747538ed61f9841026cc8b531c">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/publishing.md">Edit this page</a><span data-source-fingerprint="cabe20ed2b60a474eb9f998448fad321324754ee4e2886a7dd0c657d9633a94b">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/testing"><small>Previous</small>Test your integration</a><a href="/docs/store-clip"><small>Next</small>Store clip</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#where-your-games-data-lives">Where your game&#x27;s data lives</a><a href="#prepare-a-release">Prepare a release</a><a href="#playtests">Playtests</a><a href="#connect-github-actions">Connect GitHub Actions</a><a href="#other-ci-systems-and-local-previews">Other CI systems and local previews</a><a href="#publishing-api">Publishing API</a><a href="#catalog-updates">Catalog updates</a><a href="#required-gameplay-video">Required gameplay video</a><a href="#optional-artwork">Optional artwork</a><a href="#review-the-exact-build">Review the exact build</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -33,7 +33,7 @@ cd my-game &amp;&amp; git init &amp;&amp; git add -A &amp;&amp; git commit -m &q
 </tr>
 <tr>
 <td><code>gamenight.json</code></td>
-<td>the game's metadata: title, tagline, players, tags; the only place you edit them</td>
+<td>the game's metadata: title, tagline, developer, players, tags; the only place you edit them</td>
 </tr>
 <tr>
 <td><code>tests/lifecycle.py</code></td>
@@ -94,6 +94,25 @@ metres along a path), what to spawn round the players, a closer camera.</li>
 </ul>
 <p>Look at the screenshots yourself after visual changes. Text over characters
 and HUD clutter read badly on a TV; let shapes and colour carry the state.</p>
+<h2 id="make-3d-models">Make 3D models</h2>
+<p>Image-to-3D tools (Tripo, Meshy, Hunyuan3D, Hyper3D) give a quick first shape
+but rarely exactly what you want, and an agent driving Blender tends to lose
+detail. What works better for hard-surface models (props, vehicles, buildings):</p>
+<ol>
+<li>Generate a rough model from a concept image with one of those tools.</li>
+<li>Import it into the Godot project as a reference only.</li>
+<li>Have the agent build a new model next to it in Godot itself, from CSG
+shapes or a <code>SurfaceTool</code>/<code>ArrayMesh</code> in code, adding the details and
+proportions you need. No Blender, no plugin or MCP is required.</li>
+<li>Render it with <code>--shot</code> from a few angles, compare it with the reference
+and iterate. A second agent that only reviews the screenshots catches more
+than the builder checking its own work.</li>
+</ol>
+<p>Bake CSG into a plain mesh (<code>CSGShape3D.bake_static_mesh()</code>) before it ships:
+CSG is slow at runtime. Code-built meshes need no baking and stay easy to
+change; most of our games already build their models this way. Rigged
+characters (bones, weight painting) still need a real modelling tool.</p>
+<p>From an <a href="https://www.reddit.com/r/aigamedev/comments/1xa3gju/new_crazy_workflow_for_making_3d_assets/">r/aigamedev workflow post</a>, October 2026.</p>
 <h2 id="design-for-the-couch">Design for the couch</h2>
 <p>Players sit on a sofa, a few metres from the TV, holding controllers, and
 switch games often. The template does all of this; keep it as you build.</p>
@@ -206,7 +225,7 @@ such as one with the CI run id.</li>
 first seconds of play don't stutter.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="92a3aacadae0b8cada31f72432a644623bbb102c7ad2f7114443fa36fb06c7b3">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="c2792781517c7f3d60485a0339b585814995fa4077a3f93e9c41699a6c483be6">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#make-3d-models">Make 3D models</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

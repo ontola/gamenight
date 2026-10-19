@@ -190,7 +190,7 @@ def store(client, args):
     game = args.game or manifest.get('id')
     if not game:
         raise ValueError('Pass --game or run next to a gamenight.json with an "id"')
-    body = {k: manifest[k] for k in ('title', 'tagline', 'tags', 'match_minutes') if k in manifest}
+    body = {k: manifest[k] for k in ('title', 'tagline', 'developer', 'tags', 'match_minutes') if k in manifest}
     players = manifest.get('players', {})
     body.update({f'players_{k}': players[k] for k in ('min', 'max') if k in players})
     body.update({k: v for k, v in manifest.get('links', {}).items() if k in ('homepage', 'source')})
