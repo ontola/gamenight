@@ -16,7 +16,8 @@ python scripts/run-local.py --lobby godot --godot /path/to/godot --shelf /path/t
 
 On Windows, pass the Godot executable path. With no shelf, the script supplies
 the terminal SDK demo. `--skip-build` reuses existing Rust binaries. The default
-lobby remains the bundled platformer; this option selects `godot-lobby`.
+lobby is the bundled Game Room (`--lobby game-room`); this option selects
+`godot-lobby`.
 
 Open `sdk/godot/project.godot` in the editor to change the example. Start it
 through the runtime to get an authenticated connection. Opening the project
@@ -241,8 +242,7 @@ and players remain registered. Recovery offers Retry lobby, Resume game and
 End game night. Retry resets the restart budget; it does not erase the party.
 The installed launcher keeps browser requests available throughout the session.
 Development hosts need `GAMENIGHT_WEB=1` to serve the recovery page. `quit_party`
-is the deliberate exit path. The legacy platformer retains its old input and
-disconnect behaviour until it adopts this role.
+is the deliberate exit path.
 
 ## Faces and names
 
@@ -333,9 +333,9 @@ path and an absolute existing `cwd` when supplied:
 ```
 
 In the installed app, `party_state.lobbies` lists the lobbies the host can run
-(bundled, the Clubhouse platformer, then registered ones), the running one
-marked `current`. Game Room has **Switch lobby** in its Start menu, a page that
-lists them; the Clubhouse lists **Switch to …** for each other lobby. Picking
+(bundled, then registered ones), the running one marked `current`; with only
+one lobby the list is empty. Game Room has **Switch lobby** in its Start menu,
+a page that lists them. Picking
 one sends `switch_lobby`: between games the host saves the choice, covers the
 screen and restarts into that lobby with the same players, seats, controllers,
 phone links and queue. During a game it is refused. A host that cannot
@@ -356,9 +356,10 @@ Resume keeps the current session and queue intact;
 
 Launch `gamenight-launcher --choose-lobby`, or open
 `http://127.0.0.1:7913/host/lobby` on the host while the installed app runs.
-Choose the bundled platformer or a registered replacement. The choice is saved
-in `selected-lobby.json` and applies on the next launch. Missing executables
-fall back to the bundled lobby. Registration does not download or install a
+Choose the bundled Game Room or a registered replacement. The choice is saved
+in `selected-lobby.json` and applies on the next launch. Missing executables,
+and a saved choice of the retired Clubhouse (`lobby`), fall back to the bundled
+Game Room. Registration does not download or install a
 third-party lobby. Only install code you trust.
 
 The preference and recovery controls are host-only. They reject LAN requests;

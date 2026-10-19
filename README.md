@@ -84,8 +84,9 @@ python scripts/run-local.py --studio --shelf /path/to/games.json
 The shelf lists your games and their launch commands. GameNight adds the lobby.
 Without a shelf, the script uses a terminal SDK demo for testing the protocol.
 
-Game sources live outside this repository. Both GameNight lobbies stay here:
-[the Godot lobby](sdk/godot/lobby) and [the Rust lobby](crates/lobby).
+Game sources live outside this repository. The GameNight lobbies stay here:
+[the Game Room](lobbies/game-room), which every desktop package ships, and
+[the Godot SDK's sample lobby](sdk/godot/lobby).
 The SDKs, catalog and integration checks also belong here.
 
 The [shared LÖVE package](https://github.com/ontola/gamenight-games/tree/main/love-party) contains seven games:
@@ -114,9 +115,9 @@ and score screen. Use Back/Select to return to the lobby when you want to switch
 On Windows, the current controller backend supports up to four Xbox/XInput
 controllers. Other controllers need an XInput-compatible mode or adapter.
 
-For quick changes to the lobby, use the [development loop](docs/development-loop.md).
-It separates restarting, building and packaging, and serves web files directly
-while you work.
+For quick changes to the lobby, run `python scripts/run-local.py --godot /path/to/godot`:
+it starts the Game Room from source. Set `GAMENIGHT_DEV_WEB_DIR` to the `web`
+directory to serve web files directly while you work.
 
 ## Contribute
 

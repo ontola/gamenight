@@ -77,7 +77,7 @@ player's own colour where you can and only shift the later duplicate.</li>
 <li><strong>Read the seat count from Prepare.</strong> Don't assume a maximum. Declare
 <code>players_min</code> and <code>players_max</code> honestly in your catalog entry.</li>
 </ul>
-<p><code>controller_input</code> reports activity for presence and joining. It does not send movement to the game. Replacement lobbies use runtime-owned sampling; the legacy platformer publishes its own authenticated frames. Games consume the same frame format in both modes. See <a href="/docs/lobbies#input-and-screen-ownership">Build a lobby</a>.</p>
+<p><code>controller_input</code> reports activity for presence and joining. It does not send movement to the game. The runtime samples physical controllers and publishes the frames; no lobby or game injects its own. See <a href="/docs/lobbies#input-and-screen-ownership">Build a lobby</a>.</p>
 <h2 id="start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</h2>
 <p>Back/Select belongs to GameNight and always returns to the party, even from
 inside your pause menu. Start opens and closes your game's own menu with its
@@ -92,7 +92,7 @@ progress.</p>
 <h2 id="check-real-devices">Check real devices</h2>
 <p>Test two different profiles, reversed connection order, unplugging one pad and reconnecting it. Then switch between games. Synthetic frames can check token matching, but they do not prove that a physical controller belongs to the right player on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="84c0280057527fd4c996eeae43517a14221c9b1e09ab499fb844f5474d0024f7">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="5b483fe0a7db815685d261902f27ef452dda80312e52ba67b5920a140adacf76">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/other-engines"><small>Previous</small>Unity, Unreal &amp; others</a><a href="/docs/faces"><small>Next</small>Faces &amp; colours</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

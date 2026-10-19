@@ -4,7 +4,8 @@
 installer workflow, run 35768101137 (22 September 2026), artifact
 `gamenight-macos-smoke` (10712409675). The base image is an unmodified capture; the guide layers illustrated example
 players over it, clearly captioned as an illustration.
-Lobby artwork retains its existing licenses in `crates/lobby`.
+It shows the retired Clubhouse lobby, whose artwork remains under its licenses
+in the repository history (`crates/lobby`).
 
 Other gameplay stills use the catalog's existing versioned preview URLs.
 The controller and phone UI are inline SVG/CSS in `host.html`. Character bodies

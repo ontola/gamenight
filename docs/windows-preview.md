@@ -21,9 +21,8 @@ resume the paused game after the transition guard. The TV also offers Resume.
 Games remain hidden and silent while preparing. Older downloaded previews may
 have different controls; these instructions describe the current source.
 
-The default lobby is the Game Room. To use the Clubhouse platformer instead, press
-Start in the lobby, choose **Select other lobby** and save; it applies the next
-time GameNight opens.
+The lobby is the Game Room. A replacement lobby you registered yourself can be
+chosen from **Switch lobby** in its Start menu.
 
 Installed builds check the public GitHub releases for updates in the background.
 A downloaded update is applied only after the lobby and all game processes have
@@ -42,7 +41,7 @@ does not intentionally delete its external user data or the game's saves.
 
 - GameNight: native Windows developer build (unsigned).
 - LÖVE 11.5 (downloaded once and shared by compatible games): official Windows x64 runtime, including its license notices.
-- Lobby/Bones: see the included notices and media credits.
+- Game Room lobby: Godot 4.5.2 runs the exported Game Room; Godot's and the fonts' notices are in `notices/game-room`.
 
 This preview is intended for feedback. Controller mappings and focus should
 be checked on your hardware. Use Windows native, rather than Linux binaries

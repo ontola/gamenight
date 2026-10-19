@@ -42,7 +42,7 @@ What our games do with a changing roster:
 - **Read the seat count from Prepare.** Don't assume a maximum. Declare
   `players_min` and `players_max` honestly in your catalog entry.
 
-`controller_input` reports activity for presence and joining. It does not send movement to the game. Replacement lobbies use runtime-owned sampling; the legacy platformer publishes its own authenticated frames. Games consume the same frame format in both modes. See [Build a lobby](/docs/lobbies#input-and-screen-ownership).
+`controller_input` reports activity for presence and joining. It does not send movement to the game. The runtime samples physical controllers and publishes the frames; no lobby or game injects its own. See [Build a lobby](/docs/lobbies#input-and-screen-ownership).
 
 ## Start opens your menu, Back leaves
 

@@ -5,12 +5,12 @@ Use stable Rust, Python 3, and a native toolchain for the OS on which you play.
 ## Ubuntu / Debian
 
 ```sh
-sudo apt-get install build-essential pkg-config libudev-dev libasound2-dev \
-  libx11-dev libxkbcommon-dev libwayland-dev libxcursor-dev libxi-dev libxrandr-dev
-python3 scripts/run-local.py
+sudo apt-get install build-essential pkg-config libudev-dev
+python3 scripts/run-local.py --godot /path/to/godot
 ```
 
-Use a desktop session and graphics drivers for the lobby. WSL can build and
+The default lobby is the Game Room (`lobbies/game-room`), which needs Godot 4.5
+(`--godot`, or `godot` on `PATH`). Use a desktop session and graphics drivers for the lobby. WSL can build and
 run protocol tests, but use the Windows build for Windows controllers.
 
 ## Windows

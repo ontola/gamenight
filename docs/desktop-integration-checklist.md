@@ -62,12 +62,6 @@ checks a fresh host snapshot immediately after HTTP success and a repeated save.
 The lobby follows the same focus rule as games: focus alone must not request a
 pause. Windows can transiently reactivate the lobby during a launch.
 
-Apply skin, artwork and names after the final pose, before transform propagation.
-Center names with a Text2d anchor, not half an arbitrary UI container width.
-Animate text using transform scale, not continuously changing font_size. Bevy
-caches an atlas per size; the sleeping Z animation exhausted graphics memory by
-rasterizing a new size every frame. Test idle sleeping players for several minutes.
-
 ## Executable status and release gates
 
 See [Game contract verification](game-contract-verification.md) for the per-game, per-platform evidence matrix. This checklist is guidance; it is not a passing certificate. Missing evidence blocks publication.
@@ -75,7 +69,7 @@ See [Game contract verification](game-contract-verification.md) for the per-game
 ## Controller relay across window focus
 
 Managed LÖVE games consume host-tagged controller frames. They must not bind
-players by SDL enumeration order. Both lobby readers (Bevy and Bones) use
+players by SDL enumeration order. The runtime's controller sampler uses
 XInput on Windows so sampling continues while the game window owns focus.
 Do not substitute WGI based only on foreground tests.
 

@@ -384,10 +384,9 @@ send `media_control` to pause or skip it.
 `now_playing` is **absent whenever nothing is on**, which is most nights.
 That's the whole rendering rule: a screen draws its music controls only when
 the field is there, because controls for a stereo that isn't playing are
-worse than none. The [lobby](../crates/lobby) draws a card with the track and
-two buttons on the floor under it — jump on one to pause, the other to skip,
-and they visibly sink when you land — and neither the card nor the buttons
-exist while the field is absent.
+worse than none. The [Game Room lobby](../lobbies/game-room) shows the track on
+its jukebox, where players pause or skip it, and has no music controls while the
+field is absent.
 
 A `play_pause` flips `playing` in the very next snapshot rather than waiting
 for the poll to confirm: a pad that appears to do nothing for a second is a
@@ -798,11 +797,10 @@ the skin preference. Avatar paint is composited above skin and is not recoloured
 
 ### Bundled games: authoritative controller input
 
-With a replacement `lobby` role, the runtime samples physical controllers and
-publishes `controller_frame` to the lobby and games. It consumes Back/Select
-and the A press used to claim a seat. No client may inject physical frames in
-this mode. The legacy platformer still samples input on its authenticated game
-connection; the daemon forwards those frames to connected games.
+The runtime samples physical controllers for a lobby that uses the `lobby`
+role and publishes `controller_frame` to the lobby and games. It consumes
+Back/Select and the A press used to claim a seat. No client may inject
+physical frames.
 Each frame contains the full connected-device list, including released buttons.
 
 ```json
@@ -818,9 +816,8 @@ left stick, right stick, D-pad up, down, left, right.
 
 The shared LÖVE adapter uses these frames in managed sessions and never matches
 local SDL enumeration against lobby ordinals. Standalone games still read local
-controllers. Legacy frames are sent on change, with a 50 ms heartbeat; the
-runtime-owned stream samples approximately every 16 ms. After 250 ms
-without input, controls become neutral. TCP_NODELAY is enabled on both hops.
+controllers. The runtime-owned stream samples approximately every 16 ms. After 250 ms
+without input, controls become neutral. TCP_NODELAY is enabled.
 The Rust SDK exposes each frame as `GameEvent::ControllerFrame`. Use the seat's
 opaque controller token to find its input record; an empty frame or missing
 record means neutral input. `controller_input` reports actual human activity
@@ -828,7 +825,7 @@ for presence and joining. It does not move a game character by itself.
 
 Regression checks: `host_controller_identity_survives_reordering_and_disconnects`
 in the shared Lua suite, the daemon socket test
-`lobby_controller_frames_keep_device_ids_across_the_real_socket`, and
+`games_cannot_inject_controller_frames`, and
 `scripts/test-love-integration.py` with sparse, reversed host device IDs.
 
 ## Circular player faces

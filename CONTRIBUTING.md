@@ -10,11 +10,11 @@ preserve standalone game behavior.
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo build --manifest-path crates/lobby/Cargo.toml --locked
+python sdk/godot/sync.py --check lobbies/game-room
 ```
 
-The lobby is a separate workspace; building only the root does not validate it.
-The vendored engine is included so no private checkout is needed.
+The Game Room lobby is a Godot 4.5 project; CI runs its tests in
+`lobbies/game-room/tests` with a pinned Godot (see `.github/workflows/ci.yml`).
 
 For a game integration, run `gamenight-certify` and report any skipped checks.
 Verify hidden/silent preparation, start focus, real controller input, pause,
