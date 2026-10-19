@@ -97,7 +97,7 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
     await page.waitForURL(gamesURL);
    }
   }
-  await page.getByRole('button',{name:'Menu',exact:true}).click();
+  await tab('More').click();
   await page.getByText('Developer portal',{exact:true}).waitFor();
   await page.getByText('Assistant',{exact:true}).click();
   await page.waitForURL(/#\/assistant/);

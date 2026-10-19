@@ -133,6 +133,7 @@ class _GameNightAppState extends State<GameNightApp> {
 
   Widget _home() => HomeScreen(
       key: _homeKey,
+      onMore: _menu,
       onTabChanged: (tab) {
         if (mounted && _selectedTab != tab) setState(() => _selectedTab = tab);
       },
@@ -176,11 +177,12 @@ class _GameNightAppState extends State<GameNightApp> {
                       _assistant();
                     }),
                 for (final entry in const [
-                  ('/developers', 'Developer portal'),
-                  ('/docs', 'Documentation'),
-                  ('/host', 'Host a room')
+                  ('/developers', 'Developer portal', Icons.code),
+                  ('/docs', 'Documentation', Icons.menu_book_outlined),
+                  ('/host', 'Host a room', Icons.tv),
                 ])
                   ListTile(
+                      leading: Icon(entry.$3),
                       title: Text(entry.$2),
                       trailing: const Icon(Icons.open_in_new),
                       onTap: () {
@@ -327,15 +329,6 @@ class _GameNightAppState extends State<GameNightApp> {
                                             child: GameNightWordmark(
                                                 key: ValueKey('app-brand'),
                                                 size: 21))),
-                                    Semantics(
-                                        container: true,
-                                        excludeSemantics: true,
-                                        onTap: _menu,
-                                        label: 'Menu',
-                                        button: true,
-                                        child: IconButton(
-                                            onPressed: _menu,
-                                            icon: const Icon(Icons.menu))),
                                     if (widget.reports != null &&
                                         MediaQuery.sizeOf(context).width < 440)
                                       Semantics(
@@ -376,6 +369,9 @@ class _GameNightAppState extends State<GameNightApp> {
 
 class HomeScreen extends StatefulWidget {
   final ValueChanged<int>? onTabChanged;
+
+  /// The phone's More tab: assistant and website links, in a sheet.
+  final VoidCallback? onMore;
   final AppState state;
   final BrowserNavigation? history;
   final ReportService? reports;
@@ -386,6 +382,7 @@ class HomeScreen extends StatefulWidget {
       {super.key,
       required this.state,
       this.onTabChanged,
+      this.onMore,
       this.history,
       this.links,
       this.initialLink,
@@ -563,7 +560,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       padding: const EdgeInsets.only(top: 1),
                       child: NavigationBar(
                         selectedIndex: _tab,
-                        onDestinationSelected: _selectTab,
+                        onDestinationSelected: (tab) =>
+                            tab == 3 ? widget.onMore?.call() : _selectTab(tab),
                         destinations: [
                           NavigationDestination(
                             icon: Badge(
@@ -588,6 +586,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   face: widget.state.face,
                                   skin: widget.state.skinColor),
                               label: 'You'),
+                          if (widget.onMore != null)
+                            const NavigationDestination(
+                                icon: Icon(Icons.more_horiz), label: 'More'),
                         ],
                       ),
                     ),

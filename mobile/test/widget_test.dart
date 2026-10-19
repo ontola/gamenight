@@ -18,7 +18,7 @@ void main() {
     final state = AppState(prefs);
     await tester
         .pumpWidget(GameNightApp(state: state, reports: ReportService(prefs)));
-    expect(find.byType(NavigationDestination), findsNWidgets(3));
+    expect(find.byType(NavigationDestination), findsNWidgets(4));
     final nav = tester.state<NavigatorState>(find.byType(Navigator).first);
     unawaited(nav.push(MaterialPageRoute<void>(
         builder: (_) =>
