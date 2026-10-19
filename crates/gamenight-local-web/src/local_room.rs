@@ -4,7 +4,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use gamenight_protocol::{PartySnapshot, PlayerId, SeatOccupant};
+use gamenight_protocol::PlayerId;
 use serde::Deserialize;
 use std::{
     collections::HashMap,
@@ -21,11 +21,6 @@ pub struct Room {
     pending: HashMap<String, (String, u64)>,
     attempts: (Instant, u32),
     pub main_profile: Option<String>,
-    /// Pending ids already handed to the first seat automatically. Each is
-    /// tried once, so unlinking the main player does not pull them back in.
-    auto_claimed: std::collections::HashSet<String>,
-    /// Profiles waiting since the host started, rather than joined this run.
-    restored: std::collections::HashSet<String>,
 }
 impl Room {
     pub fn new() -> Self {
@@ -39,8 +34,6 @@ impl Room {
             pending: HashMap::new(),
             attempts: (Instant::now(), 0),
             main_profile: None,
-            auto_claimed: Default::default(),
-            restored: Default::default(),
         }
     }
     pub fn code(&self) -> &str {
@@ -50,7 +43,6 @@ impl Room {
         self.code = code;
     }
     pub fn restore(&mut self, profile: &str) {
-        self.restored.insert(profile.into());
         self.pending.insert(
             profile.into(),
             (uuid::Uuid::new_v4().to_string(), now() + 86400),
@@ -67,7 +59,7 @@ impl Room {
             .sort_by_key(|(profile, _)| (self.main_profile.as_ref() != Some(*profile), *profile));
         let pending:Vec<_>=entries.into_iter().filter_map(|(profile,(id,expires))| {
             let p=profiles.get(profile)?;
-            (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"main":self.main_profile.as_deref()==Some(profile.as_str())&&self.restored.contains(profile.as_str()),"profile":{"display_name":p.username,"skin_color":p.skin_color,"preferred_color":p.preferred_color,"avatar":p.avatar}}))
+            (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"profile":{"display_name":p.username,"skin_color":p.skin_color,"preferred_color":p.preferred_color,"avatar":p.avatar}}))
         }).collect();
         serde_json::json!({"room_code":self.code,"pending":pending})
     }
@@ -199,127 +191,9 @@ pub async fn pickup(state: &SharedState, pending: &str, player: PlayerId) -> Sta
     }
 }
 
-/// A returning main player is collected by the first seated controller
-/// without walking to the door. Guests still wait to be picked up.
-pub async fn claim_main_for_first_seat(state: &SharedState, party: &PartySnapshot) {
-    let first = party
-        .seats
-        .iter()
-        .filter_map(|seat| match seat.occupant {
-            SeatOccupant::Local { player_id } => Some((seat.index, player_id)),
-            _ => None,
-        })
-        .min_by_key(|(index, _)| *index);
-    if let Some((_, player)) = first {
-        claim_main(state, player).await;
-    }
-}
-
-async fn claim_main(state: &SharedState, player: PlayerId) -> Option<StatusCode> {
-    let (pending, bridge) = {
-        let mut s = state.lock().unwrap();
-        if s.bindings.values().any(|p| *p == player) {
-            return None;
-        }
-        let room = match &s.cloud {
-            Some(bridge) => bridge.waiting(),
-            None => s.local_room.snapshot(&s.profiles),
-        };
-        let pending = room["pending"]
-            .as_array()?
-            .iter()
-            .find(|p| p["main"] == true)?["id"]
-            .as_str()?
-            .to_string();
-        if !s.local_room.auto_claimed.insert(pending.clone()) {
-            return None;
-        }
-        (pending, s.cloud.clone())
-    };
-    let cloud = bridge.is_some();
-    let status = match bridge {
-        Some(b) => b.pickup(state, &pending, player).await,
-        None => pickup(state, &pending, player).await,
-    };
-    tracing::info!(%status, "main player collected by the first seat");
-    // A controller that just sat down is unknown to the cloud until its next
-    // poll, which answers Gone. Try again then instead of giving up for good.
-    if cloud
-        && matches!(
-            status,
-            StatusCode::GONE | StatusCode::SERVICE_UNAVAILABLE | StatusCode::BAD_GATEWAY
-        )
-    {
-        state
-            .lock()
-            .unwrap()
-            .local_room
-            .auto_claimed
-            .remove(&pending);
-    }
-    Some(status)
-}
-
-/// Hand the main profile to the first seat whenever the party changes.
-pub async fn watch_first_seat(state: SharedState) {
-    let hub = state.lock().unwrap().companions.clone();
-    loop {
-        hub.changed().await;
-        if let Some(party) = hub.party() {
-            claim_main_for_first_seat(&state, &party).await;
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[tokio::test]
-    async fn main_profile_is_offered_to_the_first_seat_once() {
-        let state = std::sync::Arc::new(std::sync::Mutex::new(crate::ServerState::new(
-            "127.0.0.1:1".into(),
-        )));
-        for id in ["guest", "main"] {
-            let mut s = state.lock().unwrap();
-            s.profiles.insert(
-                id.into(),
-                Profile {
-                    id: id.into(),
-                    username: id.into(),
-                    skin_color: "#abcdef".into(),
-                    preferred_color: None,
-                    avatar: String::new(),
-                },
-            );
-            s.local_room.restore(id);
-        }
-        let player = PlayerId(uuid::Uuid::new_v4());
-        assert_eq!(claim_main(&state, player).await, None, "no main player yet");
-        {
-            let mut s = state.lock().unwrap();
-            s.local_room.restored.remove("guest");
-            s.local_room.main_profile = Some("guest".into());
-        }
-        assert_eq!(
-            claim_main(&state, player).await,
-            None,
-            "a main player who joined this run waits at the door"
-        );
-        state.lock().unwrap().local_room.main_profile = Some("main".into());
-        let pending = state.lock().unwrap().local_room.pending["main"].0.clone();
-        let snapshot = {
-            let s = state.lock().unwrap();
-            s.local_room.snapshot(&s.profiles)
-        };
-        assert_eq!(snapshot["pending"][0]["id"], pending);
-        assert_eq!(snapshot["pending"][0]["main"], true);
-        assert_eq!(snapshot["pending"][1]["main"], false);
-        // No daemon in this test, so the claim fails and the profile goes back
-        // to the door, where it stays: it is not retried on every update.
-        assert!(claim_main(&state, player).await.is_some());
-        assert!(state.lock().unwrap().local_room.waiting("main"));
-        assert_eq!(claim_main(&state, player).await, None);
-    }
     #[tokio::test]
     async fn code_join_waits_for_native_pickup_and_can_be_cancelled() {
         let state = std::sync::Arc::new(std::sync::Mutex::new(crate::ServerState::new(

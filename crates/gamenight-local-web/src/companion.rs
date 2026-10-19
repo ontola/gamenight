@@ -36,7 +36,7 @@ use tokio_tungstenite::tungstenite::Message;
 const MAX_PHONE_MESSAGE: usize = 16 * 1024;
 
 #[derive(Clone, Default)]
-pub struct Hub(Arc<Mutex<Inner>>, Arc<tokio::sync::Notify>);
+pub struct Hub(Arc<Mutex<Inner>>);
 
 #[derive(Default)]
 struct Inner {
@@ -56,11 +56,6 @@ impl Hub {
     /// The latest party snapshot from the daemon.
     pub(crate) fn party(&self) -> Option<PartySnapshot> {
         self.0.lock().unwrap().party.clone()
-    }
-
-    /// Resolves after the next party update.
-    pub(crate) async fn changed(&self) {
-        self.1.notified().await
     }
 
     /// The screen of the game the party is playing right now, if it has one.
@@ -179,7 +174,6 @@ impl Hub {
             }
         }
         inner.party = Some(party);
-        self.1.notify_one();
     }
 
     fn deliver(&self, game: &GameId, player: Option<PlayerId>, data: &serde_json::Value) {

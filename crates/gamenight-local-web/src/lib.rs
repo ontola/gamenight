@@ -279,7 +279,6 @@ pub async fn run_server(
         let local = state.lock().unwrap();
         tokio::spawn(local.companions.clone().run(local.daemon_addr.clone()));
     }
-    tokio::spawn(local_room::watch_first_seat(state.clone()));
     tokio::spawn(phones::watch(state.clone()));
     let cloud_session = state
         .lock()

@@ -546,9 +546,6 @@ impl Bridge {
                     _ => {}
                 }
             }
-            // The cloud knows every seat now, so a main player whose pickup
-            // came too early for a new controller is collected after all.
-            crate::local_room::claim_main_for_first_seat(&state, &party).await;
             // Before applying a selection, so a newly granted game is already
             // eligible when the party picks it.
             if delivered_grants.as_ref() != Some(&updates.grants)
