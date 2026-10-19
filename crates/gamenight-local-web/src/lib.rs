@@ -438,6 +438,16 @@ async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState
         *local.link_revisions.entry(id).or_default() += 1;
         local.daemon_addr.clone()
     };
+    if anonymize_player(&addr, id).await {
+        StatusCode::NO_CONTENT
+    } else {
+        StatusCode::BAD_GATEWAY
+    }
+}
+
+/// Give a player whose profile left it a fun name and a blank face again, so
+/// the profile never shows on two characters at once.
+pub(crate) async fn anonymize_player(addr: &str, id: PlayerId) -> bool {
     use futures_util::{SinkExt, StreamExt};
     let result = tokio::time::timeout(daemon::REPLY_TIMEOUT * 2, async {
         let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
@@ -502,11 +512,7 @@ async fn unlink_player(Path(id): Path<PlayerId>, State(state): State<SharedState
         None
     })
     .await;
-    if matches!(result, Ok(Some(()))) {
-        StatusCode::NO_CONTENT
-    } else {
-        StatusCode::BAD_GATEWAY
-    }
+    matches!(result, Ok(Some(())))
 }
 
 async fn get_profile(

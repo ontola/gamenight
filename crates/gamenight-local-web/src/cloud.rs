@@ -434,7 +434,8 @@ impl Bridge {
             *self.waiting.lock().unwrap() =
                 serde_json::json!({"room_code":updates.room_code,"pending":updates.pending});
             // Apply confirmed profiles before lower-priority ticket requests.
-            retire_unreported(&mut state.lock().unwrap(), &updates.updates);
+            // Players a profile left this poll; they must not keep its name.
+            let mut vacated = retire_unreported(&mut state.lock().unwrap(), &updates.updates);
             applied.retain(|account, _| updates.updates.iter().any(|u| &u.account == account));
             for u in &updates.updates {
                 if !seats.contains(&u.seat)
@@ -474,8 +475,14 @@ impl Bridge {
                         *local.link_revisions.entry(player).or_default() += 1;
                         continue;
                     }
-                    if local.bindings.get(&id).is_some_and(|old| *old != player) {
+                    if let Some(old) = local
+                        .bindings
+                        .get(&id)
+                        .copied()
+                        .filter(|old| *old != player)
+                    {
                         local.bindings.remove(&id);
+                        vacated.push(old);
                     }
                     local.profiles.insert(
                         id.clone(),
@@ -503,6 +510,17 @@ impl Bridge {
                 }) {
                     applied.insert(u.account.clone(), (u.seat.clone(), u.profile_revision));
                 }
+            }
+            let present: Vec<_> = party.players.iter().map(|p| p.id).collect();
+            let (vacant, addr) = {
+                let local = state.lock().unwrap();
+                (
+                    still_vacant(&local, vacated, &present),
+                    local.daemon_addr.clone(),
+                )
+            };
+            for player in vacant {
+                crate::anonymize_player(&addr, player).await;
             }
             // A phone that asked to play on its own gets a player first; the
             // cloud links it once a poll has reported that player's seat.
@@ -615,7 +633,7 @@ impl Bridge {
 /// Such a stale link held its seat, so each phone that chose that seat was
 /// unlinked again a few seconds later. A seat another account takes over in
 /// the same poll keeps its revision, so that account's link still applies.
-fn retire_unreported(local: &mut crate::ServerState, updates: &[Update]) {
+fn retire_unreported(local: &mut crate::ServerState, updates: &[Update]) -> Vec<PlayerId> {
     let retired: Vec<_> = local
         .bindings
         .iter()
@@ -625,6 +643,7 @@ fn retire_unreported(local: &mut crate::ServerState, updates: &[Update]) {
         })
         .map(|(id, player)| (id.clone(), *player))
         .collect();
+    let mut vacated = Vec::new();
     for (id, player) in retired {
         local.bindings.remove(&id);
         let revision = *local.link_revisions.get(&player).unwrap_or(&0);
@@ -634,7 +653,26 @@ fn retire_unreported(local: &mut crate::ServerState, updates: &[Update]) {
         if !taken_over {
             *local.link_revisions.entry(player).or_default() += 1;
         }
+        vacated.push(player);
     }
+    vacated
+}
+
+/// Controller players a profile left that nobody claimed since. Phone players
+/// leave by themselves once their phone is gone.
+fn still_vacant(
+    local: &crate::ServerState,
+    mut vacated: Vec<PlayerId>,
+    present: &[PlayerId],
+) -> Vec<PlayerId> {
+    vacated.sort_by_key(|p| p.0);
+    vacated.dedup();
+    vacated.retain(|player| {
+        !local.bindings.values().any(|p| p == player)
+            && !local.phone_players.contains_key(player)
+            && present.contains(player)
+    });
+    vacated
 }
 
 /// Hand the daemon the current download grants. False when it could not be
@@ -872,5 +910,25 @@ mod retire_tests {
         assert_eq!(local.link_revisions[&seat], 3);
         // A seat nobody takes over is revoked like before.
         assert_eq!(local.link_revisions[&other], 1);
+    }
+
+    #[test]
+    fn a_profile_that_left_a_controller_player_leaves_its_name_behind_too() {
+        let mut local = crate::ServerState::new("127.0.0.1:1".into());
+        let seat = PlayerId(uuid::Uuid::new_v4());
+        let other = PlayerId(uuid::Uuid::new_v4());
+        let phone = PlayerId(uuid::Uuid::new_v4());
+        local.bindings.insert("cloud_old".into(), seat);
+        local.bindings.insert("cloud_gone".into(), other);
+        local.bindings.insert("cloud_phone".into(), phone);
+        local.phone_players.insert(phone, true);
+        local.link_revisions.insert(seat, 3);
+        let vacated = retire_unreported(&mut local, &[update("guest:phone", seat, 3)]);
+        // The phone's link lands on `seat` later in the same poll.
+        local.bindings.insert("cloud_guest:phone".into(), seat);
+        let present = [seat, other, phone];
+        assert_eq!(still_vacant(&local, vacated.clone(), &present), vec![other]);
+        // A player that already left needs no new name.
+        assert!(still_vacant(&local, vacated, &[seat, phone]).is_empty());
     }
 }
