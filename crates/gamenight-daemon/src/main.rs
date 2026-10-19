@@ -39,15 +39,11 @@ async fn run() -> std::io::Result<()> {
         .or_else(|| std::env::var("GAMENIGHT_ADDR").ok())
         .unwrap_or_else(|| gamenight_protocol::DEFAULT_ADDR.to_string());
 
-    // A shipped application has its lobby inside it, so that's the shelf it
-    // starts from — the demo shelf is a development convenience and its
-    // entries (TowerFall, Duck Game) aren't games we can actually launch.
+    // The desktop launcher always supplies the shelf, lobby included; the
+    // demo shelf is a development convenience.
     let mut library = match std::env::var("GAMENIGHT_LIBRARY") {
         Ok(path) => gamenight_daemon::load_library(&path)?,
-        Err(_) => match gamenight_daemon::bundled_lobby_meta() {
-            Some(lobby) => vec![lobby],
-            None => gamenight_daemon::demo_library(),
-        },
+        Err(_) => gamenight_daemon::demo_library(),
     };
 
     let mut prewarm_handle = None;

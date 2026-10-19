@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='gamenight-host-ui-') as folder:
     try:
      with urllib.request.urlopen(req,timeout=5) as r:return r.status,r.read()
     except urllib.error.HTTPError as e:return e.code,e.read()
-   status,body=call('/api/host/lobby');assert status==200 and len(json.loads(body)['choices'])==2
+   status,body=call('/api/host/lobby');assert status==200 and [c['id'] for c in json.loads(body)['choices']]==['living-room']
    assert call('/api/host/lobby',{'id':'living-room'},False)[0]==403
    assert call('/api/host/lobby',{'id':'unknown'})[0]==400
    assert call('/api/host/lobby',{'id':'living-room'})[0]==204
@@ -39,8 +39,9 @@ with tempfile.TemporaryDirectory(prefix='gamenight-host-ui-') as folder:
    from urllib.parse import urlparse
    link=urlparse(room['join_url']);assert link.port==7913
    assert call('/?'+link.query)[0]==200
-   assert call('/api/host/lobby',{'id':'lobby'})[0]==204
-   assert json.loads(config.read_text())['id']=='lobby'
+   # The retired Clubhouse is no longer a lobby this host has.
+   assert call('/api/host/lobby',{'id':'lobby'})[0]==400
+   assert json.loads(config.read_text())['id']=='living-room'
    print('PASS live host preferences, protected controls and public room QR')
   finally:
    if proc.poll() is None:

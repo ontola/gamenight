@@ -1,4 +1,4 @@
-"""Create a relocatable macOS app from universal native binaries."""
+"""Create a relocatable macOS app from universal native binaries and the Game Room lobby."""
 import argparse
 import hashlib
 import json
@@ -17,65 +17,60 @@ def plist(name, identifier, version, background=False):
                 NSBluetoothAlwaysUsageDescription="Connect controllers to GameNight.")
 
 
-def package(repo, binaries, output, version, binary_revision=None, lobby_revision=None):
+def package(repo, binaries, game_room, output, version, binary_revision=None):
     app = output / "GameNight.app"
     contents = app / "Contents"
     resources = contents / "Resources"
     helper = contents / "Helpers/GameNight.app/Contents"
     for folder in [contents / "MacOS", resources / "bin", helper / "MacOS", helper / "Resources"]:
         folder.mkdir(parents=True, exist_ok=False)
-    for source, target in [("gamenight-launcher", contents / "MacOS/GameNight"),
-                           ("gamenight-daemon", resources / "bin/gamenight-daemon"),
-                           ("lobby", helper / "MacOS/GameNight")]:
-        shutil.copy2(binaries / source, target)
+    # The lobby helper is Godot's universal binary; it runs the same-named
+    # Game Room PCK from its bundle's Resources.
+    for source, target in [(binaries / "gamenight-launcher", contents / "MacOS/GameNight"),
+                           (binaries / "gamenight-daemon", resources / "bin/gamenight-daemon"),
+                           (game_room / "GameNight", helper / "MacOS/GameNight")]:
+        shutil.copy2(source, target)
         target.chmod(0o755)
+    shutil.copy2(game_room / "GameNight.pck", helper / "Resources/GameNight.pck")
     for target, ident, background in [(contents, "io.ontola.gamenight", True),
                                        (helper, "io.ontola.gamenight.lobby", False)]:
         (target / "Info.plist").write_bytes(plistlib.dumps(plist("GameNight", ident, version, background)))
-    for folder in ["assets", "packs", "licenses"]:
-        shutil.copytree(repo / "crates/lobby" / folder, resources / "lobby" / folder)
-    for file in ["LICENSE", "CREDITS.md"]:
-        shutil.copy2(repo / "crates/lobby" / file, resources / "lobby" / file)
-    shutil.copytree(repo / "vendor/bones/licenses", resources / "notices/bones")
+    notices = resources / "notices/game-room"
+    notices.mkdir(parents=True)
+    for notice in (repo / "lobbies/game-room/assets/fonts").glob("*LICENSE*.txt"):
+        shutil.copy2(notice, notices / notice.name)
+    shutil.copy2(repo / "lobbies/game-room/GODOT-LICENSE.txt", notices / "godot.txt")
     for file in ["LICENSE", "THIRD_PARTY.md"]:
         shutil.copy2(repo / file, resources / file)
-    shutil.copy2(repo / "crates/lobby/tools/reskin/ASSET-SOURCES.md", resources / "notices")
     catalog = resources / "catalog/games"
     catalog.mkdir(parents=True)
     for file in (repo / "catalog/games").glob("*.json"):
         if "mac" in json.loads(file.read_text(encoding="utf-8")).get("downloads", {}):
             shutil.copy2(file, catalog / file.name)
     shutil.copy2(repo / "catalog/schema.json", catalog.parent / "schema.json")
-    # Verify every source asset in the bundle, including Bevy fonts and current
-    # clubhouse textures. A compile-only job cannot catch stale/missing assets.
-    hashes = {}
-    for folder in ["assets", "packs"]:
-        source = repo / "crates/lobby" / folder
-        for file in source.rglob("*"):
-            if file.is_file():
-                relative = Path("lobby") / folder / file.relative_to(source)
-                digest = hashlib.sha256(file.read_bytes()).hexdigest()
-                if hashlib.sha256((resources / relative).read_bytes()).hexdigest() != digest:
-                    raise RuntimeError(f"Packaged asset differs: {relative}")
-                hashes[relative.as_posix()] = digest
+    # Record the lobby's exported pack, relative to Resources, so the bundle
+    # check can tell a stale or truncated copy from the one exported here.
+    digest = hashlib.sha256((game_room / "GameNight.pck").read_bytes()).hexdigest()
+    hashes = {"../Helpers/GameNight.app/Contents/Resources/GameNight.pck": digest}
     revision = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
     (resources / "build.json").write_text(json.dumps({"commit": revision, "version": version,
-                                                    "binary_commit": binary_revision or revision, "lobby_commit": lobby_revision or binary_revision or revision, "assets": hashes}, indent=2) + "\n", encoding="utf-8")
+                                                    "binary_commit": binary_revision or revision, "assets": hashes}, indent=2) + "\n", encoding="utf-8")
     return app
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binaries", type=Path, required=True)
+    parser.add_argument("--game-room", type=Path, required=True,
+                        help="Exported Game Room lobby: universal Godot binary GameNight + GameNight.pck")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--version", required=True)
     parser.add_argument("--binary-revision")
-    parser.add_argument("--lobby-revision")
     parser.add_argument("--sign-identity", default="-",
                         help="Developer ID Application identity; '-' signs ad hoc")
     args = parser.parse_args()
     repo = Path(__file__).resolve().parents[1]
-    app = package(repo, args.binaries, args.output, args.version, args.binary_revision, args.lobby_revision)
+    app = package(repo, args.binaries, args.game_room, args.output, args.version, args.binary_revision)
     iconset = args.output / "GameNight.iconset"
     iconset.mkdir()
     for size in [16, 32, 128, 256, 512]:

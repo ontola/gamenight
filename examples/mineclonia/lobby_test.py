@@ -19,16 +19,16 @@ def main():
     p.add_argument("--links-url")
     a=p.parse_args();folder=a.root/"managed";folder.mkdir(exist_ok=True)
     daemon=a.daemon_exe or a.runtime/"bin/gamenight-daemon.exe"
-    lobby=a.lobby_exe or a.runtime/"bin/lobby.exe"
+    lobby=a.lobby_exe or a.runtime/"lobbies/game-room/GameRoom.exe"
     for exe in (daemon,a.godot or lobby,a.root/"controller-engine-managed/bin/luanti.exe"):
         if not exe.is_file():raise SystemExit(f"Missing {exe}")
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1",a.port))==0:raise SystemExit("Test daemon already running")
     shelf=[{"id":"mineclonia-prototype","title":"Mineclonia (controller test)","min_players":2,"max_players":2,"players":"2",
         "launch":{"command":sys.executable,"args":[str(Path(__file__).with_name("managed.py")),"--root",str(a.root)],"cwd":str(a.root)}},
-        {"id":"lobby","title":"Clubhouse","min_players":1,"max_players":4,"players":"1–4",
-        "launch":{"command":str(lobby),"cwd":str(a.runtime/"lobby"),"env":{"BEVY_ASSET_ROOT":str(a.runtime/"lobby")}}}]
-    lobby_id = "lobby"
+        {"id":"game-room","title":"Game Room","min_players":1,"max_players":8,"players":"1–8",
+        "launch":{"command":str(lobby),"cwd":str(lobby.parent),"env":{"GAMENIGHT_LOBBY_API":"1"}}}]
+    lobby_id = "game-room"
     config=folder/"selected-lobby.json"
     registrations=folder/"local-games.json"
     if a.godot:
@@ -38,7 +38,7 @@ def main():
             "launch":{"command":str(a.godot),"args":["--path",str(project)],"env":{"GAMENIGHT_LOBBY_API":"1","GAMENIGHT_LOBBY_FULLSCREEN":"1"}}}
         registrations.write_text(json.dumps([replacement]))
         preference=json.loads(config.read_text()) if config.is_file() else {"id":lobby_id}
-        if preference.get("id")=="lobby" and lobby.is_file(): lobby_id="lobby"
+        if preference.get("id")=="game-room" and lobby.is_file(): lobby_id="game-room"
         else:
             shelf[-1]=replacement
             config.write_text(json.dumps({"id":lobby_id}))

@@ -59,20 +59,25 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     if port == 0 {
         return Err("Port must not be zero".into());
     }
+    // The Game Room lobby: Godot running the exported Game Room pack. On
+    // macOS it is a helper app, so it gets its own Dock entry and name.
     #[cfg(target_os = "macos")]
     let daemon = root.join("bin/gamenight-daemon");
     #[cfg(target_os = "macos")]
-    let lobby = root
-        .join("../Helpers/GameNight.app/Contents/MacOS/GameNight")
+    let game_room = root
+        .join("../Helpers/GameNight.app/Contents/Resources")
         .canonicalize()?;
+    #[cfg(target_os = "macos")]
+    let game_room_command = game_room.join("../MacOS/GameNight").canonicalize()?;
     #[cfg(not(target_os = "macos"))]
     let daemon = root.join("bin/gamenight-daemon.exe");
     #[cfg(not(target_os = "macos"))]
-    let lobby = root.join("bin/lobby.exe");
-    let lobby_dir = root.join("lobby");
+    let game_room = root.join("lobbies/game-room");
+    #[cfg(not(target_os = "macos"))]
+    let game_room_command = game_room.join("GameRoom.exe");
     for path in [
         &daemon,
-        &lobby,
+        &game_room_command,
         &root.join("catalog/games/blast-party.json"),
     ] {
         if !path.is_file() {
@@ -121,41 +126,25 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     }
     #[cfg(windows)]
     let updates = windows::Updates::start(&local);
-    let mut shelf = serde_json::json!([
-        {"id":"lobby", "title":"Clubhouse", "players":"1-4", "min_players":1, "max_players":4,
-         "emoji":"", "color":"#7c5cff", "launch":{"command":lobby, "cwd":lobby_dir,
-         "env":{"BEVY_ASSET_ROOT":lobby_dir}}}
-    ]);
-    // Lobbies shipped in the package. The first one is the default lobby;
-    // the Clubhouse stays available from the lobby chooser.
+    // Lobbies shipped in the package. The first one is the default lobby.
     let bundled_lobbies = local.join("bundled-lobbies.json");
-    let game_room = root.join("lobbies/game-room");
-    let bundled: Vec<serde_json::Value> = [game_room.join("GameRoom.exe")]
-        .into_iter()
-        .filter(|command| command.is_file())
-        .map(|command| {
-            serde_json::json!({"id":"game-room", "title":"Game Room", "players":"1-8",
-                "min_players":1, "max_players":8, "emoji":"", "color":"#7c5cff",
-                "launch":{"command":command, "cwd":game_room, "env":{"GAMENIGHT_LOBBY_API":"1"}}})
-        })
-        .collect();
-    fs::write(&bundled_lobbies, serde_json::to_vec_pretty(&bundled)?)?;
-    shelf.as_array_mut().unwrap().extend(bundled);
+    let mut shelf = serde_json::json!([
+        {"id":"game-room", "title":"Game Room", "players":"1-8",
+         "min_players":1, "max_players":8, "emoji":"", "color":"#7c5cff",
+         "launch":{"command":game_room_command, "cwd":game_room, "env":{"GAMENIGHT_LOBBY_API":"1"}}}
+    ]);
+    fs::write(&bundled_lobbies, serde_json::to_vec_pretty(&shelf)?)?;
     data::merge_local_games(&mut shelf, &local)?;
     let lobby_config = local.join("selected-lobby.json");
     let registrations = local.join("local-games.json");
-    let custom = gamenight_local_web::host_lobby::selected(
+    let lobby_id = gamenight_local_web::host_lobby::selected(
         &lobby_config,
         &registrations,
         Some(&bundled_lobbies),
-    );
-    let lobby_id = custom
-        .as_ref()
-        .map(|m| m.id.0.clone())
-        .unwrap_or_else(|| "lobby".into());
-    if lobby_id != "lobby" {
-        shelf.as_array_mut().unwrap().retain(|v| v["id"] != "lobby");
-    }
+    )
+    .ok_or("The bundled Game Room lobby is not runnable")?
+    .id
+    .0;
     shelf
         .as_array_mut()
         .unwrap()

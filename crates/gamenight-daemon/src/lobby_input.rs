@@ -1,5 +1,5 @@
-//! Runtime-owned controller input for replacement lobbies. The legacy Bevy
-//! lobby keeps its existing input path until it adopts Role::Lobby.
+//! Runtime-owned controller input for lobbies that use the lobby API
+//! (`Role::Lobby`). No client publishes physical input itself.
 use super::*;
 use gamenight_protocol::ControllerState;
 use gilrs::{Axis, Button};

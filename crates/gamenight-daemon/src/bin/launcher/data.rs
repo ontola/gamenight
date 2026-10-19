@@ -26,7 +26,8 @@ pub fn user_dir() -> io::Result<PathBuf> {
 }
 
 /// User-owned registrations survive regeneration of the launcher's shelf.
-/// Downloaded catalogue games still fill gaps after this local overlay.
+/// Downloaded catalogue games still fill gaps after this local overlay. They
+/// never replace a lobby the package ships, nor take the reserved `lobby` id.
 pub fn merge_local_games(
     shelf: &mut serde_json::Value,
     directory: &std::path::Path,
@@ -42,7 +43,11 @@ pub fn merge_local_games(
     for game in games {
         let value = serde_json::to_value(&game).map_err(io::Error::other)?;
         let id = value["id"].as_str().unwrap_or_default();
-        if id.is_empty() || id == "lobby" {
+        let bundled_lobby = entries.iter().any(|entry| {
+            entry["id"].as_str() == Some(id)
+                && entry["launch"]["env"]["GAMENIGHT_LOBBY_API"].as_str() == Some("1")
+        });
+        if id.is_empty() || id == "lobby" || bundled_lobby {
             continue;
         }
         let Some(launch) = &game.launch else {
@@ -76,14 +81,18 @@ mod tests {
         let local = serde_json::json!([
             {"id":"ion-rush","title":"Local Ion Rush","launch":{"command":executable,"cwd":dir}},
             {"id":"lobby","title":"Invalid replacement","launch":{"command":executable}},
+            {"id":"game-room","title":"Invalid replacement","launch":{"command":executable}},
             {"id":"missing","title":"Unavailable","launch":{"command":"not-installed.exe"}}
         ]);
         std::fs::write(dir.join("local-games.json"), local.to_string()).unwrap();
         for _ in 0..2 {
-            let mut shelf = serde_json::json!([{"id":"lobby","title":"GameNight"},{"id":"ion-rush","title":"Old build"}]);
+            let mut shelf = serde_json::json!([
+                {"id":"game-room","title":"Game Room","launch":{"command":executable,"env":{"GAMENIGHT_LOBBY_API":"1"}}},
+                {"id":"ion-rush","title":"Old build"}
+            ]);
             merge_local_games(&mut shelf, &dir).unwrap();
             assert_eq!(shelf.as_array().unwrap().len(), 2);
-            assert_eq!(shelf[0]["title"], "GameNight");
+            assert_eq!(shelf[0]["title"], "Game Room");
             assert_eq!(shelf[1]["title"], "Local Ion Rush");
         }
         std::fs::remove_file(dir.join("local-games.json")).unwrap();

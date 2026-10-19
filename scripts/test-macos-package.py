@@ -1,4 +1,4 @@
-"""Check Mac bundle identity, complete asset hashes and universal executables."""
+"""Check Mac bundle identity, the Game Room pack hash and universal executables."""
 import hashlib
 import json
 import plistlib
@@ -32,8 +32,8 @@ def verify(app):
         if download["url"].endswith(".love"):
             assert download["entrypoint"] == download["url"].rsplit("/", 1)[-1], file.name
             assert download["runtime"]["argument"] == "entry_point", file.name
-    assert (resources / "lobby/assets/game.yaml").is_file()
-    print(f"Verified {len(manifest['assets'])} packaged assets and both Mac architectures: {manifest['commit']}")
+    assert (helper / "Resources/GameNight.pck").stat().st_size > 100_000, "Missing Game Room pack"
+    print(f"Verified the Game Room lobby and both Mac architectures: {manifest['commit']}")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ func _run() -> void:
 	p.x = 7.0; p.y = 0.0; p.grounded = true; p.sleeping = false
 	check(main.menu_items("p0").all(func(item): return item.action != "lobbies"), "No lobby page when the host cannot switch")
 	var party: Dictionary = main.party.duplicate(true)
-	party["lobbies"] = [{"id": "game-room", "title": "Game Room", "current": true}, {"id": "lobby", "title": "Clubhouse"}]
+	party["lobbies"] = [{"id": "game-room", "title": "Game Room", "current": true}, {"id": "living-room", "title": "Living Room"}]
 	main.set_party(party)
 	press(main, main.BTN_START)
 	var items: Array = main.menu_items("p0")
@@ -49,7 +49,7 @@ func _run() -> void:
 	check(at >= 0, "Switch lobby is in the Start menu")
 	for i in at: press(main, main.World.BTN_DOWN)
 	press(main, main.World.BTN_A)
-	check(labels(main) == ["Game Room  (here now)", "Clubhouse", "Back"], "The lobby page lists every lobby: %s" % [labels(main)])
+	check(labels(main) == ["Game Room  (here now)", "Living Room", "Back"], "The lobby page lists every lobby: %s" % [labels(main)])
 	check(main.menus.p0.index == 0, "The running lobby is highlighted first")
 	press(main, main.World.BTN_A)
 	check(recorder.commands.is_empty(), "Picking the running lobby sends nothing")
@@ -59,8 +59,8 @@ func _run() -> void:
 	press(main, main.World.BTN_A)
 	press(main, main.World.BTN_DOWN)
 	press(main, main.World.BTN_A)
-	check(recorder.commands == [{"type": "switch_lobby", "lobby": "lobby"}], "A on the Clubhouse asks the host to switch: %s" % [recorder.commands])
+	check(recorder.commands == [{"type": "switch_lobby", "lobby": "living-room"}], "A on the Living Room asks the host to switch: %s" % [recorder.commands])
 	check(main.menus.is_empty(), "The menu closes while the host restarts")
-	check(main.toasts.any(func(t): return "Clubhouse" in t.text), "The switch is announced")
+	check(main.toasts.any(func(t): return "Living Room" in t.text), "The switch is announced")
 	print("GAME_ROOM_LOBBY_SWITCH_PASS" if failures == 0 else "GAME_ROOM_LOBBY_SWITCH_FAIL")
 	quit(failures)

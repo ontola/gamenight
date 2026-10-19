@@ -1003,55 +1003,49 @@ fn fake_game_process() {
 }
 
 #[tokio::test]
-async fn lobby_controller_frames_keep_device_ids_across_the_real_socket() {
+async fn games_cannot_inject_controller_frames() {
+    // Physical input belongs to the runtime; no game connection publishes it,
+    // not even one registered under the reserved `lobby` id.
     tokio::time::timeout(std::time::Duration::from_secs(5), async {
         let addr = start_daemon().await;
-        let mut lobby = GameNight::connect("lobby", Some(&addr)).await.unwrap();
-        let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+        for id in ["lobby", "blast-party"] {
+            let (mut game, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+                .await
+                .unwrap();
+            game.send(Message::Text(
+                ClientMessage::Hello {
+                    role: Role::Game,
+                    game: Some(GameId::new(id)),
+                    token: None,
+                }
+                .to_json(),
+            ))
             .await
             .unwrap();
-        game.send(Message::Text(
-            ClientMessage::Hello {
-                role: Role::Game,
-                game: Some(GameId::new("blast-party")),
-                token: None,
-            }
-            .to_json(),
-        ))
-        .await
-        .unwrap();
-        assert!(matches!(
-            Overlay::recv_raw(&mut game).await,
-            ServerMessage::Welcome { .. }
-        ));
-        let device = gamenight_protocol::ControllerState {
-            controller: "ordinal:7".into(),
-            axes: [-32767, 0, 0, 0, 0, 0],
-            buttons: 1,
-        };
-        for frames in [vec![device.clone()], vec![]] {
-            lobby.controller_frame(frames.clone()).await.unwrap();
+            assert!(matches!(
+                Overlay::recv_raw(&mut game).await,
+                ServerMessage::Welcome { .. }
+            ));
+            game.send(Message::Text(
+                ClientMessage::ControllerFrame {
+                    controllers: vec![gamenight_protocol::ControllerState {
+                        controller: "ordinal:7".into(),
+                        axes: [-32767, 0, 0, 0, 0, 0],
+                        buttons: 1,
+                    }],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
             loop {
-                if let ServerMessage::ControllerFrame { controllers } =
-                    Overlay::recv_raw(&mut game).await
-                {
-                    assert_eq!(controllers, frames);
-                    break;
+                match Overlay::recv_raw(&mut game).await {
+                    ServerMessage::Error { .. } => break,
+                    ServerMessage::ControllerFrame { .. } => panic!("{id} injected input"),
+                    _ => {}
                 }
             }
         }
-        game.send(Message::Text(
-            ClientMessage::ControllerFrame {
-                controllers: vec![device],
-            }
-            .to_json(),
-        ))
-        .await
-        .unwrap();
-        assert!(matches!(
-            Overlay::recv_raw(&mut game).await,
-            ServerMessage::Error { .. }
-        ));
     })
     .await
     .unwrap();

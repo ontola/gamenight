@@ -8,23 +8,23 @@ Download the [Mac preview](https://gamenight.ontola.io/download/GameNight.dmg) a
 
 Run the **macOS installer** workflow on `main`, with a numeric bundle version such as `0.1.4`. It builds both Apple Silicon and Intel binaries from the same commit and combines them into one universal app.
 
-The packaging job includes the current lobby assets and packs, Mac catalog entries, attribution files and the GameNight icon. `Contents/Resources/build.json` records the source commit and a SHA-256 digest for every lobby asset. Packaging checks both executable architectures, bundle names and asset hashes. The native smoke check launches the packaged host from an unrelated working directory and captures the rendered lobby.
+The packaging job installs the pinned universal Godot 4.5.2 (`.github/actions/setup-godot`), exports the Game Room lobby (`lobbies/game-room`, preset `macOS`) as a `.pck`, and adds the Mac catalog entries, attribution files and the GameNight icon. `Contents/Resources/build.json` records the source commit and the SHA-256 digest of the lobby pack. Packaging checks both executable architectures, bundle names and the pack hash. The native smoke check launches the packaged host from an unrelated working directory and waits until the Game Room connects to it with its launch token.
 
 The app contains:
 
 - `Contents/MacOS/GameNight`: launcher, without a separate Dock icon.
-- `Contents/Helpers/GameNight.app`: the visible lobby, whose process and app name are both GameNight.
+- `Contents/Helpers/GameNight.app`: the visible lobby, whose process and app name are both GameNight. Its executable is Godot's universal editor binary, which runs the same-named `Contents/Resources/GameNight.pck` (the exported Game Room) without export templates, as the Windows package does.
 - `Contents/Resources/bin/gamenight-daemon`: session host.
-- `Contents/Resources/lobby`: all assets and packs, passed to the lobby through an explicit working directory and `BEVY_ASSET_ROOT`.
+- `Contents/Resources/notices/game-room`: Godot's and the lobby fonts' licenses.
 - `Contents/Resources/catalog`: downloadable Mac games. Shared LÖVE games use the same game archives as Windows and a separately pinned Mac runtime.
 
 Launcher logs and downloaded games go in `~/Library/Application Support/GameNight`. The app bundle stays read-only. `GAMENIGHT_DATA_DIR` overrides this directory for isolated tests.
 
 ## Publish
 
-Download `gamenight-macos-installer` and inspect the `gamenight-macos-smoke` screenshot and logs. Only publish after the build, bundle checks and native launch pass. Upload the DMG and checksum together to a GitHub release, then update the website's DMG and checksum atomically. Keep the previous installer outside the web root. Verify a fresh download against the release hash, not just the server's local file.
+Download `gamenight-macos-installer` and inspect the `gamenight-macos-smoke` logs. Only publish after the build, bundle checks and native launch pass. Upload the DMG and checksum together to a GitHub release, then update the website's DMG and checksum atomically. Keep the previous installer outside the web root. Verify a fresh download against the release hash, not just the server's local file.
 
-For changes limited to packaging or catalog metadata, `binaries_run` can reuse successful native build artifacts from an earlier run. The asset manifest records both the packaging commit and the binary commit. Never reuse all binaries when Rust sources or dependencies have changed. `lobby_run` can reuse only the lobby while rebuilding the host; use it only when lobby sources and dependencies are unchanged. The manifest records the lobby commit separately.
+For changes limited to packaging or catalog metadata, `binaries_run` can reuse successful native build artifacts from an earlier run. The asset manifest records both the packaging commit and the binary commit. Never reuse all binaries when Rust sources or dependencies have changed. The lobby is always exported from the packaging commit.
 
 ## Signing and notarization
 

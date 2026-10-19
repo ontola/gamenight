@@ -28,10 +28,6 @@ on:
         description: 'Numeric macOS bundle version'
         required: true
         default: '0.1.4'
-      lobby_run:
-        description: 'Optional previous lobby build run when only host or packaging changed'
-        required: false
-        default: ''
       binaries_run:
         description: 'Optional previous run with successful native builds (packaging-only changes)'
         required: false
@@ -60,36 +56,19 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: |
-            . -> target
-            crates/lobby -> target
+          workspaces: . -> target
           key: macos-installer-${{ matrix.target }}
-      - name: Build current host and lobby
+      - name: Build current host
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
           MACOSX_DEPLOYMENT_TARGET: '12.0'
-        run: |
-          cargo build --locked --release --target ${{ matrix.target }} -p gamenight-daemon
-          if [ -z "${{ inputs.lobby_run }}" ]; then
-            cargo build --locked --release --target ${{ matrix.target }} --manifest-path crates/lobby/Cargo.toml
-          fi
-      - uses: actions/download-artifact@v4
-        if: inputs.lobby_run != ''
-        with:
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.lobby_run }}
-          name: binaries-${{ matrix.target }}
-          path: prior-lobby
-      - name: Reuse unchanged lobby binary
-        if: inputs.lobby_run != ''
-        run: cp prior-lobby/lobby target/${{ matrix.target }}/release/lobby
+        run: cargo build --locked --release --target ${{ matrix.target }} -p gamenight-daemon
       - uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.target }}
           path: |
             target/${{ matrix.target }}/release/gamenight-launcher
             target/${{ matrix.target }}/release/gamenight-daemon
-            target/${{ matrix.target }}/release/lobby
           if-no-files-found: error
   package:
     needs: build
@@ -111,6 +90,19 @@ jobs:
         with:
           name: release-catalog
           path: catalog/games
+      - name: Install pinned Godot 4.5.2 for the Game Room lobby
+        uses: ./.github/actions/setup-godot
+        with:
+          version: 4.5.2
+      - name: Export the Game Room lobby
+        run: |
+          mkdir game-room
+          "$GODOT" --headless --path lobbies/game-room --editor --import --quit
+          "$GODOT" --headless --path lobbies/game-room --export-pack macOS "$PWD/game-room/GameNight.pck"
+          # The universal editor runs the same-named PCK from its bundle's
+          # Resources, so no export templates are needed (as on Windows).
+          cp "$GODOT" game-room/GameNight
+          lipo game-room/GameNight -verify_arch arm64 x86_64
       - name: Import Developer ID certificate
         id: signing
         env:
@@ -141,18 +133,16 @@ jobs:
           VERSION: ${{ inputs.version }}
           SOURCE_REVISION: ${{ inputs.ref }}
           BINARY_RUN: ${{ inputs.binaries_run || github.run_id }}
-          LOBBY_RUN: ${{ inputs.lobby_run || inputs.binaries_run || github.run_id }}
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p universal stage release
-          for name in gamenight-launcher gamenight-daemon lobby; do
+          for name in gamenight-launcher gamenight-daemon; do
             lipo -create binaries/binaries-aarch64-apple-darwin/$name binaries/binaries-x86_64-apple-darwin/$name -output universal/$name
             lipo universal/$name -verify_arch arm64 x86_64
           done
           binary_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BINARY_RUN" --jq .head_sha)
-          lobby_revision=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$LOBBY_RUN" --jq .head_sha)
-          if [ -n "$SOURCE_REVISION" ]; then binary_revision="$SOURCE_REVISION"; lobby_revision="$SOURCE_REVISION"; fi
-          python3 scripts/package-macos.py --binaries universal --output stage --version "$VERSION" --binary-revision "$binary_revision" --lobby-revision "$lobby_revision" --sign-identity "$SIGN_IDENTITY"
+          if [ -n "$SOURCE_REVISION" ]; then binary_revision="$SOURCE_REVISION"; fi
+          python3 scripts/package-macos.py --binaries universal --game-room game-room --output stage --version "$VERSION" --binary-revision "$binary_revision" --sign-identity "$SIGN_IDENTITY"
           python3 scripts/test-macos-package.py stage/GameNight.app
       - name: Launch packaged host outside source directory
         run: |

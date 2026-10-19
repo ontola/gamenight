@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use futures_util::{SinkExt, StreamExt};
-use gamenight_protocol::{ClientMessage, GameId, GameMeta, LobbyChoice, Role, ServerMessage};
+use gamenight_protocol::{ClientMessage, GameMeta, LobbyChoice, Role, ServerMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{net::SocketAddr, path::Path};
@@ -43,15 +43,15 @@ fn available(registrations: &Path, bundled: Option<&Path>) -> Vec<GameMeta> {
     }
     all
 }
-/// The replacement lobby to run, or `None` for the built-in Clubhouse.
+/// The lobby to run: the saved choice while it is still there, else the
+/// first bundled lobby. `None` only when no lobby is available at all. An
+/// old saved `lobby` (the retired Clubhouse) is no longer a choice, so it
+/// falls back to the default like any other missing lobby.
 pub fn selected(config: &Path, registrations: &Path, bundled: Option<&Path>) -> Option<GameMeta> {
     let value: Option<Value> = std::fs::read(config)
         .ok()
         .and_then(|v| serde_json::from_slice(&v).ok());
     let id = value.as_ref().and_then(|v| v["id"].as_str());
-    if id == Some("lobby") {
-        return None;
-    }
     let all = available(registrations, bundled);
     let default = bundled.map(choices).unwrap_or_default().into_iter().next();
     id.and_then(|id| all.into_iter().find(|m| m.id.0 == id))
@@ -80,30 +80,16 @@ fn paths() -> Result<Paths, StatusCode> {
         std::env::var_os("GAMENIGHT_BUNDLED_LOBBIES").map(Into::into),
     ))
 }
-/// Lobbies the host offers: bundled ones, the Clubhouse, then installed
-/// ones, with the one that runs now marked `current`.
+/// Lobbies the host offers: bundled ones, then installed ones, with the one
+/// that runs now marked `current`.
 pub fn list(config: &Path, registrations: &Path, bundled: Option<&Path>) -> Vec<LobbyChoice> {
-    let current = selected(config, registrations, bundled)
-        .map(|m| m.id.0)
-        .unwrap_or_else(|| "lobby".into());
-    let mut entries: Vec<(String, String)> = bundled
-        .map(choices)
-        .unwrap_or_default()
+    let current = selected(config, registrations, bundled).map(|m| m.id);
+    available(registrations, bundled)
         .into_iter()
-        .map(|m| (m.id.0, m.title))
-        .collect();
-    entries.push(("lobby".into(), "Clubhouse".into()));
-    for m in available(registrations, None) {
-        if !entries.iter().any(|(id, _)| *id == m.id.0) {
-            entries.push((m.id.0, m.title));
-        }
-    }
-    entries
-        .into_iter()
-        .map(|(id, title)| LobbyChoice {
-            current: id == current,
-            id: GameId::new(id),
-            title,
+        .map(|m| LobbyChoice {
+            current: current.as_ref() == Some(&m.id),
+            id: m.id,
+            title: m.title,
         })
         .collect()
 }
@@ -115,10 +101,9 @@ pub fn save(
     bundled: Option<&Path>,
     id: &str,
 ) -> std::io::Result<bool> {
-    if id != "lobby"
-        && !available(registrations, bundled)
-            .iter()
-            .any(|m| m.id.0 == id)
+    if !available(registrations, bundled)
+        .iter()
+        .any(|m| m.id.0 == id)
     {
         return Ok(false);
     }
@@ -138,14 +123,7 @@ pub async fn get(ConnectInfo(peer): ConnectInfo<SocketAddr>) -> Result<Json<Valu
     let current = lobbies.iter().find(|l| l.current).map(|l| l.id.0.clone());
     let entries: Vec<Value> = lobbies
         .into_iter()
-        .map(|l| {
-            let title = if l.id.0 == "lobby" {
-                "Clubhouse (platformer)".into()
-            } else {
-                l.title
-            };
-            json!({"id":l.id,"title":title})
-        })
+        .map(|l| json!({"id":l.id,"title":l.title}))
         .collect();
     Ok(Json(json!({"selected":current,"choices":entries})))
 }
@@ -264,7 +242,7 @@ mod tests {
         std::fs::remove_dir(dir).unwrap();
     }
     #[test]
-    fn bundled_lobby_is_the_default_until_clubhouse_is_chosen() {
+    fn bundled_lobby_is_the_default_and_replaces_the_retired_clubhouse() {
         let dir = std::env::temp_dir().join(format!("lobby-bundled-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&dir).unwrap();
         let bundled = dir.join("bundled.json");
@@ -274,8 +252,13 @@ mod tests {
         std::fs::write(&games, "[]").unwrap();
         let pick = |c: &Path| selected(c, &games, Some(&bundled)).map(|m| m.id.0);
         assert_eq!(pick(&config).as_deref(), Some("game-room"));
+        // A choice saved while the Clubhouse still shipped.
         std::fs::write(&config, r#"{"id":"lobby"}"#).unwrap();
-        assert_eq!(pick(&config), None);
+        assert_eq!(pick(&config).as_deref(), Some("game-room"));
+        assert!(!save(&config, &games, Some(&bundled), "lobby").unwrap());
+        let listed = list(&config, &games, Some(&bundled));
+        assert_eq!(listed.len(), 1);
+        assert!(listed[0].current && listed[0].id.0 == "game-room");
         std::fs::write(&config, r#"{"id":"removed"}"#).unwrap();
         assert_eq!(pick(&config).as_deref(), Some("game-room"));
         std::fs::remove_dir_all(dir).unwrap();

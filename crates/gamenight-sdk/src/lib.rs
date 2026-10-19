@@ -313,15 +313,6 @@ impl GameNight {
         .await
     }
 
-    /// Publish physical input from the resident lobby. Other games are rejected.
-    pub async fn controller_frame(
-        &mut self,
-        controllers: Vec<gamenight_protocol::ControllerState>,
-    ) -> Result<(), SdkError> {
-        self.send(&ClientMessage::ControllerFrame { controllers })
-            .await
-    }
-
     /// Assets loaded, controllers mapped: the session can start instantly.
     pub async fn ready(&mut self, session: SessionId) -> Result<(), SdkError> {
         self.send(&ClientMessage::Ready { session }).await

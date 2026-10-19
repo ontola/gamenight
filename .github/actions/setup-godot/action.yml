@@ -1,4 +1,4 @@
-# Installs a pinned, checksum-verified Godot editor on a Linux or Windows runner,
+# Installs a pinned, checksum-verified Godot editor on a Linux, Windows or macOS runner,
 # and optionally the export templates a build needs. One place for every
 # GameNight repository's Godot download:
 #
@@ -23,10 +23,10 @@ inputs:
 outputs:
   godot:
     description: The editor to run from scripts (on Windows the _console.exe wrapper)
-    value: ${{ steps.linux.outputs.godot || steps.windows.outputs.godot }}
+    value: ${{ steps.linux.outputs.godot || steps.windows.outputs.godot || steps.macos.outputs.godot }}
   godot-gui:
     description: The editor executable itself (on Windows the .exe without a console wrapper)
-    value: ${{ steps.linux.outputs.godot-gui || steps.windows.outputs.godot-gui }}
+    value: ${{ steps.linux.outputs.godot-gui || steps.windows.outputs.godot-gui || steps.macos.outputs.godot-gui }}
 runs:
   using: composite
   steps:
@@ -104,3 +104,27 @@ runs:
         Add-Content -Path $env:GITHUB_ENV -Value "GODOT=$console"
         Add-Content -Path $env:GITHUB_OUTPUT -Value "godot=$console"
         Add-Content -Path $env:GITHUB_OUTPUT -Value "godot-gui=$gui"
+    - id: macos
+      if: runner.os == 'macOS'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        TEMPLATES: ${{ inputs.export-templates }}
+      run: |
+        set -euo pipefail
+        if [ -n "$TEMPLATES" ]; then echo "::error::setup-godot installs export templates on Linux runners only"; exit 1; fi
+        name="Godot_v${VERSION}-stable_macos.universal.zip"
+        case "$name" in
+          Godot_v4.5.2-stable_macos.universal.zip) expected=2a3f35cf5813b0d26e3f4c15dabc5e7c58407fceec7bae5291740772f72d141a ;;
+          *) echo "::error::setup-godot has no sha256 for $name; add it to .github/actions/setup-godot/action.yml"; exit 1 ;;
+        esac
+        dir="$RUNNER_TEMP/godot-$VERSION"
+        mkdir -p "$dir"
+        curl -fsSL --retry 3 --retry-all-errors -o "$dir/godot.zip" "https://github.com/godotengine/godot-builds/releases/download/${VERSION}-stable/$name"
+        echo "$expected  $dir/godot.zip" | shasum -a 256 -c -
+        ditto -x -k "$dir/godot.zip" "$dir" && rm "$dir/godot.zip"
+        bin="$dir/Godot.app/Contents/MacOS/Godot"
+        echo "GODOT=$bin" >> "$GITHUB_ENV"
+        echo "godot=$bin" >> "$GITHUB_OUTPUT"
+        echo "godot-gui=$bin" >> "$GITHUB_OUTPUT"
+        "$bin" --version
