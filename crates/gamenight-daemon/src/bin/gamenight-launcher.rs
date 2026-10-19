@@ -18,14 +18,28 @@ use std::{
     process::{Command, Stdio},
 };
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+/// What the launcher does once the host has stopped.
+enum Next {
+    Quit,
+    /// The party is waiting in the resume file for the same version (a
+    /// lobby switch, or an update that turned out not to be there).
+    #[cfg_attr(not(windows), allow(dead_code))]
+    Restart,
+}
+
+fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     let executable = std::env::current_exe()?;
     let executable_dir = executable.parent().ok_or("No package directory")?;
     #[cfg(target_os = "macos")]
     let root = executable_dir.join("../Resources").canonicalize()?;
     #[cfg(not(target_os = "macos"))]
     let root = executable_dir.to_path_buf();
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    // A restart is a plain start: links and lobby requests were handled.
+    let args: Vec<String> = if restart {
+        Vec::new()
+    } else {
+        std::env::args().skip(1).collect()
+    };
     let choose_lobby = args.first().is_some_and(|arg| arg == "--choose-lobby");
     let requested = if args.first().is_some_and(|arg| arg == "--open-url") {
         Some(
@@ -75,15 +89,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if lock.try_lock().is_err() {
         if choose_lobby {
             browser::open_lobby_settings()?;
-            return Ok(());
+            return Ok(Next::Quit);
         }
         if let Some(game) = requested {
             links::request(&local, game)?;
-            return Ok(());
+            return Ok(Next::Quit);
         }
         return Err("GameNight is already running".into());
     }
-    drop(TcpListener::bind(("127.0.0.1", port))?);
+    port_free(port, restart)?;
     if let Err(error) = links::register() {
         eprintln!("GameNight links: {error}");
     }
@@ -256,21 +270,42 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .ok()
             .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
             .and_then(|resume| resume["lobby"].as_str().map(str::to_owned));
-        if !updates.restart_into_update() {
-            // A plain restart: cover the desktop until the lobby is back.
+        let restarted = match &lobby {
+            Some(title) => {
+                updates.restart_for_lobby(title);
+                false
+            }
+            None => updates.restart_into_update(),
+        };
+        if !restarted {
+            // A plain restart: cover the desktop until the lobby is back,
+            // and start the host again from this process. A second launcher
+            // would race this one for the lock and port, and fail unseen.
             let text = match lobby {
                 Some(title) => format!("Opening {title}\u{2026}"),
                 None => "Restarting GameNight\u{2026}".into(),
             };
             let _ = windows::spawn_splash(&splash, &text);
-            drop(lock);
-            Command::new(&executable).spawn()?;
+            return Ok(Next::Restart);
         }
-        return Ok(());
+        return Ok(Next::Quit);
     }
     #[cfg(windows)]
     updates.apply_on_exit();
-    Ok(())
+    Ok(Next::Quit)
+}
+
+/// The host's port must be free. Right after a restart the previous host
+/// may still be letting go of it, so give it a moment then.
+fn port_free(port: u16, restart: bool) -> std::io::Result<()> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    loop {
+        match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(_) => return Ok(()),
+            Err(error) if !restart || std::time::Instant::now() >= deadline => return Err(error),
+            Err(_) => std::thread::sleep(std::time::Duration::from_millis(250)),
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -308,7 +343,20 @@ fn main() {
             let _ = links::unregister();
         })
         .run();
-    if let Err(error) = run() {
+    let mut restart = false;
+    let result = loop {
+        match run(restart) {
+            Ok(Next::Quit) => break Ok(()),
+            Ok(Next::Restart) => restart = true,
+            Err(error) => break Err(error),
+        }
+    };
+    if let Err(error) = result {
+        // Never leave a restart cover hiding the error.
+        #[cfg(windows)]
+        if let Ok(local) = data::user_dir() {
+            let _ = fs::remove_file(windows::UpdateFiles::new(&local).splash);
+        }
         #[cfg(windows)]
         windows::show_error(&error.to_string());
         #[cfg(not(windows))]
