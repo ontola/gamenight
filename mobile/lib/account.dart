@@ -420,6 +420,32 @@ class CloudApi {
         .map((key, value) => MapEntry(key as String, (value as num).toInt()));
   }
 
+  /// Thumbs up and down per game, for everyone to see.
+  Future<Map<String, ({int up, int down})>> ratingTotals() async {
+    final data = await _send('GET', '/v1/game-ratings');
+    if (data is! Map) return const {};
+    return {
+      for (final MapEntry(:key, :value) in data.entries)
+        if (key is String && value is Map)
+          key: (
+            up: (value['up'] as num? ?? 0).toInt(),
+            down: (value['down'] as num? ?? 0).toInt()
+          )
+    };
+  }
+
+  /// Every game this account has played at a table; only those take votes.
+  Future<Set<String>> playedGames() async {
+    final data = await _send('GET', '/v1/me/played-games');
+    return {if (data is List) ...data.whereType<String>()};
+  }
+
+  /// 1 up, -1 down, 0 takes the vote back.
+  Future<void> rateGame(String game, int rating) =>
+      _send('PUT', '/v1/me/game-ratings',
+          body: {'game': game, 'rating': rating},
+          errors: {403: 'Play this game first, then vote.'});
+
   Future<({Set<String> games, int days})> playHistory() async {
     final data = await _send('GET', '/v1/me/play-profile') as Map;
     return (

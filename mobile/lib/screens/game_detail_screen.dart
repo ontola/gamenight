@@ -5,7 +5,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
+import '../account.dart';
 import '../catalog.dart';
+import '../widgets/game_rating.dart';
 import '../report_scope.dart';
 import '../room_controls.dart';
 import '../theme.dart';
@@ -27,6 +29,9 @@ class GameDetailScreen extends StatefulWidget {
   /// Puts a game in the room's queue.
   final Future<void> Function(CatalogGame game)? onAdd;
 
+  /// Votes and like percentages; none without it.
+  final CloudApi? cloud;
+
   /// Games this account develops, and opening one in the developer portal.
   final Set<String> developing;
   final void Function(CatalogGame game)? onManage;
@@ -40,6 +45,7 @@ class GameDetailScreen extends StatefulWidget {
       this.onAdd,
       this.developing = const {},
       this.onManage,
+      this.cloud,
       this.share});
 
   @override
@@ -117,6 +123,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                       ? widget.onManage
                       : null,
                   share: widget.share,
+                  cloud: widget.cloud,
                   onTagSelected: widget.onTagSelected,
                   onOpen: (game) =>
                       _go(_games.indexWhere((entry) => entry.id == game.id)),
@@ -134,6 +141,7 @@ class _GameDetailPage extends StatefulWidget {
       this.host,
       this.onAdd,
       this.onManage,
+      this.cloud,
       this.share,
       this.previous,
       this.onTagSelected,
@@ -147,6 +155,7 @@ class _GameDetailPage extends StatefulWidget {
   final Map<String, HostGame>? host;
   final Future<void> Function(CatalogGame)? onAdd;
   final void Function(CatalogGame)? onManage;
+  final CloudApi? cloud;
   final Future<ShareResult> Function(ShareParams)? share;
   @override
   State<_GameDetailPage> createState() => _GameDetailPageState();
@@ -278,6 +287,13 @@ class _GameDetailPageState extends State<_GameDetailPage> {
                               _Fact(Icons.sell_outlined, game.priceLabel),
                               _Fact(Icons.computer, game.platformLabel),
                             ]),
+                            if (widget.cloud != null && !game.unreviewed) ...[
+                              const SizedBox(height: 12),
+                              GameRating(
+                                  key: ValueKey('rating-${game.id}'),
+                                  game: game.id,
+                                  cloud: widget.cloud),
+                            ],
                             const SizedBox(height: 16),
                             _action(),
                             if (widget.onManage case final manage?) ...[

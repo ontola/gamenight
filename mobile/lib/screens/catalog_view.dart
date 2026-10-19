@@ -195,6 +195,7 @@ class _CatalogSectionState extends State<CatalogSection> {
               host: _inRoom && _host.isNotEmpty ? _host : null,
               onAdd: _inRoom ? _add : null,
               developing: _developing,
+              cloud: widget.cloud,
               onManage: (game) => openWebsite(widget.cloud!,
                   '/developers#game/${Uri.encodeComponent(game.id)}'),
             )));
