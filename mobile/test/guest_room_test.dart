@@ -5,6 +5,7 @@ import 'package:gamenight/account.dart';
 import 'package:gamenight/app_state.dart';
 import 'package:gamenight/link.dart';
 import 'package:gamenight/main.dart';
+import 'package:gamenight/widgets/room_code_field.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,6 +50,10 @@ class GuestCloud {
         if (r.body.isNotEmpty) bodies[key] = jsonDecode(r.body);
         switch (key) {
           case 'POST /v1/rooms/guest':
+            if (bodies[key]['code'] case final code?
+                when code != room['room_code']) {
+              return http.Response('', 404);
+            }
             expect(r.headers.containsKey('Authorization'), isFalse);
             if (bodies[key]['ticket'] != null) status = 'connected';
             return http.Response(
@@ -184,6 +189,27 @@ void main() {
     expect(state.hostedRoom!.raw['seat'], seat);
     expect(state.companion!.game, 'pocket-aces');
     expect(state.prefs.getString('guest_room_token'), isNull);
+  });
+
+  testWidgets('a wrong room code says so; Host a room is offered',
+      (tester) async {
+    await tester.pumpWidget(GameNightApp(state: state));
+    await tester.pumpAndSettle();
+    expect(find.text('Host a room'), findsOneWidget);
+    final field = find.descendant(
+        of: find.byType(RoomCodeField), matching: find.byType(TextField));
+    const wrong = 'No room with that code. Check the code on the TV.';
+    await tester.enterText(field, 'ABC23O');
+    await tester.pump();
+    expect(find.text(wrong), findsOneWidget);
+    expect(server.calls, isNot(contains('POST /v1/rooms/guest')));
+    await tester.enterText(field, 'ZZZ999');
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.text(wrong), findsOneWidget);
+    expect(server.calls, contains('POST /v1/rooms/guest'));
+    expect(state.inHostedRoom, isFalse);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('cold scanned URL shows player picker, never email form',

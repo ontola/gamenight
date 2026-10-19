@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../app_state.dart';
 import '../link.dart';
+import '../navigation/open_website.dart';
 import '../theme.dart';
 import '../layout.dart';
 import '../widgets/room_code_field.dart';
@@ -85,7 +86,13 @@ class RoomScreenState extends State<RoomScreen> {
 
   Future<void> _joinCode() async {
     final code = _code.text.trim().toUpperCase();
-    if (!isRoomCode(code)) return;
+    if (!isRoomCode(code)) {
+      // Codes never use I, L, O, 0 or 1, so this cannot be a room.
+      setState(
+          () => _error = 'No room with that code. Check the code on the TV.');
+      _code.clear();
+      return;
+    }
     // On a GameNight's Wi-Fi the code picks up a character there; otherwise
     // it is an online room, like the website's join page.
     if (state.host != null) {
@@ -477,6 +484,16 @@ class RoomScreenState extends State<RoomScreen> {
                             'The address is printed under the QR in the lobby.'),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Center(child: Hint('No room yet?')),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48)),
+                    onPressed: () => openWebsite(state, '/host'),
+                    icon: const Icon(Icons.tv),
+                    label: const Text('Host a room'),
                   ),
                 ]),
           ),

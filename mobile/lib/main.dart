@@ -14,8 +14,8 @@ import 'app_state.dart';
 import 'link.dart';
 import 'layout.dart';
 import 'player_face.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'navigation/browser_history.dart';
+import 'navigation/open_website.dart';
 import 'navigation/website_session.dart';
 import 'reports.dart';
 import 'report_scope.dart';
@@ -178,6 +178,15 @@ class _GameNightAppState extends State<GameNightApp> {
                       Navigator.pop(context);
                       _assistant();
                     }),
+                if (widget.reports != null)
+                  ListTile(
+                      leading: const Icon(Icons.mic_none),
+                      title: const Text('Feedback'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _feedback();
+                      }),
                 for (final entry in const [
                   ('/developers', 'Developer portal', Icons.code),
                   ('/docs', 'Documentation', Icons.menu_book_outlined),
@@ -200,16 +209,7 @@ class _GameNightAppState extends State<GameNightApp> {
             ));
   }
 
-  /// Opens a website page in the browser, signed in like the app when it is.
-  Future<void> _openWebsite(String path) async {
-    Uri? url;
-    try {
-      url = await widget.state.cloud.webHandoff(path);
-    } catch (_) {
-      // Fall back to the plain page; it offers its own sign-in.
-    }
-    await launchUrl(url ?? Uri.parse('$hostedOrigin$path'));
-  }
+  Future<void> _openWebsite(String path) => openWebsite(widget.state, path);
 
   void _selectDestination(int tab) {
     _navigator.currentState?.popUntil((route) => route.isFirst);
