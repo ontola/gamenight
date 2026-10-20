@@ -93,7 +93,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ActionChip, 'party').first);
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(InputChip, 'party'), findsOneWidget);
+    // The row has no tag chips; the Filter button counts the tag.
+    expect(
+        find.descendant(
+            of: find.widgetWithText(OutlinedButton, 'Filter'),
+            matching: find.text('1')),
+        findsOneWidget);
     expect(
         tester
             .widgetList<GameCard>(find.byType(GameCard))
@@ -181,7 +186,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ActionChip, 'party').first);
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(InputChip, 'party'), findsOneWidget);
+    // The row has no tag chips; the Filter button counts the tag.
+    expect(
+        find.descendant(
+            of: find.widgetWithText(OutlinedButton, 'Filter'),
+            matching: find.text('1')),
+        findsOneWidget);
     expect(searchFocused(), isFalse);
     expect(find.text('moon'), findsNothing);
 

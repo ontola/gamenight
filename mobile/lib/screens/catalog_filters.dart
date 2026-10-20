@@ -142,7 +142,8 @@ class _CatalogFiltersState extends State<CatalogFilters> {
   late bool _liked = widget.filter.liked,
       _unplayed = widget.filter.unplayed,
       _played = widget.filter.played,
-      _wanted = widget.filter.wanted;
+      _wanted = widget.filter.wanted,
+      _mine = widget.filter.mine;
   late final Set<String> _tags = {...widget.filter.tags};
   late int? _players = widget.filter.players;
   Set<String> _likedGames = {}, _playedGames = {};
@@ -194,7 +195,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
       wanted: _wanted,
       wantedGames: widget.wantedGames,
       developer: widget.filter.developer,
-      mine: widget.filter.mine,
+      mine: _mine,
       mineGames: widget.filter.mineGames,
       tags: _tags,
       likedGames: _likedGames,
@@ -225,6 +226,7 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                         _unplayed = false;
                         _played = false;
                         _wanted = false;
+                        _mine = false;
                         _players = null;
                         _tags.clear();
                       }),
@@ -246,6 +248,12 @@ class _CatalogFiltersState extends State<CatalogFilters> {
                     selected: _wanted,
                     onSelected:
                         _signedIn ? (v) => setState(() => _wanted = v) : null),
+                if (widget.filter.mineGames.isNotEmpty)
+                  FilterChip(
+                      label: const Text('My games'),
+                      avatar: const Icon(Icons.code, size: 18),
+                      selected: _mine,
+                      onSelected: (v) => setState(() => _mine = v)),
                 FilterChip(
                     label: const Text('Played'),
                     selected: _played,

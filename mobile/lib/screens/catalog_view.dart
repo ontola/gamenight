@@ -293,11 +293,11 @@ class _CatalogSectionState extends State<CatalogSection> {
 
   void _setFilter(CatalogFilter filter) => setState(() => _filter = filter);
 
-  /// Search always; player count, then Liked and Not played join the bar
-  /// as it gets wider. What does not fit stays in the Filter sheet.
+  /// One row: search, then the quick filters that fit, then Sort and
+  /// Filter. Quick filters that do not fit live in the Filter sheet, and
+  /// the Filter button counts the active filters the row does not show.
   Widget _filterBar(bool ready) => LayoutBuilder(builder: (context, box) {
-        final showPlayers = box.maxWidth >= 560;
-        final showPersonal = box.maxWidth >= 820;
+        final wide = box.maxWidth >= 560;
         final search = SizedBox(
             height: 44,
             child: TextField(
@@ -321,109 +321,105 @@ class _CatalogSectionState extends State<CatalogSection> {
                 contentPadding: EdgeInsets.zero,
               ),
             ));
-        final chips = [
+        final n = _filter.players;
+        // In order of priority: the first ones get the room first.
+        final quick = <({String label, bool active, Widget button})>[
           if (_wanted.isNotEmpty || _filter.wanted)
-            FilterChip(
-                key: const ValueKey('want-to-play'),
-                avatar: _filter.wanted
-                    ? null
-                    : const Icon(Icons.bookmark_border, size: 18),
-                label: const Text('Want to play'),
-                selected: _filter.wanted,
-                onSelected: (v) => _setFilter(
-                    _filter.copyWith(wanted: v, wantedGames: _wanted))),
-          if (_filter.played)
-            InputChip(
-                label: const Text('Played'),
-                onPressed: () => _setFilter(_filter.copyWith(played: false)),
-                onDeleted: () => _setFilter(_filter.copyWith(played: false))),
-          if (_filter.developer case final developer?)
-            InputChip(
-                label: Text(developer),
-                onPressed: () =>
-                    _setFilter(_filter.copyWith(developer: () => null)),
-                onDeleted: () =>
-                    _setFilter(_filter.copyWith(developer: () => null))),
+            (
+              label: 'Want to play',
+              active: _filter.wanted,
+              button: _BarButton(
+                  key: const ValueKey('want-to-play'),
+                  icon: Icons.bookmark_border,
+                  label: 'Want to play',
+                  selected: _filter.wanted,
+                  onPressed: ready
+                      ? () => _setFilter(_filter.copyWith(
+                          wanted: !_filter.wanted, wantedGames: _wanted))
+                      : null),
+            ),
           if (_mine.isNotEmpty)
-            FilterChip(
-                key: const ValueKey('my-games'),
-                label: const Text('My games'),
-                selected: _filter.mine,
-                onSelected: (v) => _setFilter(
-                    _filter.copyWith(mine: v, mineGames: _developing))),
-          if (_filter.liked && !showPersonal)
-            InputChip(
-                label: const Text('Liked'),
-                onPressed: () => _setFilter(_filter.copyWith(liked: false)),
-                onDeleted: () => _setFilter(_filter.copyWith(liked: false))),
-          if (_filter.unplayed && !showPersonal)
-            InputChip(
-                label: const Text('Not played'),
-                onPressed: () => _setFilter(_filter.copyWith(unplayed: false)),
-                onDeleted: () => _setFilter(_filter.copyWith(unplayed: false))),
-          if (_filter.players != null && !showPlayers)
-            InputChip(
-                label: Text('${_filter.players} players'),
-                onPressed: () =>
-                    _setFilter(_filter.copyWith(players: () => null)),
-                onDeleted: () =>
-                    _setFilter(_filter.copyWith(players: () => null))),
-          for (final tag in _filter.tags)
-            InputChip(
-                label: Text(tag),
-                onPressed: () => _setFilter(
-                    _filter.copyWith(tags: {..._filter.tags}..remove(tag))),
-                onDeleted: () => _setFilter(
-                    _filter.copyWith(tags: {..._filter.tags}..remove(tag)))),
-          if (_filter.active)
-            Text(
-                '${_visible.length} ${_visible.length == 1 ? 'game' : 'games'}',
-                style: const TextStyle(color: GnColors.muted)),
+            (
+              label: 'My games',
+              active: _filter.mine,
+              button: _BarButton(
+                  key: const ValueKey('my-games'),
+                  icon: Icons.code,
+                  label: 'My games',
+                  selected: _filter.mine,
+                  onPressed: ready
+                      ? () => _setFilter(_filter.copyWith(
+                          mine: !_filter.mine, mineGames: _developing))
+                      : null),
+            ),
+          (
+            label: n == null ? 'Players' : '$n players',
+            active: n != null,
+            button: _playersButton(ready),
+          ),
+          (
+            label: 'Liked',
+            active: _filter.liked,
+            button: _personalButton('Liked', Icons.thumb_up_outlined,
+                _filter.liked, (v) => _filter.copyWith(liked: v)),
+          ),
+          (
+            label: 'Not played',
+            active: _filter.unplayed,
+            button: _personalButton('Not played', Icons.history,
+                _filter.unplayed, (v) => _filter.copyWith(unplayed: v)),
+          ),
         ];
-        return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(children: [
-                // The search shrinks before the buttons beside it overflow.
-                Expanded(
-                    child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                                maxWidth: showPlayers ? 320 : double.infinity),
-                            child: search))),
-                if (showPlayers) ...[
-                  const SizedBox(width: 8),
-                  _playersButton(ready),
-                ],
-                if (showPersonal) ...[
-                  const SizedBox(width: 8),
-                  _personalChip('Liked', Icons.thumb_up_outlined, _filter.liked,
-                      (v) => _filter.copyWith(liked: v)),
-                  const SizedBox(width: 8),
-                  _personalChip('Not played', null, _filter.unplayed,
-                      (v) => _filter.copyWith(unplayed: v)),
-                ],
+        // Search keeps at least this much; Sort and Filter always fit.
+        final searchMin = wide ? 260.0 : 120.0;
+        final sortLabel = wide ? _sortLabel : null;
+        var room = box.maxWidth -
+            searchMin -
+            _BarButton.widthOf(context, sortLabel) -
+            _BarButton.widthOf(context, wide ? 'Filter 9' : null) -
+            16;
+        final shown = <({String label, bool active, Widget button})>[];
+        if (wide) {
+          for (final item in quick) {
+            final width = _BarButton.widthOf(context, item.label) + 8;
+            if (width > room) break;
+            room -= width;
+            shown.add(item);
+          }
+        }
+        final hidden = _filter.tags.length +
+            (_filter.played ? 1 : 0) +
+            (_filter.developer != null ? 1 : 0) +
+            quick.where((q) => q.active && !shown.contains(q)).length;
+        return SizedBox(
+            height: 44,
+            child: Row(children: [
+              Expanded(
+                  child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 400),
+                          child: search))),
+              for (final item in shown) ...[
                 const SizedBox(width: 8),
-                _sortButton(ready),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                    onPressed: ready ? _showFilters : null,
-                    icon: const Icon(Icons.tune, size: 18),
-                    label: const Text('Filter')),
-              ]),
-              if (chips.isNotEmpty)
-                Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: chips)),
-            ]);
+                item.button,
+              ],
+              const SizedBox(width: 8),
+              _sortButton(ready, sortLabel),
+              const SizedBox(width: 8),
+              _BarButton(
+                  icon: Icons.tune,
+                  label: wide ? 'Filter' : null,
+                  tooltip: 'Filter',
+                  count: hidden,
+                  selected: hidden > 0,
+                  onPressed: ready ? _showFilters : null),
+            ]));
       });
 
-  Widget _sortButton(bool ready) {
+  String get _sortLabel => _sort == CatalogSort.store ? 'Sort' : _sort.short;
+
+  Widget _sortButton(bool ready, String? label) {
     final signedIn = widget.cloud?.signedIn == true;
     return PopupMenuButton<CatalogSort>(
       key: const ValueKey('catalog-sort'),
@@ -437,18 +433,12 @@ class _CatalogSectionState extends State<CatalogSection> {
             PopupMenuItem(value: sort, child: Text(sort.label)),
       ],
       child: IgnorePointer(
-        child: _sort == CatalogSort.store
-            ? IconButton.outlined(
-                onPressed: ready ? () {} : null,
-                icon: const Icon(Icons.sort, size: 20))
-            : OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                    backgroundColor: GnColors.button.withValues(alpha: .35),
-                    side: const BorderSide(color: GnColors.accent)),
-                onPressed: ready ? () {} : null,
-                icon: const Icon(Icons.sort, size: 18),
-                label: Text(_sort.short)),
-      ),
+          child: _BarButton(
+              icon: Icons.sort,
+              label: label,
+              name: 'Sort',
+              selected: _sort != CatalogSort.store,
+              onPressed: ready ? () {} : null)),
     );
   }
 
@@ -468,36 +458,31 @@ class _CatalogSectionState extends State<CatalogSection> {
               child: Text(count == 1 ? '1 player' : '$count players')),
       ],
       child: IgnorePointer(
-        child: OutlinedButton.icon(
-          style: n == null
-              ? null
-              : OutlinedButton.styleFrom(
-                  backgroundColor: GnColors.button.withValues(alpha: .35),
-                  side: const BorderSide(color: GnColors.accent)),
-          onPressed: ready ? () {} : null,
-          icon: const Icon(Icons.group_outlined, size: 18),
-          label: Text(n == null
-              ? 'Players'
-              : n == 1
-                  ? '1 player'
-                  : '$n players'),
-        ),
+        child: _BarButton(
+            icon: Icons.group_outlined,
+            label: n == null
+                ? 'Players'
+                : n == 1
+                    ? '1 player'
+                    : '$n players',
+            selected: n != null,
+            onPressed: ready ? () {} : null),
       ),
     );
   }
 
   /// Liked and Not played need the account's ratings and play history,
   /// loaded on first use. Signed out, a tap offers sign-in instead.
-  Widget _personalChip(String label, IconData? icon, bool selected,
+  Widget _personalButton(String label, IconData icon, bool selected,
           CatalogFilter Function(bool) apply) =>
-      FilterChip(
-        label: Text(label),
-        avatar: icon == null || selected ? null : Icon(icon, size: 18),
+      _BarButton(
+        icon: icon,
+        label: label,
         selected: selected,
-        onSelected: _games == null || _personalLoading
+        onPressed: _games == null || _personalLoading
             ? null
-            : (v) async {
-                if (!v) return _setFilter(apply(false));
+            : () async {
+                if (selected) return _setFilter(apply(false));
                 if (widget.cloud?.signedIn != true) {
                   await widget.onSignIn?.call();
                   if (!mounted || widget.cloud?.signedIn != true) return;
@@ -799,5 +784,103 @@ class GameCover extends StatelessWidget {
           fit: BoxFit.cover, errorBuilder: tile, semanticLabel: game.title);
     }
     return tile(context);
+  }
+}
+
+/// The look every control in the catalog's filter row shares: as tall as
+/// the search field, outlined, and accent-coloured while it filters or
+/// sorts. Without a label it is a square icon button.
+class _BarButton extends StatelessWidget {
+  final IconData icon;
+  final String? label, tooltip;
+
+  /// What screen readers call an icon-only button; [tooltip] by default.
+  final String? name;
+  final bool selected;
+
+  /// Shown as a badge after the label when above zero.
+  final int count;
+  final VoidCallback? onPressed;
+  const _BarButton(
+      {super.key,
+      required this.icon,
+      this.label,
+      this.tooltip,
+      this.name,
+      this.selected = false,
+      this.count = 0,
+      required this.onPressed});
+
+  static const _text = TextStyle(fontSize: 14, fontWeight: FontWeight.w600);
+
+  /// How wide a button with this label is drawn, to see what fits.
+  static double widthOf(BuildContext context, String? label) {
+    if (label == null) return 44;
+    final painter = TextPainter(
+        text: TextSpan(text: label, style: _text),
+        textDirection: TextDirection.ltr,
+        textScaler: MediaQuery.textScalerOf(context))
+      ..layout();
+    return 12 + 18 + 8 + painter.width + 16 + 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final style = OutlinedButton.styleFrom(
+      minimumSize: const Size(44, 44),
+      maximumSize: const Size(double.infinity, 44),
+      padding: label == null
+          ? EdgeInsets.zero
+          : const EdgeInsets.only(left: 12, right: 16),
+      textStyle: _text,
+      backgroundColor: selected ? GnColors.button.withValues(alpha: .35) : null,
+      side: selected ? const BorderSide(color: GnColors.accent) : null,
+    );
+    // Screen readers hear the count as the button's value.
+    final badge = count > 0
+        ? ExcludeSemantics(
+            child: Container(
+                constraints: const BoxConstraints(minWidth: 18),
+                height: 18,
+                padding: const EdgeInsets.symmetric(horizontal: 5),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                    color: GnColors.accent,
+                    borderRadius: BorderRadius.circular(9)),
+                child: Text('$count',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white))))
+        : null;
+    final Widget button;
+    if (label == null) {
+      button = OutlinedButton(
+          style: style,
+          onPressed: onPressed,
+          child: Stack(clipBehavior: Clip.none, children: [
+            // Icon-only buttons still read as Sort or Filter.
+            Icon(icon, size: 20, semanticLabel: name ?? tooltip),
+            if (badge != null) Positioned(right: -12, top: -10, child: badge),
+          ]));
+    } else {
+      button = OutlinedButton(
+          style: style,
+          onPressed: onPressed,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 8),
+            Text(label!),
+            if (badge != null) ...[const SizedBox(width: 6), badge],
+          ]));
+    }
+    final semantics = Semantics(
+        selected: selected,
+        value: count > 0 ? '$count active' : null,
+        child: button);
+    return label == null && tooltip != null
+        ? Tooltip(
+            message: tooltip!, excludeFromSemantics: true, child: semantics)
+        : semantics;
   }
 }
