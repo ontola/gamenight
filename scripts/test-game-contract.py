@@ -190,7 +190,7 @@ class ContractTests(unittest.TestCase):
                 Path(cmd[cmd.index('--capture')+1]).write_bytes(b'capture')
             return True
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
-            m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
+            m.subprocess,'check_output',side_effect=['3e56813f0a01915a3e402a44a423027c131ef815\n','']), mock.patch.object(
             m,'run_check',side_effect=fake_check):
             m.run_spaceracer(report,archive,source,self.output,window_probe=True)
         game=report['games'][0]
@@ -206,7 +206,7 @@ class ContractTests(unittest.TestCase):
         default=m.new_report([{'id':'spaceracer','title':'SpaceRacer'}],
                              {'version':1,'features':features},'sha','windows')
         with mock.patch.object(m,'catalog',return_value=[entry]), mock.patch.object(
-            m.subprocess,'check_output',side_effect=['c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb\n','']), mock.patch.object(
+            m.subprocess,'check_output',side_effect=['3e56813f0a01915a3e402a44a423027c131ef815\n','']), mock.patch.object(
             m,'run_check',side_effect=lambda cmd,env,log,timeout: log.write_text('PASS') or True):
             m.run_spaceracer(default,archive,source,self.output)
         self.assertEqual(default['games'][0]['checks']['presentation.prewarm']['status'],'untested')

@@ -69,9 +69,13 @@ jobs:
           $archive = 'dist/native/spaceracer-windows.zip'
           Invoke-WebRequest $entry.downloads.windows.url -OutFile $archive
           if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.downloads.windows.sha256.ToLowerInvariant()) { throw 'SpaceRacer release checksum mismatch' }
-          git clone --depth 1 --branch v0.4.1 https://github.com/joepio/spaceracer.git dist/native-source
+          git init dist/native-source
+          if ($LASTEXITCODE -ne 0) { throw 'SpaceRacer probe source init failed' }
+          git -C dist/native-source fetch --depth 1 https://github.com/joepio/spaceracer.git 3e56813f0a01915a3e402a44a423027c131ef815
+          if ($LASTEXITCODE -ne 0) { throw 'SpaceRacer probe source fetch failed' }
+          git -C dist/native-source checkout --detach FETCH_HEAD
           if ($LASTEXITCODE -ne 0) { throw 'SpaceRacer probe checkout failed' }
-          if ((git -C dist/native-source rev-parse HEAD).Trim() -ne 'c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb') { throw 'SpaceRacer probe source changed' }
+          if ((git -C dist/native-source rev-parse HEAD).Trim() -ne '3e56813f0a01915a3e402a44a423027c131ef815') { throw 'SpaceRacer probe source changed' }
       - name: Certify every packaged game against GameNight
         shell: pwsh
         run: |
