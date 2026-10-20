@@ -7,7 +7,7 @@ async function run(action, failure=false){
   const make=tag=>({tag,children:[],listeners:{},value:'',append(...c){this.children.push(...c);},prepend(){},setAttribute(){},addEventListener(k,v){this.listeners[k]=v;},showModal(){this.open=true;},close(){this.open=false;},remove(){this.removed=true;},focus(){}});
   const node=id=>{if(!nodes.has(id))nodes.set(id,make(id));return nodes.get(id);};
   const storage={getItem(){return null;},setItem(){},removeItem(){}};
-  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement(tag){const n=make(tag);created.push(n);return n;}},window:{showToast(text){node('room-status').textContent=text;},localStorage:storage,initAccountSettings(){}},sessionStorage:{...storage,getItem(k){return k==='gamenight_pair'&&!cleared?'ticket':null;},removeItem(k){if(k==='gamenight_pair')cleared=true;}},location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,setTimeout(){},clearTimeout(){},fetch:async url=>{
+  const context={document:{body:{dataset:{cloud:'true'},append(){}},getElementById:node,querySelector:node,createElement(tag){const n=make(tag);created.push(n);return n;},createTextNode:text=>({text})},window:{showToast(text){node("room-status").textContent=text;},localStorage:storage,initAccountSettings(){},addEventListener(){}},sessionStorage:{...storage,getItem(k){return k==='gamenight_pair'&&!cleared?'ticket':null;},removeItem(k){if(k==='gamenight_pair')cleared=true;}},location:{hash:'',pathname:'/studio',replace(){}},history:{replaceState(){}},URLSearchParams,Date,setTimeout(){},clearTimeout(){},fetch:async url=>{
     let data={},status=200;
     if(url==='/v1/me')data={id:'test'};
     if(url==='/v1/pairing/ticket')data={seat:1};
@@ -17,7 +17,7 @@ async function run(action, failure=false){
   }};
   await vm.runInNewContext(readFileSync(path.join(__dirname,'../web/storage.js'),'utf8'),context);
   const dialog=created.find(n=>n.tag==='dialog'), panel=dialog.children[0];
-  const [close,title,text,accept]=panel.children;
+  const [close,title,text,remember,accept]=panel.children;
   assert.equal(dialog.open,true);assert.equal(accept.disabled,false);
   if(action==='cancel'){close.onclick();assert.equal(claims,0);assert.equal(cleared,true);assert.equal(dialog.removed,true);}
   else {

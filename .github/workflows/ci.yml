@@ -126,6 +126,47 @@ jobs:
         run: for file in web/*.js; do node --check "$file"; done
       - name: Check the generated protocol module and the JavaScript example
         run: node --check sdk/js/protocol.mjs && node --check examples/tiny-game.mjs
+      - name: Test the website scripts in isolated contexts
+        run: |
+          node scripts/test-pairing-dialog.cjs
+          node scripts/test-playlist-actions.cjs
+          node scripts/test-qr-scanner.cjs
+          node scripts/test-random-faces.cjs
+          node scripts/test-room-controls.cjs
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+      - name: Build the Svelte site shell
+        working-directory: web-app
+        run: pnpm install --frozen-lockfile && pnpm build
+      - name: Require the committed web/shell.js to match web-app/
+        run: |
+          git diff --exit-code --stat web/shell.js || {
+            echo "::error file=web/shell.js::web/shell.js differs from the web-app/ build. Run 'pnpm build' in web-app/ and commit web/shell.js."
+            exit 1
+          }
+
+  web-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: cargo build --locked -p gamenight-local-web
+      - name: Test the phone player page in Chromium against the local web host
+        run: |
+          npm install --prefix "$RUNNER_TEMP/web-browser" --no-save playwright@1.62.1
+          export NODE_PATH="$RUNNER_TEMP/web-browser/node_modules"
+          node "$NODE_PATH/playwright/cli.js" install --with-deps chromium
+          target/debug/gamenight-local-web > "$RUNNER_TEMP/local-web.log" 2>&1 &
+          for _ in $(seq 100); do curl -fs -o /dev/null http://127.0.0.1:7913/studio && break; sleep 0.2; done
+          node scripts/test-player-memory.cjs
+      - if: failure()
+        run: cat "$RUNNER_TEMP/local-web.log"
 
   documentation:
     runs-on: ubuntu-latest
