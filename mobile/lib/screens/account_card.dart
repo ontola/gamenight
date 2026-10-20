@@ -24,7 +24,7 @@ class _AccountCardState extends State<AccountCard> {
     try {
       await state.signOut();
       if (mounted) {
-        toast(context, 'Signed out. Your player stays on this phone.');
+        toast(context, 'Signed out. Sign in again to get your player back.');
       }
     } catch (e) {
       if (mounted) toast(context, e.toString());

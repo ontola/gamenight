@@ -709,8 +709,27 @@ class AppState extends ChangeNotifier {
 
   Future<void> signOut() async {
     await cloud.signOut();
-    await _forgetAccount();
+    await _forgetAccount(clearPlayer: true);
     notifyListeners();
+  }
+
+  /// A signed-out phone shows a new random player, not the account's face:
+  /// seeing your own face reads as still being signed in. Signing in again
+  /// brings the account's player back.
+  void _resetPlayer() {
+    name = randomName();
+    skinColor = defaultSkin;
+    clothingColor = '#55a0ff';
+    face = randomFace();
+    prefs.setString('player_name', name);
+    prefs.setString('skin_color', skinColor);
+    prefs.setString('clothing_color', clothingColor);
+    prefs.setString('face', encodeAvatar(face));
+    artworks.clear();
+    prefs.remove('artworks');
+    prefs.remove('current_artwork');
+    _loadArtworks(firstRun: true);
+    scheduleSave();
   }
 
   /// Deletes the account online, then forgets it here. The player stays.
@@ -732,7 +751,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _forgetAccount() async {
+  Future<void> _forgetAccount({bool clearPlayer = false}) async {
+    if (clearPlayer) _resetPlayer();
     cloud.token = null;
     account = null;
     wantToPlay = null;
@@ -756,7 +776,9 @@ class AppState extends ChangeNotifier {
     try {
       if (cloud.browserCookies) {
         if (!await cloud.restoreBrowserSession()) {
-          if (account != null || inHostedRoom) await _forgetAccount();
+          if (account != null || inHostedRoom) {
+            await _forgetAccount(clearPlayer: account != null);
+          }
           if (isGuest) await refreshHostedRoom();
           notifyListeners();
           return;
@@ -784,7 +806,7 @@ class AppState extends ChangeNotifier {
       }
       if (inHostedRoom) startPolling();
     } on SignedOut {
-      await _forgetAccount();
+      await _forgetAccount(clearPlayer: true);
     } on ApiError {
       // Offline: keep the token and try again later.
     }
@@ -931,7 +953,7 @@ class AppState extends ChangeNotifier {
       await _forgetGuestRoom();
       sessionError = e.message;
     } on SignedOut {
-      await _forgetAccount();
+      await _forgetAccount(clearPlayer: true);
     } on ApiError catch (e) {
       sessionError = e.message;
     }
@@ -954,7 +976,7 @@ class AppState extends ChangeNotifier {
     } on GuestRoomExpired {
       // Already revoked.
     } on SignedOut {
-      await _forgetAccount();
+      await _forgetAccount(clearPlayer: true);
     } on ApiError {
       // Unreachable or gone; the room is forgotten here either way.
     }

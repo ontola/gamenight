@@ -266,9 +266,27 @@ void main() {
     await state.verifySignInCode('12345678');
     state.cloud.token = 'd' * 64;
     await state.prefs.setString('cloud_token', 'd' * 64);
+    final face = encodeAvatar(state.face);
     await state.loadAccount();
     expect(state.signedIn, isFalse);
     expect(state.prefs.getString('cloud_token'), isNull);
+    expect(encodeAvatar(state.face), isNot(face),
+        reason: 'a signed-out phone must not look signed in');
+  });
+
+  test('signing out swaps the player for a new random one', () async {
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    state.setName('Joep');
+    final face = encodeAvatar(state.face);
+    await state.signOut();
+    expect(state.signedIn, isFalse);
+    expect(state.name, isNot('Joep'));
+    expect(state.prefs.getString('player_name'), state.name);
+    expect(encodeAvatar(state.face), isNot(face));
+    expect(state.artworks, hasLength(1));
+    expect(state.prefs.getString('starter_artwork'), state.currentArtworkId,
+        reason: 'signing in again drops the random face for the account\'s');
   });
 
   test('changing email needs the mailed code; a wrong one keeps the session',
