@@ -169,6 +169,36 @@ It applies them on a worker, coalesces repeated edits and retries mailbox
 conflicts. Mod installation waits for an in-flight settings update. These two
 controls do not install arbitrary mods. Edits made directly through the separate
 world bridge are not automatically republished into GameNight's setting values.</p>
+<h2 id="per-player-settings">Per-player settings</h2>
+<p>Some choices belong to one player, not the party: their character, their stick
+sensitivity, inverted look. Declare those with <code>&quot;scope&quot;: &quot;player&quot;</code> in the same
+<code>declare_settings</code> call. Kinds, ranges and validation are the same.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">GameNight.declare_settings([
+    {key = &quot;rounds&quot;, label = &quot;Rounds to win&quot;, kind = &quot;number&quot;,
+     default = 3, min = 1, max = 9},
+    {key = &quot;sensitivity&quot;, label = &quot;Stick sensitivity %&quot;, kind = &quot;number&quot;,
+     default = 100, min = 40, max = 250, scope = &quot;player&quot;},
+    {key = &quot;character&quot;, label = &quot;Character&quot;, kind = &quot;choice&quot;,
+     default = &quot;frog&quot;, options = [&quot;frog&quot;, &quot;cat&quot;, &quot;robot&quot;], scope = &quot;player&quot;},
+])
+GameNight.player_settings_changed.connect(func(player_id, values):
+    aim_speed[player_id] = values[&quot;sensitivity&quot;] / 100.0)
+</code></pre></div>
+<ul>
+<li>Every player has their own value. The game receives <code>player_settings {game, player_id, values}</code> (all per-player keys, defaults merged in) after
+<code>declare_settings</code>, with every <code>prepare</code> and <code>party_updated</code>, and whenever the
+player changes one. In Godot: the <code>player_settings_changed</code> signal and
+<code>GameNight.player_setting(player_id, key, fallback)</code>.</li>
+<li>Change one from the game's own menu with <code>set_player_setting {player_id, key, value}</code> (Godot <code>GameNight.set_player_setting</code>, Rust <code>set_player_setting</code>).
+Phones send the same message for their own player.</li>
+<li>A player with a profile keeps their values between nights: the host saves them
+in <code>gamenight/player-settings.json</code> in the user data directory (override with
+<code>GAMENIGHT_PLAYER_SETTINGS</code>). A guest's values last for the night; when the
+guest signs in, they move to their profile.</li>
+<li>Party writes (<code>set_setting</code>, <code>control_settings</code>) cannot change a per-player
+key, and <code>GameSettings.values</code> only holds party values. <code>GameSettings.players</code>
+shows each present player's own values, for the apps.</li>
+</ul>
 <h2 id="phone-and-lobby-assistant">Phone and lobby assistant</h2>
 <p>The standard desktop cloud bridge and the custom lobby relay publish these same
 declarations for the active game, or the prepared game if none is running. Numeric
@@ -209,7 +239,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="e374209f7a87c17be64b9decf3c333c7153dd732610743b947e395685b9d235b">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="1098965e37d9d449a112148288ec20fdbed31a271d679aff1a735754789d0f09">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/store-clip"><small>Previous</small>Store clip</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#per-player-settings">Per-player settings</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
