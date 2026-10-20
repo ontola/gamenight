@@ -42,23 +42,27 @@ func _run() -> void:
 	for case in [["blaster", 4.0], ["minigun", 4.0], ["popcorn", 2.0], ["bazooka", 4.0], ["laser", 9.0], ["saber", 1.2]]:
 		var setup := arena(case[0], case[1])
 		var w = setup[0]; var b: Dictionary = setup[2]
-		press(w, "a", World.BTN_X, 20 if case[0] == "minigun" else 1)
+		press(w, "a", World.BTN_RT, 20 if case[0] == "minigun" else 1)
 		run_for(w, 1.0)
 		# Popcorn only nudges; the rest send people flying.
 		var push := 0.15 if case[0] == "popcorn" else 0.5
 		check(b.x > case[1] + push, "%s knocks the player in front away (x %.2f)" % [case[0], b.x])
 	var setup := arena("laser", 9.0)
 	var w = setup[0]
-	press(w, "a", World.BTN_X)
+	press(w, "a", World.BTN_RT)
 	check(w.events.any(func(e): return e.type == "laser"), "The laser draws a beam")
 	setup = arena("saber", 1.2)
 	w = setup[0]; var item: Dictionary = setup[3]
 	for i in World.WEAPONS.saber.ammo:
-		press(w, "a", World.BTN_X)
+		press(w, "a", World.BTN_RT)
 		run_for(w, 0.4)
 	check(item.dead and setup[1].item == -1, "The saber wears out")
 	setup = arena("popcorn", 3.0)
 	w = setup[0]
-	press(w, "a", World.BTN_X)
+	press(w, "a", World.BTN_RT)
 	check(w.shots.size() == World.WEAPONS.popcorn.handful, "Popcorn is thrown by the handful")
 	check(w.shots.all(func(s): return s.vy > 0), "Popcorn is lobbed")
+	setup = arena("blaster", 1.0)
+	w = setup[0]
+	press(w, "a", World.BTN_X)
+	check(w.shots.is_empty() and setup[1].punch > 0, "X punches and leaves the held item alone")

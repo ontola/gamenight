@@ -414,6 +414,8 @@ func _controllers_changed(frames: Array) -> void:
 		var buttons := int(frame.get("buttons", 0))
 		var axes: Array = frame.get("axes", [0, 0, 0, 0, 0, 0])
 		var stick := Vector2(float(axes[0]) / 32767.0, float(axes[1]) / 32767.0) if axes.size() >= 2 else Vector2.ZERO
+		# Items are used with the right trigger, so it becomes a button here.
+		if axes.size() >= 6 and float(axes[5]) / 32767.0 > 0.5: buttons |= World.BTN_RT
 		input(id, buttons, stick)
 
 ## Routes one player's controller state; demo bots use the same path.

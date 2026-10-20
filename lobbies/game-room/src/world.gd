@@ -24,6 +24,8 @@ const BTN_B := 2
 const BTN_X := 4
 const BTN_Y := 8
 const BTN_START := 128
+## Right trigger, folded into the button mask by main (the wire sends it as an axis).
+const BTN_RT := 1 << 20
 const BTN_UP := 1 << 10
 const BTN_DOWN := 1 << 11
 const BTN_LEFT := 1 << 12
@@ -218,12 +220,14 @@ func _actions(p: Dictionary, stunned: bool) -> void:
 		if not item.is_empty(): _drop_item(p, true)
 		elif not pickup_target(p).is_empty(): _grab(p)
 		else: _grab_player(p)
-	# The minigun fires while X is held; everything else once per press.
-	if not item.is_empty() and item.kind == "minigun" and p.held & BTN_X:
+	# X punches; RT uses the held item. The minigun fires while RT is held,
+	# everything else once per pull.
+	if p.pressed & BTN_X: _punch(p)
+	if item.is_empty(): return
+	if item.kind == "minigun" and p.held & BTN_RT:
 		_fire(p, item)
-	elif p.pressed & BTN_X:
-		if item.is_empty(): _punch(p)
-		elif item.kind == "bomb": _drop_item(p, true)
+	elif p.pressed & BTN_RT:
+		if item.kind == "bomb": _drop_item(p, true)
 		elif item.kind == "laser": _laser(p, item)
 		elif item.kind == "saber": _slash(p, item)
 		elif WEAPONS.has(item.kind): _fire(p, item)

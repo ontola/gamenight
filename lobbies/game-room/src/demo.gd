@@ -124,6 +124,7 @@ func tick(delta: float) -> void:
 			elif bot.jump > 0.2: buttons |= 1
 			if rng.randf() < 0.01: buttons |= 2
 			if rng.randf() < 0.02: buttons |= 4
+			if rng.randf() < 0.02: buttons |= main.World.BTN_RT
 		main.input(id, buttons, stick)
 	if scene == "action":
 		# A mid-air pose for the screenshot: one player leaping, one punched.
