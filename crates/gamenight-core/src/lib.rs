@@ -10,7 +10,7 @@ mod playlist;
 mod session;
 mod vote;
 
-pub use night::{Command, Effect, GameCommand, GameNight, PartyCarry};
+pub use night::{Command, Effect, GameCommand, GameNight, PartyCarry, PlayerSettingsStore};
 pub use playlist::Playlist;
 pub use session::{IllegalTransition, Session};
 pub use vote::VoteBoard;
@@ -1602,6 +1602,7 @@ mod night_tests {
 
     fn toggle(key: &str, default: bool) -> SettingSpec {
         SettingSpec {
+            scope: Default::default(),
             key: key.into(),
             label: key.to_uppercase(),
             description: None,
@@ -1614,6 +1615,121 @@ mod night_tests {
             Effect::SettingChanged { game, key, value } => Some((game, key.as_str(), value)),
             _ => None,
         })
+    }
+
+    fn sensitivity() -> SettingSpec {
+        SettingSpec {
+            scope: gamenight_protocol::SettingScope::Player,
+            key: "sensitivity".into(),
+            label: "Stick sensitivity %".into(),
+            description: None,
+            kind: SettingKind::Number {
+                default: 100,
+                min: 40,
+                max: 250,
+            },
+        }
+    }
+
+    fn player_values(fx: &[Effect], who: gamenight_protocol::PlayerId) -> Option<&SettingValue> {
+        fx.iter().rev().find_map(|e| match e {
+            Effect::PlayerSettings {
+                player_id, values, ..
+            } if *player_id == who => values.get("sensitivity"),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn player_settings_are_per_player_and_follow_the_profile() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ada", Some(0), None));
+        night.handle(join_cmd("Bo", Some(1), None));
+        let (ada, bo) = (
+            night.snapshot().players[0].id,
+            night.snapshot().players[1].id,
+        );
+        let shooter = GameId::new("shooter");
+        let fx = night.handle(Command::DeclareSettings {
+            game: shooter.clone(),
+            settings: vec![toggle("items", true), sensitivity()],
+        });
+        assert_eq!(player_values(&fx, ada), Some(&SettingValue::Number(100)));
+        let snapshot = night.snapshot();
+        assert!(!snapshot.settings[0].values.contains_key("sensitivity"));
+        assert_eq!(
+            snapshot.settings[0].players[&bo]["sensitivity"],
+            SettingValue::Number(100)
+        );
+
+        // A party write cannot touch a player's knob, nor the reverse.
+        let fx = night.handle(Command::SetSetting {
+            game: Some(shooter.clone()),
+            key: "sensitivity".into(),
+            value: SettingValue::Number(150),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        let fx = night.handle(Command::SetPlayerSetting {
+            game: Some(shooter.clone()),
+            player_id: ada,
+            key: "items".into(),
+            value: SettingValue::Toggle(false),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        let fx = night.handle(Command::SetPlayerSetting {
+            game: Some(shooter.clone()),
+            player_id: ada,
+            key: "sensitivity".into(),
+            value: SettingValue::Number(999),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+
+        // A guest's choice is theirs tonight only...
+        let fx = night.handle(Command::SetPlayerSetting {
+            game: Some(shooter.clone()),
+            player_id: ada,
+            key: "sensitivity".into(),
+            value: SettingValue::Number(180),
+        });
+        assert_eq!(player_values(&fx, ada), Some(&SettingValue::Number(180)));
+        assert!(!fx.iter().any(|e| matches!(e, Effect::PlayerSettingsStored)));
+        assert_eq!(
+            night.player_settings(&shooter, bo).unwrap()["sensitivity"],
+            SettingValue::Number(100)
+        );
+        assert!(night.saved_player_settings().is_empty());
+
+        // ...until they sign in: then it is saved with their profile.
+        let fx = night.handle(Command::SetPlayerProfile {
+            player_id: ada,
+            profile: Some("account:ada".into()),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::PlayerSettingsStored)));
+        assert_eq!(player_values(&fx, ada), Some(&SettingValue::Number(180)));
+        let saved = night.saved_player_settings();
+        assert_eq!(
+            saved["account:ada"]["shooter"]["sensitivity"],
+            SettingValue::Number(180)
+        );
+
+        // Another night: the profile's value comes back on a new player.
+        let mut later = GameNight::default();
+        later.load_player_settings(saved);
+        later.handle(join_cmd("Ada", Some(0), None));
+        let again = later.snapshot().players[0].id;
+        later.handle(Command::DeclareSettings {
+            game: shooter.clone(),
+            settings: vec![sensitivity()],
+        });
+        assert_eq!(
+            later.player_settings(&shooter, again).unwrap()["sensitivity"],
+            SettingValue::Number(100)
+        );
+        let fx = later.handle(Command::SetPlayerProfile {
+            player_id: again,
+            profile: Some("account:ada".into()),
+        });
+        assert_eq!(player_values(&fx, again), Some(&SettingValue::Number(180)));
     }
 
     #[test]
@@ -1631,6 +1747,7 @@ mod night_tests {
             settings: vec![
                 toggle("items", true),
                 SettingSpec {
+                    scope: Default::default(),
                     key: "arena".into(),
                     label: "Arena".into(),
                     description: None,
@@ -1697,6 +1814,7 @@ mod night_tests {
             settings: vec![
                 toggle("items", true),
                 SettingSpec {
+                    scope: Default::default(),
                     key: "stock".into(),
                     label: "Stock".into(),
                     description: None,
@@ -1835,6 +1953,7 @@ mod night_tests {
         let fx = night.handle(Command::DeclareSettings {
             game: GameId::new("g1"),
             settings: vec![SettingSpec {
+                scope: Default::default(),
                 key: "arena".into(),
                 label: "Arena".into(),
                 description: None,

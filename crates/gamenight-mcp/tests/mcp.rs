@@ -20,12 +20,14 @@ async fn game_with_settings(addr: &str) -> GameNight {
     let mut gn = GameNight::connect("lobby", Some(addr)).await.unwrap();
     gn.declare_settings(vec![
         SettingSpec {
+            scope: Default::default(),
             key: "items".into(),
             label: "Items".into(),
             description: Some("Whether power-ups spawn.".into()),
             kind: SettingKind::Toggle { default: true },
         },
         SettingSpec {
+            scope: Default::default(),
             key: "stock".into(),
             label: "Stock".into(),
             description: None,

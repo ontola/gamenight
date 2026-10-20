@@ -81,7 +81,7 @@ restarts into another one the same way. See
 The daemon answers with a `welcome`:
 
 ```json
-{ "type": "welcome", "protocol_version": 1, "godot_sdk": 2, "party": { ... } }
+{ "type": "welcome", "protocol_version": 1, "godot_sdk": 3, "party": { ... } }
 ```
 
 `godot_sdk` is the version of the Godot addon this host ships. The addon

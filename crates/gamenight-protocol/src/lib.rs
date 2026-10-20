@@ -24,7 +24,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
 /// gamenight.gd). Bump both together when the addon gains a feature games
 /// rely on, so an older vendored copy warns at runtime.
-pub const GODOT_SDK_VERSION: u32 = 2;
+pub const GODOT_SDK_VERSION: u32 = 3;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -94,7 +94,7 @@ pub const ENV_OVERLAY_URL: &str = "GAMENIGHT_OVERLAY_URL";
 // ---------------------------------------------------------------------------
 
 /// A player in the party. Stable for the lifetime of the party, across games.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(transparent)]
 pub struct PlayerId(#[cfg_attr(feature = "schema", schemars(with = "String"))] pub Uuid);
@@ -828,6 +828,30 @@ pub struct SettingSpec {
     pub description: Option<String>,
     #[serde(flatten)]
     pub kind: SettingKind,
+    /// `player`: every player has their own value (their character, their
+    /// stick sensitivity), saved with their profile between nights. Sent with
+    /// `player_settings`, changed with `set_player_setting`. Default `party`:
+    /// one value for everyone.
+    #[serde(default, skip_serializing_if = "SettingScope::is_party")]
+    pub scope: SettingScope,
+}
+
+/// Whose value a [`SettingSpec`] is.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum SettingScope {
+    /// One value for the whole party.
+    #[default]
+    Party,
+    /// Each player their own value.
+    Player,
+}
+
+impl SettingScope {
+    pub fn is_party(&self) -> bool {
+        *self == SettingScope::Party
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -851,7 +875,12 @@ pub struct GameSettings {
     #[serde(default)]
     pub can_undo: bool,
     pub specs: Vec<SettingSpec>,
+    /// Party-scoped values only.
     pub values: std::collections::BTreeMap<String, SettingValue>,
+    /// Each present player's effective values for the `player`-scoped specs.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub players:
+        std::collections::BTreeMap<PlayerId, std::collections::BTreeMap<String, SettingValue>>,
 }
 
 /// A stopped game process. Exit codes cannot reliably distinguish a forced
@@ -1246,6 +1275,17 @@ pub enum ClientMessage {
         value: SettingValue,
     },
 
+    /// Change one player's own value of a `player`-scoped setting. A game
+    /// sends it from its own menu (the game id comes from the connection);
+    /// the host's web server sends it for a phone, with `game`.
+    SetPlayerSetting {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        game: Option<GameId>,
+        player_id: PlayerId,
+        key: String,
+        value: SettingValue,
+    },
+
     /// Atomically validate a settings batch against a live session and revision.
     /// Undo restores the last batch. Keep discards that undo snapshot.
     ControlSettings {
@@ -1432,6 +1472,16 @@ pub enum ServerMessage {
         game: GameId,
         key: String,
         value: SettingValue,
+    },
+
+    /// One player's effective values for every `player`-scoped setting the
+    /// game declared (defaults merged in). Sent after `declare_settings`,
+    /// with every `prepare` and `party_updated`, and whenever the player or
+    /// their profile changes one.
+    PlayerSettings {
+        game: GameId,
+        player_id: PlayerId,
+        values: std::collections::BTreeMap<String, SettingValue>,
     },
 
     /// Sent to the persistent lobby game specifically (see
@@ -1663,6 +1713,7 @@ mod tests {
     #[test]
     fn setting_specs_are_flat_on_the_wire() {
         let spec = SettingSpec {
+            scope: Default::default(),
             key: "stock".into(),
             label: "Stock count".into(),
             description: Some("Lives per player.".into()),

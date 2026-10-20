@@ -45,6 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The knobs the party (overlay, or an LLM via gamenight-mcp) may turn.
     gn.declare_settings(vec![
         SettingSpec {
+            scope: Default::default(),
             key: "match_seconds".into(),
             label: "Match length".into(),
             description: Some("How long one match lasts, in seconds.".into()),
@@ -55,12 +56,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         },
         SettingSpec {
+            scope: Default::default(),
             key: "items".into(),
             label: "Items".into(),
             description: Some("Whether power-up items spawn during a match.".into()),
             kind: SettingKind::Toggle { default: true },
         },
         SettingSpec {
+            scope: Default::default(),
             key: "arena".into(),
             label: "Arena".into(),
             description: Some("Which arena the match is fought in.".into()),

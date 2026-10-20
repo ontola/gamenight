@@ -21,7 +21,7 @@ export const ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL";
 export const ENV_TOKEN = "GAMENIGHT_TOKEN";
 export const DEFAULT_ADDR = "127.0.0.1:7912";
 export const DEFAULT_WEB_PORT = 7913;
-export const GODOT_SDK_VERSION = 2;
+export const GODOT_SDK_VERSION = 3;
 export const PROTOCOL_VERSION = 1;
 
 /** Message "type" tags, both directions. */
@@ -57,6 +57,7 @@ export const MSG = Object.freeze({
   "PAUSE": "pause",
   "PERFORMANCE": "performance",
   "PLAY_NEXT": "play_next",
+  "PLAYER_SETTINGS": "player_settings",
   "PLAYTESTS": "playtests",
   "PREPARE": "prepare",
   "PROGRESS": "progress",
@@ -74,6 +75,7 @@ export const MSG = Object.freeze({
   "SET_PLAYER_AVATAR": "set_player_avatar",
   "SET_PLAYER_COLOR": "set_player_color",
   "SET_PLAYER_PROFILE": "set_player_profile",
+  "SET_PLAYER_SETTING": "set_player_setting",
   "SET_PLAYER_SKIN_COLOR": "set_player_skin_color",
   "SET_PLAYLIST": "set_playlist",
   "SET_SETTING": "set_setting",
@@ -371,6 +373,19 @@ export const CLIENT_MESSAGES = {
       "value"
     ]
   },
+  "set_player_setting": {
+    "fields": [
+      "game",
+      "key",
+      "player_id",
+      "value"
+    ],
+    "required": [
+      "key",
+      "player_id",
+      "value"
+    ]
+  },
   "control_settings": {
     "fields": [
       "action",
@@ -598,6 +613,18 @@ export const SERVER_MESSAGES = {
       "value"
     ]
   },
+  "player_settings": {
+    "fields": [
+      "game",
+      "player_id",
+      "values"
+    ],
+    "required": [
+      "game",
+      "player_id",
+      "values"
+    ]
+  },
   "lobby_focus": {
     "fields": [
       "active"
@@ -696,6 +723,10 @@ export const ENUMS = {
     "number",
     "choice"
   ],
+  "SettingScope": [
+    "party",
+    "player"
+  ],
   "SettingSpec": [
     "toggle",
     "number",
@@ -778,6 +809,11 @@ export const SettingKind = Object.freeze({
   "TOGGLE": "toggle",
   "NUMBER": "number",
   "CHOICE": "choice"
+});
+
+export const SettingScope = Object.freeze({
+  "PARTY": "party",
+  "PLAYER": "player"
 });
 
 export const SettingSpec = Object.freeze({

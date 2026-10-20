@@ -22,7 +22,7 @@ ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL"
 ENV_TOKEN = "GAMENIGHT_TOKEN"
 DEFAULT_ADDR = "127.0.0.1:7912"
 DEFAULT_WEB_PORT = 7913
-GODOT_SDK_VERSION = 2
+GODOT_SDK_VERSION = 3
 PROTOCOL_VERSION = 1
 
 # Message "type" tags, both directions.
@@ -57,6 +57,7 @@ MSG_PARTY_UPDATED = "party_updated"
 MSG_PAUSE = "pause"
 MSG_PERFORMANCE = "performance"
 MSG_PLAY_NEXT = "play_next"
+MSG_PLAYER_SETTINGS = "player_settings"
 MSG_PLAYTESTS = "playtests"
 MSG_PREPARE = "prepare"
 MSG_PROGRESS = "progress"
@@ -74,6 +75,7 @@ MSG_SET_PHONES = "set_phones"
 MSG_SET_PLAYER_AVATAR = "set_player_avatar"
 MSG_SET_PLAYER_COLOR = "set_player_color"
 MSG_SET_PLAYER_PROFILE = "set_player_profile"
+MSG_SET_PLAYER_SETTING = "set_player_setting"
 MSG_SET_PLAYER_SKIN_COLOR = "set_player_skin_color"
 MSG_SET_PLAYLIST = "set_playlist"
 MSG_SET_SETTING = "set_setting"
@@ -141,6 +143,10 @@ SESSION_PHASE_DISPOSED = "disposed"
 SETTING_KIND_TOGGLE = "toggle"
 SETTING_KIND_NUMBER = "number"
 SETTING_KIND_CHOICE = "choice"
+
+# SettingScope
+SETTING_SCOPE_PARTY = "party"
+SETTING_SCOPE_PLAYER = "player"
 
 # SettingSpec
 SETTING_SPEC_TOGGLE = "toggle"
@@ -443,6 +449,19 @@ CLIENT_MESSAGES = {
             "value"
         ]
     },
+    "set_player_setting": {
+        "fields": [
+            "game",
+            "key",
+            "player_id",
+            "value"
+        ],
+        "required": [
+            "key",
+            "player_id",
+            "value"
+        ]
+    },
     "control_settings": {
         "fields": [
             "action",
@@ -670,6 +689,18 @@ SERVER_MESSAGES = {
             "value"
         ]
     },
+    "player_settings": {
+        "fields": [
+            "game",
+            "player_id",
+            "values"
+        ],
+        "required": [
+            "game",
+            "player_id",
+            "values"
+        ]
+    },
     "lobby_focus": {
         "fields": [
             "active"
@@ -767,6 +798,10 @@ ENUMS = {
         "toggle",
         "number",
         "choice"
+    ],
+    "SettingScope": [
+        "party",
+        "player"
     ],
     "SettingSpec": [
         "toggle",

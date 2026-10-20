@@ -79,7 +79,7 @@ extern "C" {
 #define GN_ENV_TOKEN "GAMENIGHT_TOKEN"
 #define GN_DEFAULT_ADDR "127.0.0.1:7912"
 #define GN_DEFAULT_WEB_PORT 7913
-#define GN_GODOT_SDK_VERSION 2
+#define GN_GODOT_SDK_VERSION 3
 #define GN_PROTOCOL_VERSION 1
 
 /* Initialisers, e.g. static const char *colors[] = GN_GUEST_COLORS; */
@@ -118,6 +118,7 @@ extern "C" {
 #define GN_MSG_PAUSE "pause"
 #define GN_MSG_PERFORMANCE "performance"
 #define GN_MSG_PLAY_NEXT "play_next"
+#define GN_MSG_PLAYER_SETTINGS "player_settings"
 #define GN_MSG_PLAYTESTS "playtests"
 #define GN_MSG_PREPARE "prepare"
 #define GN_MSG_PROGRESS "progress"
@@ -135,6 +136,7 @@ extern "C" {
 #define GN_MSG_SET_PLAYER_AVATAR "set_player_avatar"
 #define GN_MSG_SET_PLAYER_COLOR "set_player_color"
 #define GN_MSG_SET_PLAYER_PROFILE "set_player_profile"
+#define GN_MSG_SET_PLAYER_SETTING "set_player_setting"
 #define GN_MSG_SET_PLAYER_SKIN_COLOR "set_player_skin_color"
 #define GN_MSG_SET_PLAYLIST "set_playlist"
 #define GN_MSG_SET_SETTING "set_setting"
@@ -202,6 +204,10 @@ extern "C" {
 #define GN_SETTING_KIND_TOGGLE "toggle"
 #define GN_SETTING_KIND_NUMBER "number"
 #define GN_SETTING_KIND_CHOICE "choice"
+
+/* SettingScope */
+#define GN_SETTING_SCOPE_PARTY "party"
+#define GN_SETTING_SCOPE_PLAYER "player"
 
 /* SettingSpec */
 #define GN_SETTING_SPEC_TOGGLE "toggle"

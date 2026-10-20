@@ -189,6 +189,13 @@ pub enum Command {
         game: GameId,
         settings: Vec<SettingSpec>,
     },
+    /// One player turns their own knob. `game` defaults to the active game.
+    SetPlayerSetting {
+        game: Option<GameId>,
+        player_id: PlayerId,
+        key: String,
+        value: SettingValue,
+    },
     /// The party turns a knob. `game` defaults to the active game.
     SetSetting {
         game: Option<GameId>,
@@ -262,6 +269,14 @@ pub enum Effect {
     /// Tell the lobby game whether it currently has the couch's attention.
     /// See `ServerMessage::LobbyFocus`.
     LobbyFocus { game: GameId, active: bool },
+    /// Deliver one player's effective `player`-scoped values to `game`.
+    PlayerSettings {
+        game: GameId,
+        player_id: PlayerId,
+        values: std::collections::BTreeMap<String, SettingValue>,
+    },
+    /// Saved player settings changed: write [`GameNight::saved_player_settings`].
+    PlayerSettingsStored,
     /// The command was rejected; inform the sender only.
     Reject { reason: String },
 }
@@ -278,6 +293,8 @@ pub struct PartyCarry {
     pub preferred_colors: HashMap<PlayerId, String>,
     #[serde(default)]
     pub profiles: HashMap<PlayerId, String>,
+    #[serde(default)]
+    pub player_settings: PlayerSettingsStore,
     pub seats: Vec<Seat>,
     /// The games still to come, the player queue first.
     #[serde(default)]
@@ -290,6 +307,14 @@ pub struct PartyCarry {
     #[serde(default)]
     pub settings: Vec<GameSettings>,
 }
+
+/// Players' own setting values: owner -> game -> key -> value. The owner is a
+/// profile (saved between nights) or `party:<player id>` (a guest, tonight
+/// only).
+pub type PlayerSettingsStore = std::collections::BTreeMap<
+    String,
+    std::collections::BTreeMap<String, std::collections::BTreeMap<String, SettingValue>>,
+>;
 
 /// Seats including those added for phone-only players.
 const MAX_SEATS: usize = 8;
@@ -306,6 +331,9 @@ pub struct GameNight {
     /// Kept out of `players` so it never reaches overlays or phones; games
     /// get a per-game key derived from it (see `profile_key`).
     profiles: HashMap<PlayerId, String>,
+    /// Each owner's own setting values: owner (a profile, or `party:<id>` for
+    /// a guest) -> game -> key -> value. Only explicitly chosen values.
+    player_settings: PlayerSettingsStore,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
     /// Players with a linked phone, as the host's web server last reported.
     phones: Vec<PlayerId>,
@@ -373,6 +401,7 @@ impl GameNight {
             players: Vec::new(),
             preferred_colors: HashMap::new(),
             profiles: HashMap::new(),
+            player_settings: PlayerSettingsStore::new(),
             presence: HashMap::new(),
             phones: Vec::new(),
             participation: HashMap::new(),
@@ -818,6 +847,12 @@ impl GameNight {
             Command::SetSetting { game, key, value } => {
                 self.on_set_setting(game, key, value, &mut fx)
             }
+            Command::SetPlayerSetting {
+                game,
+                player_id,
+                key,
+                value,
+            } => self.on_set_player_setting(game, player_id, key, value, &mut fx),
         }
         self.refresh_autoplay(&mut fx);
         if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
@@ -1073,6 +1108,13 @@ impl GameNight {
             settings: {
                 let mut settings = self.settings.clone();
                 settings.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+                for entry in &mut settings {
+                    entry.players = self
+                        .players
+                        .iter()
+                        .filter_map(|p| self.player_settings(&entry.game, p.id).map(|v| (p.id, v)))
+                        .collect();
+                }
                 settings
             },
         }
@@ -1108,6 +1150,7 @@ impl GameNight {
             players: self.players.clone(),
             preferred_colors: self.preferred_colors.clone(),
             profiles: self.profiles.clone(),
+            player_settings: self.player_settings.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.entries()[self
                 .playlist
@@ -1141,6 +1184,9 @@ impl GameNight {
         self.players = carry.players;
         self.preferred_colors = carry.preferred_colors;
         self.profiles = carry.profiles;
+        for (owner, games) in carry.player_settings {
+            self.player_settings.entry(owner).or_insert(games);
+        }
         self.profiles
             .retain(|id, _| self.players.iter().any(|p| p.id == *id));
         self.playlist.set_entries(carry.playlist);
@@ -1402,6 +1448,8 @@ impl GameNight {
         self.players.retain(|p| p.id != player_id);
         self.preferred_colors.remove(&player_id);
         self.profiles.remove(&player_id);
+        self.player_settings
+            .remove(&format!("party:{}", player_id.0));
         self.assign_player_colors();
         for seat in &mut self.seats {
             if seat.occupant.player_id() == Some(player_id) {
@@ -1445,11 +1493,24 @@ impl GameNight {
                 // leaves the character it was on.
                 self.profiles
                     .retain(|id, p| *id == player_id || *p != profile);
+                // What a guest chose tonight stays with them when they sign
+                // in, for games their profile has no values for yet.
+                if let Some(guest) = self
+                    .player_settings
+                    .remove(&format!("party:{}", player_id.0))
+                {
+                    let saved = self.player_settings.entry(profile.clone()).or_default();
+                    for (game, values) in guest {
+                        saved.entry(game).or_insert(values);
+                    }
+                    fx.push(Effect::PlayerSettingsStored);
+                }
                 self.profiles.insert(player_id, profile.clone()) != Some(profile)
             }
             None => self.profiles.remove(&player_id).is_some(),
         };
         if changed {
+            self.push_player_settings(None, Some(player_id), fx);
             fx.push(Effect::StateChanged);
             self.send_participation(fx);
             // The warm game was prepared without this player's key: prepare
@@ -2098,7 +2159,7 @@ impl GameNight {
             .position(|s| s.game == game)
             .map(|i| self.settings.remove(i));
         let mut values = std::collections::BTreeMap::new();
-        for spec in &specs {
+        for spec in specs.iter().filter(|s| s.scope.is_party()) {
             let carried = old
                 .as_ref()
                 .and_then(|o| o.values.get(&spec.key))
@@ -2118,10 +2179,154 @@ impl GameNight {
         self.settings.push(GameSettings {
             revision: old.as_ref().map_or(0, |s| s.revision + 1),
             can_undo: false,
-            game,
+            game: game.clone(),
             specs,
             values,
+            players: Default::default(),
         });
+        self.push_player_settings(Some(&game), None, fx);
+        fx.push(Effect::StateChanged);
+    }
+
+    /// A player's effective values for `game`'s player-scoped settings, or
+    /// `None` when the game declared none.
+    pub fn player_settings(
+        &self,
+        game: &GameId,
+        player_id: PlayerId,
+    ) -> Option<std::collections::BTreeMap<String, SettingValue>> {
+        let entry = self.settings.iter().find(|s| s.game == *game)?;
+        let saved = self
+            .player_settings
+            .get(&self.settings_owner(player_id))
+            .and_then(|games| games.get(&game.0));
+        let values: std::collections::BTreeMap<_, _> = entry
+            .specs
+            .iter()
+            .filter(|spec| !spec.scope.is_party())
+            .map(|spec| {
+                let value = saved
+                    .and_then(|v| v.get(&spec.key))
+                    .filter(|v| spec.kind.validate(v).is_ok())
+                    .cloned()
+                    .unwrap_or_else(|| spec.kind.default_value());
+                (spec.key.clone(), value)
+            })
+            .collect();
+        (!values.is_empty()).then_some(values)
+    }
+
+    /// Saved values of players with a profile, for writing to disk.
+    pub fn saved_player_settings(&self) -> PlayerSettingsStore {
+        self.player_settings
+            .iter()
+            .filter(|(owner, _)| !owner.starts_with("party:"))
+            .map(|(owner, games)| (owner.clone(), games.clone()))
+            .collect()
+    }
+
+    /// Load values saved on an earlier night. Values already chosen tonight
+    /// win.
+    pub fn load_player_settings(&mut self, saved: PlayerSettingsStore) {
+        for (owner, games) in saved {
+            if owner.starts_with("party:") {
+                continue;
+            }
+            let entry = self.player_settings.entry(owner).or_default();
+            for (game, values) in games {
+                entry.entry(game).or_insert(values);
+            }
+        }
+    }
+
+    fn settings_owner(&self, player_id: PlayerId) -> String {
+        self.profiles
+            .get(&player_id)
+            .cloned()
+            .unwrap_or_else(|| format!("party:{}", player_id.0))
+    }
+
+    /// Queue `PlayerSettings` for `game` (or every game with player settings)
+    /// and `player` (or everyone in the party).
+    fn push_player_settings(
+        &self,
+        game: Option<&GameId>,
+        player: Option<PlayerId>,
+        fx: &mut Vec<Effect>,
+    ) {
+        for entry in &self.settings {
+            if game.is_some_and(|g| *g != entry.game) {
+                continue;
+            }
+            for p in &self.players {
+                if player.is_some_and(|id| id != p.id) {
+                    continue;
+                }
+                if let Some(values) = self.player_settings(&entry.game, p.id) {
+                    fx.push(Effect::PlayerSettings {
+                        game: entry.game.clone(),
+                        player_id: p.id,
+                        values,
+                    });
+                }
+            }
+        }
+    }
+
+    fn on_set_player_setting(
+        &mut self,
+        game: Option<GameId>,
+        player_id: PlayerId,
+        key: String,
+        value: SettingValue,
+        fx: &mut Vec<Effect>,
+    ) {
+        let Some(game) = game.or_else(|| self.active.as_ref().map(|a| a.game.clone())) else {
+            fx.push(Effect::Reject {
+                reason: "no game given and nothing is playing".into(),
+            });
+            return;
+        };
+        if !self.players.iter().any(|p| p.id == player_id) {
+            fx.push(Effect::Reject {
+                reason: "unknown player".into(),
+            });
+            return;
+        }
+        let Some(spec) = self
+            .settings
+            .iter()
+            .find(|s| s.game == game)
+            .and_then(|entry| {
+                entry
+                    .specs
+                    .iter()
+                    .find(|s| s.key == key && !s.scope.is_party())
+            })
+        else {
+            fx.push(Effect::Reject {
+                reason: format!("'{game}' has no per-player setting '{key}'"),
+            });
+            return;
+        };
+        if let Err(why) = spec.kind.validate(&value) {
+            fx.push(Effect::Reject {
+                reason: format!("'{key}': {why}"),
+            });
+            return;
+        }
+        let owner = self.settings_owner(player_id);
+        let previous = self
+            .player_settings
+            .entry(owner.clone())
+            .or_default()
+            .entry(game.0.clone())
+            .or_default()
+            .insert(key, value.clone());
+        if previous.as_ref() != Some(&value) && !owner.starts_with("party:") {
+            fx.push(Effect::PlayerSettingsStored);
+        }
+        self.push_player_settings(Some(&game), Some(player_id), fx);
         fx.push(Effect::StateChanged);
     }
 
@@ -2144,7 +2349,11 @@ impl GameNight {
             });
             return;
         };
-        let Some(spec) = entry.specs.iter().find(|s| s.key == key) else {
+        let Some(spec) = entry
+            .specs
+            .iter()
+            .find(|s| s.key == key && s.scope.is_party())
+        else {
             // Spell out the alternatives: this is the message an LLM (or a
             // squinting human) uses to correct itself.
             let known: Vec<&str> = entry.specs.iter().map(|s| s.key.as_str()).collect();
@@ -2246,7 +2455,7 @@ impl GameNight {
             if !entry
                 .specs
                 .iter()
-                .any(|s| s.key == *key && s.kind.validate(value).is_ok())
+                .any(|s| s.key == *key && s.scope.is_party() && s.kind.validate(value).is_ok())
             {
                 reject(fx, &format!("Unsupported setting or value: {key}"));
                 return;

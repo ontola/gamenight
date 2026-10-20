@@ -106,6 +106,13 @@ pub enum GameEvent {
         key: String,
         value: SettingValue,
     },
+    /// One player's own values for your `player`-scoped settings (defaults
+    /// merged in), keyed by setting. Sent after `declare_settings`, with every
+    /// `Prepare`/`PartyUpdated`, and whenever that player changes one.
+    PlayerSettings {
+        player_id: gamenight_protocol::PlayerId,
+        values: std::collections::BTreeMap<String, SettingValue>,
+    },
     /// Only ever sent to the process registered as the persistent lobby
     /// (`GAMENIGHT_GAME_ID` matching what the daemon was told via
     /// `set_lobby_game`) — `active: false` the moment some other game
@@ -243,6 +250,9 @@ impl GameNight {
                         ServerMessage::SettingChanged { key, value, .. } => {
                             GameEvent::SettingChanged { key, value }
                         }
+                        ServerMessage::PlayerSettings {
+                            player_id, values, ..
+                        } => GameEvent::PlayerSettings { player_id, values },
                         ServerMessage::LobbyFocus { active } => GameEvent::LobbyFocus { active },
                         ServerMessage::PartyState { party } => {
                             self.party = party;
@@ -368,6 +378,24 @@ impl GameNight {
     pub async fn declare_settings(&mut self, settings: Vec<SettingSpec>) -> Result<(), SdkError> {
         self.send(&ClientMessage::DeclareSettings { settings })
             .await
+    }
+
+    /// Change one player's own value of a `player`-scoped setting, for
+    /// example from your character select. Answered with
+    /// [`GameEvent::PlayerSettings`].
+    pub async fn set_player_setting(
+        &mut self,
+        player_id: gamenight_protocol::PlayerId,
+        key: impl Into<String>,
+        value: SettingValue,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::SetPlayerSetting {
+            game: None,
+            player_id,
+            key: key.into(),
+            value,
+        })
+        .await
     }
 
     /// Change one of this game's declared settings, for example from its own

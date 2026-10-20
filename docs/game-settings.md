@@ -117,6 +117,41 @@ conflicts. Mod installation waits for an in-flight settings update. These two
 controls do not install arbitrary mods. Edits made directly through the separate
 world bridge are not automatically republished into GameNight's setting values.
 
+## Per-player settings
+
+Some choices belong to one player, not the party: their character, their stick
+sensitivity, inverted look. Declare those with `"scope": "player"` in the same
+`declare_settings` call. Kinds, ranges and validation are the same.
+
+```gdscript
+GameNight.declare_settings([
+    {key = "rounds", label = "Rounds to win", kind = "number",
+     default = 3, min = 1, max = 9},
+    {key = "sensitivity", label = "Stick sensitivity %", kind = "number",
+     default = 100, min = 40, max = 250, scope = "player"},
+    {key = "character", label = "Character", kind = "choice",
+     default = "frog", options = ["frog", "cat", "robot"], scope = "player"},
+])
+GameNight.player_settings_changed.connect(func(player_id, values):
+    aim_speed[player_id] = values["sensitivity"] / 100.0)
+```
+
+- Every player has their own value. The game receives `player_settings
+  {game, player_id, values}` (all per-player keys, defaults merged in) after
+  `declare_settings`, with every `prepare` and `party_updated`, and whenever the
+  player changes one. In Godot: the `player_settings_changed` signal and
+  `GameNight.player_setting(player_id, key, fallback)`.
+- Change one from the game's own menu with `set_player_setting {player_id, key,
+  value}` (Godot `GameNight.set_player_setting`, Rust `set_player_setting`).
+  Phones send the same message for their own player.
+- A player with a profile keeps their values between nights: the host saves them
+  in `gamenight/player-settings.json` in the user data directory (override with
+  `GAMENIGHT_PLAYER_SETTINGS`). A guest's values last for the night; when the
+  guest signs in, they move to their profile.
+- Party writes (`set_setting`, `control_settings`) cannot change a per-player
+  key, and `GameSettings.values` only holds party values. `GameSettings.players`
+  shows each present player's own values, for the apps.
+
 ## Phone and lobby assistant
 
 The standard desktop cloud bridge and the custom lobby relay publish these same

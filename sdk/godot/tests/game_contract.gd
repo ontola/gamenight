@@ -40,6 +40,12 @@ func run():
 	sdk._handle({"type":"controller_frame","controllers":[{"controller":"pad:A","axes":[0,0,0,0,0,0],"buttons":1}]})
 	sdk._physics_process(0)
 	check(sdk.just_pressed(0,sdk.BUTTON_A),"released and pressed again is an edge")
+	var seen := []
+	sdk.player_settings_changed.connect(func(id, values): seen.append([id, values]))
+	sdk._handle({"type":"player_settings","game":"test","player_id":"p1","values":{"sensitivity":150.0,"character":"cat"}})
+	check(seen.size()==1 and seen[0][0]=="p1","player settings are announced")
+	check(sdk.player_setting("p1","sensitivity") is int and sdk.player_setting("p1","sensitivity")==150,"player numbers are ints")
+	check(sdk.player_setting("p1","character")=="cat" and sdk.player_setting("p2","character","frog")=="frog","player settings are per player with a fallback")
 	sdk._handle({"type":"dispose","session":"s1"})
 	check(sdk.session.is_empty() and sdk.phase=="idle","dispose clears session")
 	sdk.free()

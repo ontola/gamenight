@@ -720,6 +720,41 @@
           "type": "object"
         },
         {
+          "description": "Change one player's own value of a `player`-scoped setting. A game\nsends it from its own menu (the game id comes from the connection);\nthe host's web server sends it for a phone, with `game`.",
+          "properties": {
+            "game": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/GameId"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "key": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "set_player_setting",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SettingValue"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Atomically validate a settings batch against a live session and revision.\nUndo restores the last batch. Keep discards that undo snapshot.",
           "properties": {
             "action": {
@@ -1285,6 +1320,16 @@
         "game": {
           "$ref": "#/$defs/GameId"
         },
+        "players": {
+          "additionalProperties": {
+            "additionalProperties": {
+              "$ref": "#/$defs/SettingValue"
+            },
+            "type": "object"
+          },
+          "description": "Each present player's effective values for the `player`-scoped specs.",
+          "type": "object"
+        },
         "revision": {
           "default": 0,
           "format": "uint64",
@@ -1301,6 +1346,7 @@
           "additionalProperties": {
             "$ref": "#/$defs/SettingValue"
           },
+          "description": "Party-scoped values only.",
           "type": "object"
         }
       },
@@ -2262,6 +2308,34 @@
           "type": "object"
         },
         {
+          "description": "One player's effective values for every `player`-scoped setting the\ngame declared (defaults merged in). Sent after `declare_settings`,\nwith every `prepare` and `party_updated`, and whenever the player or\ntheir profile changes one.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "player_settings",
+              "type": "string"
+            },
+            "values": {
+              "additionalProperties": {
+                "$ref": "#/$defs/SettingValue"
+              },
+              "type": "object"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Sent to the persistent lobby game specifically (see\n`GameNight::set_lobby_game`) — `active: false` the moment some other\ngame actually starts, so the lobby can mute itself and step out of\nthe way; `true` once the party's back with nothing else running. Not\nsession-scoped: the lobby never has a tracked session of its own to\nhang this off of.",
           "properties": {
             "active": {
@@ -2519,6 +2593,21 @@
         }
       ]
     },
+    "SettingScope": {
+      "description": "Whose value a [`SettingSpec`] is.",
+      "oneOf": [
+        {
+          "const": "party",
+          "description": "One value for the whole party.",
+          "type": "string"
+        },
+        {
+          "const": "player",
+          "description": "Each player their own value.",
+          "type": "string"
+        }
+      ]
+    },
     "SettingSpec": {
       "description": "One knob a game exposes to the party.",
       "oneOf": [
@@ -2607,6 +2696,10 @@
         "label": {
           "description": "Human-readable name (`\"Items\"`, `\"Stock count\"`).",
           "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/SettingScope",
+          "description": "`player`: every player has their own value (their character, their\nstick sensitivity), saved with their profile between nights. Sent with\n`player_settings`, changed with `set_player_setting`. Default `party`:\none value for everyone."
         }
       },
       "required": [
@@ -2745,7 +2838,7 @@
     "protocol": {
       "DEFAULT_ADDR": "127.0.0.1:7912",
       "DEFAULT_WEB_PORT": 7913,
-      "GODOT_SDK_VERSION": 2,
+      "GODOT_SDK_VERSION": 3,
       "PROTOCOL_VERSION": 1
     }
   },

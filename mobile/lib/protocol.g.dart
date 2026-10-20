@@ -20,7 +20,7 @@ const String envOverlayUrl = 'GAMENIGHT_OVERLAY_URL';
 const String envToken = 'GAMENIGHT_TOKEN';
 const String defaultAddr = '127.0.0.1:7912';
 const int defaultWebPort = 7913;
-const int godotSdkVersion = 2;
+const int godotSdkVersion = 3;
 const int protocolVersion = 1;
 
 /// Message "type" tags, both directions.
@@ -55,6 +55,7 @@ const String msgPartyUpdated = 'party_updated';
 const String msgPause = 'pause';
 const String msgPerformance = 'performance';
 const String msgPlayNext = 'play_next';
+const String msgPlayerSettings = 'player_settings';
 const String msgPlaytests = 'playtests';
 const String msgPrepare = 'prepare';
 const String msgProgress = 'progress';
@@ -72,6 +73,7 @@ const String msgSetPhones = 'set_phones';
 const String msgSetPlayerAvatar = 'set_player_avatar';
 const String msgSetPlayerColor = 'set_player_color';
 const String msgSetPlayerProfile = 'set_player_profile';
+const String msgSetPlayerSetting = 'set_player_setting';
 const String msgSetPlayerSkinColor = 'set_player_skin_color';
 const String msgSetPlaylist = 'set_playlist';
 const String msgSetSetting = 'set_setting';
@@ -109,6 +111,9 @@ const List<String> sessionPhaseValues = ['created', 'preparing', 'ready', 'runni
 
 /// SettingKind
 const List<String> settingKindValues = ['toggle', 'number', 'choice'];
+
+/// SettingScope
+const List<String> settingScopeValues = ['party', 'player'];
 
 /// SettingSpec
 const List<String> settingSpecValues = ['toggle', 'number', 'choice'];

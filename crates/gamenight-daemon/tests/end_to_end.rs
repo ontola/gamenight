@@ -353,6 +353,7 @@ async fn settings_flow_daemon_validates_and_pushes() {
 
     game.gn
         .declare_settings(vec![SettingSpec {
+            scope: Default::default(),
             key: "items".into(),
             label: "Items".into(),
             description: None,
