@@ -73,6 +73,7 @@ export const MSG = Object.freeze({
   "SET_PHONES": "set_phones",
   "SET_PLAYER_AVATAR": "set_player_avatar",
   "SET_PLAYER_COLOR": "set_player_color",
+  "SET_PLAYER_PROFILE": "set_player_profile",
   "SET_PLAYER_SKIN_COLOR": "set_player_skin_color",
   "SET_PLAYLIST": "set_playlist",
   "SET_SETTING": "set_setting",
@@ -223,6 +224,15 @@ export const CLIENT_MESSAGES = {
     ],
     "required": [
       "avatar",
+      "player_id"
+    ]
+  },
+  "set_player_profile": {
+    "fields": [
+      "player_id",
+      "profile"
+    ],
+    "required": [
       "player_id"
     ]
   },

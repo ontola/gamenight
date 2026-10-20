@@ -134,6 +134,7 @@ extern "C" {
 #define GN_MSG_SET_PHONES "set_phones"
 #define GN_MSG_SET_PLAYER_AVATAR "set_player_avatar"
 #define GN_MSG_SET_PLAYER_COLOR "set_player_color"
+#define GN_MSG_SET_PLAYER_PROFILE "set_player_profile"
 #define GN_MSG_SET_PLAYER_SKIN_COLOR "set_player_skin_color"
 #define GN_MSG_SET_PLAYLIST "set_playlist"
 #define GN_MSG_SET_SETTING "set_setting"

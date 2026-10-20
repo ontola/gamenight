@@ -71,6 +71,7 @@ const String msgRetryLobby = 'retry_lobby';
 const String msgSetPhones = 'set_phones';
 const String msgSetPlayerAvatar = 'set_player_avatar';
 const String msgSetPlayerColor = 'set_player_color';
+const String msgSetPlayerProfile = 'set_player_profile';
 const String msgSetPlayerSkinColor = 'set_player_skin_color';
 const String msgSetPlaylist = 'set_playlist';
 const String msgSetSetting = 'set_setting';

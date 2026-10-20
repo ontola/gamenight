@@ -174,6 +174,31 @@ pub struct Player {
     /// Games owned in this player's profile library, shared with the party.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub library: Vec<GameId>,
+    /// Stable key for the person behind this player, for saving their own
+    /// settings, progress and world data between nights. Different for every
+    /// game, so two games cannot match up their players; never an account id.
+    /// Only sent to games, and only for players with a profile (a signed-in
+    /// account or a remembered local profile). Guests have none: keep their
+    /// data for the night only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile_key: Option<String>,
+}
+
+/// The [`Player::profile_key`] a game sees for a profile: a SHA-256 of the
+/// game id and the profile, so it is stable between nights and hosts but
+/// different in every game. Profiles are random ids (`local:…`, `account:…`),
+/// so the key cannot be turned back into one.
+pub fn profile_key(game: &GameId, profile: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    hash.update(b"gamenight-profile-key/v1\0");
+    hash.update(game.0.as_bytes());
+    hash.update(b"\0");
+    hash.update(profile.as_bytes());
+    hash.finalize()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// Presence is separate from identity: sleeping never releases a seat.
@@ -1141,6 +1166,14 @@ pub enum ClientMessage {
     SetPlayerAvatar {
         player_id: PlayerId,
         avatar: String,
+    },
+    /// Tie a player to the profile behind them (`None` clears it), sent by
+    /// the host's web server when a profile is picked up. The value never
+    /// reaches games: they get a per-game [`Player::profile_key`] derived
+    /// from it.
+    SetPlayerProfile {
+        player_id: PlayerId,
+        profile: Option<String>,
     },
     AssignSeat {
         seat: u8,

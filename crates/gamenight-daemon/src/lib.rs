@@ -618,12 +618,14 @@ impl Shared {
         // can yield only their soundtrack. Do not stream large catalog art
         // or every unrelated party update to background games.
         if self.night.now_playing() != previous_music.as_ref() {
-            let music = ServerMessage::PartyState {
-                party: game_welcome_snapshot(self.snapshot()),
-            };
             for (id, tx) in &self.games {
                 if !self.lobby_connections.contains(id) {
-                    send(tx, &music);
+                    send(
+                        tx,
+                        &ServerMessage::PartyState {
+                            party: self.game_snapshot(id),
+                        },
+                    );
                 }
             }
         }
@@ -847,6 +849,20 @@ impl Shared {
         }
     }
 
+    /// Fill in each player's per-game profile key; only games see these.
+    fn add_profile_keys(&self, game: &GameId, players: &mut [gamenight_protocol::Player]) {
+        for player in players {
+            player.profile_key = self.night.profile_key(game, player.id);
+        }
+    }
+
+    /// The party as a game process sees it.
+    fn game_snapshot(&self, game: &GameId) -> gamenight_protocol::PartySnapshot {
+        let mut party = game_welcome_snapshot(self.snapshot());
+        self.add_profile_keys(game, &mut party.players);
+        party
+    }
+
     fn send_to_game(&mut self, game: &GameId, session: SessionId, command: GameCommand) {
         let Some(tx) = self.games.get(game) else {
             // The process vanished between the state change and delivery; the
@@ -857,20 +873,26 @@ impl Shared {
         let msg = match command {
             GameCommand::PartyUpdated {
                 seats,
-                players,
+                mut players,
                 presence,
-            } => ServerMessage::PartyUpdated {
-                session,
-                seats,
-                players,
-                presence,
-            },
-            GameCommand::Prepare { seats, players } => ServerMessage::Prepare {
-                session,
-                game: game.clone(),
-                seats,
-                players,
-            },
+            } => {
+                self.add_profile_keys(game, &mut players);
+                ServerMessage::PartyUpdated {
+                    session,
+                    seats,
+                    players,
+                    presence,
+                }
+            }
+            GameCommand::Prepare { seats, mut players } => {
+                self.add_profile_keys(game, &mut players);
+                ServerMessage::Prepare {
+                    session,
+                    game: game.clone(),
+                    seats,
+                    players,
+                }
+            }
             GameCommand::Start => ServerMessage::Start { session },
             GameCommand::Pause => ServerMessage::Pause { session },
             GameCommand::Resume => ServerMessage::Resume { session },
@@ -1911,7 +1933,7 @@ async fn serve(
                     party: if role == Role::Lobby {
                         lobby_snapshot(s.snapshot())
                     } else {
-                        game_welcome_snapshot(s.snapshot())
+                        s.game_snapshot(&game_id)
                     },
                 },
             );
@@ -2372,6 +2394,9 @@ fn message_to_command(
         ClientMessage::SetPlayerAvatar { player_id, avatar } => {
             Command::SetPlayerAvatar { player_id, avatar }
         }
+        ClientMessage::SetPlayerProfile { player_id, profile } => {
+            Command::SetPlayerProfile { player_id, profile }
+        }
         ClientMessage::AssignSeat { seat, occupant } => Command::AssignSeat { seat, occupant },
         ClientMessage::SwapSeats { a, b } => Command::SwapSeats { a, b },
         ClientMessage::BindController {
@@ -2674,6 +2699,97 @@ mod replacement_lobby_tests {
         restarted.close(None).await.unwrap();
         overlay.close(None).await.unwrap();
         new_overlay.close(None).await.unwrap();
+        server.abort();
+    }
+
+    /// Games get a per-game profile key for a player with a profile; the
+    /// overlays and phones never see it.
+    #[tokio::test]
+    async fn games_receive_a_profile_key_overlays_do_not() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap().to_string();
+        let state = Arc::new(Mutex::new(Shared::new(
+            vec![test_game(serde_json::Value::Null)],
+            addr.clone(),
+            None,
+        )));
+        let server_state = state.clone();
+        let server = tokio::spawn(async move {
+            loop {
+                let (stream, _) = listener.accept().await.unwrap();
+                let state = server_state.clone();
+                tokio::spawn(async move {
+                    let _ = handle_connection(stream, state).await;
+                });
+            }
+        });
+        let mut overlay = connect(&addr, Role::Overlay, "", "").await;
+        receive(&mut overlay).await;
+        overlay
+            .send(Message::Text(
+                ClientMessage::JoinParty {
+                    name: "Ada".into(),
+                    seat: None,
+                    color: None,
+                    avatar: None,
+                    library: vec![],
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        let player_id = loop {
+            if let ServerMessage::PartyState { party } = receive(&mut overlay).await {
+                if let Some(player) = party.players.first() {
+                    break player.id;
+                }
+            }
+        };
+        overlay
+            .send(Message::Text(
+                ClientMessage::SetPlayerProfile {
+                    player_id,
+                    profile: Some("account:ada".into()),
+                }
+                .to_json(),
+            ))
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), async {
+            while state
+                .lock()
+                .await
+                .night
+                .profile_key(&GameId::new("test"), player_id)
+                .is_none()
+            {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        let expected = gamenight_protocol::profile_key(&GameId::new("test"), "account:ada");
+        let mut game = connect(&addr, Role::Game, "test", "").await;
+        match receive(&mut game).await {
+            ServerMessage::Welcome { party, .. } => {
+                assert_eq!(
+                    party.players[0].profile_key.as_deref(),
+                    Some(expected.as_str())
+                )
+            }
+            other => panic!("{other:?}"),
+        }
+        match receive(&mut game).await {
+            ServerMessage::Prepare { players, .. } => {
+                assert_eq!(players[0].profile_key.as_deref(), Some(expected.as_str()))
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(state.lock().await.snapshot().players[0]
+            .profile_key
+            .is_none());
+        game.close(None).await.unwrap();
+        overlay.close(None).await.unwrap();
         server.abort();
     }
 

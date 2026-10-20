@@ -2779,6 +2779,67 @@ mod player_count_fit_tests {
         assert!(fx.iter().any(|e| matches!(e, Effect::ToGame { command: GameCommand::Prepare { players, .. }, .. } if players.iter().any(|p| p.name == "Ada"))));
     }
 
+    /// Games recognise a profile between nights by its per-game key, never by
+    /// the party's player id; overlays never see it.
+    #[test]
+    fn a_profile_gives_games_a_per_game_key() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("wide", 1, 4, None)]);
+        night.handle(join("a"));
+        night.handle(Command::GameConnected {
+            game: GameId::new("wide"),
+        });
+        let before = night.snapshot().warm_session.map(|s| s.id);
+        let player_id = night.snapshot().players[0].id;
+        let fx = night.handle(Command::SetPlayerProfile {
+            player_id,
+            profile: Some("local:ada".into()),
+        });
+        assert_ne!(night.snapshot().warm_session.map(|s| s.id), before);
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame {
+                command: GameCommand::Prepare { .. },
+                ..
+            }
+        )));
+        let wide = night.profile_key(&GameId::new("wide"), player_id).unwrap();
+        let other = night.profile_key(&GameId::new("other"), player_id).unwrap();
+        assert_eq!(wide.len(), 32);
+        assert_ne!(wide, other);
+        assert_eq!(
+            wide,
+            gamenight_protocol::profile_key(&GameId::new("wide"), "local:ada")
+        );
+        assert!(night.snapshot().players[0].profile_key.is_none());
+
+        // One profile, one player: picking it up elsewhere moves it.
+        night.handle(join("b"));
+        let b = night.snapshot().players[1].id;
+        night.handle(Command::SetPlayerProfile {
+            player_id: b,
+            profile: Some("local:ada".into()),
+        });
+        assert!(night.profile_key(&GameId::new("wide"), player_id).is_none());
+        assert_eq!(night.profile_key(&GameId::new("wide"), b), Some(wide));
+
+        let carried = night.carry();
+        let mut restored = GameNight::default();
+        restored.restore(carried);
+        assert!(restored.profile_key(&GameId::new("wide"), b).is_some());
+
+        night.handle(Command::SetPlayerProfile {
+            player_id: b,
+            profile: None,
+        });
+        assert!(night.profile_key(&GameId::new("wide"), b).is_none());
+        let fx = night.handle(Command::SetPlayerProfile {
+            player_id: b,
+            profile: Some(String::new()),
+        });
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+    }
+
     /// An unsupported party size must not fall back to an unplayable title.
     #[test]
     fn nothing_warms_when_no_game_supports_the_party() {

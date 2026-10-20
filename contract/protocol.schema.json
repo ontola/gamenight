@@ -368,6 +368,29 @@
           "type": "object"
         },
         {
+          "description": "Tie a player to the profile behind them (`None` clears it), sent by\nthe host's web server when a profile is picked up. The value never\nreaches games: they get a per-game [`Player::profile_key`] derived\nfrom it.",
+          "properties": {
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "profile": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "set_player_profile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id"
+          ],
+          "type": "object"
+        },
+        {
           "properties": {
             "occupant": {
               "$ref": "#/$defs/SeatOccupant"
@@ -1747,6 +1770,13 @@
         },
         "name": {
           "type": "string"
+        },
+        "profile_key": {
+          "description": "Stable key for the person behind this player, for saving their own\nsettings, progress and world data between nights. Different for every\ngame, so two games cannot match up their players; never an account id.\nOnly sent to games, and only for players with a profile (a signed-in\naccount or a remembered local profile). Guests have none: keep their\ndata for the night only.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "skin_color": {
           "description": "Personal skin colour (#rrggbb), independent of game/team clothing colours.",

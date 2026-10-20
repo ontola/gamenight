@@ -39,6 +39,19 @@ pub struct Profile {
     pub avatar: String, // 16x16 pixel matrix serialized or data URI
 }
 
+/// The stable identity behind a studio profile id, from which games get a
+/// per-game `profile_key`: the account for a cloud profile, so it is the same
+/// on every host, otherwise the local profile. Room guests have none.
+fn profile_identity(id: &str) -> Option<String> {
+    if id.starts_with("cloud_guest") || id.is_empty() {
+        None
+    } else if let Some(account) = id.strip_prefix("cloud_") {
+        Some(format!("account:{account}"))
+    } else {
+        Some(format!("local:{id}"))
+    }
+}
+
 fn default_skin_color() -> String {
     "#f5e9be".into()
 }
@@ -493,6 +506,10 @@ pub(crate) async fn anonymize_player(addr: &str, id: PlayerId) -> bool {
         }
         let name = names[index].to_string();
         for message in [
+            ClientMessage::SetPlayerProfile {
+                player_id: id,
+                profile: None,
+            },
             ClientMessage::RenamePlayer {
                 player_id: id,
                 name: name.clone(),
@@ -755,6 +772,18 @@ async fn join_session_inner(
                 ),
             };
 
+            if let (Some(player_id), Some(profile)) = (player_id, profile_identity(&id)) {
+                ws_stream
+                    .send(tokio_tungstenite::tungstenite::Message::Text(
+                        ClientMessage::SetPlayerProfile {
+                            player_id,
+                            profile: Some(profile),
+                        }
+                        .to_json(),
+                    ))
+                    .await
+                    .map_err(|_| StatusCode::BAD_GATEWAY)?;
+            }
             if let Some(player_id) = player_id {
                 ws_stream
                     .send(tokio_tungstenite::tungstenite::Message::Text(

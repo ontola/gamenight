@@ -73,6 +73,7 @@ MSG_RETRY_LOBBY = "retry_lobby"
 MSG_SET_PHONES = "set_phones"
 MSG_SET_PLAYER_AVATAR = "set_player_avatar"
 MSG_SET_PLAYER_COLOR = "set_player_color"
+MSG_SET_PLAYER_PROFILE = "set_player_profile"
 MSG_SET_PLAYER_SKIN_COLOR = "set_player_skin_color"
 MSG_SET_PLAYLIST = "set_playlist"
 MSG_SET_SETTING = "set_setting"
@@ -295,6 +296,15 @@ CLIENT_MESSAGES = {
         ],
         "required": [
             "avatar",
+            "player_id"
+        ]
+    },
+    "set_player_profile": {
+        "fields": [
+            "player_id",
+            "profile"
+        ],
+        "required": [
             "player_id"
         ]
     },

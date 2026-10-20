@@ -289,6 +289,7 @@ role; the runtime supplies its controller stream.
 | `set_player_color {player_id, color}` | game-controlled clothing/team colour (`#rrggbb`); independent of skin |
 | `set_player_skin_color {player_id, skin_color}` | saved personal skin preference (`#rrggbb`); exposed as `Player.skin_color` |
 | `set_player_avatar {player_id, avatar}` | set their pixel-art face (opaque string — see [avatars](faces.md)) |
+| `set_player_profile {player_id, profile}` | tie a player to the profile behind them (`null` clears); sent by the host's web server, never shown to games as-is (see below) |
 | `assign_seat {seat, occupant}` | re-seat a player / add a bot / empty a seat |
 | `swap_seats {a, b}` | two people trade controllers: swap the occupants of two seats |
 | `set_playlist {entries}` | set the night's queue; the next game starts warming |
@@ -793,6 +794,25 @@ fixed round rosters. Custom clients can send the JSON directly.
 The character studio saves `skin_color` with the player profile and never changes
 `Player.color` on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.
+
+### Recognising a player between nights
+
+`Player.id` lives as long as the party. To keep a player's own data (their
+inventory in a world, settings, unlocks) between nights, key it on
+`Player.profile_key` instead. Games receive it in `welcome`, `prepare`,
+`party_updated` and `party_state`; overlays and phones never do.
+
+- It is a 32-character hex string, the same for that person every time, on any
+  host where they use the same signed-in account (a remembered local profile
+  only matches on its own host).
+- It differs per game, so two games cannot match up their players, and it
+  cannot be turned back into an account.
+- Players without a profile (guests) have no `profile_key`: keep their data for
+  the night only.
+
+The daemon derives it as `gamenight_protocol::profile_key(game, profile)`. A
+profile picked up on another character moves its key with it, and the warm game
+is prepared again so it can load the right data.
 
 
 ### Bundled games: authoritative controller input

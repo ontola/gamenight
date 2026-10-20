@@ -80,6 +80,11 @@ pub enum Command {
         player_id: PlayerId,
         avatar: String,
     },
+    /// See `ClientMessage::SetPlayerProfile`.
+    SetPlayerProfile {
+        player_id: PlayerId,
+        profile: Option<String>,
+    },
     AssignSeat {
         seat: u8,
         occupant: SeatOccupant,
@@ -271,6 +276,8 @@ pub struct PartyCarry {
     pub players: Vec<Player>,
     #[serde(default)]
     pub preferred_colors: HashMap<PlayerId, String>,
+    #[serde(default)]
+    pub profiles: HashMap<PlayerId, String>,
     pub seats: Vec<Seat>,
     /// The games still to come, the player queue first.
     #[serde(default)]
@@ -295,6 +302,10 @@ const PLAYED_KEPT: usize = 8;
 pub struct GameNight {
     players: Vec<Player>,
     preferred_colors: HashMap<PlayerId, String>,
+    /// The profile behind each player, as the host's web server reported it.
+    /// Kept out of `players` so it never reaches overlays or phones; games
+    /// get a per-game key derived from it (see `profile_key`).
+    profiles: HashMap<PlayerId, String>,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
     /// Players with a linked phone, as the host's web server last reported.
     phones: Vec<PlayerId>,
@@ -361,6 +372,7 @@ impl GameNight {
         Self {
             players: Vec::new(),
             preferred_colors: HashMap::new(),
+            profiles: HashMap::new(),
             presence: HashMap::new(),
             phones: Vec::new(),
             participation: HashMap::new(),
@@ -591,6 +603,9 @@ impl GameNight {
             }
             Command::SetPlayerAvatar { player_id, avatar } => {
                 self.on_set_player_avatar(player_id, avatar, &mut fx)
+            }
+            Command::SetPlayerProfile { player_id, profile } => {
+                self.on_set_player_profile(player_id, profile, &mut fx)
             }
             Command::AssignSeat { seat, occupant } => self.on_assign_seat(seat, occupant, &mut fx),
             Command::BindController {
@@ -1092,6 +1107,7 @@ impl GameNight {
         PartyCarry {
             players: self.players.clone(),
             preferred_colors: self.preferred_colors.clone(),
+            profiles: self.profiles.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.entries()[self
                 .playlist
@@ -1124,6 +1140,9 @@ impl GameNight {
         }
         self.players = carry.players;
         self.preferred_colors = carry.preferred_colors;
+        self.profiles = carry.profiles;
+        self.profiles
+            .retain(|id, _| self.players.iter().any(|p| p.id == *id));
         self.playlist.set_entries(carry.playlist);
         self.playlist.set_queued(carry.queued);
         self.history = carry.history;
@@ -1215,6 +1234,7 @@ impl GameNight {
             avatar: avatar
                 .or_else(|| Some(gamenight_protocol::guest_face::avatar(id.0.as_bytes()).encode())),
             library,
+            profile_key: None,
         };
         // Walk in, grab a controller, press A: your preferred seat if it's
         // free, otherwise the first free seat.
@@ -1381,6 +1401,7 @@ impl GameNight {
     fn on_leave(&mut self, player_id: PlayerId, fx: &mut Vec<Effect>) {
         self.players.retain(|p| p.id != player_id);
         self.preferred_colors.remove(&player_id);
+        self.profiles.remove(&player_id);
         self.assign_player_colors();
         for seat in &mut self.seats {
             if seat.occupant.player_id() == Some(player_id) {
@@ -1395,6 +1416,56 @@ impl GameNight {
         // Someone leaving shrinks the party the same way joining grows it: a
         // four-player game warmed for four is the wrong thing to hand two.
         self.rewarm_if_misfit(fx);
+    }
+
+    fn on_set_player_profile(
+        &mut self,
+        player_id: PlayerId,
+        profile: Option<String>,
+        fx: &mut Vec<Effect>,
+    ) {
+        if !self.players.iter().any(|p| p.id == player_id) {
+            fx.push(Effect::Reject {
+                reason: "unknown player".into(),
+            });
+            return;
+        }
+        if profile
+            .as_ref()
+            .is_some_and(|p| p.is_empty() || p.len() > 200)
+        {
+            fx.push(Effect::Reject {
+                reason: "profile must be 1-200 characters".into(),
+            });
+            return;
+        }
+        let changed = match profile {
+            Some(profile) => {
+                // One person, one player: a profile picked up elsewhere
+                // leaves the character it was on.
+                self.profiles
+                    .retain(|id, p| *id == player_id || *p != profile);
+                self.profiles.insert(player_id, profile.clone()) != Some(profile)
+            }
+            None => self.profiles.remove(&player_id).is_some(),
+        };
+        if changed {
+            fx.push(Effect::StateChanged);
+            self.send_participation(fx);
+            // The warm game was prepared without this player's key: prepare
+            // it again, as for a rename, so it loads the right save.
+            if self.warm.is_some() {
+                self.dispose_warm(fx);
+                self.maybe_warm(fx);
+            }
+        }
+    }
+
+    /// The per-game key a game sees for this player's profile, if any.
+    pub fn profile_key(&self, game: &GameId, player: PlayerId) -> Option<String> {
+        self.profiles
+            .get(&player)
+            .map(|profile| gamenight_protocol::profile_key(game, profile))
     }
 
     fn on_rename_player(&mut self, player_id: PlayerId, name: String, fx: &mut Vec<Effect>) {
