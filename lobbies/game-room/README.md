@@ -43,7 +43,7 @@ The runtime joins controllers and handles Back, as for every lobby.
 
 ## Stations
 
-- **Game shelf**: a cupboard of game box spines. The selected cover appears on
+- **Game shelf**: a cupboard of game box spines, only for games the seated group can play. The selected cover appears on
   top only while a player stands in front of the cupboard. LB/RB pick the previous or next box, Y (Play now) puts it on top of
   the queue and switches to it once it has loaded (`queue_next`, then `next`),
   X (Queue) adds it to the players' queue after earlier picks (`queue_game`).

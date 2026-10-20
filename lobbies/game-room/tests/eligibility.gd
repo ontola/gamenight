@@ -32,7 +32,7 @@ func _run() -> void:
 	party.warm_session = {"game": "duo", "phase": "ready"} # stale snapshot from previous roster
 	main.set_party(party)
 	check(ids(main) == ["solo-ai"], "One human sees only explicitly solo-capable suggestions")
-	check(main.shelf_games().size() == 3, "All manual catalog choices remain visible")
+	check(main.shelf_games().map(func(g): return g.id) == ["solo-ai"], "The shelf only shows games this group can play")
 	check(main.tv_station().label == "Start Solo + Bots", "TV cannot advertise an incompatible ready game")
 	await capture(main, "eligibility-solo")
 	party.players = initial.players.slice(0, 2)
@@ -47,7 +47,7 @@ func _run() -> void:
 	party.warm_session = {"game": "four", "phase": "ready"}
 	main.set_party(party)
 	check(ids(main) == ["four"], "Explicit host next target leads the preview")
-	check(main.shelf_games().size() == 3, "Count changes do not hide manual games")
+	check(main.shelf_games().map(func(g): return g.id) == ["solo-ai", "four"], "The shelf follows the group size")
 	party.playlist = {"entries": [{"game": "solo-ai", "title": "Solo + Bots"}, {"game": "four", "title": "Four Friends"}, {"game": "solo-ai", "title": "Solo + Bots"}], "current": 1}
 	party.warm_session = {"game": "solo-ai", "phase": "ready"}
 	main.set_party(party)

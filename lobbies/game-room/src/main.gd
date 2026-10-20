@@ -269,8 +269,10 @@ func set_party(snapshot: Dictionary) -> void:
 	if shelf.size() > 0: shelf_offset = posmod(shelf_offset, shelf.size())
 	_redraw_screens()
 
+## The games this party can play right now: a game that doesn't fit the
+## group isn't on the shelf at all (Joep: show only what you can play).
 func shelf_games() -> Array:
-	return party.get("library", []).filter(func(g): return str(g.get("id")) != client.lobby_id)
+	return party.get("library", []).filter(func(g): return str(g.get("id")) != client.lobby_id and _fits_party(g))
 
 func game_meta(id: String) -> Dictionary:
 	for game in party.get("library", []):
@@ -1042,7 +1044,7 @@ func _draw_queue_preview(canvas: Control) -> void:
 	var queue := upcoming()
 	_text(canvas, "UP NEXT", Vector2(24, 46), 34, GREEN)
 	if queue.is_empty():
-		var matching := shelf_games().any(func(g): return _fits_party(g))
+		var matching := not shelf_games().is_empty()
 		_text(canvas, "Choose a game" if matching else "No matching games", Vector2(24, 206), 44, TEXT)
 		_text(canvas, "at the game shelf" if matching else "%d players in this party" % _human_count(), Vector2(24, 256), 32, DIM)
 		return

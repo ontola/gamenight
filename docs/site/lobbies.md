@@ -24,7 +24,8 @@ through the runtime to get an authenticated connection. Opening the project
 alone displays a connecting screen, not a synthetic party.
 
 Controls: press A, B, X, Y or Start on a controller to join. LT/RT cycle games; the
-selected game is larger in the centre of its two neighbours. The stick/D-pad
+selected game is larger in the centre of its two neighbours. Only games the
+seated players fit are listed. The stick/D-pad
 moves between controls. On a game card, A queues the game after earlier picks;
 X plays it now (it goes on top of the queue and starts once it has loaded). The
 merged queue panel shows its first entry as Up next, with the remaining games

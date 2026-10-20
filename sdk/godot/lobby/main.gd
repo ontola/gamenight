@@ -130,7 +130,8 @@ func _process(_delta: float) -> void:
 func _party_changed(snapshot: Dictionary) -> void:
 	var previous_id: String = str(games[selected].get("id", "")) if not games.is_empty() else ""
 	party = snapshot
-	games = snapshot.get("library", []).filter(func(game: Dictionary): return game.get("id") != client.lobby_id)
+	# Only games this group can play: a game that doesn't fit isn't listed.
+	games = snapshot.get("library", []).filter(func(game: Dictionary): return game.get("id") != client.lobby_id and _fits(game))
 	selected = clampi(selected, 0, maxi(0, games.size() - 1))
 	for i in games.size():
 		if games[i].get("id") == previous_id: selected = i
@@ -455,6 +456,15 @@ func _activate(action: String, controller: String = "") -> void:
 		_message = ("%s starts as soon as it has loaded." if action == "play-next" else "%s added to queue.") % game.get("title", "Game")
 		_message_until = Time.get_ticks_msec() + 2500
 	queue_redraw()
+
+## Whether the seated players fit the game's player range, like the host's
+## own check. Before anyone joins, everything fits.
+func _fits(game: Dictionary) -> bool:
+	var count: int = party.get("players", []).size()
+	if count == 0: return true
+	var most: Variant = game.get("max_players")
+	var least: Variant = game.get("min_players")
+	return (most == null or count <= int(most)) and (least == null or count >= int(least))
 
 func _unavailable(game: Dictionary) -> String:
 	if not client.connected: return "Waiting for connection"
