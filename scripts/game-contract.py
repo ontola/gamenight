@@ -139,8 +139,8 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
     if actual != expected:
         raise ValueError(f'SpaceRacer download SHA-256 mismatch: {actual}')
     source_commit = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
-    if source_commit != 'c5bb5eb9eb05a1a3dc3273453a5f1e49e36edfcb':
-        raise ValueError('SpaceRacer probe source differs from v0.4.1 release')
+    if source_commit != '3e56813f0a01915a3e402a44a423027c131ef815':
+        raise ValueError('SpaceRacer probe source differs from the catalog release')
     source_changes = subprocess.check_output(
         ['git', '-C', str(source), 'status', '--porcelain', '--untracked-files=no'], text=True).strip()
     if source_changes:
@@ -186,7 +186,7 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
     for feature in supported:
         game['checks'][feature] = {
             'status': 'passed' if passed else 'failed', 'evidence': [ref],
-            'detail': 'Pinned v0.4.1 synthetic-host probe on the SHA-256-matched Windows ZIP',
+            'detail': 'Pinned catalog-release synthetic-host probe on the SHA-256-matched Windows ZIP',
         }
         print(f"spaceracer: {feature}: {game['checks'][feature]['status']}", flush=True)
     game['checks']['profile.colors'] = {
@@ -206,7 +206,7 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
         game['checks']['presentation.prewarm'] = {
             'status': 'passed' if window_passed else 'failed',
             'evidence': [evidence(window_log, output)],
-            'detail': 'Pinned v0.4.1 windowed probe checks hidden, muted preparation and hidden, muted pause',
+            'detail': 'Pinned catalog-release windowed probe checks hidden, muted preparation and hidden, muted pause',
         }
         print(f"spaceracer: presentation.prewarm: {game['checks']['presentation.prewarm']['status']}", flush=True)
         frame_refs = [evidence(frame_log, output)]
@@ -215,7 +215,7 @@ def run_spaceracer(report, archive, source, output, window_probe=False):
         game['checks']['presentation.frame'] = {
             'status': 'passed' if frame_passed else 'failed',
             'evidence': frame_refs,
-            'detail': 'Packaged v0.4.1 Godot build captured a nonblank gameplay frame with renderer draw calls',
+            'detail': 'Packaged catalog-release Godot build captured a nonblank gameplay frame with renderer draw calls',
         }
         print(f"spaceracer: presentation.frame: {game['checks']['presentation.frame']['status']}", flush=True)
 
