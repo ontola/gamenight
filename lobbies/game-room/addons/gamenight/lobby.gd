@@ -85,14 +85,15 @@ func _command(message: Dictionary) -> void:
 		rejected.emit("Reconnecting to GameNight. Please try again when connected.")
 		return
 	# Godot parses every JSON number as float. The optimistic queue snapshot
-	# must echo the host's integer cursor, otherwise serde rejects e.g. 3.0.
+	# must echo the host's integer cursor and queue length, otherwise serde rejects e.g. 3.0.
 	# Copy only this command payload; never mutate the received party state or
 	# coerce unrelated numeric game settings.
 	if message.get("type") in [PROTOCOL.MSG_REMOVE_PLAYLIST_ENTRY, PROTOCOL.MSG_MOVE_PLAYLIST_ENTRY]:
 		message = message.duplicate(true)
 		var expected: Dictionary = message.get("expected", {})
-		if expected.get("current") != null:
-			expected["current"] = int(expected["current"])
+		for key in ["current", "queued"]:
+			if expected.get(key) != null:
+				expected[key] = int(expected[key])
 	if message.get("type") in [PROTOCOL.MSG_NEXT, PROTOCOL.MSG_PLAY_NEXT, PROTOCOL.MSG_CLOSE_OVERLAY]: _allow_game_foreground()
 	_send(message)
 

@@ -9,7 +9,7 @@ func _initialize() -> void:
 	var client := RecordingClient.new()
 	client.connected = true
 	for cursor in ["3", "0", "null", "absent"]:
-		var raw := '{"entries":[{"game":"the-builders","title":"The Builders"}]'
+		var raw := '{"entries":[{"game":"the-builders","title":"The Builders"}],"queued":2'
 		if cursor != "absent": raw += ',"current":' + cursor
 		raw += '}'
 		client.party = {"playlist": JSON.parse_string(raw)}

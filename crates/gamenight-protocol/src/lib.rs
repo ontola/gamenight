@@ -429,13 +429,42 @@ pub enum MediaAction {
 pub struct PlaylistSnapshot {
     pub entries: Vec<PlaylistEntry>,
     /// Index of the entry the *active* session is playing, if any.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "whole_number::option"
+    )]
     pub current: Option<usize>,
     /// How many entries right after `current` players queued themselves, in
     /// the order they asked. Everything after those is autoplay: games the
     /// host recommends so the queue never runs dry.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "whole_number::plain")]
     pub queued: usize,
+}
+
+/// Clients echo playlist snapshots back as edit guards, and some JSON
+/// parsers (Godot's) turn every number into a float: accept `3.0` as `3`,
+/// but nothing fractional or negative.
+mod whole_number {
+    use serde::{de::Error, Deserialize, Deserializer};
+
+    fn to_usize<E: Error>(value: f64) -> Result<usize, E> {
+        if value.fract() == 0.0 && value >= 0.0 && value <= usize::MAX as f64 {
+            Ok(value as usize)
+        } else {
+            Err(E::custom(format!("expected a whole number, got {value}")))
+        }
+    }
+
+    pub fn plain<'de, D: Deserializer<'de>>(deserializer: D) -> Result<usize, D::Error> {
+        to_usize(f64::deserialize(deserializer)?)
+    }
+
+    pub fn option<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<usize>, D::Error> {
+        Option::<f64>::deserialize(deserializer)?
+            .map(to_usize)
+            .transpose()
+    }
 }
 
 impl PlaylistSnapshot {
@@ -1442,6 +1471,21 @@ impl std::fmt::Debug for Playtest {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn playlist_guards_accept_whole_floats_from_godot() {
+        let echoed: PlaylistSnapshot =
+            serde_json::from_str(r#"{"entries":[],"current":0.0,"queued":2.0}"#).unwrap();
+        assert_eq!((echoed.current, echoed.queued), (Some(0), 2));
+        let plain: PlaylistSnapshot = serde_json::from_str(r#"{"entries":[]}"#).unwrap();
+        assert_eq!((plain.current, plain.queued), (None, 0));
+        for bad in [
+            r#"{"entries":[],"queued":1.5}"#,
+            r#"{"entries":[],"current":-1}"#,
+        ] {
+            assert!(serde_json::from_str::<PlaylistSnapshot>(bad).is_err());
+        }
+    }
 
     fn seated(controller: bool) -> (Seat, PlayerId) {
         let id = PlayerId::new();

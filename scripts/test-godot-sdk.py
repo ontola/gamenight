@@ -47,10 +47,11 @@ with tempfile.TemporaryDirectory(prefix='gamenight-godot-sdk-') as folder:
    assert type(expected['current']) is int and expected['current']==(3 if index<3 else 0), message
   elif index<9: assert expected['current'] is None, message
   else: assert 'current' not in expected, message
+  assert type(expected['queued']) is int and expected['queued']==2, message
   for key in ('index','from','to'):
    if key in message: assert type(message[key]) is int, message
  assert wires[-1]['value']==1.25, wires[-1]
- print('PASS queue remove/move serialize integer cursors; nullable cursors and fractional settings preserved')
+ print('PASS queue remove/move serialize integer cursors and queue lengths; nullable cursors and fractional settings preserved')
 
  # A managed game with no host must exit instead of running unattended/reconnecting.
  env['GAMENIGHT']='1'
