@@ -11,24 +11,8 @@ const int avatarHeadY = 28;
 const String avatarLegacyTransparent = '#0f172a';
 const int avatarMaxSide = 256;
 const int avatarSize = 48;
-const List<String> guestColors = [
-  '#4daf7c',
-  '#e36c76',
-  '#648cdd',
-  '#d7ad43',
-  '#a67bdd',
-  '#49b8bc',
-  '#d88950',
-  '#cf7aaf'
-];
-const List<String> guestSkins = [
-  '#f5e9be',
-  '#efc39a',
-  '#d99b72',
-  '#bf855b',
-  '#905c40',
-  '#654332'
-];
+const List<String> guestColors = ['#4daf7c', '#e36c76', '#648cdd', '#d7ad43', '#a67bdd', '#49b8bc', '#d88950', '#cf7aaf'];
+const List<String> guestSkins = ['#f5e9be', '#efc39a', '#d99b72', '#bf855b', '#905c40', '#654332'];
 const String envAddr = 'GAMENIGHT_ADDR';
 const String envGamenight = 'GAMENIGHT';
 const String envGameId = 'GAMENIGHT_GAME_ID';
@@ -99,39 +83,16 @@ const String msgVote = 'vote';
 const String msgWelcome = 'welcome';
 
 /// GameIssueKind
-const List<String> gameIssueKindValues = [
-  'closed',
-  'disconnected',
-  'exited_unexpectedly',
-  'failed_to_start',
-  'startup_timeout'
-];
+const List<String> gameIssueKindValues = ['closed', 'disconnected', 'exited_unexpectedly', 'failed_to_start', 'startup_timeout'];
 
 /// InstallState
-const List<String> installStateValues = [
-  'queued',
-  'downloading',
-  'verifying',
-  'extracting',
-  'installed',
-  'failed'
-];
+const List<String> installStateValues = ['queued', 'downloading', 'verifying', 'extracting', 'installed', 'failed'];
 
 /// MediaAction
-const List<String> mediaActionValues = [
-  'next_track',
-  'previous_track',
-  'play_pause',
-  'resume'
-];
+const List<String> mediaActionValues = ['next_track', 'previous_track', 'play_pause', 'resume'];
 
 /// PlayWith
-const List<String> playWithValues = [
-  'controller',
-  'phone',
-  'controller_and_phone',
-  'controller_or_phone'
-];
+const List<String> playWithValues = ['controller', 'phone', 'controller_and_phone', 'controller_or_phone'];
 
 /// PresenceState
 const List<String> presenceStateValues = ['active', 'warning', 'sleeping'];
@@ -143,15 +104,7 @@ const List<String> roleValues = ['game', 'lobby', 'overlay'];
 const List<String> seatOccupantValues = ['local', 'remote', 'ai', 'empty'];
 
 /// SessionPhase
-const List<String> sessionPhaseValues = [
-  'created',
-  'preparing',
-  'ready',
-  'running',
-  'paused',
-  'finished',
-  'disposed'
-];
+const List<String> sessionPhaseValues = ['created', 'preparing', 'ready', 'running', 'paused', 'finished', 'disposed'];
 
 /// SettingKind
 const List<String> settingKindValues = ['toggle', 'number', 'choice'];
