@@ -42,10 +42,10 @@
       "entrypoint": "Growing Guns.app/Contents/MacOS/Growing Guns"
     },
     "windows": {
-      "url": "https://gamenight.ontola.io/games/growing-guns/windows/6f2d9bafd0de.zip",
-      "sha256": "6f2d9bafd0de8276f93594c84dd0818c17c08826080dc4fa6568d5fbb87e3bf9",
-      "entrypoint": "GrowingGuns.exe",
-      "size_mb": 83
+      "entrypoint": "MoreRounds.exe",
+      "sha256": "8c0524689d3f6f144135a3dd7724a09aa1a85c748df73ea4a4b377abfa06f9de",
+      "size_mb": 93,
+      "url": "https://gamenight.ontola.io/v1/game-artifacts/0be12ad1-27cc-488e-b420-00a2be50fa17/MoreRounds.zip"
     }
   }
 }
