@@ -28,7 +28,8 @@ jobs:
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev
       - name: Test Mineclonia settings and adapter boundaries
-        working-directory: examples/mineclonia
+        # The pinned ontola/gamenight-mineclonia checkout from game-sources.json.
+        working-directory: ${{ github.workspace }}/../gamenight-mineclonia
         run: python -m unittest test_settings test_managed test_mod_lifecycle test_host test_relay test_couch
       - run: python scripts/test-release.py
       - run: cargo fmt --all --check

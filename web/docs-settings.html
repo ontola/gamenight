@@ -14,7 +14,7 @@
 must declare their options and implement the changes. Having the protocol or SDK
 in a project does not expose its gameplay rules automatically.</p>
 <h2 id="available-controls">Available controls</h2>
-<p>The shared LÖVE pack now declares these settings. These are source capabilities;
+<p>The shared LÖVE pack and the Mineclonia catalog game declare these settings. These are source capabilities;
 installed releases need newly built packages before the controls appear.</p>
 <table>
 <thead>
@@ -61,8 +61,8 @@ installed releases need newly built packages before the controls appear.</p>
 <td>Next run</td>
 </tr>
 <tr>
-<td>Mineclonia prototype</td>
-<td>Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; <a href="https://github.com/ontola/gamenight/blob/main/examples/mineclonia/README.md">ranges and effects</a></td>
+<td>Mineclonia</td>
+<td>Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; <a href="https://github.com/ontola/gamenight-mineclonia#reversible-live-changes">ranges and effects</a></td>
 <td>Live, after the world acknowledges the change</td>
 </tr>
 </tbody>
@@ -191,7 +191,9 @@ game contract remains usable offline, without an AI provider.</p>
 # Linux, with LÖVE installed: real host and game processes, no display needed.
 cargo build -p gamenight-daemon
 python scripts/test-live-settings.py
-cd examples/mineclonia
+# Mineclonia lives in ontola/gamenight-mineclonia; fetch-game-sources.py checks
+# out its pinned revision beside this repository.
+cd ../gamenight-mineclonia
 python -m unittest test_settings test_managed test_mod_lifecycle
 </code></pre></div>
 <p>The live-settings process test checks typed batches, stale/invalid rejection and
@@ -207,7 +209,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="7fb0f1da22d9be90a050b230f7d22563e7ede8d9ba2e43b1200f234770d8ca2a">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="e374209f7a87c17be64b9decf3c333c7153dd732610743b947e395685b9d235b">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/store-clip"><small>Previous</small>Store clip</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

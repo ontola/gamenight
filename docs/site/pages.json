@@ -178,7 +178,7 @@
     "watch": [
       "games/love-party/shared/settings.lua",
       "games/love-party/tests/settings.lua",
-      "examples/mineclonia/settings.py"
+      "mineclonia/settings.py"
     ]
   },
   {

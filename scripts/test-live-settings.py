@@ -6,8 +6,8 @@ import contextlib,json,os,shutil,socket,subprocess,sys,tempfile,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(Path(__file__).resolve().parent))
-from game_sources import game_sources
-sys.path.insert(0,str(ROOT/"examples/mineclonia"))
+from game_sources import game_sources,mineclonia_source
+sys.path.insert(0,str(mineclonia_source()))
 from host import Host
 from game_controls import controls,execute
 

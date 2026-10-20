@@ -37,7 +37,9 @@ after changing it. Add lessons from real games to the playbook's pitfalls.
 # Game source boundaries
 
 Keep game source outside this repository. LÖVE games live in
-`ontola/gamenight-games`; both lobby implementations stay public here. Run
+`ontola/gamenight-games` and the Mineclonia adapter in
+`ontola/gamenight-mineclonia` (pinned under `mineclonia` in `game-sources.json`,
+override with `GAMENIGHT_MINECLONIA_DIR`); both lobby implementations stay public here. Run
 `python scripts/fetch-game-sources.py` before building docs or game packages.
 CI uses the revision in `game-sources.json`. For development, explicitly set
 `GAMENIGHT_GAMES_DIR` to the game checkout. Push game changes before updating

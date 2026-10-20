@@ -105,8 +105,8 @@ python scripts/fetch-game-sources.py
 python scripts/package-love-party.py --output dist/party
 ```
 
-`game-sources.json` pins the game-source revision used by CI and release builds.
-The fetch command creates a sibling `gamenight-games` checkout and refuses to
+`game-sources.json` pins the game-source revisions used by CI and release builds.
+The fetch command creates sibling `gamenight-games` and `gamenight-mineclonia` checkouts and refuses to
 overwrite local changes. For game development, set `GAMENIGHT_GAMES_DIR` to your
 working checkout. Commit and push game changes before updating the pin.
 

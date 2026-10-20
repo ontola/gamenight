@@ -4,7 +4,7 @@
 Install docs/site/requirements.txt. --check fails when docs or watched code drift.
 No network, timestamps or Git working-tree state are used in generated output.
 """
-from game_sources import game_sources, MANIFEST
+from game_sources import game_sources, mineclonia_source, MANIFEST
 import argparse
 import hashlib
 import html
@@ -40,19 +40,25 @@ def slugify(text):
     return re.sub(r"-+", "-", re.sub(r"[^a-z0-9 _-]", "", text).replace(" ", "-")).strip("-")
 
 
+# Watched paths from the pinned sibling repositories in game-sources.json.
+EXTERNAL = {"games/": (game_sources, MANIFEST), "mineclonia/": (mineclonia_source, MANIFEST["mineclonia"])}
+
+
 def source_file(path):
     # games/ is a stable documentation namespace for the separately pinned source.
-    external = path.startswith("games/")
-    base = game_sources() if external else ROOT
-    file = (base / (path.removeprefix("games/") if external else path)).resolve()
+    prefix = next((p for p in EXTERNAL if path.startswith(p)), None)
+    base = EXTERNAL[prefix][0]() if prefix else ROOT
+    file = (base / path.removeprefix(prefix or "")).resolve()
     if not file.is_relative_to(base) or not file.exists():
         raise ValueError(f"Missing or invalid documentation source: {path}")
     return file
 
 
 def source_url(path):
-    if path.startswith("games/"):
-        return MANIFEST["repository"].removesuffix(".git") + "/blob/" + MANIFEST["revision"] + "/" + quote(path.removeprefix("games/"))
+    prefix = next((p for p in EXTERNAL if path.startswith(p)), None)
+    if prefix:
+        pin = EXTERNAL[prefix][1]
+        return pin["repository"].removesuffix(".git") + "/blob/" + pin["revision"] + "/" + quote(path.removeprefix(prefix))
     return REPO + quote(path)
 
 

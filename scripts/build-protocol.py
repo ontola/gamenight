@@ -273,7 +273,10 @@ BLOCKS = {
 SCANNED = [
     "examples/tiny-game.mjs",
     "examples/c-game.c",
-    "examples/mineclonia/managed.py",
+    # Files of the pinned ontola/gamenight-mineclonia checkout (see game-sources.json).
+    "mineclonia/managed.py",
+    "mineclonia/host.py",
+    "mineclonia/game_controls.py",
     "scripts/test-love-party.py",
     "sdk/godot/addons/gamenight/gamenight.gd",
     "sdk/godot/addons/gamenight/lobby.gd",
@@ -293,7 +296,12 @@ def splice(text: str, path: str, prefix: str, suffix: str, body: str) -> str:
 def scan(p: Protocol) -> list[str]:
     problems = []
     for path in SCANNED:
-        text = (ROOT / path).read_text(encoding="utf-8")
+        if path.startswith("mineclonia/"):
+            from game_sources import mineclonia_source
+            file = mineclonia_source() / path.removeprefix("mineclonia/")
+        else:
+            file = ROOT / path
+        text = file.read_text(encoding="utf-8")
         for match in TAG_LITERAL.finditer(text):
             if match.group(1) not in p.tags:
                 line = text.count("\n", 0, match.start()) + 1

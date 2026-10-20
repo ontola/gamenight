@@ -6,7 +6,7 @@ in a project does not expose its gameplay rules automatically.
 
 ## Available controls
 
-The shared LÖVE pack now declares these settings. These are source capabilities;
+The shared LÖVE pack and the Mineclonia catalog game declare these settings. These are source capabilities;
 installed releases need newly built packages before the controls appear.
 
 | Game | Controls | When they apply |
@@ -18,7 +18,7 @@ installed releases need newly built packages before the controls appear.
 | Volley Trouble | Court; exploding ball; rotating rules; 1–21 points to win | Next match, not the next point |
 | Stack Together | 4–40 rows to win; falling speed 50–175% | Next round |
 | Bubble Buddies | 2–12 shared hearts; 1–10 waves; 30–150 seconds per wave | Next run |
-| Mineclonia prototype | Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; [ranges and effects](https://github.com/ontola/gamenight/blob/main/examples/mineclonia/README.md) | Live, after the world acknowledges the change |
+| Mineclonia | Gravity, jump, movement speed, air steering, sneaking speed, clock time, day/night speed and bounce pads; [ranges and effects](https://github.com/ontola/gamenight-mineclonia#reversible-live-changes) | Live, after the world acknowledges the change |
 
 The default values preserve the existing games. Blast Party's pickup chance
 controls drops from crates; its two opening prizes remain. Neon Siege's enemy
@@ -147,7 +147,9 @@ python scripts/test-love-simulation.py --love /path/to/love
 # Linux, with LÖVE installed: real host and game processes, no display needed.
 cargo build -p gamenight-daemon
 python scripts/test-live-settings.py
-cd examples/mineclonia
+# Mineclonia lives in ontola/gamenight-mineclonia; fetch-game-sources.py checks
+# out its pinned revision beside this repository.
+cd ../gamenight-mineclonia
 python -m unittest test_settings test_managed test_mod_lifecycle
 ```
 
