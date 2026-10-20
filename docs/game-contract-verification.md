@@ -12,7 +12,7 @@ feature gets `passed`, `failed`, `untested`, or (only for optional requirements)
 Packaged `.love` games are discovered from the package directory, not a second
 hardcoded certification list. A package with no catalog entry or an empty pack fails.
 SpaceRacer has a separate native runner. CI downloads the exact catalog ZIP,
-checks its SHA-256, checks out the v0.4.1 probe source at its fixed commit,
+checks its SHA-256, checks out the matching probe source at its fixed release commit,
 and runs the packaged executable against its synthetic-host integration test.
 
 Each run emits `matrix.json`, `matrix.md`, raw certifier JSON, and command logs.
@@ -39,8 +39,9 @@ Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
 For SpaceRacer, the packaged native probe covers protocol connection, start,
 pause/resume, synthetic controller ownership, host disconnect, names and avatar
-updates. A separate headless test changes skin and clothing colours during play
-and checks that only the matching player's face layer is rebuilt. Another runs
+updates. Start opens the in-game pause menu; Back requests the host lobby. A separate headless test changes skin and clothing colours during play
+and checks that only the matching player's face layer is rebuilt. It explicitly
+disables extra AI racers so the probe observes only its two seated players. Another runs
 an AI race through finish, then checks that the game starts a fresh race in the
 same process and session. The optional
 `--spaceracer-window-probe` runs the same pinned test

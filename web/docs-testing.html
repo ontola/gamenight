@@ -20,7 +20,7 @@ feature gets <code>passed</code>, <code>failed</code>, <code>untested</code>, or
 Packaged <code>.love</code> games are discovered from the package directory, not a second
 hardcoded certification list. A package with no catalog entry or an empty pack fails.
 SpaceRacer has a separate native runner. CI downloads the exact catalog ZIP,
-checks its SHA-256, checks out the v0.4.1 probe source at its fixed commit,
+checks its SHA-256, checks out the matching probe source at its fixed release commit,
 and runs the packaged executable against its synthetic-host integration test.</p>
 <p>Each run emits <code>matrix.json</code>, <code>matrix.md</code>, raw certifier JSON, and command logs.
 Evidence is tied to the source commit, operating system and SHA-256 of the tested
@@ -45,8 +45,9 @@ Physical controller ownership still requires hardware testing; synthetic frames
 and roster assertions are not proof of hardware behavior.
 For SpaceRacer, the packaged native probe covers protocol connection, start,
 pause/resume, synthetic controller ownership, host disconnect, names and avatar
-updates. A separate headless test changes skin and clothing colours during play
-and checks that only the matching player's face layer is rebuilt. Another runs
+updates. Start opens the in-game pause menu; Back requests the host lobby. A separate headless test changes skin and clothing colours during play
+and checks that only the matching player's face layer is rebuilt. It explicitly
+disables extra AI racers so the probe observes only its two seated players. Another runs
 an AI race through finish, then checks that the game starts a fresh race in the
 same process and session. The optional
 <code>--spaceracer-window-probe</code> runs the same pinned test
@@ -220,7 +221,7 @@ connection order, a pad unplugged and plugged back in, repeated Back and
 Resume, and several game switches. Tuning against bots alone misses how the
 controls feel.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="5acc80b28f5c052a64960060033edff2e96b6ba1a7aa3545bdbc95c574c07f6e">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-contract-verification.md">Edit this page</a><span data-source-fingerprint="9d7b0d7211d5ed09615b384825b792e2c296fc50801b3b015bc1178d3775588f">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/performance"><small>Previous</small>Performance</a><a href="/docs/publishing"><small>Next</small>Publish a game</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#one-matrix-including-missing-integrations">One matrix, including missing integrations</a><a href="#running-it">Running it</a><a href="#ci-and-publication">CI and publication</a><a href="#extending-coverage">Extending coverage</a><a href="#grouped-ratings-contract-v4">Grouped ratings (contract v4)</a><a href="#continuous-play">Continuous play</a><a href="#ci-builds-versus-publication">CI builds versus publication</a><a href="#your-games-own-tests">Your game&#x27;s own tests</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
