@@ -45,31 +45,74 @@ pub(crate) fn controls_for(party: &PartySnapshot, game: Option<&str>) -> Option<
     if entry.specs.is_empty() {
         return None;
     }
+    // Per-player settings are each player's own business: see
+    // `player_controls`.
     let mut settings = serde_json::Map::new();
-    for spec in &entry.specs {
-        let mut item = json!({"label":spec.label,"description":spec.description.clone().unwrap_or_default(),
-            "value":entry.values.get(&spec.key)?,"applies":"See game description"});
-        match &spec.kind {
-            SettingKind::Number { min, max, .. } => {
-                item["kind"] = json!("number");
-                item["min"] = json!(min);
-                item["max"] = json!(max);
-                item["integer"] = json!(true);
-            }
-            SettingKind::Toggle { .. } => {
-                item["kind"] = json!("toggle");
-            }
-            SettingKind::Choice { options, .. } => {
-                item["kind"] = json!("choice");
-                item["options"] = json!(options);
-            }
-        }
-        settings.insert(spec.key.clone(), item);
+    for spec in entry.specs.iter().filter(|s| s.scope.is_party()) {
+        settings.insert(spec.key.clone(), item(spec, entry.values.get(&spec.key)?));
+    }
+    if settings.is_empty() {
+        return None;
     }
     Some(
         json!({"game":session.game,"instance":session.id,"revision":entry.revision,
         "can_undo":entry.can_undo,"settings":settings}),
     )
+}
+
+fn item(spec: &gamenight_protocol::SettingSpec, value: &SettingValue) -> Value {
+    let mut item = json!({"label":spec.label,"description":spec.description.clone().unwrap_or_default(),
+        "value":value,"applies":"See game description"});
+    match &spec.kind {
+        SettingKind::Number { min, max, .. } => {
+            item["kind"] = json!("number");
+            item["min"] = json!(min);
+            item["max"] = json!(max);
+            item["integer"] = json!(true);
+        }
+        SettingKind::Toggle { .. } => {
+            item["kind"] = json!("toggle");
+        }
+        SettingKind::Choice { options, .. } => {
+            item["kind"] = json!("choice");
+            item["options"] = json!(options);
+        }
+    }
+    item
+}
+
+/// `player`'s own settings for the game being played or warmed up (or
+/// `game`, when it is either), in the same item shape as [`controls_for`],
+/// or `None` when it declared none.
+pub(crate) fn player_controls(
+    party: &PartySnapshot,
+    game: Option<&str>,
+    player: PlayerId,
+) -> Option<Value> {
+    let session = match game {
+        None => party
+            .active_session
+            .as_ref()
+            .or(party.warm_session.as_ref())?,
+        Some(game) => party
+            .active_session
+            .iter()
+            .chain(party.warm_session.iter())
+            .find(|s| s.game.0 == game)?,
+    };
+    let entry = party.settings.iter().find(|s| s.game == session.game)?;
+    let values = entry.players.get(&player)?;
+    let mut settings = serde_json::Map::new();
+    for spec in entry.specs.iter().filter(|s| !s.scope.is_party()) {
+        settings.insert(spec.key.clone(), item(spec, values.get(&spec.key)?));
+    }
+    let title = party
+        .library
+        .iter()
+        .find(|g| g.id == session.game)
+        .map(|g| g.title.clone());
+    (!settings.is_empty())
+        .then(|| json!({"game": session.game, "title": title, "settings": settings}))
 }
 
 pub(crate) async fn apply(state: &SharedState, selection: &Selection) -> Result<(), String> {

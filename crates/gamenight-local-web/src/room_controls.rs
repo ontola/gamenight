@@ -186,6 +186,114 @@ pub(crate) async fn get_settings(
     Ok(Json(settings::controls_for(&party, query.game.as_deref())))
 }
 
+/// `GET /api/player-settings?profile=…[&game=…]`: this phone's player's own
+/// settings for the game being played or warmed up (or `game`), or `null`.
+pub(crate) async fn get_player_settings(
+    State(state): State<SharedState>,
+    Query(query): Query<ProfileQuery>,
+) -> Result<Json<Option<Value>>, StatusCode> {
+    let party = daemon::party(&state).await?;
+    let seat = seat(&state, &party, &query.profile).ok_or(StatusCode::FORBIDDEN)?;
+    let player = gamenight_protocol::PlayerId(
+        uuid::Uuid::parse_str(&seat.player).map_err(|_| StatusCode::FORBIDDEN)?,
+    );
+    Ok(Json(settings::player_controls(
+        &party,
+        query.game.as_deref(),
+        player,
+    )))
+}
+
+#[derive(Deserialize)]
+pub struct PlayerSettingRequest {
+    profile: String,
+    game: String,
+    key: String,
+    value: gamenight_protocol::SettingValue,
+}
+
+/// `POST /api/player-settings`: change one of the phone's player's own
+/// settings. Answers with the updated settings, or a 409 whose `error` says
+/// why the host refused.
+pub(crate) async fn set_player_setting(
+    State(state): State<SharedState>,
+    Json(request): Json<PlayerSettingRequest>,
+) -> Response {
+    let party = match daemon::party(&state).await {
+        Ok(party) => party,
+        Err(status) => return status.into_response(),
+    };
+    let Some(seat) = seat(&state, &party, &request.profile) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let Ok(uuid) = uuid::Uuid::parse_str(&seat.player) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let player = gamenight_protocol::PlayerId(uuid);
+    let addr = state.lock().unwrap().daemon_addr.clone();
+    let game = GameId(request.game.clone());
+    let result = tokio::time::timeout(daemon::REPLY_TIMEOUT * 3, async {
+        let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
+            .await
+            .map_err(|_| "Host unavailable".to_string())?;
+        ws.send(Message::Text(
+            ClientMessage::Hello {
+                role: gamenight_protocol::Role::Overlay,
+                game: None,
+                token: None,
+            }
+            .to_json(),
+        ))
+        .await
+        .map_err(|_| "Host disconnected".to_string())?;
+        daemon::read_welcome(&mut ws)
+            .await
+            .map_err(|_| "Host did not reply".to_string())?;
+        ws.send(Message::Text(
+            ClientMessage::SetPlayerSetting {
+                game: Some(game.clone()),
+                player_id: player,
+                key: request.key.clone(),
+                value: request.value.clone(),
+            }
+            .to_json(),
+        ))
+        .await
+        .map_err(|_| "Host disconnected".to_string())?;
+        while let Some(Ok(Message::Text(text))) = ws.next().await {
+            match serde_json::from_str::<ServerMessage>(&text) {
+                Ok(ServerMessage::Error { message }) => return Err(message),
+                Ok(ServerMessage::PartyState { party }) => {
+                    let set = party.settings.iter().any(|s| {
+                        s.game == game
+                            && s.players.get(&player).and_then(|v| v.get(&request.key))
+                                == Some(&request.value)
+                    });
+                    if set {
+                        let _ = ws.close(None).await;
+                        return Ok(party);
+                    }
+                }
+                _ => {}
+            }
+        }
+        Err("Host disconnected".to_string())
+    })
+    .await;
+    match result {
+        Ok(Ok(party)) => Json(settings::player_controls(
+            &party,
+            Some(&request.game),
+            player,
+        ))
+        .into_response(),
+        Ok(Err(message)) => {
+            (StatusCode::CONFLICT, Json(json!({ "error": message }))).into_response()
+        }
+        Err(_) => StatusCode::GATEWAY_TIMEOUT.into_response(),
+    }
+}
+
 #[derive(Deserialize)]
 pub struct SettingsRequest {
     profile: String,
@@ -268,7 +376,8 @@ mod tests {
         game.send(Message::Text(
             json!({"type":"declare_settings","settings":[
                 {"key":"items","label":"Items","kind":"toggle","default":true},
-                {"key":"stock","label":"Stock","kind":"number","default":3,"min":1,"max":9}
+                {"key":"stock","label":"Stock","kind":"number","default":3,"min":1,"max":9},
+                {"key":"sensitivity","label":"Sensitivity %","kind":"number","default":100,"min":40,"max":250,"scope":"player"}
             ]})
             .to_string(),
         ))
@@ -303,6 +412,59 @@ mod tests {
             profile: id.into(),
             game: None,
         })
+    }
+
+    #[tokio::test]
+    async fn a_phone_changes_only_its_own_player_settings() {
+        let (state, _, tasks) = room().await;
+        let mut view = None;
+        for _ in 0..50 {
+            let Json(got) = get_player_settings(State(state.clone()), profile("phone"))
+                .await
+                .unwrap();
+            if got.is_some() {
+                view = got;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        let view = view.expect("the warm game's player settings");
+        assert_eq!(view["game"], "test");
+        assert_eq!(view["settings"]["sensitivity"]["value"], 100);
+        assert!(view["settings"].get("items").is_none());
+        let Json(party) = get_settings(State(state.clone()), profile("phone"))
+            .await
+            .unwrap();
+        assert!(party.unwrap()["settings"].get("sensitivity").is_none());
+        assert_eq!(
+            get_player_settings(State(state.clone()), profile("stranger"))
+                .await
+                .unwrap_err(),
+            StatusCode::FORBIDDEN
+        );
+
+        let set = |value: i64| {
+            set_player_setting(
+                State(state.clone()),
+                Json(PlayerSettingRequest {
+                    profile: "phone".into(),
+                    game: "test".into(),
+                    key: "sensitivity".into(),
+                    value: gamenight_protocol::SettingValue::Number(value),
+                }),
+            )
+        };
+        let response = set(150).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let updated: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(updated["settings"]["sensitivity"]["value"], 150);
+        assert_eq!(set(999).await.status(), StatusCode::CONFLICT);
+        for task in tasks {
+            task.abort();
+        }
     }
 
     #[tokio::test]

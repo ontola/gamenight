@@ -135,6 +135,31 @@ class GameSettings {
 
 enum SettingsAction { set, undo, keep }
 
+/// This player's own settings for one game (their character, their stick
+/// sensitivity). Nobody else's change, and no revision to race.
+class PlayerSettings {
+  final String game;
+  final String? title;
+  final List<Setting> settings;
+
+  const PlayerSettings(
+      {required this.game, this.title, required this.settings});
+
+  static PlayerSettings? fromJson(Object? j) {
+    if (j is! Map || j['game'] is! String) return null;
+    final raw = j['settings'] is Map ? j['settings'] as Map : const {};
+    final settings = [
+      for (final MapEntry(:key, :value) in raw.entries)
+        if (Setting.fromJson(key.toString(), value) case final s?) s,
+    ];
+    if (settings.isEmpty) return null;
+    return PlayerSettings(
+        game: j['game'] as String,
+        title: j['title'] as String?,
+        settings: settings);
+  }
+}
+
 abstract class RoomControls {
   /// Stable identity across screen rebuilds; changing rooms invalidates edits.
   Object get target;
@@ -161,6 +186,15 @@ abstract class RoomControls {
   Future<GameSettings?> applySettings(GameSettings current,
       {Map<String, Object> values = const {},
       SettingsAction action = SettingsAction.set});
+
+  /// This player's own settings for the game being played or warmed up (or
+  /// [game]), or null when it has none or the room cannot say.
+  Future<PlayerSettings?> playerSettings({String? game}) async => null;
+
+  /// Changes one of this player's own settings. Returns them afterwards.
+  Future<PlayerSettings?> setPlayerSetting(
+          String game, String key, Object value) async =>
+      null;
 }
 
 /// The room on a GameNight computer on this Wi-Fi. The host knows this phone
@@ -244,6 +278,26 @@ class LocalRoomControls implements RoomControls {
             'The game did not take that change. It may have changed meanwhile.');
     return GameSettings.fromJson(j);
   }
+
+  @override
+  Future<PlayerSettings?> playerSettings({String? game}) async {
+    final only = game == null ? '' : '&game=${Uri.encodeQueryComponent(game)}';
+    try {
+      return PlayerSettings.fromJson(
+          await api.request('GET', '/api/player-settings?$_query$only'));
+    } on ApiError catch (e) {
+      // Hosts from before this feature, and phones not in the room.
+      if (e.status == 404 || e.status == 403 || e.status == 405) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<PlayerSettings?> setPlayerSetting(
+          String game, String key, Object value) async =>
+      PlayerSettings.fromJson(await api.request('POST', '/api/player-settings',
+          body: {'profile': profile, 'game': game, 'key': key, 'value': value},
+          failure: 'The game did not take that change.'));
 }
 
 /// An online room joined by code. The website relays to the GameNight
@@ -425,6 +479,15 @@ class CloudRoomControls implements RoomControls {
     }
     throw unconfirmed;
   }
+
+  // Online rooms do not relay players' own settings yet.
+  @override
+  Future<PlayerSettings?> playerSettings({String? game}) async => null;
+
+  @override
+  Future<PlayerSettings?> setPlayerSetting(
+          String game, String key, Object value) async =>
+      null;
 }
 
 /// The controls for the room this phone is playing in, if it is in one.

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../room_controls.dart';
@@ -361,6 +363,260 @@ class _SettingsSectionState extends State<SettingsSection> {
                   selected: option == _value(s),
                   onSelected: (_) {
                     if (option != _value(s)) _apply({s.key: option});
+                  },
+                ),
+            ]),
+          ]),
+        );
+    }
+  }
+}
+
+/// Where this phone keeps its player's own settings, per game, so they come
+/// back on any GameNight computer even without signing in.
+class PhoneSettingsStore {
+  final SharedPreferences prefs;
+  const PhoneSettingsStore(this.prefs);
+  static const _key = 'my_game_settings';
+
+  Map<String, Object> forGame(String game) {
+    try {
+      final all = jsonDecode(prefs.getString(_key) ?? '{}');
+      final values = all is Map ? all[game] : null;
+      if (values is! Map) return {};
+      return {
+        for (final MapEntry(:key, :value) in values.entries)
+          if (value is bool || value is num || value is String)
+            key.toString(): value is num ? value.toInt() : value as Object,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  Future<void> save(PlayerSettings settings) async {
+    Map all;
+    try {
+      final decoded = jsonDecode(prefs.getString(_key) ?? '{}');
+      all = decoded is Map ? decoded : {};
+    } on FormatException {
+      all = {};
+    }
+    all[settings.game] = {for (final s in settings.settings) s.key: s.value};
+    await prefs.setString(_key, jsonEncode(all));
+  }
+}
+
+/// This player's own settings for the game being played or warmed up: their
+/// character, their stick sensitivity. Hidden when the game has none.
+///
+/// The phone remembers them too. A phone that is not signed in hands them
+/// to the room when it joins, so they follow it from computer to computer.
+class MySettingsSection extends StatefulWidget {
+  final RoomControls? controls;
+  final PhoneSettingsStore? store;
+
+  /// Signed in: the host keeps these with the account, the phone only
+  /// remembers them.
+  final bool signedIn;
+  final String? game;
+
+  const MySettingsSection(
+      {super.key, this.controls, this.store, this.signedIn = false, this.game});
+
+  @override
+  State<MySettingsSection> createState() => _MySettingsSectionState();
+}
+
+class _MySettingsSectionState extends State<MySettingsSection> {
+  PlayerSettings? _settings;
+  final Set<String> _handedOver = {};
+  final Map<String, Object> _saving = {};
+  String? _error;
+  Timer? _poll;
+  int _generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+  }
+
+  @override
+  void didUpdateWidget(MySettingsSection old) {
+    super.didUpdateWidget(old);
+    if (old.controls?.target != widget.controls?.target ||
+        old.game != widget.game) {
+      _generation++;
+      _settings = null;
+      _error = null;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    _generation++;
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final controls = widget.controls;
+    if (controls == null || _saving.isNotEmpty) return;
+    final generation = _generation;
+    PlayerSettings? settings;
+    try {
+      settings = await controls.playerSettings(game: widget.game);
+    } catch (_) {
+      return; // Keep what we had; the next poll tries again.
+    }
+    if (!mounted || generation != _generation || _saving.isNotEmpty) return;
+    setState(() => _settings = settings);
+    if (settings == null) return;
+    final store = widget.store;
+    if (store == null) return;
+    if (!widget.signedIn && _handedOver.add(settings.game)) {
+      // What this phone chose before, on this or another computer.
+      final remembered = store.forGame(settings.game);
+      for (final s in settings.settings) {
+        final value = remembered[s.key];
+        if (value != null && value != s.value) {
+          await _set(s, value);
+        }
+      }
+      return;
+    }
+    await store.save(settings);
+  }
+
+  Future<void> _set(Setting s, Object value) async {
+    final controls = widget.controls;
+    final current = _settings;
+    if (controls == null || current == null) return;
+    final generation = _generation;
+    setState(() {
+      _saving[s.key] = value;
+      _error = null;
+    });
+    try {
+      final next = await controls.setPlayerSetting(current.game, s.key, value);
+      if (!mounted || generation != _generation) return;
+      setState(() => _settings = next ?? current);
+      if (next != null) await widget.store?.save(next);
+    } catch (e) {
+      if (!mounted || generation != _generation) return;
+      setState(() => _error =
+          e is ApiError ? e.message : 'Could not save that. Please try again.');
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _saving.remove(s.key));
+      }
+    }
+  }
+
+  Object _value(Setting s) => _saving[s.key] ?? s.value;
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = _settings;
+    if (settings == null) return const SizedBox.shrink();
+    return Section(
+      title: settings.title == null
+          ? 'My settings'
+          : 'My settings in ${settings.title}',
+      children: [
+        for (final s in settings.settings) _row(s),
+        if (_error case final error?)
+          Text(error,
+              key: const ValueKey('my-settings-error'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        const SizedBox(height: 4),
+        Hint(widget.signedIn
+            ? 'Only for you. Saved with your profile.'
+            : 'Only for you. Saved on this phone; sign in to keep them everywhere.'),
+      ],
+    );
+  }
+
+  Widget _row(Setting s) {
+    final subtitle = s.description.isEmpty
+        ? null
+        : Text(s.description,
+            style: const TextStyle(color: GnColors.muted, fontSize: 13));
+    final title = Row(children: [
+      Expanded(child: Text(s.label)),
+      if (_saving.containsKey(s.key))
+        const Padding(
+            padding: EdgeInsets.only(left: 8),
+            child: Text('Saving…',
+                style: TextStyle(color: GnColors.muted, fontSize: 12))),
+    ]);
+    switch (s.kind) {
+      case SettingKind.toggle:
+        return SwitchListTile(
+          key: ValueKey('my-setting-${s.key}'),
+          contentPadding: EdgeInsets.zero,
+          title: title,
+          subtitle: subtitle,
+          value: _value(s) as bool,
+          onChanged: (v) => _set(s, v),
+        );
+      case SettingKind.number:
+        final value = _value(s) as int;
+        // Wide ranges (a sensitivity in percent) move in fives.
+        final step = (s.max ?? 0) - (s.min ?? 0) > 50 ? 5 : 1;
+        int? next(int delta) {
+          final v = value + delta;
+          if (s.min != null && v < s.min!) return value > s.min! ? s.min : null;
+          if (s.max != null && v > s.max!) return value < s.max! ? s.max : null;
+          return v;
+        }
+
+        final lower = next(-step);
+        final higher = next(step);
+        return ListTile(
+          key: ValueKey('my-setting-${s.key}'),
+          contentPadding: EdgeInsets.zero,
+          title: title,
+          subtitle: subtitle,
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            IconButton(
+              tooltip: 'Less ${s.label}',
+              onPressed: lower == null ? null : () => _set(s, lower),
+              icon: const Icon(Icons.remove_circle_outline),
+            ),
+            SizedBox(
+              width: 40,
+              child: Text('$value',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            IconButton(
+              tooltip: 'More ${s.label}',
+              onPressed: higher == null ? null : () => _set(s, higher),
+              icon: const Icon(Icons.add_circle_outline),
+            ),
+          ]),
+        );
+      case SettingKind.choice:
+        return Padding(
+          key: ValueKey('my-setting-${s.key}'),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            title,
+            if (subtitle != null) subtitle,
+            const SizedBox(height: 8),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final option in s.options)
+                ChoiceChip(
+                  label: Text(option),
+                  selected: option == _value(s),
+                  onSelected: (_) {
+                    if (option != _value(s)) _set(s, option);
                   },
                 ),
             ]),

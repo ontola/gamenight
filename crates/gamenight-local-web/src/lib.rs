@@ -254,6 +254,10 @@ pub fn create_router(state: SharedState) -> Router {
             "/api/settings",
             get(room_controls::get_settings).post(room_controls::set_settings),
         )
+        .route(
+            "/api/player-settings",
+            get(room_controls::get_player_settings).post(room_controls::set_player_setting),
+        )
         .route("/api/player-links", get(player_links))
         .route("/api/companion", get(companion::current))
         .route("/api/companion/ws", get(companion::socket))

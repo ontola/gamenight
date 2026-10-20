@@ -63,6 +63,15 @@ class GameScreen extends StatelessWidget {
                 icon: const Icon(Icons.tune, size: 18),
                 label: const Text('Edit game settings'),
               );
+        // The player's own settings (their character, their sensitivity)
+        // are few and personal: shown right here.
+        final Widget mine = state.isGuest || controls == null
+            ? const SizedBox.shrink()
+            : MySettingsSection(
+                key: const ValueKey('my-settings'),
+                controls: controls,
+                store: PhoneSettingsStore(state.prefs),
+                signedIn: state.signedIn);
         final catalog = CatalogSection(
             key: const ValueKey('catalog'),
             cloud: state.cloud,
@@ -138,6 +147,7 @@ class GameScreen extends StatelessWidget {
                   child: ListView(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                       children: [
+                        mine,
                         settings,
                         if (playlist case final playlist?) playlist,
                         ...below,
@@ -196,7 +206,7 @@ class GameScreen extends StatelessWidget {
                   const Hint('On the TV now.')
                 else
                   const Hint('In the lobby. Phone screens open here.'),
-                if (linked) ...[const SizedBox(height: 12), settings],
+                if (linked) ...[const SizedBox(height: 12), mine, settings],
               ]),
               if (state.companionError case final String error) Hint(error),
               if (playlist case final playlist?) playlist,
