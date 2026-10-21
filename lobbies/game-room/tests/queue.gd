@@ -59,6 +59,11 @@ func _run() -> void:
 	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
 	check(recorder.commands[-1] == {"type": "close_overlay"}, "Y at TV still resumes the current game")
 	main.input("p0", 0, Vector2.ZERO)
+	main._station_cooldown.clear()
+	main.input("p0", main.World.BTN_X, Vector2.ZERO)
+	check(recorder.commands[-1] == {"type": "next"}, "X at the TV quits the current game and starts the next")
+	check(not bool(p.held & main.World.BTN_X), "Quitting does not also punch")
+	main.input("p0", 0, Vector2.ZERO)
 	for x in [-3.1, 0.0, 3.1]:
 		p.x = x; p.y = main.Layout.TV_CONSOLE[2]
 		check(main.station_for("p0").get("action") == "resume", "Low console shelf offers Resume across its width")
@@ -145,6 +150,13 @@ func _run() -> void:
 	party.playlist.current = 1
 	main.set_party(party)
 	check(main.upcoming()[0].game == "god-game" and main.queue_title_rows()[0].title == "Blast Party", "Advancing promotes the next title in order")
+	party.erase("active_session")
+	main.set_party(party)
+	var queue: Array = main.upcoming()
+	check(main.cabinet_queue()[0] == queue[1], "With nothing running the TV shows the first game and the cabinet the one after it")
+	check(main.queue_title_rows()[0].number == 3, "Title rows number on from the cabinet's game")
+	party.active_session = {"game": "spaceracer", "phase": "paused"}
+	main.set_party(party)
 	party.playlist.entries = []
 	party.playlist.erase("current")
 	party.erase("active_session")

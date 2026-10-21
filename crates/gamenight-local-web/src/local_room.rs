@@ -19,6 +19,9 @@ fn now() -> u64 {
 pub struct Room {
     code: String,
     pending: HashMap<String, (String, u64)>,
+    /// When each code-joined profile arrived at the doors, as a running count.
+    arrivals: HashMap<String, u64>,
+    next_arrival: u64,
     attempts: (Instant, u32),
     pub main_profile: Option<String>,
 }
@@ -32,6 +35,8 @@ impl Room {
                 .map(|b| alphabet[*b as usize % alphabet.len()] as char)
                 .collect(),
             pending: HashMap::new(),
+            arrivals: HashMap::new(),
+            next_arrival: 0,
             attempts: (Instant::now(), 0),
             main_profile: None,
         }
@@ -43,6 +48,7 @@ impl Room {
         self.code = code;
     }
     pub fn restore(&mut self, profile: &str) {
+        self.arrivals.remove(profile);
         self.pending.insert(
             profile.into(),
             (uuid::Uuid::new_v4().to_string(), now() + 86400),
@@ -53,10 +59,14 @@ impl Room {
             .get(profile)
             .is_some_and(|(_, expires)| *expires > now())
     }
+    fn arrival(&self, profile: &str) -> u64 {
+        self.arrivals.get(profile).copied().unwrap_or(u64::MAX)
+    }
     pub fn snapshot(&self, profiles: &HashMap<String, Profile>) -> serde_json::Value {
         let mut entries: Vec<_> = self.pending.iter().collect();
-        entries
-            .sort_by_key(|(profile, _)| (self.main_profile.as_ref() != Some(*profile), *profile));
+        // Arrival order. A restored main profile never arrived through a code,
+        // so it sorts last and always keeps a door.
+        entries.sort_by_key(|(profile, _)| (self.arrival(profile), *profile));
         let pending:Vec<_>=entries.into_iter().filter_map(|(profile,(id,expires))| {
             let p=profiles.get(profile)?;
             (*expires>now()).then(||serde_json::json!({"id":id,"expires":expires,"profile":{"display_name":p.username,"skin_color":p.skin_color,"preferred_color":p.preferred_color,"avatar":p.avatar}}))
@@ -64,6 +74,8 @@ impl Room {
         serde_json::json!({"room_code":self.code,"pending":pending})
     }
 }
+/// Profiles that can wait at the doors at once.
+const MAX_PENDING: usize = 4;
 #[derive(Deserialize)]
 pub struct Join {
     code: String,
@@ -95,14 +107,30 @@ pub async fn join(State(state): State<SharedState>, Json(req): Json<Join>) -> St
     s.local_room
         .pending
         .retain(|_, (_, expires)| *expires > now());
-    if s.local_room.pending.len() >= 4 && !s.local_room.pending.contains_key(&req.profile) {
-        return StatusCode::TOO_MANY_REQUESTS;
+    // First in, first out: a full door row makes room for the newcomer by
+    // sending the longest-waiting profile away.
+    if s.local_room.pending.len() >= MAX_PENDING && !s.local_room.pending.contains_key(&req.profile)
+    {
+        let room = &s.local_room;
+        let oldest = room
+            .pending
+            .keys()
+            .min_by_key(|profile| room.arrival(profile))
+            .cloned();
+        if let Some(oldest) = oldest {
+            s.local_room.pending.remove(&oldest);
+        }
     }
     let profile = s.profiles[&req.profile].clone();
     if s.memory.linked(&profile, req.remember).is_err() {
         return StatusCode::INTERNAL_SERVER_ERROR;
     }
     s.local_room.main_profile = s.memory.main_profile.clone();
+    if !s.local_room.pending.contains_key(&req.profile) {
+        let arrival = s.local_room.next_arrival;
+        s.local_room.next_arrival += 1;
+        s.local_room.arrivals.insert(req.profile.clone(), arrival);
+    }
     s.local_room
         .pending
         .entry(req.profile)
@@ -246,6 +274,43 @@ mod tests {
         }
         cancel(Path("phone".into()), State(state.clone())).await;
         assert!(!state.lock().unwrap().local_room.waiting("phone"));
+        // A full row of doors: the newest arrival sends the oldest away.
+        for i in 0..=MAX_PENDING {
+            let id = format!("guest{i}");
+            state.lock().unwrap().profiles.insert(
+                id.clone(),
+                Profile {
+                    id: id.clone(),
+                    username: id.clone(),
+                    skin_color: "#abcdef".into(),
+                    preferred_color: None,
+                    avatar: String::new(),
+                },
+            );
+            let code = state.lock().unwrap().local_room.code.clone();
+            let joined = join(
+                State(state.clone()),
+                Json(Join {
+                    code,
+                    remember: None,
+                    profile: id,
+                }),
+            )
+            .await;
+            assert_eq!(joined, StatusCode::NO_CONTENT);
+        }
+        {
+            let s = state.lock().unwrap();
+            assert!(!s.local_room.waiting("guest0"));
+            let names: Vec<_> = s.local_room.snapshot(&s.profiles)["pending"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|p| p["profile"]["display_name"].as_str().unwrap().to_string())
+                .collect();
+            assert_eq!(names, ["guest1", "guest2", "guest3", "guest4"]);
+        }
+        state.lock().unwrap().local_room.pending.clear();
         for _ in 0..20 {
             let _ = join(
                 State(state.clone()),

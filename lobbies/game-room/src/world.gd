@@ -220,10 +220,12 @@ func _actions(p: Dictionary, stunned: bool) -> void:
 		if not item.is_empty(): _drop_item(p, true)
 		elif not pickup_target(p).is_empty(): _grab(p)
 		else: _grab_player(p)
-	# X punches; RT uses the held item. The minigun fires while RT is held,
+	# RT uses the held item, or punches empty-handed. X is only for the room's
+	# buttons, so it does nothing here. The minigun fires while RT is held,
 	# everything else once per pull.
-	if p.pressed & BTN_X: _punch(p)
-	if item.is_empty(): return
+	if item.is_empty():
+		if p.pressed & BTN_RT: _punch(p)
+		return
 	if item.kind == "minigun" and p.held & BTN_RT:
 		_fire(p, item)
 	elif p.pressed & BTN_RT:

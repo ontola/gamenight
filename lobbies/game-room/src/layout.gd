@@ -52,8 +52,8 @@ const TV_STATION := Vector2(-2.9, 2.7)        # in front of the TV: Y starts or 
 const EXIT_DOOR := -11.0
 const JUKEBOX := 3.6
 const MUSIC_PADS := [3.05, 3.6, 4.15]
-const PROFILE_DOORS := [9.35, 10.75]
-const DOOR_HALF := 0.6
+const PROFILE_DOORS := [8.8, 9.9, 11.0]
+const DOOR_HALF := 0.52
 
 ## Where the camera sits; it looks straight down -z, so x projects simply.
 const CAMERA := Vector3(0, 4.7, 20.4)

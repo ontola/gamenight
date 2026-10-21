@@ -412,9 +412,12 @@ func _controllers_changed(frames: Array) -> void:
 	for frame in frames:
 		var token := str(frame.get("controller", ""))
 		var id: String = controllers.get(token, "")
-		if id.is_empty(): continue
 		var buttons := int(frame.get("buttons", 0))
 		var axes: Array = frame.get("axes", [0, 0, 0, 0, 0, 0])
+		if id.is_empty():
+			# A controller that hasn't joined: show it's heard on the table.
+			if _accepts_input() and (buttons != 0 or axes.any(func(a): return absf(float(a)) > 12000.0)): room.nudge_pads()
+			continue
 		var stick := Vector2(float(axes[0]) / 32767.0, float(axes[1]) / 32767.0) if axes.size() >= 2 else Vector2.ZERO
 		# Items are used with the right trigger, so it becomes a button here.
 		if axes.size() >= 6 and float(axes[5]) / 32767.0 > 0.5: buttons |= World.BTN_RT
@@ -454,9 +457,9 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 			if node != null: _item_prompt_presses[item.id] = {"item": item.duplicate(), "position": node.global_position, "time": _time}
 	var station_kind: String = station_for(id).get("kind", "")
 	var at_shelf := station_kind == "shelf"
-	var station_x := station_kind in ["shelf", "queue"]
-	# X belongs to the station here, so it must not punch another player.
-	world.set_input(id, buttons & ~World.BTN_X if station_x else buttons, stick)
+	var station_x: bool = station_kind in ["shelf", "queue"] or (station_kind == "tv" and station_for(id).get("quit", false))
+	# X only works the room's buttons; the world never sees it.
+	world.set_input(id, buttons & ~World.BTN_X, stick)
 	if pressed & World.BTN_Y: _use_station(id)
 	if station_x and pressed & World.BTN_X: _use_station(id, true)
 	if at_shelf and pressed & (BTN_LB | BTN_RB):
@@ -537,14 +540,21 @@ func station_for(id: String) -> Dictionary:
 func tv_station() -> Dictionary:
 	var active := current_game()
 	if not active.is_empty() and _fits_party(active):
-		return {"label": "Resume %s" % active.get("title", "game"), "short": "Resume", "action": "resume", "enabled": true}
+		return {"label": "Resume %s" % active.get("title", "game"), "short": "Resume", "action": "resume", "enabled": true,
+			"quit": not upcoming().is_empty(), "extra": "X quit" if not upcoming().is_empty() else ""}
 	var queue := upcoming()
 	if queue.is_empty(): return {"label": "No queued games for this party", "short": "Start", "action": "next", "enabled": false}
 	return {"label": "Start %s" % queue[0].title, "short": "Start", "action": "next", "enabled": true}
 
+## What the Up next cabinet shows. With nothing running the TV itself shows
+## (and loads) the first queued game, so the cabinet shows the one after it.
+func cabinet_queue() -> Array:
+	var queue := upcoming()
+	return queue if not current_game().is_empty() else queue.slice(1)
+
 ## The queue cabinet always starts the next game, even while another is paused.
 func queue_station() -> Dictionary:
-	var entries := upcoming()
+	var entries := cabinet_queue()
 	return {"id": "queue", "kind": "queue", "action": "next", "short": "Play next",
 		"label": "Play %s" % entries[0].title if not entries.is_empty() else "Queue is empty",
 		"enabled": not entries.is_empty() and (client.connected or demo != null)}
@@ -577,13 +587,23 @@ func _use_station(id: String, queue := false) -> void:
 				client.start_next()
 				toast("%s starts as soon as it has loaded." % station.title, GREEN)
 		"queue":
+			var entries := cabinet_queue()
+			if entries.is_empty(): return
 			if queue:
-				var entries := upcoming()
-				if entries.is_empty(): return
 				client._command({"type": "remove_playlist_entry", "expected": party.get("playlist", {}).duplicate(true), "index": int(entries[0].index)})
 				toast("Skipped %s." % entries[0].title, GREEN)
+			elif entries[0] != upcoming()[0]:
+				# The cabinet's game is not the TV's: put it first, then start it.
+				client._command({"type": "queue_next", "game": str(entries[0].game)})
+				client.start_next()
 			else: client.start_next()
 		"tv":
+			if queue:
+				# X quits the current game: the next one loads straight away.
+				if not station.get("quit", false): return
+				toast("Quitting %s. The next game is loading." % current_game().get("title", "the game"), GREEN)
+				client.start_next()
+				return
 			match station.action:
 				"resume": client.resume_game()
 				"next": client.start_next()
@@ -715,11 +735,14 @@ func _menu_page(menu: Dictionary, page: String) -> void:
 
 # ---------------------------------------------------------------- phone links
 
+## Profiles waiting at the doors, in arrival order. First in, first out:
+## with more waiting than doors, the newest arrivals take the doors.
 func pending_profiles() -> Array:
 	var now := Time.get_unix_time_from_system()
-	return links.get("room", {}).get("pending", []).filter(func(p):
+	var waiting: Array = links.get("room", {}).get("pending", []).filter(func(p):
 		var expires: Variant = p.get("expires")
 		return not (expires is float or expires is int) or float(expires) > now or float(expires) < 1e9)
+	return waiting.slice(maxi(0, waiting.size() - Layout.PROFILE_DOORS.size()))
 
 func _links_received(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
@@ -766,11 +789,12 @@ func _make_door(x: float, profile: Dictionary) -> Node3D:
 	room.add_child(node)
 	var z := Layout.BACK + 0.08
 	var frame: StandardMaterial3D = room.mat(Color("2a1d3a"), 0.5)
-	room.box(Vector3(1.25, 2.35, 0.14), Vector3(x, 1.17, z), frame, node)
+	room.box(Vector3(Layout.DOOR_HALF * 2.0, 2.35, 0.14), Vector3(x, 1.17, z), frame, node)
 	# The doorway glows: someone is waiting on the other side.
-	room.box(Vector3(1.0, 2.1, 0.04), Vector3(x, 1.05, z + 0.08), room.mat(Color("6a3a1c"), 0.3, 0, AMBER, 0.55), node, false)
+	room.box(Vector3(Layout.DOOR_HALF * 2.0 - 0.22, 2.1, 0.04), Vector3(x, 1.05, z + 0.08), room.mat(Color("6a3a1c"), 0.3, 0, AMBER, 0.55), node, false)
 	var color := Color.from_string(str(profile.get("skin_color", "")), AMBER)
-	for p in [[Vector3(-0.6, 0, 0.12), Vector3(-0.6, 2.3, 0.12)], [Vector3(0.6, 0, 0.12), Vector3(0.6, 2.3, 0.12)], [Vector3(-0.6, 2.3, 0.12), Vector3(0.6, 2.3, 0.12)]]:
+	var half := Layout.DOOR_HALF - 0.02
+	for p in [[Vector3(-half, 0, 0.12), Vector3(-half, 2.3, 0.12)], [Vector3(half, 0, 0.12), Vector3(half, 2.3, 0.12)], [Vector3(-half, 2.3, 0.12), Vector3(half, 2.3, 0.12)]]:
 		var tube: MeshInstance3D = room.neon_line(Vector3(x, 0, z) + p[0], Vector3(x, 0, z) + p[1], AMBER, 3.5, 0.05, 3.0)
 		tube.reparent(node)
 	var waiting := Sprite3D.new()
@@ -785,7 +809,7 @@ func _make_door(x: float, profile: Dictionary) -> Node3D:
 	waiting.offset = Vector2(0, Character.H / 2.0 - 2)
 	waiting.position = Vector3(x, 0.0, z + 0.14)
 	node.add_child(waiting)
-	var tag: Label3D = room.label(str(profile.get("display_name", "Player")).left(20), Vector3(x, 2.65, z + 0.2), 36, Color(2.2, 1.6, 0.8), node, 10)
+	var tag: Label3D = room.label(str(profile.get("display_name", "Player")).left(20), Vector3(x, 2.65, z + 0.2), 30, Color(2.2, 1.6, 0.8), node, 10)
 	tag.name = "tag"
 	var light := OmniLight3D.new()
 	light.light_color = color.lerp(AMBER, 0.5)
@@ -847,7 +871,8 @@ func _update_prompts() -> void:
 		var station := station_for(id)
 		if not station.is_empty() and (not occupied.has(station.id) or station.enabled): occupied[station.id] = station
 	var tv := tv_station()
-	room.set_prompt("tv", [["Y", tv.short]], tv.enabled, occupied.has("tv"))
+	var tv_buttons := [["Y", tv.short], ["X", "Quit"]] if tv.get("quit", false) else [["Y", tv.short]]
+	room.set_prompt("tv", tv_buttons, tv.enabled, occupied.has("tv"))
 	var queued := queue_station()
 	room.set_prompt("queue", [["Y", "Play next"], ["X", "Skip next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
@@ -890,7 +915,7 @@ func _redraw_screens() -> void:
 		_shelf_key = shelf_key
 		room.set_shelf(shelf, shelf_offset)
 	_update_prompts()
-	var queue := upcoming()
+	var queue := cabinet_queue()
 	_animate_queue(queue.map(func(e): return e.game))
 
 ## Promote the next preview and slide the title list when the queue advances.
@@ -967,18 +992,21 @@ func _draw_tv(canvas: Control) -> void:
 			kicker = "UP NEXT"
 			var warm: Variant = party.get("warm_session")
 			var issue := _issue(str(game.id))
+			var loading := _loading_session(str(game.id))
 			if not issue.is_empty():
 				kicker = issue.to_upper()
 				kicker_color = PINK
 				detail = "Press Y at the TV to retry"
-			elif warm is Dictionary and str(warm.get("game")) == str(game.id):
-				if warm.get("phase") == "ready":
-					kicker = "UP NEXT · READY"
-					kicker_color = GREEN
-				else:
-					kicker = "LOADING %d%%" % loading_percent(str(game.id))
-					kicker_color = AMBER
-			if issue.is_empty(): detail = "Press Y at the TV to start"
+			elif not loading.is_empty():
+				# The first game loads right here, with what it is doing.
+				kicker = "LOADING %d%%" % loading_percent(str(game.id))
+				kicker_color = AMBER
+				detail = "%s  ·  Y at the TV starts it when ready" % str(loading.get("progress_label", "Preparing game"))
+			elif warm is Dictionary and str(warm.get("game")) == str(game.id) and warm.get("phase") == "ready":
+				kicker = "UP NEXT · READY"
+				kicker_color = GREEN
+				detail = "Press Y at the TV to start"
+			else: detail = "Press Y at the TV to start"
 	if game.is_empty():
 		_draw_idle_tv(canvas)
 		return
@@ -1041,8 +1069,12 @@ func _draw_front_box(canvas: Control) -> void:
 func _draw_queue_preview(canvas: Control) -> void:
 	var size := canvas.size
 	canvas.draw_rect(Rect2(Vector2.ZERO, size), BG)
-	var queue := upcoming()
+	var queue := cabinet_queue()
 	_text(canvas, "UP NEXT", Vector2(24, 46), 34, GREEN)
+	if queue.is_empty() and not upcoming().is_empty():
+		_text(canvas, "Nothing after this", Vector2(24, 206), 44, TEXT)
+		_text(canvas, "Queue more at the game shelf", Vector2(24, 256), 32, DIM)
+		return
 	if queue.is_empty():
 		var matching := not shelf_games().is_empty()
 		_text(canvas, "Choose a game" if matching else "No matching games", Vector2(24, 206), 44, TEXT)
@@ -1114,10 +1146,11 @@ func _queue_status(game_id: String) -> String:
 ## Pure title data keeps the rest of the playlist independent from artwork.
 func queue_title_rows() -> Array:
 	var result: Array = []
-	var queue := upcoming()
+	var queue := cabinet_queue()
+	var first := upcoming().size() - queue.size()  # 1 when the TV shows the first game
 	for i in range(1, mini(queue.size(), Room.QUEUE_TITLE_ROWS + 1)):
 		var meta := game_meta(queue[i].game)
-		result.append({"number": i + 1, "title": str(meta.get("title", queue[i].title))})
+		result.append({"number": first + i + 1, "title": str(meta.get("title", queue[i].title))})
 	return result
 
 func _draw_queue_titles(canvas: Control) -> void:
@@ -1131,7 +1164,7 @@ func _draw_queue_titles(canvas: Control) -> void:
 		var title := _short(str(rows[i].title), 32)
 		_text(canvas, title, Vector2(88, y), _fit(title, 40, size.x - 108, 28), TEXT)
 		canvas.draw_line(Vector2(88, y + 14), Vector2(size.x - 24, y + 14), Color(1, 1, 1, 0.08))
-	var more := maxi(0, upcoming().size() - 1 - rows.size())
+	var more := maxi(0, cabinet_queue().size() - 1 - rows.size())
 	if more > 0: _text(canvas, "+%d more in queue" % more, Vector2(88, 284), 30, GREEN)
 
 func _draw_jukebox(canvas: Control) -> void:

@@ -65,4 +65,8 @@ func _run() -> void:
 	setup = arena("blaster", 1.0)
 	w = setup[0]
 	press(w, "a", World.BTN_X)
-	check(w.shots.is_empty() and setup[1].punch > 0, "X punches and leaves the held item alone")
+	check(w.shots.is_empty() and setup[1].punch == 0, "X does nothing in the world")
+	setup[1].item = -1
+	setup[3].holder = ""
+	press(w, "a", World.BTN_RT)
+	check(setup[1].punch > 0, "RT punches empty-handed")

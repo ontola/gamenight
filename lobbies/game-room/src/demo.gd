@@ -55,7 +55,8 @@ func _ready() -> void:
 		main.menus.p0 = {"index": 0, "confirm": false}
 	var links := {"room": {"room_code": "KJX4", "pending": [
 		{"id": "pend1", "profile": {"display_name": "Sanne", "skin_color": "#edc59a", "avatar": _face(8)}},
-		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(9)}}]}, "linked": {}}
+		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(9)}},
+		{"id": "pend3", "profile": {"display_name": "Lotte", "skin_color": "#f0d2b4", "avatar": _face(10)}}]}, "linked": {}}
 	for argument in OS.get_cmdline_user_args():
 		if argument.begins_with("--links="):
 			var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(argument.trim_prefix("--links=")))
@@ -123,7 +124,6 @@ func tick(delta: float) -> void:
 				bot.jump = 0.5
 			elif bot.jump > 0.2: buttons |= 1
 			if rng.randf() < 0.01: buttons |= 2
-			if rng.randf() < 0.02: buttons |= 4
 			if rng.randf() < 0.02: buttons |= main.World.BTN_RT
 		main.input(id, buttons, stick)
 	if scene == "action":

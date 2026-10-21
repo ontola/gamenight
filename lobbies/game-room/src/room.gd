@@ -14,6 +14,8 @@ const CYAN := Color("38d6ff")
 const BG := Color("0b0b12")
 const TEXT := Color("f2f1f8")
 
+var _pads: Array = []
+var _pad_activity := 0.0
 var font: FontFile
 var bold: FontFile
 var wordmark: FontFile              # Bungee, the GameNight wordmark only
@@ -762,7 +764,7 @@ func _couch_corner() -> void:
 	box(Vector3(0.5, 0.42, 0.18), Vector3(5.2, 1.08, z - 0.12), mat(AMBER, 0.9)).rotation.z = 0.25
 	box(Vector3(0.5, 0.42, 0.18), Vector3(7.7, 1.08, z - 0.12), mat(GREEN.darkened(0.2), 0.9)).rotation.z = -0.2
 	# Floor lamp: warm light, a nice contrast to the neon.
-	var lamp_x := 8.55
+	var lamp_x := 4.5  # between jukebox and couch, clear of the doors
 	cylinder(0.025, 2.6, Vector3(lamp_x, 1.3, Layout.BACK + 0.5), mat(Color("c8a46a"), 0.3, 0.8))
 	cylinder(0.2, 0.04, Vector3(lamp_x, 0.02, Layout.BACK + 0.5), mat(Color("c8a46a"), 0.3, 0.8))
 	var shade := CylinderMesh.new()
@@ -939,6 +941,8 @@ func _foreground() -> void:
 	# The two controllers from the GameNight logo, put down mid-evening.
 	_logo_pad(AMBER, Vector3(0.3, 0.6, table_z - 0.1), 0.24)
 	_logo_pad(VIOLET, Vector3(0.75, 0.62, table_z + 0.2), -0.23)
+	# A controller nobody has joined with yet makes these jump, with the hint.
+	prompt("join", [["A", "Join"]], Vector3(0.52, 1.45, table_z + 0.1))
 	for s in [-1, 1]:
 		var x: float = s * 11.0
 		cylinder(0.35, 0.6, Vector3(x, 0.3, 2.5), mat(Color("c46c4a"), 0.8))
@@ -957,6 +961,7 @@ func _logo_pad(color: Color, pos: Vector3, yaw: float) -> void:
 	add_child(pad)
 	# A faint glow of their own keeps them readable in the dim foreground.
 	var body := mat(color, 0.45, 0.0, color, 0.5)
+	_pads.append({"node": pad, "pos": pos, "yaw": yaw, "body": body})
 	var ink := mat(Color("0b0b12"), 0.6)
 	box(Vector3(0.36, 0.07, 0.17), Vector3(0, 0, -0.02), body, pad)
 	for side in [-1, 1]:
@@ -1047,8 +1052,25 @@ func shake(amount: float) -> void:
 func set_mood(color: Color) -> void:
 	mood = color
 
+## Shows that an unjoined controller is being heard: the table pads jump
+## and "A Join" appears for a moment. Called on every frame of its input.
+func nudge_pads() -> void:
+	_pad_activity = 2.0
+
+func _animate_pads(delta: float) -> void:
+	_pad_activity = maxf(0.0, _pad_activity - delta)
+	var k := clampf(_pad_activity / 0.6, 0.0, 1.0)
+	for i in _pads.size():
+		var p: Dictionary = _pads[i]
+		var node: Node3D = p.node
+		node.position = p.pos + Vector3(0, absf(sin(_time * 13.0 + i * 1.3)) * 0.12 * k, 0)
+		node.rotation = Vector3(sin(_time * 19.0 + i) * 0.12 * k, p.yaw, sin(_time * 23.0 + i * 1.7) * 0.18 * k)
+		p.body.emission_energy_multiplier = 0.5 + 1.6 * k
+	set_prompt("join", [["A", "Join"]], true, _pad_activity > 0.0)
+
 func _process(delta: float) -> void:
 	_time += delta
+	_animate_pads(delta)
 	for name in _prompts:
 		var presses: Dictionary = _prompts[name].state.get("pressed", {})
 		for key in presses.keys():
