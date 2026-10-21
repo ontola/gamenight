@@ -104,6 +104,7 @@ jobs:
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/bench.gd -- --demo --scene=phones
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/weapons.gd
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/carry.gd
+      - run: $GODOT --headless --path lobbies/game-room --script res://tests/pickup.gd -- --demo
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/queue.gd -- --demo --scene=stations
       - run: python3 scripts/test-lobby-recovery.py
       - run: python3 scripts/test-host-lobby.py

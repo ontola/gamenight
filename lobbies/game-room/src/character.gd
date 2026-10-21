@@ -27,6 +27,7 @@ static func build(player: Dictionary, face: Dictionary, hat: String = "none", ph
 	sheet.fill(Color.TRANSPARENT)
 	var cloth := Color.from_string(str(player.get("color", "")), Color("7c5cff"))
 	var skin := Color.from_string(str(player.get("skin_color", "")), Color("f5e9be"))
+	if face.has("image"): face = {"image": _solid(face.image), "center": face.center}
 	for i in FRAMES.size():
 		var frame := Image.create(W, H, false, Image.FORMAT_RGBA8)
 		frame.fill(Color.TRANSPARENT)
@@ -96,19 +97,18 @@ static func _draw_frame(img: Image, frame: String, cloth: Color, skin: Color, fa
 				_rect(img, Rect2i(29, y + 4, 2, 3), skin)
 	# Head: skin disc, the player's face art at 1:1, then the hat.
 	var head := HEAD + Vector2(0, bob)
-	for y in range(-OY, H - OY):
-		for x in range(-OX, W - OX):
-			if Vector2(x + 0.5, y + 0.5).distance_to(head) <= RADIUS:
-				_px(img, x, y, skin)
+	# One span per row: the pixels whose centres lie within RADIUS.
+	for y in range(int(head.y) - RADIUS - 1, int(head.y) + RADIUS + 2):
+		var dy := y + 0.5 - head.y
+		if dy * dy > RADIUS * RADIUS: continue
+		var half := sqrt(RADIUS * RADIUS - dy * dy)
+		var from := int(ceil(head.x - half - 0.5))
+		var to := int(floor(head.x + half - 0.5))
+		_rect(img, Rect2i(from, y, to - from + 1, 1), skin)
 	if face.has("image"):
 		var art: Image = face.image
-		var origin := Vector2i(head - face.center)
-		for v in art.get_height():
-			for u in art.get_width():
-				var c := art.get_pixel(u, v)
-				if c.a < 0.5: continue
-				var p := origin + Vector2i(u, v)
-				_px(img, p.x, p.y, c)
+		var origin := Vector2i(head - face.center) + Vector2i(OX, OY)
+		img.blit_rect_mask(art, art, Rect2i(Vector2i.ZERO, art.get_size()), origin)
 	else:
 		# Same default face as the shared helpers.
 		var eye_y := int(head.y) - 2
@@ -192,18 +192,31 @@ static func _rect(img: Image, rect: Rect2i, color: Color) -> void:
 	if clipped.size.x > 0 and clipped.size.y > 0:
 		img.fill_rect(clipped, color)
 
+## Face art with its half-transparent pixels dropped, so it can be stamped
+## with one masked blit per frame.
+static func _solid(art: Image) -> Image:
+	var solid := art.duplicate()
+	solid.convert(Image.FORMAT_RGBA8)
+	for v in solid.get_height():
+		for u in solid.get_width():
+			if solid.get_pixel(u, v).a < 0.5: solid.set_pixel(u, v, Color.TRANSPARENT)
+	return solid
+
 ## One-pixel dark outline around every opaque shape: classic sprite look,
 ## and it keeps light faces readable against bright neon.
 static func _outline(img: Image) -> void:
+	# Image operations instead of a per-pixel loop: this runs for every frame
+	# of every sheet, and a pickup must not stall the room. Ink goes wherever
+	# a neighbour is opaque, then the sprite goes back on top.
 	var source := img.duplicate()
-	for y in H:
-		for x in W:
-			if source.get_pixel(x, y).a > 0.5: continue
-			for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
-				var p: Vector2i = Vector2i(x, y) + d
-				if p.x >= 0 and p.y >= 0 and p.x < W and p.y < H and source.get_pixelv(p).a > 0.5:
-					img.set_pixel(x, y, INK)
-					break
+	var whole := Rect2i(0, 0, W, H)
+	var grown := Image.create(W, H, false, Image.FORMAT_RGBA8)
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		grown.blend_rect(source, whole, d)
+	var ink := Image.create(W, H, false, Image.FORMAT_RGBA8)
+	ink.fill(INK)
+	img.blit_rect_mask(ink, grown, whole, Vector2i.ZERO)
+	img.blend_rect(source, whole, Vector2i.ZERO)
 
 ## Decodes profile art through the shared face helper into a plain Image.
 static func decode_face(faces, player: Dictionary) -> Dictionary:

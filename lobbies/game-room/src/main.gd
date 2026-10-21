@@ -58,12 +58,16 @@ var _links_base := ""
 var _links := HTTPRequest.new()
 var _pickup := HTTPRequest.new()
 var _pickup_cooldown := 0.0
+## Pickups shown before the host confirms them: player id -> the profile, its
+## door entry and when to give up. The host sends name, colour and face as
+## separate updates, so without this the character changes in steps.
+var _claims: Dictionary = {}
+var _claimed_doors: Dictionary = {}  # door entry id -> time it may show again
 var _accumulator := 0.0
 var _station_cooldown: Dictionary = {}
 var _item_prompt_presses: Dictionary = {}
 var _pressed_flash: Dictionary = {}  # station id -> time of last press
-var _door_nodes: Array = []
-var _door_key := ""
+var _door_nodes: Dictionary = {}  # door entry + profile -> its door, built once
 ## Loading percentage shown per game. Games report progress in phases that
 ## jump (3% to 53%), or not at all; the bar estimates in between so it
 ## always moves: it creeps toward the next phase and eases into each report.
@@ -129,6 +133,7 @@ func _ready() -> void:
 	_pickup.request_completed.connect(func(_r, code, _h, body: PackedByteArray):
 		if code >= 300:
 			print("pickup refused: ", code, " ", body.get_string_from_utf8().left(200))
+			_drop_claims()
 			toast("That profile could not be picked up. Try again.", PINK))
 	if not _links_base.is_empty():
 		var timer := Timer.new()
@@ -236,6 +241,7 @@ func set_party(snapshot: Dictionary) -> void:
 		toast("New GameNight version ready. It installs when the room is quiet, or press Start.", GREEN)
 	profiles.clear()
 	for player in party.get("players", []): profiles[str(player.id)] = player
+	_apply_claims()
 	controllers.clear()
 	var slots: Dictionary = {}
 	for seat in party.get("seats", []):
@@ -616,8 +622,13 @@ func _use_station(id: String, queue := false) -> void:
 			_pickup_cooldown = now + 5.0
 			var sent := _pickup.request(_links_base + "/api/room-pickup/" + str(station.pending) + "/" + id,
 				["X-GameNight-Local-Pickup: 1"], HTTPClient.METHOD_POST)
-			if sent != OK: toast("That profile could not be picked up. Try again.", PINK)
-			toast("Welcome in!", GREEN)
+			if sent != OK:
+				toast("That profile could not be picked up. Try again.", PINK)
+				return
+			# Instant: the character becomes the profile and the door empties
+			# now. The host's snapshot confirms it, a refusal undoes it.
+			claim(id, station)
+			toast("Welcome in, %s!" % _name(id), GREEN)
 	_celebrate(id, str(station.id))
 
 func _celebrate(id: String, station_id: String) -> void:
@@ -735,11 +746,52 @@ func _menu_page(menu: Dictionary, page: String) -> void:
 
 # ---------------------------------------------------------------- phone links
 
+## Show a pickup straight away, before the host has done it.
+func claim(id: String, station: Dictionary) -> void:
+	for entry in pending_profiles():
+		if str(entry.get("id", "")) != str(station.pending): continue
+		_claims[id] = {"profile": entry.get("profile", {}), "until": _time + 8.0}
+		# The door list lags behind the party, so keep the door empty on its own.
+		_claimed_doors[str(entry.id)] = _time + 8.0
+		_apply_claims()
+		_sync_doors()
+		view.sync_profiles(profiles, world.players)
+		return
+
+## Lay unconfirmed pickups over the host's players. A claim ends when the
+## host shows the same name and face, or after a few seconds regardless.
+func _apply_claims() -> void:
+	for id in _claims.keys():
+		var claim: Dictionary = _claims[id]
+		var profile: Dictionary = claim.profile
+		var player: Dictionary = profiles.get(id, {})
+		var name := str(profile.get("display_name", ""))
+		var avatar := str(profile.get("avatar", ""))
+		if player.is_empty() or _time > float(claim.until) or (str(player.get("name")) == name and str(player.get("avatar", "")) == avatar):
+			_claims.erase(id)
+			continue
+		var shown := player.duplicate()
+		if not name.is_empty(): shown.name = name
+		if not avatar.is_empty(): shown.avatar = avatar
+		if profile.get("skin_color") != null: shown.skin_color = profile.skin_color
+		if profile.get("preferred_color") != null: shown.color = profile.preferred_color
+		profiles[id] = shown
+
+func _drop_claims() -> void:
+	if _claims.is_empty() and _claimed_doors.is_empty(): return
+	_claims.clear()
+	_claimed_doors.clear()
+	set_party(party)
+	_sync_doors()
+
 ## Profiles waiting at the doors, in arrival order. First in, first out:
 ## with more waiting than doors, the newest arrivals take the doors.
 func pending_profiles() -> Array:
 	var now := Time.get_unix_time_from_system()
+	for door in _claimed_doors.keys():
+		if _time > float(_claimed_doors[door]): _claimed_doors.erase(door)
 	var waiting: Array = links.get("room", {}).get("pending", []).filter(func(p):
+		if _claimed_doors.has(str(p.get("id", ""))): return false
 		var expires: Variant = p.get("expires")
 		return not (expires is float or expires is int) or float(expires) > now or float(expires) < 1e9)
 	return waiting.slice(maxi(0, waiting.size() - Layout.PROFILE_DOORS.size()))
@@ -773,16 +825,19 @@ static func _inverted_qr(image: Image) -> Image:
 			image.set_pixel(x, y, Color.WHITE if c.a > 0.5 and c.get_luminance() < 0.5 else Color.TRANSPARENT)
 	return image
 
+## Doors are kept per waiting profile and only moved: building one draws a
+## character sheet, which is too slow to redo for every door on each change.
 func _sync_doors() -> void:
 	var pending := pending_profiles()
-	var key := JSON.stringify(pending.slice(0, Layout.PROFILE_DOORS.size()))
-	if key == _door_key: return
-	_door_key = key
-	for node in _door_nodes: node.queue_free()
-	_door_nodes.clear()
+	var shown := {}
 	for i in mini(pending.size(), Layout.PROFILE_DOORS.size()):
-		var profile: Dictionary = pending[i].get("profile", {})
-		_door_nodes.append(_make_door(Layout.PROFILE_DOORS[i], profile))
+		var key := JSON.stringify([pending[i].get("id"), pending[i].get("profile")])
+		var node: Node3D = _door_nodes.get(key) if _door_nodes.has(key) else _make_door(0.0, pending[i].get("profile", {}))
+		node.position.x = Layout.PROFILE_DOORS[i]
+		shown[key] = node
+	for key in _door_nodes:
+		if not shown.has(key): _door_nodes[key].queue_free()
+	_door_nodes = shown
 
 func _make_door(x: float, profile: Dictionary) -> Node3D:
 	var node := Node3D.new()
