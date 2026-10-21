@@ -1,3 +1,5 @@
 #include "Generated.xcconfig"
 // CI writes this file with the TestFlight signing settings (ios/testflight.py).
 #include? "Signing.xcconfig"
+
+#include? "Firebase.xcconfig"

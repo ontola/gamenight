@@ -17,6 +17,7 @@ import 'avatar.dart';
 import 'faces.dart';
 import 'link.dart';
 import 'room_controls.dart';
+import 'push_notifications.dart';
 
 enum SyncState { idle, saving, savedLocally, synced, joined, warning }
 
@@ -26,11 +27,15 @@ class AppState extends ChangeNotifier {
 
   /// GameNight online: the account and hosted rooms.
   final CloudApi cloud;
+  late final AccountPush push;
 
   AppState(this.prefs,
-      {GameNightApi Function(Uri base)? apiFactory, CloudApi? cloud})
+      {GameNightApi Function(Uri base)? apiFactory,
+      CloudApi? cloud,
+      PushDevice? pushDevice})
       : apiFactory = apiFactory ?? ((base) => GameNightApi(base)),
         cloud = cloud ?? CloudApi() {
+    push = AccountPush(this.cloud, pushDevice);
     profileId = prefs.getString('profile_id') ?? _newProfileId();
     prefs.setString('profile_id', profileId);
     name = prefs.getString('player_name') ?? randomName();
@@ -632,6 +637,7 @@ class AppState extends ChangeNotifier {
     await prefs.setString('cloud_token', cloud.token!);
     try {
       account = await cloud.me();
+      unawaited(push.sync());
       unawaited(loadPlayLists());
       final doc = await cloud.studio();
       final adopted = _adoptStudio(doc);
@@ -736,6 +742,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await push.signOut();
     await cloud.signOut();
     await _forgetAccount(clearPlayer: true);
     notifyListeners();
@@ -818,6 +825,7 @@ class AppState extends ChangeNotifier {
         return;
       }
       account = await cloud.me();
+      unawaited(push.sync());
       unawaited(loadPlayLists());
       if (!_accountProfileLoaded && !isGuest) {
         _adoptStudio(await cloud.studio());
@@ -1164,6 +1172,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    push.dispose();
     _poll?.cancel();
     _roomWatch?.cancel();
     _saveTimer?.cancel();

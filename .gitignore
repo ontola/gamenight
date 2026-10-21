@@ -16,3 +16,8 @@ __pycache__/
 
 # Game Room keeps its fonts and icon as raw files in exported packs.
 !lobbies/game-room/assets/**/*.import
+
+# Firebase configuration is supplied by CI or local setup.
+mobile/android/app/google-services.json
+mobile/ios/Runner/GoogleService-Info.plist
+mobile/ios/Flutter/Firebase.xcconfig

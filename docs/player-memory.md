@@ -49,3 +49,12 @@ Checks:
 - `cargo test -p gamenight-local-web --lib`: local persistence, full profile restoration, forgetting, and access while waiting/connected.
 - Cloud `cargo test -p gamenight-cloud`: persistence across relay/database reopen, device isolation, unauthorized changes, and forgetting without unlinking.
 - `node scripts/test-player-memory.cjs`: mobile Join option, waiting/connected toggle, save failure rollback, and hiding the option after leaving. Uses mocked room endpoints against a local development host.
+
+### Push after door pickup
+
+An account phone with notification permission can receive “You're in room ABC234”
+after its player is picked up at the lobby door. Waiting at the door, scanning a
+pairing QR and choosing a seat on the phone do not send this notification. A tap
+opens Room and uses the existing authenticated room lookup; the notification's
+room code never grants access. Push delivery is optional and cannot delay pickup.
+Signing out removes only that phone's notification registration.

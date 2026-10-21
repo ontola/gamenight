@@ -6,6 +6,10 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Use the same switch as Dart, so installer permissions and UI cannot drift.
 val playStore = (project.findProperty("dart-defines") as? String)
     ?.split(",")

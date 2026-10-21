@@ -5,11 +5,13 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- GameNight installs games' own phone apps from the GameNight computer. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="GameNight"
         android:usesCleartextTraffic="true"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

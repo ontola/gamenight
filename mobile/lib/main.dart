@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart' show ApiError;
 import 'app_update.dart';
 import 'app_state.dart';
+import 'push_notifications.dart';
 import 'link.dart';
 import 'layout.dart';
 import 'player_face.dart';
@@ -39,7 +40,8 @@ Future<void> main() async {
   });
   final prefs = await SharedPreferences.getInstance();
   if (kIsWeb) await migrateWebsiteRoom(prefs);
-  final state = AppState(prefs);
+  final push = await FirebasePushDevice.create();
+  final state = AppState(prefs, pushDevice: push);
   final reports = ReportService(prefs,
       requestHeaders: state.cloud.browserMutationHeaders,
       context: () => {
@@ -71,6 +73,7 @@ Future<void> main() async {
   }
   runApp(GameNightApp(
       state: state,
+      pushDevice: push,
       links: links.uriLinkStream,
       initialLink: first,
       accountLoading: accountLoading,
@@ -79,6 +82,7 @@ Future<void> main() async {
 
 class GameNightApp extends StatefulWidget {
   final AppState state;
+  final PushDevice? pushDevice;
   final ReportService? reports;
 
   /// Links that open the app, e.g. from the sign-in email.
@@ -88,6 +92,7 @@ class GameNightApp extends StatefulWidget {
   const GameNightApp(
       {super.key,
       required this.state,
+      this.pushDevice,
       this.links,
       this.initialLink,
       this.accountLoading,
@@ -102,6 +107,8 @@ class _GameNightAppState extends State<GameNightApp> {
   final _homeKey = GlobalKey<_HomeScreenState>();
   final _feedbackGame = FeedbackGameContext();
   int _selectedTab = 0;
+  StreamSubscription<String>? _pushOpened;
+  StreamSubscription<String>? _pushForeground;
 
   /// The About page is open, so no sidebar tab shows as current.
   bool _aboutOpen = false;
@@ -110,6 +117,22 @@ class _GameNightAppState extends State<GameNightApp> {
   @override
   void initState() {
     super.initState();
+    final push = widget.pushDevice;
+    if (push != null) {
+      _pushOpened = push.opened.listen((_) => unawaited(_openPushRoom()));
+      _pushForeground = push.foreground.listen((room) {
+        final context = _navigator.currentState?.overlay?.context;
+        if (context != null && context.mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text("You're in room $room")));
+        }
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          if (await push.initialRoom() != null) await _openPushRoom();
+        } catch (_) {/* Push is optional. */}
+      });
+    }
     final initial = widget.initialLink;
     if (initial != null &&
         Uri.tryParse(initial.fragment)?.path == '/assistant') {
@@ -128,10 +151,20 @@ class _GameNightAppState extends State<GameNightApp> {
     }
   }
 
+  Future<void> _openPushRoom() async {
+    await widget.accountLoading;
+    if (!mounted) return;
+    _selectDestination(0);
+    await widget.state.findHostedRoom();
+    if (widget.state.inHostedRoom) await widget.state.refreshHostedRoom();
+  }
+
   void _fullscreenChanged() => _history?.fullscreenChanged();
 
   @override
   void dispose() {
+    _pushOpened?.cancel();
+    _pushForeground?.cancel();
     widget.state.removeListener(_fullscreenChanged);
     _history?.dispose();
     super.dispose();

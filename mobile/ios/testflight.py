@@ -19,6 +19,7 @@ import json
 import os
 import plistlib
 import secrets
+import subprocess
 import sys
 import time
 import urllib.error
@@ -77,6 +78,20 @@ def bundle_id() -> str:
         "identifier": BUNDLE_ID, "name": "GameNight", "platform": "IOS"}}})["data"]["id"]
 
 
+def ensure_push_capability(bundle: str) -> None:
+    """Configured push builds need APNs in the newly issued profile."""
+    if os.environ.get("GAMENIGHT_PUSH") != "true":
+        return
+    capabilities = call("GET", f"/bundleIds/{bundle}/bundleIdCapabilities")["data"]
+    if not any(c["attributes"]["capabilityType"] == "PUSH_NOTIFICATIONS"
+               for c in capabilities):
+        call("POST", "/bundleIdCapabilities", {"data": {
+            "type": "bundleIdCapabilities",
+            "attributes": {"capabilityType": "PUSH_NOTIFICATIONS"},
+            "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bundle}}}}})
+    print("Push Notifications capability is enabled for the app bundle")
+
+
 def delete_stale_profiles() -> None:
     """Profiles a cancelled run left behind."""
     for profile in call("GET", "/profiles?filter[profileType]=IOS_APP_STORE&limit=200")["data"]:
@@ -87,6 +102,7 @@ def delete_stale_profiles() -> None:
 def prepare(out: Path) -> None:
     out.mkdir(parents=True, exist_ok=True)
     bundle = bundle_id()
+    ensure_push_capability(bundle)
     delete_stale_profiles()
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -123,6 +139,13 @@ def prepare(out: Path) -> None:
     uuid = profile["attributes"]["uuid"]
     (out / f"{uuid}.mobileprovision").write_bytes(
         base64.b64decode(profile["attributes"]["profileContent"]))
+
+    if os.environ.get("GAMENIGHT_PUSH") == "true":
+        decoded = subprocess.check_output([
+            "security", "cms", "-D", "-i", str(out / f"{uuid}.mobileprovision")])
+        entitlements = plistlib.loads(decoded).get("Entitlements", {})
+        if entitlements.get("aps-environment") != "production":
+            raise RuntimeError("New TestFlight profile is missing the production APNs entitlement")
 
     # Only the Runner target includes this file (from Flutter/Release.xcconfig),
     # so the plugins' pods keep building unsigned.

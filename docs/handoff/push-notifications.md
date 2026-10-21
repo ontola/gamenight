@@ -1,5 +1,42 @@
 # Handoff: pushmelding "Je bent in de room" voor de GameNight-app
 
+## Implementatie (21 oktober 2026)
+
+De cloud heeft nu accountgebonden `POST` en `DELETE /v1/me/push-token` routes.
+DELETE ontvangt `{token}` en verwijdert alleen deze telefoon, niet alle apparaten
+van het account. Maximaal vijf tokens blijven bewaard. Alleen succesvolle
+`/v1/lobbies/pickup` verstuurt; FCM draait buiten de broker-lock met een timeout.
+Het productiepad wordt via Compose read-only in de container gemount. Omdat de
+container als UID 10001 draait moet het JSON-bestand eigenaar `10001:10001` en
+modus `600` hebben. Zonder configuratie blijft push uit.
+
+De app gebruikt `firebase_core` en `firebase_messaging`. CI schrijft de configuratie
+met `mobile/tool/configure_push.py` en zet `GAMENIGHT_PUSH=true` alleen als het
+platformsecret aanwezig is. Lokale builds gebruiken dezelfde configuratiestap en
+`--dart-define=GAMENIGHT_PUSH=true`. Zonder secrets bouwt de app zonder initialisatie
+of push-entitlements. Firebase Analytics wordt niet toegevoegd. Tokenregistratie
+vraagt pas na accountherstel/inloggen toestemming; logout verwijdert alleen het
+eigen token en trekt het ook bij FCM in. De cloud blijft HTTP v1-registratietokens
+gebruiken; de nieuwe FID-API van Firebase Messaging 17 wordt nog niet gebruikt.
+
+Bij iOS genereert configuratie `Flutter/Firebase.xcconfig`; Runner gebruikt
+`Runner.entitlements` met production voor TestFlight en development voor Debug.
+`testflight.py` activeert voor geconfigureerde push-builds de bundle-capability via
+de bestaande App Store Connect API en controleert het nieuwe profiel op
+`aps-environment=production`. APNs-sleutelregistratie bij Firebase blijft een
+aparte vereiste. Een tik kiest Room en haalt de actuele, geauthenticeerde room op;
+de code uit een melding is nooit een toegangsbewijs.
+
+Firebase-project: `gamenight-a2dd3` (Ontola), apps `io.ontola.gamenight` voor beide
+platforms. De twee platformconfiguraties staan in de bedoelde Actions-secrets.
+Privésleutels horen uitsluitend in de beveiligde lokale opslag, Firebase en de
+productieserver. De echte notificatie- en taptest op iPhone en Android moet nog
+uitgevoerd worden; de gesimuleerde app-tests bewijzen geen aflevering op hardware.
+
+## Oorspronkelijke overdracht
+
+Het onderstaande plan beschrijft de situatie vóór bovenstaande implementatie.
+
 ## Doel
 
 Joep is ingelogd op zijn telefoon en is de main player op de GameNight-PC. Hij pakt zijn controller, loopt met zijn character naar zijn deur in de Game Room-lobby en pakt zijn profiel op, zonder een QR-code te scannen. Op dat moment moet zijn telefoon een pushmelding krijgen ("Je bent in de room" of "Joined Room ABC234"). Tikt hij erop, dan opent de app en staat hij meteen in die room, ingelogd en gekoppeld.
@@ -77,3 +114,4 @@ Gebruik Firebase Cloud Messaging (FCM) voor beide platforms. Upload de APNs-sleu
 ## Klaar wanneer
 
 Joep scant niets, pakt zijn character op bij de deur op Mancave en krijgt binnen een paar seconden een melding op zijn iPhone. Tikken opent de app in die room met "Connected as Joep". Hetzelfde op een Android-telefoon met de APK.
+
