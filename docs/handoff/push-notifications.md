@@ -30,7 +30,22 @@ de code uit een melding is nooit een toegangsbewijs.
 Firebase-project: `gamenight-a2dd3` (Ontola), apps `io.ontola.gamenight` voor beide
 platforms. De twee platformconfiguraties staan in de bedoelde Actions-secrets.
 Privésleutels horen uitsluitend in de beveiligde lokale opslag, Firebase en de
-productieserver. De echte notificatie- en taptest op iPhone en Android moet nog
+productieserver. De serviceaccountsleutel is op 21 oktober geïnstalleerd op
+`gamenight-web`; de cloud kan het bestand als UID 10001 lezen en de publieke
+healthcheck is groen. Google OAuth gaf HTTP 200. Een FCM `validate_only`-request
+met een bewust ongeldig testtoken gaf de verwachte `INVALID_ARGUMENT`; dit
+controleert authenticatie en API-bereikbaarheid, niet aflevering.
+
+Firebase heeft de productie-APNs-sleutel `GameNight Push`, beperkt tot topic
+`io.ontola.gamenight`. Deze ondersteunt TestFlight en App Store-builds; er is
+geen development-APNs-sleutel ingesteld voor lokale Debug-builds. De volledige
+mobiele workflow voor commit `aaa6c317` en build 86 is geslaagd, inclusief
+TestFlight-upload en Play. App Store Connect toont build 86 als verwerkt en
+gekoppeld aan de interne groep GameNight. Op het moment van configuratie waren er nog geen
+push-tokens geregistreerd. Open de nieuwe app en sta meldingen toe om een
+telefoon te registreren.
+
+De echte notificatie- en taptest op iPhone en Android moet nog
 uitgevoerd worden; de gesimuleerde app-tests bewijzen geen aflevering op hardware.
 
 ## Oorspronkelijke overdracht
