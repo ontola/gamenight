@@ -1539,14 +1539,18 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	var menu: Dictionary = menus[id]
 	var line := size + 16.0
 	var w := 0.0
-	var block := size * 0.8
-	var gap := size * 0.3
+	# Couch position gets a second row: one small block per place on the couch.
+	var block := size * 0.5
+	var gap := size * 0.22
+	var row := block + 12.0
+	var extra := 0.0
 	for item in items:
-		var item_w := font.get_string_size(item.label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
-		if item.action == "couch": item_w += size + profiles.size() * (block + gap)
-		w = maxf(w, item_w)
+		w = maxf(w, font.get_string_size(item.label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+		if item.action == "couch":
+			w = maxf(w, profiles.size() * (block + gap) - gap)
+			extra += row
 	w += 80
-	var h := line * items.size() + 70
+	var h := line * items.size() + extra + 70
 	var rect := Rect2(at.x - w / 2, at.y - h, w, h)
 	rect.position.x = clampf(rect.position.x, 16, canvas.size.x - w - 16)
 	rect.position.y = maxf(rect.position.y, 16)
@@ -1554,21 +1558,23 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	canvas.draw_rect(rect, Color(VIOLET, 0.9), false, 3)
 	var heading: String = {"lobbies": "CHOOSE A LOBBY", "remove": "REMOVE A PLAYER"}.get(menu.get("page", ""), _name(id).to_upper())
 	_text(canvas, heading, rect.position + Vector2(24, size + 14), int(size * 0.7), AMBER)
+	var y := rect.position.y + 50
 	for i in items.size():
-		var y := rect.position.y + 50 + i * line
 		var selected: bool = i == menu.index
 		var label: String = items[i].label
+		var couch: bool = items[i].action == "couch"
 		if items[i].action == "quit" and menu.confirm and selected: label = "Press A again to quit"
 		if items[i].action == "remove" and menu.confirm and selected: label = "Press A again to remove %s" % _short(items[i].name, 14)
-		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4), Color(VIOLET, 0.35))
+		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4 + (row if couch else 0.0)), Color(VIOLET, 0.35))
 		_text(canvas, label, Vector2(rect.position.x + 32, y + size), size, TEXT if selected else DIM)
-		if items[i].action == "couch":
-			# One block per place on the couch; yours is filled.
-			var x := rect.position.x + 32 + font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size
+		if couch:
+			# Yours is filled.
 			var mine := couch_place(id)
 			var colour := Color(str(profiles.get(id, {}).get("color", ""))) if str(profiles.get(id, {}).get("color", "")).begins_with("#") else AMBER
 			for place in profiles.size():
-				var cell := Rect2(x + place * (block + gap), y + (line - 4 - block) / 2, block, block)
+				var cell := Rect2(rect.position.x + 32 + place * (block + gap), y + line - 2, block, block)
 				if place == mine: canvas.draw_rect(cell, colour)
 				else: canvas.draw_rect(cell, Color(DIM, 0.8 if selected else 0.5), false, 2)
+			y += row
+		y += line
 
