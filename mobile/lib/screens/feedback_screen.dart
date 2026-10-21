@@ -175,7 +175,8 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                         for (final game in {
                           widget.initialGame,
                           widget.reports.currentGame,
-                          _game
+                          _game,
+                          ...widget.reports.recentGames,
                         }.whereType<String>())
                           ChoiceChip(
                               label: Text(_gameTitle(game)),

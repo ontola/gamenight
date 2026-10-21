@@ -151,6 +151,24 @@ class AppState extends ChangeNotifier {
     prefs.setString('current_artwork', currentArtworkId);
   }
 
+  /// Ever played in a room from this phone.
+  bool get joinedRoom => prefs.getBool('joined_room') ?? false;
+
+  /// Ever been the main player of a GameNight PC: your own GameNight.
+  bool get hostedOwnRoom => prefs.getBool('hosted_own_room') ?? false;
+
+  void _noteRoom(
+      {required bool linked, required bool mainPlayer, String? game}) {
+    if (linked && !joinedRoom) prefs.setBool('joined_room', true);
+    if (mainPlayer && !hostedOwnRoom) prefs.setBool('hosted_own_room', true);
+    final recent = prefs.getStringList('recent_games') ?? const [];
+    if (linked && game != null && recent.firstOrNull != game) {
+      // Feedback can go to any of these, not only the game playing now.
+      prefs.setStringList('recent_games',
+          [game, ...recent.where((g) => g != game)].take(8).toList());
+    }
+  }
+
   /// False while the face is still the random one from the first start.
   bool get drewFace => prefs.getString('starter_artwork') == null;
 
@@ -522,6 +540,10 @@ class AppState extends ChangeNotifier {
       final next = await api.session(profileId);
       final wasLinked = session?.linked ?? false;
       session = next;
+      _noteRoom(
+          linked: next.linked,
+          mainPlayer: next.mainPlayer,
+          game: next.currentGame);
       sessionError = null;
       if (next.linked && next.playerId != null) {
         _bind(next.playerId);
@@ -923,6 +945,10 @@ class AppState extends ChangeNotifier {
         return;
       }
       hostedRoom = room;
+      _noteRoom(
+          linked: room.connected,
+          mainPlayer: room.mainPlayer,
+          game: room.current);
       sessionError = null;
       companionError = null;
       if (!room.connected || room.current == null) {

@@ -88,7 +88,7 @@ class RoomScreenState extends State<RoomScreen> {
 
   Future<void> _joinAction(Future<String> Function() action) => _run(action);
 
-  Future<void> _scan() async {
+  Future<void> scan() async {
     final text = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const ScannerScreen()),
     );
@@ -448,7 +448,7 @@ class RoomScreenState extends State<RoomScreen> {
                   FilledButton.icon(
                     style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(56)),
-                    onPressed: _busy ? null : _scan,
+                    onPressed: _busy ? null : scan,
                     icon: const Icon(Icons.qr_code_scanner),
                     label: const Text('Scan the QR on the TV'),
                   ),
@@ -630,7 +630,7 @@ class RoomScreenState extends State<RoomScreen> {
           const SizedBox(width: 8),
           Expanded(child: Hint('GameNight at ${state.host!.authority}')),
           TextButton(
-            onPressed: _busy ? null : _scan,
+            onPressed: _busy ? null : scan,
             child: const Text('Scan again'),
           ),
           // Linked, Leave room at the bottom does this.

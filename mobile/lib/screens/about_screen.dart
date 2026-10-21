@@ -14,7 +14,11 @@ import 'sign_in_screen.dart';
 /// from the logo.
 class AboutScreen extends StatelessWidget {
   final AppState state;
-  const AboutScreen({super.key, required this.state});
+  final VoidCallback? onHost;
+  final VoidCallback? onScan;
+  final VoidCallback? onDocs;
+  const AboutScreen(
+      {super.key, required this.state, this.onHost, this.onScan, this.onDocs});
 
   static const _points = [
     (
@@ -41,7 +45,7 @@ class AboutScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('About')),
+        appBar: AppBar(),
         body: ListenableBuilder(
           listenable: state,
           builder: (context, _) => ContentWidth(
@@ -88,7 +92,27 @@ class AboutScreen extends StatelessWidget {
                         ]),
                   ),
                 const SizedBox(height: 10),
-                _Todos(state: state),
+                _Todos(state: state, onHost: onHost, onScan: onScan),
+                const SizedBox(height: 18),
+                Wrap(spacing: 8, runSpacing: 8, children: [
+                  if (onDocs != null)
+                    _Link(
+                        key: const ValueKey('about-docs'),
+                        label: 'Docs',
+                        icon: Icons.menu_book_outlined,
+                        onTap: onDocs!),
+                  _Link(
+                      key: const ValueKey('about-github'),
+                      label: 'GitHub',
+                      icon: Icons.code,
+                      onTap: () => launchUrl(
+                          Uri.parse('https://github.com/ontola/gamenight'))),
+                  _Link(
+                      key: const ValueKey('about-ontola'),
+                      label: 'Made by Ontola',
+                      icon: Icons.favorite_outline,
+                      onTap: () => launchUrl(Uri.parse('https://ontola.io'))),
+                ]),
               ],
             ),
           ),
@@ -96,9 +120,26 @@ class AboutScreen extends StatelessWidget {
       );
 }
 
+class _Link extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+  const _Link(
+      {super.key,
+      required this.label,
+      required this.icon,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+      onPressed: onTap, icon: Icon(icon, size: 18), label: Text(label));
+}
+
 class _Todos extends StatelessWidget {
   final AppState state;
-  const _Todos({required this.state});
+  final VoidCallback? onHost;
+  final VoidCallback? onScan;
+  const _Todos({required this.state, this.onHost, this.onScan});
 
   @override
   Widget build(BuildContext context) {
@@ -118,6 +159,22 @@ class _Todos extends StatelessWidget {
               launchUrl(AppUpdate.apk, mode: LaunchMode.externalApplication),
         ),
       _Todo(
+        key: const ValueKey('todo-join'),
+        done: state.joinedRoom,
+        title: 'Join a session',
+        hint: 'Scan the QR code on the TV to pick up your player.',
+        action: onScan == null ? null : 'Scan QR',
+        onTap: () => onScan?.call(),
+      ),
+      _Todo(
+        key: const ValueKey('todo-face'),
+        done: state.drewFace,
+        title: 'Draw your face',
+        hint: 'It shows up on your character in the games.',
+        action: 'Draw',
+        onTap: () => FaceEditorScreen.open(context, state),
+      ),
+      _Todo(
         key: const ValueKey('todo-email'),
         done: state.signedIn,
         title: 'Save your player with your email',
@@ -129,17 +186,19 @@ class _Todos extends StatelessWidget {
             builder: (_) => SignInScreen(state: state))),
       ),
       _Todo(
-        key: const ValueKey('todo-face'),
-        done: state.drewFace,
-        title: 'Draw your face',
-        hint: 'It shows up on your character in the games.',
-        action: 'Draw',
-        onTap: () => FaceEditorScreen.open(context, state),
+        key: const ValueKey('todo-host'),
+        done: state.hostedOwnRoom,
+        title: 'Install on your PC and host a session',
+        hint: 'Run GameNight on the TV computer and invite your friends.',
+        action: onHost == null ? null : 'Host',
+        onTap: () => onHost?.call(),
       ),
     ];
     final left = items.where((t) => !t.done).length;
+    // Nothing left to do: the checklist goes away.
+    if (left == 0) return const SizedBox.shrink();
     return Section(
-      title: left == 0 ? 'All set' : 'Get ready ($left to go)',
+      title: 'Get ready ($left to go)',
       children: items,
     );
   }

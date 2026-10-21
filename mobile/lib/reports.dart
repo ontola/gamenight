@@ -43,6 +43,10 @@ class ReportService {
 
   String? get currentGame => _context()['game'];
 
+  /// Games played on this phone lately, newest first.
+  List<String> get recentGames =>
+      prefs.getStringList('recent_games') ?? const [];
+
   String? get draftGame => prefs.getString('feedback_draft_game');
 
   String get draft => prefs.getString('feedback_draft') ?? '';

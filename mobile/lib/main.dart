@@ -102,6 +102,9 @@ class _GameNightAppState extends State<GameNightApp> {
   final _homeKey = GlobalKey<_HomeScreenState>();
   final _feedbackGame = FeedbackGameContext();
   int _selectedTab = 0;
+
+  /// The About page is open, so no sidebar tab shows as current.
+  bool _aboutOpen = false;
   BrowserNavigation? _history;
 
   @override
@@ -173,10 +176,22 @@ class _GameNightAppState extends State<GameNightApp> {
       return true;
     });
     if (top == 'about') return;
-    navigator.push(MaterialPageRoute<void>(
+    setState(() => _aboutOpen = true);
+    navigator
+        .push(MaterialPageRoute<void>(
       settings: const RouteSettings(name: 'about'),
-      builder: (_) => AboutScreen(state: widget.state),
-    ));
+      builder: (_) => AboutScreen(
+          state: widget.state,
+          onHost: () => _openWebsite('/host'),
+          onDocs: () => _openWebsite('/docs'),
+          onScan: () {
+            _selectDestination(0);
+            _homeKey.currentState?._roomKey.currentState?.scan();
+          }),
+    ))
+        .whenComplete(() {
+      if (mounted) setState(() => _aboutOpen = false);
+    });
   }
 
   void _menu() {
@@ -264,7 +279,7 @@ class _GameNightAppState extends State<GameNightApp> {
                 key: ValueKey('desktop-tab-${entry.$1}'),
                 label: entry.$2,
                 icon: Icon(_selectedTab == entry.$1 ? entry.$4 : entry.$3),
-                selected: _selectedTab == entry.$1,
+                selected: !_aboutOpen && _selectedTab == entry.$1,
                 onTap: () => _selectDestination(entry.$1),
               ),
             _SidebarItem(
@@ -273,7 +288,7 @@ class _GameNightAppState extends State<GameNightApp> {
               icon: FittedBox(
                   child: PlayerFaceIcon(
                       face: widget.state.face, skin: widget.state.skinColor)),
-              selected: _selectedTab == 2,
+              selected: !_aboutOpen && _selectedTab == 2,
               onTap: () => _selectDestination(2),
             ),
             const _SidebarHeading('Help'),
