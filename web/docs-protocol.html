@@ -798,6 +798,23 @@ installed need no confirmation on Android 12+), and <strong>Open</strong> launch
 game by its own means, for example LAN discovery; <code>companion_message</code> is for
 pages only. iPhones can't install apps from outside the App Store, so there
 the app must come from the App Store or TestFlight.</p>
+<h2 id="plain-text-requests">Plain-text requests</h2>
+<p>A game can accept requests in plain words, such as &quot;geef me 10 End Crystal&quot;,
+from the GameNight app and the session assistant (which turns speech or loose
+wording into a request the game understands). Declare it after <code>welcome</code>:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;: &quot;declare_commands&quot;, &quot;description&quot;: &quot;Ask for items for yourself or everyone.&quot;,
+ &quot;examples&quot;: [&quot;geef me 10 End Crystal&quot;, &quot;geef iedereen 5 Torch&quot;]}
+</code></pre></div>
+<p>The daemon lists it in the party snapshot under <code>commands</code>. The local web server
+then forwards a request from a seated player as</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;: &quot;game_command&quot;, &quot;game&quot;: &quot;mineclonia&quot;, &quot;player_id&quot;: &quot;…&quot;, &quot;id&quot;: &quot;r-12&quot;, &quot;text&quot;: &quot;geef me 10 End Crystal&quot;}
+</code></pre></div>
+<p>and the game answers once, in words for that player:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;: &quot;command_result&quot;, &quot;id&quot;: &quot;r-12&quot;, &quot;ok&quot;: true, &quot;message&quot;: &quot;Alsjeblieft: 10× End Crystal.&quot;}
+</code></pre></div>
+<p>The game decides what text means; nothing is executed as code. Only the local
+web server sends <code>game_command</code>, only for a player who is in the party, and
+only to a game that declared commands. A declaration ends when the game disconnects.</p>
 <h2 id="the-night-end-to-end">The night, end to end</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>overlay: set_playlist [neon-trails, neon-siege]
 daemon → neon-trails: prepare      (warm the first game)
@@ -992,7 +1009,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="8f0d4c5637ae18c9c118fa01f8a4f15f139d418dd2f69f6d33792a23634fe8c3">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="27c59fc26553cdb1ecdaae33345b5e1b49b6bc4003ea3769712205a1accf739e">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
