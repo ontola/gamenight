@@ -90,6 +90,32 @@ void main() {
     expect(state.companionError, isNull);
   });
 
+  test('a player picked up at its door brings the phone into that room',
+      () async {
+    SharedPreferences.setMockInitialValues({'cloud_token': 'test-only'});
+    var status = <String, dynamic>{'status': 'none'};
+    final client = MockClient((request) async {
+      if (request.url.path == '/v1/rooms/status') {
+        return http.Response(jsonEncode(status), 200);
+      }
+      if (request.url.path == '/v1/me') {
+        return http.Response('{"id":"joep"}', 200);
+      }
+      return http.Response('{}', 200);
+    });
+    final state = AppState(await SharedPreferences.getInstance(),
+        cloud: CloudApi(client: client));
+    addTearDown(state.dispose);
+    await state.findHostedRoom();
+    expect(state.inHostedRoom, isFalse);
+    // Picked up at the door on the TV, without scanning anything.
+    status = roomFixture();
+    await state.findHostedRoom();
+    expect(state.inHostedRoom, isTrue);
+    expect(state.hostedRoom!.connected, isTrue);
+    expect(state.prefs.getBool('hosted_room'), isTrue);
+  });
+
   test('a signed-in phone waiting at its door can take a free player',
       () async {
     SharedPreferences.setMockInitialValues(

@@ -509,6 +509,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       unawaited(widget.reports?.flush());
       if (widget.state.cloud.browserCookies) {
         unawaited(widget.state.loadAccount());
+      } else {
+        unawaited(widget.state.findHostedRoom());
       }
     }
   }

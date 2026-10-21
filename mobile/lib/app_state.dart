@@ -830,12 +830,48 @@ class AppState extends ChangeNotifier {
         }
       }
       if (inHostedRoom) startPolling();
+      _roomWatch ??= Timer.periodic(
+          const Duration(seconds: 10), (_) => unawaited(findHostedRoom()));
+      await findHostedRoom();
     } on SignedOut {
       await _forgetAccount(clearPlayer: true);
     } on ApiError {
       // Offline: keep the token and try again later.
     }
     notifyListeners();
+  }
+
+  Timer? _roomWatch;
+
+  /// Signed in without a room on this phone: a player picked up at its door
+  /// on the TV, or waiting there, brings this phone into that room without
+  /// scanning anything.
+  Future<void> findHostedRoom() async {
+    // A scanned invitation still being resumed decides the room itself.
+    if (!cloud.signedIn ||
+        isGuest ||
+        inHostedRoom ||
+        _api != null ||
+        pendingRoomDestination != null) {
+      return;
+    }
+    try {
+      final token = cloud.roomIdentity;
+      final room = await cloud.roomStatus();
+      if (room.none ||
+          inHostedRoom ||
+          _api != null ||
+          token != cloud.roomIdentity ||
+          _disposed) {
+        return;
+      }
+      await _enterHostedRoom();
+    } on SignedOut {
+      await _forgetAccount(clearPlayer: true);
+      notifyListeners();
+    } on ApiError {
+      // Offline: the next check tries again.
+    }
   }
 
   // ---- Hosted rooms (joined by room code over the internet) ------------
@@ -1126,6 +1162,7 @@ class AppState extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _poll?.cancel();
+    _roomWatch?.cancel();
     _saveTimer?.cancel();
     _api?.close();
     cloud.close();
