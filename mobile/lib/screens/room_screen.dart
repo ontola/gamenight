@@ -272,10 +272,13 @@ class RoomScreenState extends State<RoomScreen> {
     final room = state.hostedRoom;
     final connected = room?.connected ?? false;
     final waiting = room?.waiting ?? false;
+    final choosing = room?.canChoosePlayer ?? false;
     return [
-      if (room?.choosingPlayer == true)
+      if (choosing)
         Section(title: 'Choose your player', children: [
-          const Hint('Pick the player you are using on the TV.'),
+          Hint(waiting
+              ? 'Pick the player you are holding the controller for, or walk it to your door on the TV.'
+              : 'Pick the player you are using on the TV.'),
           const SizedBox(height: 12),
           for (final seat in room!.seats)
             Padding(
@@ -315,7 +318,7 @@ class RoomScreenState extends State<RoomScreen> {
                           : connected
                               ? 'Connected as ${state.name} · '
                                   '${room.players} ${room.players == 1 ? 'player' : 'players'}'
-                              : room.choosingPlayer
+                              : choosing
                                   ? 'Choose your player above'
                                   : waiting
                                       ? 'Waiting for a controller'
@@ -329,9 +332,11 @@ class RoomScreenState extends State<RoomScreen> {
               const SizedBox(height: 8),
               Hint(room?.choosingPlayer == true
                   ? 'No account needed.'
-                  : waiting
-                      ? 'Connect a controller on the TV. Your player will appear here.'
-                      : 'The pickup expired or you left. Enter the room code again.'),
+                  : choosing
+                      ? 'Not listed? Press A on your controller first.'
+                      : waiting
+                          ? 'Press A on a controller. Your player shows up here to choose.'
+                          : 'The pickup expired or you left. Enter the room code again.'),
             ],
             if (connected && !room!.fresh)
               const Padding(

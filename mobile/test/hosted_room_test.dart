@@ -90,6 +90,47 @@ void main() {
     expect(state.companionError, isNull);
   });
 
+  test('a signed-in phone waiting at its door can take a free player',
+      () async {
+    SharedPreferences.setMockInitialValues(
+        {'cloud_token': 'test-only', 'hosted_room': true});
+    var status = <String, dynamic>{
+      'status': 'waiting',
+      'room_code': 'TEST42',
+      'seats': [
+        {'index': 0, 'player': 'p1', 'revision': 0, 'available': false},
+      ],
+    };
+    Object? chosen;
+    final client = MockClient((request) async {
+      expect(request.headers['Authorization'], 'Bearer test-only');
+      expect(request.headers.containsKey('X-GameNight-Room-Token'), isFalse);
+      if (request.url.path == '/v1/rooms/guest/seat') {
+        chosen = jsonDecode(request.body);
+        status = roomFixture();
+        return http.Response('{"status":"connected"}', 200);
+      }
+      if (request.url.path == '/v1/rooms/status') {
+        return http.Response(jsonEncode(status), 200);
+      }
+      return http.Response('{}', 200);
+    });
+    final state = AppState(await SharedPreferences.getInstance(),
+        cloud: CloudApi(client: client));
+    addTearDown(state.dispose);
+    await state.refreshHostedRoom();
+    expect(state.hostedRoom!.waiting, isTrue);
+    expect(state.hostedRoom!.canChoosePlayer, isFalse);
+    // Someone presses A: Player 2 appears and is free.
+    (status['seats'] as List)
+        .add({'index': 1, 'player': 'p2', 'revision': 0, 'available': true});
+    await state.refreshHostedRoom();
+    expect(state.hostedRoom!.canChoosePlayer, isTrue);
+    await state.chooseGuestSeat(state.hostedRoom!.seats[1]);
+    expect(chosen, {'index': 1, 'player': 'p2', 'revision': 0});
+    expect(state.hostedRoom!.connected, isTrue);
+  });
+
   test(
       'hosted playlist edits carry exact snapshot and wait for reflected queue',
       () async {

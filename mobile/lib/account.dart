@@ -101,6 +101,12 @@ class HostedRoom {
   bool get connected => status == 'connected';
   bool get waiting => status == 'waiting';
   bool get choosingPlayer => status == 'choose_player';
+
+  /// A free player on the TV this phone can take: a guest choosing, or a
+  /// signed-in phone waiting at its door.
+  bool get canChoosePlayer =>
+      (choosingPlayer || waiting) &&
+      seats.any((seat) => seat['available'] == true);
   bool get guest => raw['guest'] == true;
 
   /// Asked to play on this phone; the GameNight PC is adding the player.
@@ -588,6 +594,7 @@ class CloudApi {
     await _send('PUT', '/v1/rooms/guest/profile', body: profile);
   }
 
+  /// Guests and signed-in phones both take a free player here.
   Future<void> chooseGuestSeat(Map<String, dynamic> seat) async {
     await _send('POST', '/v1/rooms/guest/seat', body: {
       'index': seat['index'],

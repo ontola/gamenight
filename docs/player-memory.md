@@ -20,7 +20,9 @@ is explained and can be declined by unchecking Remember me.
 On host startup, the main profile and remembered guests wait at the pickup door,
 with the main profile listed first. A controller must still collect a profile:
 the main profile is never handed to a seat automatically, because whoever holds
-the first controller is not necessarily the main player. Remembering never
+the first controller is not necessarily the main player. The phone of a
+waiting profile lists the room's free players instead, so its owner can tap the
+player they hold a controller for, or a new one after pressing A. Remembering never
 claims a seat or starts a game automatically. Turning memory
 off leaves the current player connected; leaving the room does not change the
 memory preference. Main player is a startup preference, not an administrator
