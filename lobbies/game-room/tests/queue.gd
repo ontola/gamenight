@@ -135,7 +135,33 @@ func _run() -> void:
 	party.erase("onboarding_error")
 	party.erase("game_issues")
 	party.erase("warm_session")
+	# A game that reports nothing: its process is launching, so there is no
+	# session yet, only the host's warming hint. The lobby still shows it.
+	party.warming = {"game": "ballkickers", "title": "Ballkickers"}
 	main.set_party(party)
+	check(main._loading_session("ballkickers").get("progress_label") == "Starting the game", "A launching game shows as loading before it says anything")
+	for i in 120: tick(main)
+	check(main.loading_percent("ballkickers") > 0, "The launch bar moves without reports")
+	check(main.loading_kicker("ballkickers").begins_with("LOADING"), "Launching reads as loading")
+	await capture(main, "queue-starting")
+	party.installs = [{"game": "ballkickers", "title": "Ballkickers", "state": "downloading", "percent": 40}]
+	main.set_party(party)
+	tick(main)
+	check(main.loading_kicker("ballkickers").begins_with("DOWNLOADING") and main.loading_percent("ballkickers") < 5, "A download starts its own bar: %s" % main.loading_kicker("ballkickers"))
+	for i in 240: tick(main)
+	check(main.loading_percent("ballkickers") in [39, 40], "A download follows the real percentage: %s" % main.loading_kicker("ballkickers"))
+	check(main._queue_status("ballkickers").ends_with("Downloading"), "Queue says it is downloading")
+	await capture(main, "queue-downloading")
+	var paused: Dictionary = party.active_session
+	party.erase("active_session")
+	main.set_party(party)
+	await capture(main, "tv-downloading")
+	party.active_session = paused
+	party.erase("installs")
+	party.erase("warming")
+	main.set_party(party)
+	tick(main)
+	check(main._loading_session("ballkickers").is_empty(), "Nothing loading clears the fallback")
 	main.room.set_process(false)
 	main.room.press_prompt("queue", "X")
 	await capture(main, "queue-skip-pressed")

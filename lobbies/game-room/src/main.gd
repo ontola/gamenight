@@ -850,7 +850,7 @@ func _process(delta: float) -> void:
 	room.set_mood(Color.from_string(str(next.get("color", "")), VIOLET) if not next.is_empty() else VIOLET)
 	_update_loading(delta)
 	var shown := _load_shown.keys().map(func(game): return [game, loading_percent(game)])
-	var key := JSON.stringify([party.get("active_session"), party.get("warm_session"), party.get("warming"), party.get("game_issues"), party.get("now_playing"), shelf_offset, shown])
+	var key := JSON.stringify([party.get("active_session"), party.get("warm_session"), party.get("warming"), party.get("installs"), party.get("game_issues"), party.get("now_playing"), shelf_offset, shown])
 	if key != _screen_key:
 		_screen_key = key
 		_redraw_screens()
@@ -978,7 +978,7 @@ func _draw_tv(canvas: Control) -> void:
 		detail = "Press Y at the TV to resume"
 		var loading := _loading_session(str(game.id))
 		if not loading.is_empty():
-			kicker = "LOADING %d%%" % loading_percent(str(game.id))
+			kicker = loading_kicker(str(game.id))
 			kicker_color = AMBER
 			detail = str(loading.get("progress_label", "Preparing game"))
 		elif not _fits_party(game):
@@ -999,7 +999,7 @@ func _draw_tv(canvas: Control) -> void:
 				detail = "Press Y at the TV to retry"
 			elif not loading.is_empty():
 				# The first game loads right here, with what it is doing.
-				kicker = "LOADING %d%%" % loading_percent(str(game.id))
+				kicker = loading_kicker(str(game.id))
 				kicker_color = AMBER
 				detail = "%s  ·  Y at the TV starts it when ready" % str(loading.get("progress_label", "Preparing game"))
 			elif warm is Dictionary and str(warm.get("game")) == str(game.id) and warm.get("phase") == "ready":
@@ -1094,19 +1094,24 @@ func _draw_queue_preview(canvas: Control) -> void:
 
 func _update_loading(delta: float) -> void:
 	var seen := {}
-	for key in ["active_session", "warm_session", "warming"]:
-		var session: Variant = party.get(key)
-		if not (session is Dictionary and str(session.get("phase")) in ["created", "preparing"]): continue
+	for session in _loading_entries():
 		var game := str(session.get("game"))
 		if seen.has(game): continue
 		seen[game] = true
 		var reported := clampf(float(session.progress), 0.0, 100.0) if session.get("progress") != null else 0.0
-		var report: Array = _load_report.get(game, [-1.0, _time])
+		var stage := str(session.get("stage"))
+		var report: Array = _load_report.get(game, [-1.0, _time, stage])
+		if report.size() < 3 or report[2] != stage:
+			# Downloading and loading are separate bars: each starts at 0.
+			report = [-1.0, _time, stage]
+			_load_shown[game] = 0.0
 		if reported != report[0]:
-			report = [reported, _time]
+			report = [reported, _time, stage]
 			_load_report[game] = report
-		# Creep halfway toward 95% over this phase, never reaching it.
-		var ceiling := reported + (95.0 - reported) * 0.5 if reported < 95.0 else reported
+		# A download reports real bytes, so follow it. Anything else creeps
+		# halfway toward 95% over this phase, never reaching it.
+		var ceiling := reported
+		if stage != "download" and reported < 95.0: ceiling = reported + (95.0 - reported) * 0.5
 		var estimate := reported + (ceiling - reported) * (1.0 - exp(-(_time - float(report[1])) / 6.0))
 		var now: float = _load_shown.get(game, 0.0)
 		_load_shown[game] = minf(99.0, maxf(now, now + (estimate - now) * minf(1.0, delta * 2.5)))
@@ -1118,13 +1123,39 @@ func _update_loading(delta: float) -> void:
 func loading_percent(game_id: String) -> int:
 	return int(_load_shown.get(game_id, 0.0))
 
-## Loading can move from the warm slot to the active slot after Play next.
-func _loading_session(game_id: String) -> Dictionary:
-	for key in ["active_session", "warm_session", "warming"]:
+## Everything that is on its way to playable, as session-like dictionaries
+## with a stage: "download" while installing, "start" while the process
+## launches (no session exists yet, so the game itself can't say anything),
+## and "load" while the game prepares. Loading can move from the warm slot
+## to the active slot after Play next.
+func _loading_entries() -> Array:
+	var result: Array = []
+	for key in ["active_session", "warm_session"]:
 		var session: Variant = party.get(key)
-		if session is Dictionary and str(session.get("game")) == game_id and str(session.get("phase")) in ["created", "preparing"]:
-			return session
+		if session is Dictionary and str(session.get("phase")) in ["created", "preparing"]:
+			result.append(session.merged({"stage": "load"}))
+	for install in party.get("installs", []):
+		if not install is Dictionary: continue
+		var state := str(install.get("state"))
+		if not state in ["queued", "downloading", "verifying", "extracting"]: continue
+		var label: String = {"queued": "Waiting to download", "downloading": "Downloading", "verifying": "Checking the download", "extracting": "Unpacking"}[state]
+		result.append({"game": install.get("game"), "stage": "download", "progress": install.get("percent"), "progress_label": label})
+	var warming: Variant = party.get("warming")
+	if warming is Dictionary and not warming.is_empty():
+		var game := str(warming.get("game"))
+		if _issue(game).is_empty() and not result.any(func(e): return str(e.game) == game):
+			result.append({"game": game, "stage": "start", "progress": null, "progress_label": "Starting the game"})
+	return result
+
+func _loading_session(game_id: String) -> Dictionary:
+	for session in _loading_entries():
+		if str(session.get("game")) == game_id: return session
 	return {}
+
+## "LOADING 40%", or "DOWNLOADING 40%" while the game is still arriving.
+func loading_kicker(game_id: String) -> String:
+	var stage := str(_loading_session(game_id).get("stage"))
+	return "%s %d%%" % ["DOWNLOADING" if stage == "download" else "LOADING", loading_percent(game_id)]
 
 func _draw_loading_bar(canvas: Control, rect: Rect2, game_id: String) -> void:
 	var loading := _loading_session(game_id)
