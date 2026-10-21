@@ -215,6 +215,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `set_setting` *(optional)* | change one of this game's own settings, from its in-game menu (see [Match settings](#match-settings)) |
 | `declare_companion` *(optional)* | a phone screen for this game (see [Phone screens](#phone-screens)) |
 | `companion_message` *(optional)* | JSON for one player's phone screen, or every phone |
+| `rumble` *(optional)* | vibrate the controller on one of your seats (see [Rumble](#rumble)) |
 
 ```json
 { "type": "ready",    "session": "9be2…" }
@@ -266,6 +267,24 @@ resume, input ownership, clean switching and continuous play.
 Session snapshots include [diagnostics](#session-diagnostics). Consumers must
 treat absent diagnostics from older hosts as unavailable, not zero measured
 play time.
+
+### Rumble
+
+The host owns the pads, so a game asks it to vibrate one:
+
+```json
+{ "type": "rumble", "session": "9be2…", "seat": 0, "weak": 12000, "strong": 40000, "ms": 150 }
+```
+
+`seat` is a seat index from `prepare`. `weak` drives the light, buzzy motor
+(road surface, texture) and `strong` the heavy one (impacts, grip loss), each
+0 to 65535 as in XInput. `ms` is how long it lasts, at most 5000. Every
+message replaces what that pad was playing, so send short pulses a few times a
+second while an effect goes on, and zeros to stop at once. The host only
+honours it from the running game in front, for a seat that has a pad; a warm
+or paused game, or the lobby being open, is silently ignored. Pads without
+motors ignore it too. In Godot, call `GameNight.rumble(seat, weak, strong,
+seconds)` with 0 to 1 strengths.
 
 `finished` is an optional round notification. It never advances the playlist,
 opens the lobby, pauses the game or hides its window. The game owns its score

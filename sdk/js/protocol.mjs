@@ -21,7 +21,7 @@ export const ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL";
 export const ENV_TOKEN = "GAMENIGHT_TOKEN";
 export const DEFAULT_ADDR = "127.0.0.1:7912";
 export const DEFAULT_WEB_PORT = 7913;
-export const GODOT_SDK_VERSION = 4;
+export const GODOT_SDK_VERSION = 5;
 export const PROTOCOL_VERSION = 1;
 
 /** Message "type" tags, both directions. */
@@ -75,6 +75,7 @@ export const MSG = Object.freeze({
   "REQUEST_START": "request_start",
   "RESUME": "resume",
   "RETRY_LOBBY": "retry_lobby",
+  "RUMBLE": "rumble",
   "SET_COUCH_POSITION": "set_couch_position",
   "SET_PHONES": "set_phones",
   "SET_PLAYER_AVATAR": "set_player_avatar",
@@ -143,6 +144,22 @@ export const CLIENT_MESSAGES = {
     "required": [
       "instant_join",
       "session"
+    ]
+  },
+  "rumble": {
+    "fields": [
+      "ms",
+      "seat",
+      "session",
+      "strong",
+      "weak"
+    ],
+    "required": [
+      "ms",
+      "seat",
+      "session",
+      "strong",
+      "weak"
     ]
   },
   "controller_input": {

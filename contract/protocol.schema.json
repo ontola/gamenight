@@ -133,6 +133,50 @@
           "type": "object"
         },
         {
+          "description": "Vibrate the controller on one of this session's seats. Games only, and\nonly while their session is running in front: a warm or paused game\nis ignored. `weak` is the light high-frequency motor (surface, texture),\n`strong` the heavy low one (impacts), each 0 to 65535 like XInput.\n`ms` is how long it lasts (at most 5000); every message replaces the\nprevious one for that pad, so send short pulses repeatedly while the\neffect should go on, and zero to stop at once.",
+          "properties": {
+            "ms": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "seat": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "strong": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "rumble",
+              "type": "string"
+            },
+            "weak": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "seat",
+            "weak",
+            "strong",
+            "ms"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Meaningful human input (deadzone filtered, at most once a second per device).\nGames must supply their active session. Overlays omit it.",
           "properties": {
             "controller": {
@@ -3062,7 +3106,7 @@
     "protocol": {
       "DEFAULT_ADDR": "127.0.0.1:7912",
       "DEFAULT_WEB_PORT": 7913,
-      "GODOT_SDK_VERSION": 4,
+      "GODOT_SDK_VERSION": 5,
       "PROTOCOL_VERSION": 1
     }
   },

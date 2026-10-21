@@ -2335,6 +2335,24 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::Rumble {
+                session,
+                seat,
+                weak,
+                strong,
+                ms,
+            } = parsed
+            {
+                // The runtime owns the pads, so it also drives their motors.
+                // Only the game in front may, and only on its own seats.
+                if let Registration::Game(game) = &registration {
+                    let target = shared.lock().await.night.rumble_target(game, session, seat);
+                    if let Some(controller) = target {
+                        lobby_input::rumble(&controller, weak, strong, ms);
+                    }
+                }
+                continue;
+            }
             if let ClientMessage::ControllerFrame { .. } = &parsed {
                 // The runtime samples physical controllers; no client
                 // may inject frames.
@@ -2494,6 +2512,7 @@ fn message_to_command(
         ClientMessage::ControllerFrame { .. } => {
             return Err("controller frames require lobby routing".into())
         }
+        ClientMessage::Rumble { .. } => return Err("rumble requires input routing".into()),
         ClientMessage::Hello { .. } => return Err("already said hello".into()),
         ClientMessage::DeclareCompanion { .. }
         | ClientMessage::CompanionMessage { .. }

@@ -1107,6 +1107,39 @@ mod night_tests {
         (night, s1)
     }
 
+    #[test]
+    fn only_the_running_game_in_front_rumbles_its_own_seats() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("A", None, None));
+        let player = night.snapshot().players[0].id;
+        night.handle(Command::BindController {
+            player_id: player,
+            controller: "ordinal:3".into(),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("g1"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("g1")],
+        });
+        let (_, s1) = prepared_session(&fx).unwrap();
+        let g1 = GameId::new("g1");
+        assert_eq!(night.rumble_target(&g1, s1, 0), None, "not started yet");
+        night.handle(Command::SessionReady { session: s1 });
+        assert_eq!(
+            night.rumble_target(&g1, s1, 0).as_deref(),
+            Some("ordinal:3")
+        );
+        assert_eq!(night.rumble_target(&g1, s1, 1), None, "no pad on seat 1");
+        assert_eq!(night.rumble_target(&GameId::new("other"), s1, 0), None);
+        night.handle(Command::OverlayOpened);
+        assert_eq!(
+            night.rumble_target(&g1, s1, 0),
+            None,
+            "paused for the lobby"
+        );
+    }
+
     fn pause_effect(fx: &[Effect]) -> bool {
         fx.iter().any(|e| {
             matches!(

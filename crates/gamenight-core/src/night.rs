@@ -1622,6 +1622,22 @@ impl GameNight {
         }
     }
 
+    /// The controller a running, foreground game may rumble on `seat`, if any.
+    pub fn rumble_target(&self, game: &GameId, session: SessionId, seat: u8) -> Option<String> {
+        let active = self.active.as_ref()?;
+        if active.id != session
+            || &active.game != game
+            || active.phase != SessionPhase::Running
+            || self.overlay_open
+        {
+            return None;
+        }
+        self.active_seats
+            .iter()
+            .find(|s| s.index == seat)
+            .and_then(|s| s.controller.clone())
+    }
+
     /// The per-game key a game sees for this player's profile, if any.
     pub fn profile_key(&self, game: &GameId, player: PlayerId) -> Option<String> {
         self.profiles

@@ -6,6 +6,80 @@ use gilrs::{Axis, Button};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 
+/// A rumble for one pad, applied by the sampler thread that owns the pads.
+struct Rumble {
+    controller: String,
+    weak: u16,
+    strong: u16,
+    ms: u32,
+}
+
+/// The longest single rumble; games send short pulses while an effect lasts.
+const MAX_RUMBLE_MS: u32 = 5000;
+
+static RUMBLE: std::sync::Mutex<Option<std::sync::mpsc::Sender<Rumble>>> =
+    std::sync::Mutex::new(None);
+
+/// Vibrate the pad behind `controller` (an `ordinal:N` token). Does nothing
+/// when runtime input is off or the pad has no motors.
+pub(super) fn rumble(controller: &str, weak: u16, strong: u16, ms: u32) {
+    if let Some(tx) = RUMBLE.lock().unwrap().as_ref() {
+        let _ = tx.send(Rumble {
+            controller: controller.to_owned(),
+            weak,
+            strong,
+            ms: ms.min(MAX_RUMBLE_MS),
+        });
+    }
+}
+
+/// Replace what `request`'s pad is playing. Dropping the old effect stops it.
+fn apply_rumble(
+    pads: &mut gilrs::Gilrs,
+    playing: &mut HashMap<String, gilrs::ff::Effect>,
+    request: Rumble,
+) {
+    use gilrs::ff::{BaseEffect, BaseEffectType, EffectBuilder, Repeat, Replay, Ticks};
+    playing.remove(&request.controller);
+    if request.ms == 0 || (request.weak == 0 && request.strong == 0) {
+        return;
+    }
+    let Some(id) = pads
+        .gamepads()
+        .find(|(id, pad)| {
+            format!("ordinal:{}", usize::from(*id)) == request.controller && pad.is_ff_supported()
+        })
+        .map(|(id, _)| id)
+    else {
+        return;
+    };
+    let length = Ticks::from_ms(request.ms);
+    let motor = |kind| BaseEffect {
+        kind,
+        scheduling: Replay {
+            play_for: length,
+            ..Default::default()
+        },
+        envelope: Default::default(),
+    };
+    let effect = EffectBuilder::new()
+        .add_effect(motor(BaseEffectType::Weak {
+            magnitude: request.weak,
+        }))
+        .add_effect(motor(BaseEffectType::Strong {
+            magnitude: request.strong,
+        }))
+        .repeat(Repeat::For(length))
+        .gamepads(&[id])
+        .finish(pads);
+    match effect.and_then(|effect| effect.play().map(|_| effect)) {
+        Ok(effect) => {
+            playing.insert(request.controller, effect);
+        }
+        Err(error) => debug!(%error, "rumble not played"),
+    }
+}
+
 pub(super) fn spawn(shared: Arc<Mutex<Shared>>) {
     // Protocol/scene tests inject their own seats and input. Connected physical
     // pads must not alter those fixtures. Normal launches never set this flag.
@@ -18,6 +92,8 @@ pub(super) fn spawn(shared: Arc<Mutex<Shared>>) {
     // Shared's mutex. The sampler owns this fast path; the router owns party
     // commands. Sender refreshes are tiny and never hold the party lock here.
     let targets = Arc::new(std::sync::RwLock::new(Vec::<Tx>::new()));
+    let (rumble_tx, rumble_rx) = std::sync::mpsc::channel::<Rumble>();
+    *RUMBLE.lock().unwrap() = Some(rumble_tx);
     let sample_targets = targets.clone();
     let result = std::thread::Builder::new()
         .name("lobby-input".into())
@@ -31,8 +107,12 @@ pub(super) fn spawn(shared: Arc<Mutex<Shared>>) {
             };
             let mut known = Vec::new();
             let mut filter = FrameFilter::default();
+            let mut playing = HashMap::new();
             loop {
                 while pads.next_event().is_some() {}
+                while let Ok(request) = rumble_rx.try_recv() {
+                    apply_rumble(&mut pads, &mut playing, request);
+                }
                 let controllers: Vec<_> = pads
                     .gamepads()
                     .map(|(id, pad)| {

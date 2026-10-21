@@ -79,7 +79,7 @@ extern "C" {
 #define GN_ENV_TOKEN "GAMENIGHT_TOKEN"
 #define GN_DEFAULT_ADDR "127.0.0.1:7912"
 #define GN_DEFAULT_WEB_PORT 7913
-#define GN_GODOT_SDK_VERSION 4
+#define GN_GODOT_SDK_VERSION 5
 #define GN_PROTOCOL_VERSION 1
 
 /* Initialisers, e.g. static const char *colors[] = GN_GUEST_COLORS; */
@@ -136,6 +136,7 @@ extern "C" {
 #define GN_MSG_REQUEST_START "request_start"
 #define GN_MSG_RESUME "resume"
 #define GN_MSG_RETRY_LOBBY "retry_lobby"
+#define GN_MSG_RUMBLE "rumble"
 #define GN_MSG_SET_COUCH_POSITION "set_couch_position"
 #define GN_MSG_SET_PHONES "set_phones"
 #define GN_MSG_SET_PLAYER_AVATAR "set_player_avatar"

@@ -22,7 +22,7 @@ ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL"
 ENV_TOKEN = "GAMENIGHT_TOKEN"
 DEFAULT_ADDR = "127.0.0.1:7912"
 DEFAULT_WEB_PORT = 7913
-GODOT_SDK_VERSION = 4
+GODOT_SDK_VERSION = 5
 PROTOCOL_VERSION = 1
 
 # Message "type" tags, both directions.
@@ -75,6 +75,7 @@ MSG_REQUEST_OVERLAY = "request_overlay"
 MSG_REQUEST_START = "request_start"
 MSG_RESUME = "resume"
 MSG_RETRY_LOBBY = "retry_lobby"
+MSG_RUMBLE = "rumble"
 MSG_SET_COUCH_POSITION = "set_couch_position"
 MSG_SET_PHONES = "set_phones"
 MSG_SET_PLAYER_AVATAR = "set_player_avatar"
@@ -219,6 +220,22 @@ CLIENT_MESSAGES = {
         "required": [
             "instant_join",
             "session"
+        ]
+    },
+    "rumble": {
+        "fields": [
+            "ms",
+            "seat",
+            "session",
+            "strong",
+            "weak"
+        ],
+        "required": [
+            "ms",
+            "seat",
+            "session",
+            "strong",
+            "weak"
         ]
     },
     "controller_input": {

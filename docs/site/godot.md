@@ -91,6 +91,11 @@ physics tick a button went down; read it in `_physics_process`. After Start
 and Resume, a button still held from the lobby must be released first, so the
 press that started the game does not also fire in it.
 
+Rumble a seat's pad with `GameNight.rumble(seat, weak, strong, seconds)`:
+`weak` is the light motor, `strong` the heavy one, both 0 to 1. Each call
+replaces the last, so call it a few times a second while an effect lasts and
+with zeros to stop. Standalone it drives the local joypad.
+
 `frame_for_seat` is empty while the session is not running. Your own Start
 menu can read input while paused with `frame_for_seat(seat, true)`.
 

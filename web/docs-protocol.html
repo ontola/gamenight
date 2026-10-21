@@ -318,6 +318,10 @@ playing, in the lobby, and a second route in makes the two disagree.</p>
 <td><code>companion_message</code> <em>(optional)</em></td>
 <td>JSON for one player's phone screen, or every phone</td>
 </tr>
+<tr>
+<td><code>rumble</code> <em>(optional)</em></td>
+<td>vibrate the controller on one of your seats (see <a href="#rumble">Rumble</a>)</td>
+</tr>
 </tbody>
 </table>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;ready&quot;,    &quot;session&quot;: &quot;9be2…&quot; }
@@ -356,6 +360,18 @@ resume, input ownership, clean switching and continuous play.</p>
 <p>Session snapshots include <a href="#session-diagnostics">diagnostics</a>. Consumers must
 treat absent diagnostics from older hosts as unavailable, not zero measured
 play time.</p>
+<h3 id="rumble">Rumble</h3>
+<p>The host owns the pads, so a game asks it to vibrate one:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;rumble&quot;, &quot;session&quot;: &quot;9be2…&quot;, &quot;seat&quot;: 0, &quot;weak&quot;: 12000, &quot;strong&quot;: 40000, &quot;ms&quot;: 150 }
+</code></pre></div>
+<p><code>seat</code> is a seat index from <code>prepare</code>. <code>weak</code> drives the light, buzzy motor
+(road surface, texture) and <code>strong</code> the heavy one (impacts, grip loss), each
+0 to 65535 as in XInput. <code>ms</code> is how long it lasts, at most 5000. Every
+message replaces what that pad was playing, so send short pulses a few times a
+second while an effect goes on, and zeros to stop at once. The host only
+honours it from the running game in front, for a seat that has a pad; a warm
+or paused game, or the lobby being open, is silently ignored. Pads without
+motors ignore it too. In Godot, call <code>GameNight.rumble(seat, weak, strong, seconds)</code> with 0 to 1 strengths.</p>
 <p><code>finished</code> is an optional round notification. It never advances the playlist,
 opens the lobby, pauses the game or hides its window. The game owns its score
 screen and starts the next round itself. Players can keep playing indefinitely.
@@ -904,7 +920,7 @@ of protection, preserving the current wave and team score. Other pack games reta
 fixed round rosters. Custom clients can send the JSON directly.</p>
 <h3 id="profile-changes-during-a-match">Profile changes during a match</h3>
 <p>When someone goes back to the lobby mid-match and picks up a profile (or
-changes name, colour or face), the active session gets the same people with new
+changes name, colour, face or couch position), the active session gets the same people with new
 details. Every game receives this, whether or not it sent <code>participation</code>:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;:&quot;players_updated&quot;,&quot;session&quot;:&quot;&lt;session UUID&gt;&quot;,&quot;players&quot;:[{&quot;id&quot;:&quot;&lt;player UUID&gt;&quot;,&quot;name&quot;:&quot;Joep&quot;,&quot;color&quot;:&quot;#e94b3c&quot;,&quot;avatar&quot;:&quot;…&quot;,&quot;profile_key&quot;:&quot;…&quot;}]}
 </code></pre></div>
@@ -916,6 +932,20 @@ in) or at the next <code>prepare</code>. Closing the lobby resumes the same sess
 <p>The character studio saves <code>skin_color</code> with the player profile and never changes
 <code>Player.color</code> on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.</p>
+<h3 id="couch-position">Couch position</h3>
+<p>Every player has a place on the couch, <code>Player.couch</code>, counted from the left
+(0 is the leftmost). Each player in the party has a different one. Players move
+with left and right on <strong>Couch position</strong> in their own Start menu in the lobby;
+the host sends <code>set_couch_position {player_id, position}</code> and shifts the people
+in between one place over. Newcomers sit down on the right, and leaving closes
+the gap.</p>
+<p>Lay out anything that runs left to right by it: split-screen views, start
+positions, scoreboards. Not by seat: a seat is a controller slot and does not
+change when someone moves. Sort by <code>couch</code> rather than index with it, since a
+session may have part of the party. A move during a match arrives as
+<code>players_updated</code> (and in <code>party_updated</code>): move the views over, never restart.
+Older hosts leave <code>couch</code> out; fall back to seat order. The Godot SDK has
+<code>GameNight.couch_order(seats, players)</code>.</p>
 <h3 id="recognising-a-player-between-nights">Recognising a player between nights</h3>
 <p><code>Player.id</code> lives as long as the party. To keep a player's own data (their
 inventory in a world, settings, unlocks) between nights, key it on
@@ -1009,7 +1039,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="27c59fc26553cdb1ecdaae33345b5e1b49b6bc4003ea3769712205a1accf739e">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="3e8a6c6bde8c2e83c55d56c286730a608db5c7ba5a8b32756fb02fa94e64c5c1">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -52,7 +52,7 @@ development connections may reconnect automatically.</p>
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L348">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L374">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
 <p>To get live roster updates, opt in from <code>prepared</code>, before Ready:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">func _on_prepared(session_id: String, seats: Array, players: Array) -&gt; void:
@@ -88,6 +88,10 @@ deadzones our games settled on (<code>STICK_DEADZONE</code> 0.15, <code>TRIGGER_
 physics tick a button went down; read it in <code>_physics_process</code>. After Start
 and Resume, a button still held from the lobby must be released first, so the
 press that started the game does not also fire in it.</p>
+<p>Rumble a seat's pad with <code>GameNight.rumble(seat, weak, strong, seconds)</code>:
+<code>weak</code> is the light motor, <code>strong</code> the heavy one, both 0 to 1. Each call
+replaces the last, so call it a few times a second while an effect lasts and
+with zeros to stop. Standalone it drives the local joypad.</p>
 <p><code>frame_for_seat</code> is empty while the session is not running. Your own Start
 menu can read input while paused with <code>frame_for_seat(seat, true)</code>.</p>
 <p>Use <code>GameNight.roster_changed</code> to refresh seat ownership, names, skin colour
@@ -95,7 +99,11 @@ and avatar artwork. The current snapshot is available in <code>GameNight.party</
 <p>Connect <code>GameNight.players_updated</code> too. It fires when someone picks up a
 profile in the lobby mid-match: the same players in the same seats, with a new
 name, colour, face or <code>profile_key</code>. Update labels and faces in place and keep
-the match going; never restart over it. Every game gets it, opted in or not.
+the match going; never restart over it. Every game gets it, opted in or not.</p>
+<p>Split-screen and other left-to-right layouts follow the couch, not the seat:
+<code>GameNight.couch_order(seats, players)</code> returns the seats left to right as the
+players sit (they pick their place in the lobby's Start menu). Call it again on
+<code>players_updated</code>, because people can move mid-match; slide the views over.
 <code>devices_for_local_seats()</code> is only for standalone play and returns no native
 devices in managed mode. Back/Select belongs to the host; do not bind native
 Back to a second pause/resume handler.</p>
@@ -178,7 +186,7 @@ func _host_music(party: Dictionary):
 <p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
 soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="feffbf79202fe766a06a014b23e52f38ace15c8db39d4426e1f839770006adb0">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="8f82d36278b3025b2783377f718e4f1c952d4f006f708f2637c8b15bbc5e0304">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#phone-screens">Phone screens</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

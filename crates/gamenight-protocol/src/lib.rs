@@ -24,7 +24,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
 /// gamenight.gd). Bump both together when the addon gains a feature games
 /// rely on, so an older vendored copy warns at runtime.
-pub const GODOT_SDK_VERSION: u32 = 4;
+pub const GODOT_SDK_VERSION: u32 = 5;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -1155,6 +1155,20 @@ pub enum ClientMessage {
     Participation {
         session: SessionId,
         instant_join: bool,
+    },
+    /// Vibrate the controller on one of this session's seats. Games only, and
+    /// only while their session is running in front: a warm or paused game
+    /// is ignored. `weak` is the light high-frequency motor (surface, texture),
+    /// `strong` the heavy low one (impacts), each 0 to 65535 like XInput.
+    /// `ms` is how long it lasts (at most 5000); every message replaces the
+    /// previous one for that pad, so send short pulses repeatedly while the
+    /// effect should go on, and zero to stop at once.
+    Rumble {
+        session: SessionId,
+        seat: u8,
+        weak: u16,
+        strong: u16,
+        ms: u32,
     },
     /// Meaningful human input (deadzone filtered, at most once a second per device).
     /// Games must supply their active session. Overlays omit it.
