@@ -670,6 +670,15 @@ func set_prompt(name: String, items: Array, enabled: bool, active: bool) -> void
 		p.node.mesh.size = Vector2(px) * 0.0042
 		redraw("prompt_" + name)
 
+## How far a held button has charged, 0 to 1; 0 clears the ring.
+func hold_prompt(name: String, key: String, amount: float) -> void:
+	if not _prompts.has(name): return
+	var state: Dictionary = _prompts[name].state
+	var current: float = state.get("hold", {}).get(key, 0.0)
+	if is_equal_approx(current, amount): return
+	state["hold"] = {key: amount} if amount > 0.0 else {}
+	redraw("prompt_" + name)
+
 func press_prompt(name: String, key: String) -> void:
 	if _prompts.has(name):
 		_prompts[name].state["pressed"] = {key: 1.0}
@@ -706,6 +715,10 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font, base := 
 			# Depress the physical badge, keeping the label and pill stationary.
 			# A stronger travel + compressed face remains readable across the room.
 			canvas.draw_circle(center, h / 2 - 13, color.darkened(.65))
+			# A ring fills around the badge while a hold action charges.
+			var hold: float = state.get("hold", {}).get(key, 0.0)
+			if hold > 0.0:
+				canvas.draw_arc(center, h / 2 - 4, -PI / 2, -PI / 2 + TAU * hold, 48, color.lightened(0.3), 7.0, true)
 			canvas.draw_set_transform_matrix(base * Transform2D(0, Vector2(1.0, 1.0 - pressed * .18), 0, center + Vector2(0, pressed * 10)))
 			canvas.draw_circle(Vector2.ZERO, h / 2 - 14, color.darkened(pressed * .12))
 			canvas.draw_set_transform_matrix(base)

@@ -459,6 +459,18 @@ async fn room_pickup(
     {
         return StatusCode::FORBIDDEN;
     }
+    // A character that already is someone swaps: the lobby asks for that
+    // with a held button, so drop its link here instead of a separate unlink.
+    // The pickup renames it, so it needs no fun name in between.
+    if headers
+        .get("x-gamenight-swap")
+        .and_then(|h| h.to_str().ok())
+        == Some("1")
+    {
+        let mut local = state.lock().unwrap();
+        local.bindings.retain(|_, p| *p != player);
+        *local.link_revisions.entry(player).or_default() += 1;
+    }
     let bridge = state.lock().unwrap().cloud.clone();
     match bridge {
         Some(b) => b.pickup(&state, &pending, player).await,

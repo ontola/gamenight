@@ -62,6 +62,9 @@ var _pickup_cooldown := 0.0
 ## door entry and when to give up. The host sends name, colour and face as
 ## separate updates, so without this the character changes in steps.
 var _claims: Dictionary = {}
+## Y held at a door to swap profiles: player id -> {station, since}.
+var _holds: Dictionary = {}
+const HOLD_SECONDS := 0.8
 var _claimed_doors: Dictionary = {}  # door entry id -> time it may show again
 var _accumulator := 0.0
 var _station_cooldown: Dictionary = {}
@@ -466,7 +469,10 @@ func input(id: String, buttons: int, stick: Vector2) -> void:
 	var station_x: bool = station_kind in ["shelf", "queue"] or (station_kind == "tv" and station_for(id).get("quit", false))
 	# X only works the room's buttons; the world never sees it.
 	world.set_input(id, buttons & ~World.BTN_X, stick)
-	if pressed & World.BTN_Y: _use_station(id)
+	var station := station_for(id)
+	if station.get("hold", false):
+		if pressed & World.BTN_Y: _holds[id] = {"station": str(station.id), "since": _time}
+	elif pressed & World.BTN_Y: _use_station(id)
 	if station_x and pressed & World.BTN_X: _use_station(id, true)
 	if at_shelf and pressed & (BTN_LB | BTN_RB):
 		room.press_prompt("shelf", "LB" if pressed & BTN_LB else "RB")
@@ -536,10 +542,11 @@ func station_for(id: String) -> Dictionary:
 	var pending := pending_profiles()
 	for i in mini(pending.size(), Layout.PROFILE_DOORS.size()):
 		if absf(x - Layout.PROFILE_DOORS[i]) <= Layout.DOOR_HALF:
+			# Already someone else: swapping drops that profile, so it takes a hold.
 			var linked: bool = links.get("linked", {}).has(id)
 			var name := str(pending[i].get("profile", {}).get("display_name", "Player"))
 			return {"id": "door%d" % i, "kind": "door", "pending": str(pending[i].get("id", "")),
-				"label": "Unlink first to pick up %s" % name if linked else "Pick up %s" % name, "enabled": not linked}
+				"label": "Hold Y to become %s" % name if linked else "Pick up %s" % name, "enabled": true, "hold": linked}
 	return {}
 
 ## The TV: Y resumes the paused game, or starts the next one.
@@ -620,8 +627,10 @@ func _use_station(id: String, queue := false) -> void:
 		"door":
 			if _links_base.is_empty() or now < _pickup_cooldown: return
 			_pickup_cooldown = now + 5.0
+			var headers := ["X-GameNight-Local-Pickup: 1"]
+			if station.get("hold", false): headers.append("X-GameNight-Swap: 1")
 			var sent := _pickup.request(_links_base + "/api/room-pickup/" + str(station.pending) + "/" + id,
-				["X-GameNight-Local-Pickup: 1"], HTTPClient.METHOD_POST)
+				headers, HTTPClient.METHOD_POST)
 			if sent != OK:
 				toast("That profile could not be picked up. Try again.", PINK)
 				return
@@ -897,6 +906,7 @@ func _process(delta: float) -> void:
 	_update_sleep()
 	view.sync_profiles(profiles, world.players)
 	view.update(world, delta)
+	_update_holds()
 	_update_prompts()
 	var next := current_game()
 	if next.is_empty():
@@ -941,7 +951,26 @@ func _update_prompts() -> void:
 	for i in Layout.PROFILE_DOORS.size():
 		var key := "door%d" % i
 		var enabled: bool = occupied.get(key, {}).get("enabled", false)
-		room.set_prompt(key, [["Y", "Pick up" if enabled else "Unlink first"]], enabled, occupied.has(key))
+		var swap: bool = occupied.get(key, {}).get("hold", false)
+		room.set_prompt(key, [["Y", "Hold to swap" if swap else "Pick up"]], enabled, occupied.has(key))
+		var charge := 0.0
+		for id in _holds:
+			if _holds[id].station == key: charge = maxf(charge, _hold_charge(id))
+		room.hold_prompt(key, "Y", charge)
+
+## Fire a hold once Y has stayed down long enough at the same door; letting
+## go or walking away cancels it.
+func _update_holds() -> void:
+	for id in _holds.keys():
+		var station := station_for(id)
+		if not world.players.has(id) or not (int(held.get(id, 0)) & World.BTN_Y) or str(station.get("id", "")) != _holds[id].station or not station.get("hold", false):
+			_holds.erase(id)
+		elif _hold_charge(id) >= 1.0:
+			_holds.erase(id)
+			_use_station(id)
+
+func _hold_charge(id: String) -> float:
+	return clampf((_time - float(_holds[id].since)) / HOLD_SECONDS, 0.0, 1.0)
 
 func toast(message: String, color: Color = TEXT) -> void:
 	toasts.append({"text": message, "color": color, "until": _time + 3.5})

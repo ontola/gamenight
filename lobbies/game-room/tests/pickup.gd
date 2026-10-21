@@ -48,6 +48,44 @@ func _run() -> void:
 	main._drop_claims()
 	check(str(main.profiles[id].name) == before, "A refused pickup restores the character")
 	check(main.pending_profiles().size() == doors, "A refused pickup restores the door")
+	# Someone who already is a profile swaps with a hold, not a tap.
+	main.set_party(party)
+	main.links.linked = {id: "someone"}
+	var p: Dictionary = main.world.players[id]
+	p.x = main.Layout.PROFILE_DOORS[0]; p.y = 0.0; p.grounded = true; p.sleeping = false
+	var station: Dictionary = main.station_for(id)
+	check(station.kind == "door" and station.enabled and station.get("hold", false), "A linked player may swap at a door, by holding")
+	main._station_cooldown.clear()
+	main.input(id, main.World.BTN_Y, Vector2.ZERO)
+	check(main._station_cooldown.is_empty(), "Tapping Y does not swap")
+	main._time += main.HOLD_SECONDS * 0.5
+	main._update_holds()
+	check(main._station_cooldown.is_empty() and main._hold_charge(id) > 0.4, "Half a hold charges without swapping")
+	main._update_prompts()
+	await capture(main, "door-hold")
+	main._time = main._holds[id].since + main.HOLD_SECONDS * 0.5
+	main.input(id, 0, Vector2.ZERO)
+	main._update_holds()
+	check(main._holds.is_empty(), "Letting go cancels the hold")
+	main.input(id, main.World.BTN_Y, Vector2.ZERO)
+	main._time += main.HOLD_SECONDS + 0.01
+	main._update_holds()
+	check(main._station_cooldown.has("%s::Y" % station.id), "A full hold swaps")
+	main.input(id, 0, Vector2.ZERO)
+	main.links.linked = {}
+	check(not main.station_for(id).get("hold", false), "An unlinked player picks up with a tap")
 	print("GAME_ROOM_PICKUP_", "PASS" if failures == 0 else "FAIL")
 	main.free()
 	quit(0 if failures == 0 else 1)
+
+func capture(main, name: String) -> void:
+	var directory := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--capture-dir="): directory = arg.trim_prefix("--capture-dir=")
+	if directory.is_empty() or DisplayServer.get_name() == "headless": return
+	main.view.sync_profiles(main.profiles, main.world.players)
+	main.view.update(main.world, 0.0)
+	await create_timer(0.6).timeout
+	await RenderingServer.frame_post_draw
+	DirAccess.make_dir_recursive_absolute(directory)
+	root.get_texture().get_image().save_png(directory.path_join(name + ".png"))
