@@ -151,6 +151,9 @@ class AppState extends ChangeNotifier {
     prefs.setString('current_artwork', currentArtworkId);
   }
 
+  /// False while the face is still the random one from the first start.
+  bool get drewFace => prefs.getString('starter_artwork') == null;
+
   Artwork get currentArtwork =>
       artworks.firstWhere((a) => a.id == currentArtworkId);
 

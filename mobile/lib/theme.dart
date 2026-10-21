@@ -71,7 +71,8 @@ ThemeData gameNightTheme() {
         foregroundColor: Colors.white,
         minimumSize: const Size(44, 48),
         shape: shape,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle:
+            const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -81,7 +82,8 @@ ThemeData gameNightTheme() {
         side: const BorderSide(color: GnColors.border),
         minimumSize: const Size(44, 44),
         shape: shape,
-        textStyle: const TextStyle(fontWeight: FontWeight.w600),
+        textStyle:
+            const TextStyle(fontFamily: 'Outfit', fontWeight: FontWeight.w600),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

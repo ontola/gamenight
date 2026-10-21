@@ -21,6 +21,7 @@ import 'reports.dart';
 import 'report_scope.dart';
 import 'diagnostics.dart';
 import 'screens/feedback_screen.dart';
+import 'screens/about_screen.dart';
 import 'screens/assistant_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
@@ -163,6 +164,21 @@ class _GameNightAppState extends State<GameNightApp> {
     ));
   }
 
+  void _about() {
+    final navigator = _navigator.currentState;
+    if (navigator == null) return;
+    String? top;
+    navigator.popUntil((route) {
+      top = route.settings.name;
+      return true;
+    });
+    if (top == 'about') return;
+    navigator.push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'about'),
+      builder: (_) => AboutScreen(state: widget.state),
+    ));
+  }
+
   void _menu() {
     final context = _navigator.currentState?.overlay?.context;
     if (context == null) return;
@@ -223,18 +239,22 @@ class _GameNightAppState extends State<GameNightApp> {
           key: const ValueKey('desktop-sidebar'),
           padding: const EdgeInsets.fromLTRB(12, 24, 12, 20),
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(10, 0, 8, 28),
-              child: Row(children: [
-                GameNightLogo(size: 28),
-                SizedBox(width: 9),
-                Expanded(
-                    child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: GameNightWordmark(
-                            key: ValueKey('app-brand'), size: 19)))
-              ]),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 20),
+              child: _BrandButton(
+                onTap: _about,
+                padding: const EdgeInsets.fromLTRB(10, 4, 8, 4),
+                child: const Row(children: [
+                  GameNightLogo(size: 28),
+                  SizedBox(width: 9),
+                  Expanded(
+                      child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: GameNightWordmark(
+                              key: ValueKey('app-brand'), size: 19)))
+                ]),
+              ),
             ),
             for (final entry in [
               (0, 'Room', Icons.meeting_room_outlined, Icons.meeting_room),
@@ -327,17 +347,30 @@ class _GameNightAppState extends State<GameNightApp> {
                                 color: GnColors.bg,
                                 child: Padding(
                                   padding:
-                                      const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                                      const EdgeInsets.fromLTRB(8, 4, 8, 4),
                                   child: Row(children: [
-                                    const GameNightLogo(size: 28),
-                                    const SizedBox(width: 8),
-                                    const Expanded(
-                                        child: FittedBox(
-                                            fit: BoxFit.scaleDown,
-                                            alignment: Alignment.centerLeft,
-                                            child: GameNightWordmark(
-                                                key: ValueKey('app-brand'),
-                                                size: 21))),
+                                    Expanded(
+                                        child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _BrandButton(
+                                        onTap: _about,
+                                        child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              GameNightLogo(size: 28),
+                                              SizedBox(width: 8),
+                                              Flexible(
+                                                  child: FittedBox(
+                                                      fit: BoxFit.scaleDown,
+                                                      alignment:
+                                                          Alignment.centerLeft,
+                                                      child: GameNightWordmark(
+                                                          key: ValueKey(
+                                                              'app-brand'),
+                                                          size: 21))),
+                                            ]),
+                                      ),
+                                    )),
                                     if (widget.reports != null &&
                                         MediaQuery.sizeOf(context).width < 440)
                                       Semantics(
@@ -697,4 +730,28 @@ class _SidebarItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The logo and wordmark; a tap opens the About page.
+class _BrandButton extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final EdgeInsets padding;
+  const _BrandButton(
+      {required this.child,
+      required this.onTap,
+      this.padding = const EdgeInsets.symmetric(horizontal: 8, vertical: 4)});
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        label: 'About GameNight',
+        excludeSemantics: true,
+        child: InkWell(
+          key: const ValueKey('about-button'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(padding: padding, child: child),
+        ),
+      );
 }
