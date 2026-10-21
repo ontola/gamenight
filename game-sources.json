@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/ontola/gamenight-games.git",
-  "revision": "e3f8e3e7931c03849bf56fbd9a0298ea9170a8cb",
+  "revision": "ebb42fd6bab71450f02382d10fce2fc053c0698b",
   "mineclonia": {
     "repository": "https://github.com/ontola/gamenight-mineclonia.git",
     "revision": "23dbff5ece312638f9be4df33b46ed5387f6fa6c"
