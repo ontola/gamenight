@@ -14,6 +14,9 @@ import time
 import threading
 
 
+# Games that draw no text during play (Joep's call for the co-op games).
+TEXT_FREE = {'bubble-buddies', 'stack-together'}
+
 def wait_until(read, predicate, timeout=12):
     deadline = time.monotonic() + timeout
     last = None
@@ -185,8 +188,15 @@ def check(love, artifact, output):
             rendered = sample['rendered']
             def carried(key):
                 return len(actual)==2 and all(actual[i].get(key)==p[key] for i,p in enumerate(players))
-            verdict('profile.identity', carried('name') and all(any(p['name'] in t for t in rendered['text']) for p in players),
-                    'Live-updated names in game state and actual text drawing calls')
+            if artifact.stem in TEXT_FREE:
+                # Text-free by design: you recognise yourself by your own
+                # face and colours, so the drawn face stands in for the name.
+                verdict('profile.identity', carried('name') and carried('avatar')
+                        and all(p['avatar'] in rendered['faces'] for p in players),
+                        'Text-free game: live-updated names kept in state, each player shown by their own drawn face')
+            else:
+                verdict('profile.identity', carried('name') and all(any(p['name'] in t for t in rendered['text']) for p in players),
+                        'Live-updated names in game state and actual text drawing calls')
             verdict('profile.colors', carried('color') and carried('skin_color') and all(
                 p[k] in rendered['colors'] for p in players for k in ('color','skin_color')),
                 'Live-updated outfit AND skin colours retained and used by the renderer')
