@@ -471,8 +471,8 @@ is a game's preview build that this table may play because someone seated owns
 or tests the game: <code>entry</code> (a catalog entry whose downloads point at the
 preview), <code>versions</code> (platform to version) and <code>grant</code> (sent with the download
 even for free games). The daemon installs the build apart from catalog installs
-and puts it on the shelf as &quot;Title (playtest)&quot;, replacing a released version of
-that game for the rest of the night. The same build announced again does
+and puts it on the shelf under its own title with a &quot;Test build&quot; tagline,
+replacing a released version of that game for the rest of the night. The same build announced again does
 nothing; a failed download is retried a minute later. Other roles get an <code>error</code>.</p>
 <h3 id="the-overlay-is-party-state">The overlay is party state</h3>
 <p>Whether the overlay is up is <strong>server-authoritative</strong> (<code>overlay_open</code> in the
@@ -992,7 +992,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="f10461e1b899b581e81d6c022ade44b44aa6c351a4ee6485ea6483546a2e7b90">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="8f0d4c5637ae18c9c118fa01f8a4f15f139d418dd2f69f6d33792a23634fe8c3">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

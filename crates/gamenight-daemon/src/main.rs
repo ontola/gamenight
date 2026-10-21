@@ -45,6 +45,11 @@ async fn run() -> std::io::Result<()> {
         Ok(path) => gamenight_daemon::load_library(&path)?,
         Err(_) => gamenight_daemon::demo_library(),
     };
+    // A local registration (a game built on this machine) replaces the
+    // catalogue entry but should keep its cover art.
+    if let Ok(catalog) = gamenight_catalog::load_dir(&gamenight_catalog::catalog_dir()) {
+        gamenight_daemon::add_catalog_art(&mut library, &catalog);
+    }
 
     let mut prewarm_handle = None;
     let mut install_progress = None;

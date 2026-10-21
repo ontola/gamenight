@@ -624,8 +624,11 @@ async fn playtests_join_the_shelf_from_overlays_only() {
         .iter()
         .find(|g| g.id.0 == "preview-game")
         .unwrap();
-    assert_eq!(meta.title, "Preview Game (playtest)");
-    assert_eq!(meta.tagline.as_deref(), Some("Playtest build 0.3.1"));
+    assert_eq!(meta.title, "Preview Game");
+    assert_eq!(
+        meta.tagline.as_deref(),
+        Some("Test build 0.3.1, newer than the store version")
+    );
     let launch = meta.launch.as_ref().expect("a playtest is launchable");
     assert!(launch.command.contains(".playtests"), "{}", launch.command);
     overlay

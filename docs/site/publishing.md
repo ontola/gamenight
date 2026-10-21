@@ -30,7 +30,7 @@ Previews are private to the owner, their game-scoped keys and tables with a test
 
 Play your preview with real people before it reaches the store. In the portal, open your game's **Playtest** tab and create an invite link. Anyone who opens it and signs in with a GameNight account becomes a tester; you are always one yourself.
 
-When you or a tester join a GameNight table with your phone, the host downloads the current preview build and shows it in the lobby as "Title (playtest)". Everyone at that table can play it, testers or not. After the game, every phone at the table asks how it went: a thumbs up or down and an optional comment. Answers appear in the **Playtest** tab with the version and the player's name.
+When you or a tester join a GameNight table with your phone, the host downloads the current preview build and shows it in the lobby under its own title, with "Test build" in its description. Everyone at that table can play it, testers or not. After the game, every phone at the table asks how it went: a thumbs up or down and an optional comment. Answers appear in the **Playtest** tab with the version and the player's name.
 
 Every new preview, from CI or by hand, becomes the playtest build. A new invite link stops the old one from working; testers who joined stay until you remove them. A playtest build stays on a host's shelf until GameNight restarts, even after the tester leaves. When tables like it, send the build for review.
 

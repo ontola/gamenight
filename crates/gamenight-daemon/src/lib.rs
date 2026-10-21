@@ -1420,17 +1420,45 @@ fn spawn_install_progress_pump(
 /// How long a failed playtest download waits before the next poll retries it.
 const PLAYTEST_RETRY: std::time::Duration = std::time::Duration::from_secs(60);
 
-/// The shelf name and tagline that mark a preview build.
+/// The tagline that marks a preview build. The title stays the game's own:
+/// a "(playtest)" suffix on the shelf only puzzled people.
 fn playtest_entry(
     mut entry: gamenight_catalog::CatalogEntry,
     version: Option<&String>,
 ) -> gamenight_catalog::CatalogEntry {
-    entry.title = format!("{} (playtest)", entry.title);
     entry.tagline = Some(match version {
-        Some(version) => format!("Playtest build {version}"),
-        None => "Playtest build".into(),
+        Some(version) => format!("Test build {version}, newer than the store version"),
+        None => "Test build, newer than the store version".into(),
     });
     entry
+}
+
+/// Local shelf entries and playtests often carry no artwork of their own.
+/// Fill in what they lack from the catalogue entry with the same id, so a
+/// game looks the same on the shelf however it got there.
+pub fn add_catalog_art(library: &mut [GameMeta], catalog: &[gamenight_catalog::CatalogEntry]) {
+    for game in library {
+        let Some(entry) = catalog.iter().find(|e| e.id == game.id.0) else {
+            continue;
+        };
+        for (art, from) in [
+            (&mut game.cover, &entry.cover),
+            (&mut game.icon, &entry.icon),
+            (&mut game.screenshot, &entry.screenshot),
+        ] {
+            if art.as_deref().is_none_or(str::is_empty) {
+                art.clone_from(from);
+            }
+        }
+    }
+}
+
+/// [`add_catalog_art`] from the catalogue this host reads.
+fn with_catalog_art(mut meta: GameMeta) -> GameMeta {
+    let catalog =
+        gamenight_catalog::load_dir(&gamenight_catalog::catalog_dir()).unwrap_or_default();
+    add_catalog_art(std::slice::from_mut(&mut meta), &catalog);
+    meta
 }
 
 /// Install a playtest the cloud announced and put it on the shelf, replacing
@@ -1499,7 +1527,7 @@ fn start_playtest(
         }
         match result {
             Ok(installed) => {
-                let meta = gamenight_installer::game_meta(&entry, &installed);
+                let meta = with_catalog_art(gamenight_installer::game_meta(&entry, &installed));
                 info!(%game, "playtest build joined the shelf");
                 if let Some(launch) = &meta.launch {
                     s.launch_specs.insert(game.clone(), launch.clone());
@@ -3567,6 +3595,27 @@ mod desktop_lifetime_tests {
 
 #[cfg(test)]
 mod local_artwork_tests {
+    #[test]
+    fn local_shelf_entries_keep_their_catalogue_art() {
+        let mut library = super::demo_library();
+        library[0].cover = Some("own.png".into());
+        let shipped: gamenight_catalog::CatalogEntry =
+            serde_json::from_str(include_str!("../../../catalog/games/demo-game.json")).unwrap();
+        let mut catalog = shipped.clone();
+        catalog.cover = Some("https://example.com/cover.png".into());
+        catalog.icon = Some("https://example.com/icon.png".into());
+        let mut other = shipped;
+        other.id = "other".into();
+        other.screenshot = Some("https://example.com/s.png".into());
+        super::add_catalog_art(&mut library, &[other, catalog]);
+        assert_eq!(library[0].cover.as_deref(), Some("own.png"), "own art wins");
+        assert_eq!(
+            library[0].icon.as_deref(),
+            Some("https://example.com/icon.png")
+        );
+        assert!(library[0].screenshot.is_none(), "only the same game's art");
+    }
+
     #[test]
     fn shelf_resolves_packaged_png_and_falls_back_for_missing_art() {
         let root = std::env::temp_dir().join(format!("gamenight-art-{}", uuid::Uuid::new_v4()));

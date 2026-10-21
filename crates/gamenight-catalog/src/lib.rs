@@ -529,6 +529,18 @@ pub fn load_dir(dir: &Path) -> Result<Vec<CatalogEntry>, Vec<String>> {
                     if feed.schema == 1 && validate_published(&feed.games).is_ok() {
                         for remote in feed.games {
                             if let Some(existing) = entries.iter_mut().find(|e| e.id == remote.id) {
+                                // Keep the shipped artwork where the published
+                                // entry has none.
+                                let mut remote = remote;
+                                for (art, shipped) in [
+                                    (&mut remote.cover, &mut existing.cover),
+                                    (&mut remote.icon, &mut existing.icon),
+                                    (&mut remote.screenshot, &mut existing.screenshot),
+                                ] {
+                                    if art.is_none() {
+                                        *art = shipped.take();
+                                    }
+                                }
                                 *existing = remote;
                             } else {
                                 entries.push(remote);
