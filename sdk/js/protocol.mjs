@@ -21,7 +21,7 @@ export const ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL";
 export const ENV_TOKEN = "GAMENIGHT_TOKEN";
 export const DEFAULT_ADDR = "127.0.0.1:7912";
 export const DEFAULT_WEB_PORT = 7913;
-export const GODOT_SDK_VERSION = 3;
+export const GODOT_SDK_VERSION = 4;
 export const PROTOCOL_VERSION = 1;
 
 /** Message "type" tags, both directions. */
@@ -58,6 +58,7 @@ export const MSG = Object.freeze({
   "PERFORMANCE": "performance",
   "PLAY_NEXT": "play_next",
   "PLAYER_SETTINGS": "player_settings",
+  "PLAYERS_UPDATED": "players_updated",
   "PLAYTESTS": "playtests",
   "PREPARE": "prepare",
   "PROGRESS": "progress",
@@ -521,6 +522,16 @@ export const SERVER_MESSAGES = {
       "players",
       "presence",
       "seats",
+      "session"
+    ]
+  },
+  "players_updated": {
+    "fields": [
+      "players",
+      "session"
+    ],
+    "required": [
+      "players",
       "session"
     ]
   },

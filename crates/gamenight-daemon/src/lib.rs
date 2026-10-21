@@ -958,6 +958,10 @@ impl Shared {
                     players,
                 }
             }
+            GameCommand::PlayersUpdated { mut players } => {
+                self.add_profile_keys(game, &mut players);
+                ServerMessage::PlayersUpdated { session, players }
+            }
             GameCommand::Start => ServerMessage::Start { session },
             GameCommand::Pause => ServerMessage::Pause { session },
             GameCommand::Resume => ServerMessage::Resume { session },

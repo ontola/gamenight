@@ -96,6 +96,11 @@ menu can read input while paused with `frame_for_seat(seat, true)`.
 
 Use `GameNight.roster_changed` to refresh seat ownership, names, skin colour
 and avatar artwork. The current snapshot is available in `GameNight.party`.
+
+Connect `GameNight.players_updated` too. It fires when someone picks up a
+profile in the lobby mid-match: the same players in the same seats, with a new
+name, colour, face or `profile_key`. Update labels and faces in place and keep
+the match going; never restart over it. Every game gets it, opted in or not.
 `devices_for_local_seats()` is only for standalone play and returns no native
 devices in managed mode. Back/Select belongs to the host; do not bind native
 Back to a second pause/resume handler.

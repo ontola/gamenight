@@ -78,6 +78,13 @@ pub enum GameEvent {
         players: Vec<Player>,
         presence: Vec<gamenight_protocol::PlayerPresence>,
     },
+    /// The same players changed name, colour, face or `profile_key` (a
+    /// profile picked up in the lobby). Update them in the running match;
+    /// never restart over it.
+    PlayersUpdated {
+        session: SessionId,
+        players: Vec<Player>,
+    },
 
     /// Warm up: load everything for these seats, then call [`GameNight::ready`].
     Prepare {
@@ -232,6 +239,16 @@ impl GameNight {
                                 players,
                                 presence,
                             }
+                        }
+                        ServerMessage::PlayersUpdated { session, players } => {
+                            for player in &players {
+                                if let Some(known) =
+                                    self.party.players.iter_mut().find(|p| p.id == player.id)
+                                {
+                                    *known = player.clone();
+                                }
+                            }
+                            GameEvent::PlayersUpdated { session, players }
                         }
                         ServerMessage::Prepare {
                             session,

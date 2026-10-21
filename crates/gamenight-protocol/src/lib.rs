@@ -24,7 +24,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
 /// gamenight.gd). Bump both together when the addon gains a feature games
 /// rely on, so an older vendored copy warns at runtime.
-pub const GODOT_SDK_VERSION: u32 = 3;
+pub const GODOT_SDK_VERSION: u32 = 4;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -1420,6 +1420,15 @@ pub enum ServerMessage {
         seats: Vec<Seat>,
         players: Vec<Player>,
         presence: Vec<PlayerPresence>,
+    },
+    /// Players of this session changed their details: name, colour, skin,
+    /// face or `profile_key` (someone picked up a profile in the lobby). The
+    /// same people in the same seats, so apply it to the running match: never
+    /// restart or reset over it. Sent to every active session, opted in or
+    /// not, with the players it was prepared with.
+    PlayersUpdated {
+        session: SessionId,
+        players: Vec<Player>,
     },
 
     /// Reply to `hello`.

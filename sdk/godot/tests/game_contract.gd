@@ -20,6 +20,13 @@ func run():
 	sdk._handle({"type":"party_updated","session":"s1","seats":[{"index":0,"controller":"pad:A"}],"players":[{"name":"Updated"}],"presence":[]})
 	check(sdk.axis(sdk.frame_for_seat(0),0)==1.,"live seat changes remap immediately")
 	check(sdk.party.players[0].name=="Updated","live profiles delivered")
+	var renamed := []
+	sdk.players_updated.connect(func(players): renamed.append_array(players))
+	sdk.party.players=[{"id":"a","name":"Rocket"}]
+	sdk._handle({"type":"players_updated","session":"stale","players":[{"id":"a","name":"Joep"}]})
+	check(renamed.is_empty(),"stale players_updated ignored")
+	sdk._handle({"type":"players_updated","session":"s1","players":[{"id":"a","name":"Joep","avatar":"face"}]})
+	check(renamed.size()==1 and sdk.party.players[0].name=="Joep" and sdk.phase=="running","players_updated renames in place")
 	sdk._frame_at=Time.get_ticks_msec()-251
 	check(sdk.frame_for_seat(0).is_empty(),"lost input times out")
 	sdk._frame_at=Time.get_ticks_msec()

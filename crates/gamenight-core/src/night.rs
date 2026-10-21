@@ -225,6 +225,10 @@ pub enum GameCommand {
         seats: Vec<Seat>,
         players: Vec<Player>,
     },
+    /// Same people, new details (name, colour, face, profile): apply live.
+    PlayersUpdated {
+        players: Vec<Player>,
+    },
     Start,
     Pause,
     Resume,
@@ -350,6 +354,9 @@ pub struct GameNight {
     active_seats: Vec<Seat>,
     warm_players: Vec<Player>,
     active_players: Vec<Player>,
+    /// The profile behind each of `active_players` as the active game last
+    /// heard it, so picking one up reaches the game as a new `profile_key`.
+    active_profiles: HashMap<PlayerId, String>,
     // Bounded tombstones for replies already in flight when Dispose is sent.
     retired_sessions: VecDeque<SessionId>,
     history: Vec<GameId>,
@@ -420,6 +427,7 @@ impl GameNight {
             active_seats: Vec::new(),
             warm_players: Vec::new(),
             active_players: Vec::new(),
+            active_profiles: HashMap::new(),
             retired_sessions: VecDeque::new(),
             history: Vec::new(),
             vote: VoteBoard::default(),
@@ -856,6 +864,7 @@ impl GameNight {
         }
         self.refresh_autoplay(&mut fx);
         if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
+            self.sync_active_players(&mut fx);
             self.presence
                 .retain(|id, _| self.players.iter().any(|p| p.id == *id));
             let sessions: HashSet<_> = self
@@ -882,6 +891,47 @@ impl GameNight {
                         state: *state,
                     })
             })
+            .collect()
+    }
+
+    /// Tell the active game when its players changed name, colour, face or
+    /// profile. Those are details of the same people in the same seats, so
+    /// the match keeps going: only joins, leaves and seat changes are a
+    /// roster change (see `on_overlay_closed`).
+    fn sync_active_players(&mut self, fx: &mut Vec<Effect>) {
+        let Some(active) = &self.active else {
+            return;
+        };
+        let players: Vec<Player> = self
+            .active_players
+            .iter()
+            .map(|old| {
+                self.players
+                    .iter()
+                    .find(|p| p.id == old.id)
+                    .unwrap_or(old)
+                    .clone()
+            })
+            .collect();
+        let profiles = self.profiles_of(&players);
+        if players == self.active_players && profiles == self.active_profiles {
+            return;
+        }
+        fx.push(Effect::ToGame {
+            game: active.game.clone(),
+            session: active.id,
+            command: GameCommand::PlayersUpdated {
+                players: players.clone(),
+            },
+        });
+        self.active_players = players;
+        self.active_profiles = profiles;
+    }
+
+    fn profiles_of(&self, players: &[Player]) -> HashMap<PlayerId, String> {
+        players
+            .iter()
+            .filter_map(|p| self.profiles.get(&p.id).map(|v| (p.id, v.clone())))
             .collect()
     }
 
@@ -1363,11 +1413,13 @@ impl GameNight {
     fn on_overlay_closed(&mut self, fx: &mut Vec<Effect>) {
         // Prepare is the roster boundary. Restart a paused round when seats
         // changed, instead of resuming a game that cannot see the new player.
+        // A new name, colour, face or profile is not a roster change: the
+        // game gets `players_updated` and the round goes on.
         if let Some(active) = &self.active {
             if self.overlay_open
                 && self.overlay_paused
                 && (self.active_seats != self.seats_for(&active.game)
-                    || self.active_players != self.players)
+                    || !same_people(&self.active_players, &self.players))
             {
                 let game = active.game.clone();
                 let fits = self.game_fits_party(&active.game);
@@ -2739,6 +2791,7 @@ impl GameNight {
                 let mut next = self.warm.take().expect("checked");
                 self.active_seats = std::mem::take(&mut self.warm_seats);
                 self.active_players = std::mem::take(&mut self.warm_players);
+                self.active_profiles = self.profiles_of(&self.active_players);
                 next.advance(SessionPhase::Running)
                     .expect("ready -> running");
                 fx.push(Effect::ToGame {
@@ -2813,4 +2866,9 @@ impl GameNight {
             });
         }
     }
+}
+
+/// The same people, whatever they are called or look like now.
+fn same_people(a: &[Player], b: &[Player]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.id == b.id)
 }

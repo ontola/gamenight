@@ -1153,6 +1153,59 @@ mod night_tests {
     }
 
     #[test]
+    fn picking_up_a_profile_in_the_lobby_updates_the_running_game() {
+        let (mut night, s1) = night_in_progress();
+        let a = night.snapshot().players[0].id;
+        night.handle(Command::OverlayOpened);
+        // What a profile pickup sends: same player, new name, face, colour
+        // and profile.
+        let mut fx = night.handle(Command::RenamePlayer {
+            player_id: a,
+            name: "Joep".into(),
+        });
+        fx.extend(night.handle(Command::SetPlayerAvatar {
+            player_id: a,
+            avatar: "face".into(),
+        }));
+        fx.extend(night.handle(Command::SetPlayerColor {
+            player_id: a,
+            color: "#123456".into(),
+        }));
+        let updates: Vec<_> = fx
+            .iter()
+            .filter_map(|e| match e {
+                Effect::ToGame {
+                    session,
+                    command: GameCommand::PlayersUpdated { players },
+                    ..
+                } if *session == s1 => Some(players.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(updates.len(), 3, "every change reaches the game: {fx:?}");
+        let last = &updates[2][0];
+        assert_eq!(last.name, "Joep");
+        assert_eq!(last.avatar.as_deref(), Some("face"));
+        assert_eq!(last.color.as_deref(), Some("#123456"));
+        let fx = night.handle(Command::SetPlayerProfile {
+            player_id: a,
+            profile: Some("local:joep".into()),
+        });
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame { session, command: GameCommand::PlayersUpdated { .. }, .. } if *session == s1
+        )));
+
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(resume_effect(&fx), "back in the same round: {fx:?}");
+        assert!(!fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame { session, command: GameCommand::Dispose, .. } if *session == s1
+        )));
+        assert_eq!(night.snapshot().active_session.unwrap().id, s1);
+    }
+
+    #[test]
     fn closing_overlay_keeps_explicit_pause() {
         let (mut night, _s1) = night_in_progress();
         // Someone paused on purpose, then browsed the overlay.

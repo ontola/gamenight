@@ -57,11 +57,14 @@ def main():
                                                    "seats": [{"index": 0, "occupant": {"kind": P.SEAT_OCCUPANT_AI}},
                                                              {"index": 2, "occupant": {"kind": P.SEAT_OCCUPANT_AI}}], "players": []})+"\n").encode())
                         reply = json.loads(stream.readline())
-                        while reply.get("type") in (P.MSG_PARTICIPATION, P.MSG_DECLARE_SETTINGS):
+                        while reply.get("type") in (P.MSG_PARTICIPATION, P.MSG_DECLARE_SETTINGS, P.MSG_PROGRESS):
                             if reply["type"] == P.MSG_PARTICIPATION: assert reply["session"] == "session-one"
                             reply = json.loads(stream.readline())
                         assert reply == {"type": P.MSG_READY, "session": "session-one"}, reply
                         stream.write((json.dumps({"type": P.MSG_START, "session": "session-one"})+"\n").encode())
+                        # A profile picked up mid-match: applied in place, never a restart.
+                        stream.write((json.dumps({"type": P.MSG_PLAYERS_UPDATED, "session": "session-one",
+                                                   "players": [{"id": "nobody", "name": "Joep"}]})+"\n").encode())
                         if args.continuous:
                             def round_finished():
                                 deadline = time.monotonic() + 10

@@ -153,6 +153,9 @@ for a fixed roster. Apply profile changes without resetting the match. Report
 real human activity through `controller_input`; see the
 [presence contract](protocol.md#player-activity-sleep-and-joining-during-play).
 `party_state` is the overlay snapshot, not a substitute for the game update API.
+Every game also receives `players_updated` when someone picks up a profile in
+the lobby mid-match: same seats, new name, colour, face or `profile_key`. Apply
+it in place; the session resumes, it is never a restart.
 
 `declare_settings` exposes game options. Handle `setting_changed` and document
 which settings apply immediately or at the next round. See

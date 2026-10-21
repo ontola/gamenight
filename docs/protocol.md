@@ -791,6 +791,22 @@ first instant-join implementation: a new pilot spawns centrally with three secon
 of protection, preserving the current wave and team score. Other pack games retain
 fixed round rosters. Custom clients can send the JSON directly.
 
+### Profile changes during a match
+
+When someone goes back to the lobby mid-match and picks up a profile (or
+changes name, colour or face), the active session gets the same people with new
+details. Every game receives this, whether or not it sent `participation`:
+
+```json
+{"type":"players_updated","session":"<session UUID>","players":[{"id":"<player UUID>","name":"Joep","color":"#e94b3c","avatar":"…","profile_key":"…"}]}
+```
+
+`players` lists every player the session was prepared with. Apply it to the
+running match: update names, colours and faces, and load that person's data
+when `profile_key` changed. Never restart or reset the match over it. Seats do
+not change; joins, leaves and seat swaps still arrive as `party_updated` (opted
+in) or at the next `prepare`. Closing the lobby resumes the same session.
+
 The character studio saves `skin_color` with the player profile and never changes
 `Player.color` on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.
@@ -800,7 +816,7 @@ the skin preference. Avatar paint is composited above skin and is not recoloured
 `Player.id` lives as long as the party. To keep a player's own data (their
 inventory in a world, settings, unlocks) between nights, key it on
 `Player.profile_key` instead. Games receive it in `welcome`, `prepare`,
-`party_updated` and `party_state`; overlays and phones never do.
+`party_updated`, `players_updated` and `party_state`; overlays and phones never do.
 
 - It is a 32-character hex string, the same for that person every time, on any
   host where they use the same signed-in account (a remembered local profile

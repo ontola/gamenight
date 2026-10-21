@@ -22,7 +22,7 @@ ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL"
 ENV_TOKEN = "GAMENIGHT_TOKEN"
 DEFAULT_ADDR = "127.0.0.1:7912"
 DEFAULT_WEB_PORT = 7913
-GODOT_SDK_VERSION = 3
+GODOT_SDK_VERSION = 4
 PROTOCOL_VERSION = 1
 
 # Message "type" tags, both directions.
@@ -58,6 +58,7 @@ MSG_PAUSE = "pause"
 MSG_PERFORMANCE = "performance"
 MSG_PLAY_NEXT = "play_next"
 MSG_PLAYER_SETTINGS = "player_settings"
+MSG_PLAYERS_UPDATED = "players_updated"
 MSG_PLAYTESTS = "playtests"
 MSG_PREPARE = "prepare"
 MSG_PROGRESS = "progress"
@@ -597,6 +598,16 @@ SERVER_MESSAGES = {
             "players",
             "presence",
             "seats",
+            "session"
+        ]
+    },
+    "players_updated": {
+        "fields": [
+            "players",
+            "session"
+        ],
+        "required": [
+            "players",
             "session"
         ]
     },

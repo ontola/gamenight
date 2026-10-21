@@ -127,7 +127,10 @@ Set <code>instant_join</code> to true if your running match can accept new playe
 for a fixed roster. Apply profile changes without resetting the match. Report
 real human activity through <code>controller_input</code>; see the
 <a href="/docs/protocol#player-activity-sleep-and-joining-during-play">presence contract</a>.
-<code>party_state</code> is the overlay snapshot, not a substitute for the game update API.</p>
+<code>party_state</code> is the overlay snapshot, not a substitute for the game update API.
+Every game also receives <code>players_updated</code> when someone picks up a profile in
+the lobby mid-match: same seats, new name, colour, face or <code>profile_key</code>. Apply
+it in place; the session resumes, it is never a restart.</p>
 <p><code>declare_settings</code> exposes game options. Handle <code>setting_changed</code> and document
 which settings apply immediately or at the next round. See
 <a href="/docs/protocol#match-settings">match settings</a>. Log protocol errors and ignore
@@ -174,7 +177,7 @@ a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
 repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="2de5230cdc269a745b7fdeac2d604bcdb5c4b1330cd1f9910cda255550b3239e">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="96df720a9bd4dda8c6c28271376f74c201e4ed7acab3771e354cabd14d854c6a">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/engines"><small>Previous</small>Engine support</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#submit-a-game">Submit a game</a><a href="#connect">Connect</a><a href="#prepare-before-taking-the-screen">Prepare before taking the screen</a><a href="#controllers-belong-to-players">Controllers belong to players</a><a href="#back-focus-and-fullscreen">Back, focus and fullscreen</a><a href="#rounds-continue-inside-the-session">Rounds continue inside the session</a><a href="#live-players-and-settings">Live players and settings</a><a href="#player-faces-and-colours">Player faces and colours</a><a href="#artwork-for-the-catalog-and-lobby">Artwork for the catalog and lobby</a><a href="#verify-before-shipping">Verify before shipping</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

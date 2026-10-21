@@ -32,6 +32,11 @@ signal daemon_disconnected
 signal party_updated(party: Dictionary)
 signal controllers_changed(controllers: Array)
 signal roster_changed(seats: Array, players: Array, presence: Array)
+## The same players changed name, colour, face or profile_key (someone picked
+## up a profile in the lobby). Update labels, colours and saves in place; the
+## match keeps going, so never restart over it. `players` holds every player
+## the session was prepared with; `party.players` is already updated.
+signal players_updated(players: Array)
 ## The party changed one of the settings you declared with
 ## declare_settings(). Apply it live when safe, or at the next round boundary.
 ## State that timing in the label. `value` is a bool, int or String.
@@ -533,7 +538,7 @@ func _handle(msg: Variant) -> void:
 	if typeof(msg) != TYPE_DICTIONARY:
 		return
 	var kind: String = msg.get("type", "")
-	if kind in [PROTOCOL.MSG_START, PROTOCOL.MSG_PAUSE, PROTOCOL.MSG_RESUME, PROTOCOL.MSG_DISPOSE, PROTOCOL.MSG_PARTY_UPDATED] and (session.is_empty() or msg.get("session","") != session): return
+	if kind in [PROTOCOL.MSG_START, PROTOCOL.MSG_PAUSE, PROTOCOL.MSG_RESUME, PROTOCOL.MSG_DISPOSE, PROTOCOL.MSG_PARTY_UPDATED, PROTOCOL.MSG_PLAYERS_UPDATED] and (session.is_empty() or msg.get("session","") != session): return
 	match kind:
 		PROTOCOL.MSG_WELCOME:
 			if int(msg.get("godot_sdk", 0)) > SDK_VERSION:
@@ -560,6 +565,18 @@ func _handle(msg: Variant) -> void:
 		PROTOCOL.MSG_PARTY_UPDATED:
 			for key in ["seats","players","presence"]: party[key] = msg.get(key,[])
 			roster_changed.emit(party.seats,party.players,party.presence)
+			party_updated.emit(party)
+		PROTOCOL.MSG_PLAYERS_UPDATED:
+			var updated: Array = msg.get("players", [])
+			var players: Array = party.get("players", [])
+			for player in updated:
+				var known := -1
+				for i in players.size():
+					if players[i].get("id") == player.get("id"): known = i
+				if known >= 0: players[known] = player
+				else: players.append(player)
+			party["players"] = players
+			players_updated.emit(updated)
 			party_updated.emit(party)
 		PROTOCOL.MSG_PREPARE:
 			if msg.get("game", game_id) != game_id or msg.get("session", "").is_empty() or msg.get("session", "") == session: return

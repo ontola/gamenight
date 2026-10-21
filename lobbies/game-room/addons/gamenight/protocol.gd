@@ -22,7 +22,7 @@ const ENV_OVERLAY_URL := "GAMENIGHT_OVERLAY_URL"
 const ENV_TOKEN := "GAMENIGHT_TOKEN"
 const DEFAULT_ADDR := "127.0.0.1:7912"
 const DEFAULT_WEB_PORT := 7913
-const GODOT_SDK_VERSION := 3
+const GODOT_SDK_VERSION := 4
 const PROTOCOL_VERSION := 1
 
 ## Message "type" tags, both directions.
@@ -58,6 +58,7 @@ const MSG_PAUSE := "pause"
 const MSG_PERFORMANCE := "performance"
 const MSG_PLAY_NEXT := "play_next"
 const MSG_PLAYER_SETTINGS := "player_settings"
+const MSG_PLAYERS_UPDATED := "players_updated"
 const MSG_PLAYTESTS := "playtests"
 const MSG_PREPARE := "prepare"
 const MSG_PROGRESS := "progress"

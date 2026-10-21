@@ -885,6 +885,17 @@ shared lifecycle module; sleeping players use AI until they wake. Neon Siege is 
 first instant-join implementation: a new pilot spawns centrally with three seconds
 of protection, preserving the current wave and team score. Other pack games retain
 fixed round rosters. Custom clients can send the JSON directly.</p>
+<h3 id="profile-changes-during-a-match">Profile changes during a match</h3>
+<p>When someone goes back to the lobby mid-match and picks up a profile (or
+changes name, colour or face), the active session gets the same people with new
+details. Every game receives this, whether or not it sent <code>participation</code>:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;:&quot;players_updated&quot;,&quot;session&quot;:&quot;&lt;session UUID&gt;&quot;,&quot;players&quot;:[{&quot;id&quot;:&quot;&lt;player UUID&gt;&quot;,&quot;name&quot;:&quot;Joep&quot;,&quot;color&quot;:&quot;#e94b3c&quot;,&quot;avatar&quot;:&quot;…&quot;,&quot;profile_key&quot;:&quot;…&quot;}]}
+</code></pre></div>
+<p><code>players</code> lists every player the session was prepared with. Apply it to the
+running match: update names, colours and faces, and load that person's data
+when <code>profile_key</code> changed. Never restart or reset the match over it. Seats do
+not change; joins, leaves and seat swaps still arrive as <code>party_updated</code> (opted
+in) or at the next <code>prepare</code>. Closing the lobby resumes the same session.</p>
 <p>The character studio saves <code>skin_color</code> with the player profile and never changes
 <code>Player.color</code> on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.</p>
@@ -892,7 +903,7 @@ the skin preference. Avatar paint is composited above skin and is not recoloured
 <p><code>Player.id</code> lives as long as the party. To keep a player's own data (their
 inventory in a world, settings, unlocks) between nights, key it on
 <code>Player.profile_key</code> instead. Games receive it in <code>welcome</code>, <code>prepare</code>,
-<code>party_updated</code> and <code>party_state</code>; overlays and phones never do.</p>
+<code>party_updated</code>, <code>players_updated</code> and <code>party_state</code>; overlays and phones never do.</p>
 <ul>
 <li>It is a 32-character hex string, the same for that person every time, on any
 host where they use the same signed-in account (a remembered local profile
@@ -981,7 +992,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="04a00216324e6f3f6c2c976f30b3775dbf1c977757f6cb82af73fa6a681a6cfe">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="f10461e1b899b581e81d6c022ade44b44aa6c351a4ee6485ea6483546a2e7b90">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
