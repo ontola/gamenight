@@ -243,6 +243,9 @@ jobs:
           security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
 
   web:
+    # Publishing the web-latest release needs write access; pull requests never get it.
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -272,6 +275,27 @@ jobs:
         with:
           name: gamenight-player-web
           path: mobile/build/web
+      # The website's /app/ follows this release: the private site sync
+      # promotes web-latest whenever it names a newer commit than the live one.
+      - name: Publish the tested web build as the web-latest release
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: .
+        run: |
+          printf '{"repository":"https://github.com/ontola/gamenight","revision":"%s"}\n' "$GITHUB_SHA" > mobile/build/web/build-info.json
+          tar -czf gamenight-web.tar.gz -C mobile/build/web .
+          sha=$(sha256sum gamenight-web.tar.gz | cut -d' ' -f1)
+          printf '{"commit":"%s","run_id":%s,"sha256":"%s"}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$sha" > web.json
+          git tag -f web-latest "$GITHUB_SHA"
+          git push -f origin refs/tags/web-latest
+          notes="Tested web build of the GameNight app (/app/ on the website) from commit ${GITHUB_SHA::7}."
+          gh release view web-latest >/dev/null 2>&1 \
+            || gh release create web-latest --title "GameNight web app" --notes "$notes" --prerelease --latest=false
+          gh release edit web-latest --notes "$notes"
+          # The archive first: a site sync that sees the new web.json must find its archive.
+          gh release upload web-latest gamenight-web.tar.gz --clobber
+          gh release upload web-latest web.json --clobber
       - uses: actions/upload-artifact@v4
         if: always()
         with:
