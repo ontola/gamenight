@@ -391,6 +391,30 @@
           "type": "object"
         },
         {
+          "description": "Move a player to another place on the couch (see [`Player::couch`]),\nshifting the people in between one place over. A position past the\nend means the rightmost place.",
+          "properties": {
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "position": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "set_couch_position",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "position"
+          ],
+          "type": "object"
+        },
+        {
           "properties": {
             "occupant": {
               "$ref": "#/$defs/SeatOccupant"
@@ -1909,6 +1933,16 @@
           "description": "Game-controlled clothing/team colour (`#rrggbb`). Games may override\nit without changing the personal `skin_color` preference.",
           "type": [
             "string",
+            "null"
+          ]
+        },
+        "couch": {
+          "description": "Where this player sits on the couch, counted from the left (0 is the\nleftmost). Every player in the party has a distinct position; players\nchange it from their Start menu in the lobby, also during a match\n(`players_updated`). Order split-screen views and anything else laid\nout left to right by it, not by seat: a seat is a controller slot.\nSort by it rather than indexing with it, since a session's players\nmay be a part of the party. Older hosts leave it out.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
             "null"
           ]
         },

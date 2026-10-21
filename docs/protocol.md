@@ -822,7 +822,7 @@ fixed round rosters. Custom clients can send the JSON directly.
 ### Profile changes during a match
 
 When someone goes back to the lobby mid-match and picks up a profile (or
-changes name, colour or face), the active session gets the same people with new
+changes name, colour, face or couch position), the active session gets the same people with new
 details. Every game receives this, whether or not it sent `participation`:
 
 ```json
@@ -838,6 +838,23 @@ in) or at the next `prepare`. Closing the lobby resumes the same session.
 The character studio saves `skin_color` with the player profile and never changes
 `Player.color` on sign-in. Games may assign clothing or team colours while retaining
 the skin preference. Avatar paint is composited above skin and is not recoloured.
+
+### Couch position
+
+Every player has a place on the couch, `Player.couch`, counted from the left
+(0 is the leftmost). Each player in the party has a different one. Players move
+with left and right on **Couch position** in their own Start menu in the lobby;
+the host sends `set_couch_position {player_id, position}` and shifts the people
+in between one place over. Newcomers sit down on the right, and leaving closes
+the gap.
+
+Lay out anything that runs left to right by it: split-screen views, start
+positions, scoreboards. Not by seat: a seat is a controller slot and does not
+change when someone moves. Sort by `couch` rather than index with it, since a
+session may have part of the party. A move during a match arrives as
+`players_updated` (and in `party_updated`): move the views over, never restart.
+Older hosts leave `couch` out; fall back to seat order. The Godot SDK has
+`GameNight.couch_order(seats, players)`.
 
 ### Recognising a player between nights
 

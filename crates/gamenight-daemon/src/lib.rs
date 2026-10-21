@@ -2662,6 +2662,13 @@ fn message_to_command(
         }
         ClientMessage::AssignSeat { seat, occupant } => Command::AssignSeat { seat, occupant },
         ClientMessage::SwapSeats { a, b } => Command::SwapSeats { a, b },
+        ClientMessage::SetCouchPosition {
+            player_id,
+            position,
+        } => Command::SetCouchPosition {
+            player_id,
+            position,
+        },
         ClientMessage::BindController {
             player_id,
             controller,

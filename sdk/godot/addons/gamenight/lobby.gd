@@ -113,6 +113,10 @@ func join_guest(name: String) -> void:
 func leave(player_id: String) -> void:
 	_command({"type": PROTOCOL.MSG_LEAVE_PARTY, "player_id": player_id})
 
+## Sit `player_id` down at `position` on the couch, counted from the left.
+func set_couch_position(player_id: String, position: int) -> void:
+	_command({"type": PROTOCOL.MSG_SET_COUCH_POSITION, "player_id": player_id, "position": position})
+
 func play(game_id: String) -> void:
 	_command({"type": PROTOCOL.MSG_PLAY_NEXT, "game": game_id})
 

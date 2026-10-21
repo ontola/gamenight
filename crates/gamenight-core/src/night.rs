@@ -85,6 +85,11 @@ pub enum Command {
         player_id: PlayerId,
         profile: Option<String>,
     },
+    /// See `ClientMessage::SetCouchPosition`.
+    SetCouchPosition {
+        player_id: PlayerId,
+        position: u8,
+    },
     AssignSeat {
         seat: u8,
         occupant: SeatOccupant,
@@ -681,6 +686,10 @@ impl GameNight {
                 }
             }
             Command::SwapSeats { a, b } => self.on_swap_seats(a, b, &mut fx),
+            Command::SetCouchPosition {
+                player_id,
+                position,
+            } => self.on_set_couch_position(player_id, position, &mut fx),
             Command::SetPlaylist { entries } => self.on_set_playlist(entries, &mut fx),
             Command::MovePlaylistEntry { expected, from, to } => {
                 if self.playlist.snapshot() != expected
@@ -1233,6 +1242,7 @@ impl GameNight {
             self.seats = seats;
         }
         self.players = carry.players;
+        self.arrange_couch(None);
         self.preferred_colors = carry.preferred_colors;
         self.profiles = carry.profiles;
         for (owner, games) in carry.player_settings {
@@ -1332,6 +1342,7 @@ impl GameNight {
                 .or_else(|| Some(gamenight_protocol::guest_face::avatar(id.0.as_bytes()).encode())),
             library,
             profile_key: None,
+            couch: None,
         };
         // Walk in, grab a controller, press A: your preferred seat if it's
         // free, otherwise the first free seat.
@@ -1351,6 +1362,7 @@ impl GameNight {
             };
         }
         self.players.push(player);
+        self.arrange_couch(None);
         if let Some(color) = preference {
             self.preferred_colors.insert(id, color.to_ascii_lowercase());
         }
@@ -1389,6 +1401,40 @@ impl GameNight {
         // Two people trading controllers means seat 0 is now a different
         // person — the warm session was prepared for the old arrangement.
         self.rewarm_if_misfit(fx);
+    }
+
+    fn on_set_couch_position(&mut self, player_id: PlayerId, position: u8, fx: &mut Vec<Effect>) {
+        if !self.players.iter().any(|p| p.id == player_id) {
+            fx.push(Effect::Reject {
+                reason: "unknown player".into(),
+            });
+            return;
+        }
+        let before: Vec<_> = self.players.iter().map(|p| p.couch).collect();
+        self.arrange_couch(Some((player_id, position)));
+        if self.players.iter().map(|p| p.couch).ne(before) {
+            fx.push(Effect::StateChanged);
+            // The same people in the same seats: the active game hears it as
+            // `players_updated`, a warm one is prepared again.
+            self.rewarm_if_misfit(fx);
+        }
+    }
+
+    /// Give every player a distinct couch position, left to right, keeping
+    /// the current order; newcomers sit down on the right. `moving` takes
+    /// one player out and sits them down at that position.
+    fn arrange_couch(&mut self, moving: Option<(PlayerId, u8)>) {
+        let mut order: Vec<usize> = (0..self.players.len()).collect();
+        order.sort_by_key(|&i| (self.players[i].couch.unwrap_or(u8::MAX), i));
+        if let Some((id, position)) = moving {
+            if let Some(at) = order.iter().position(|&i| self.players[i].id == id) {
+                let index = order.remove(at);
+                order.insert(usize::from(position).min(order.len()), index);
+            }
+        }
+        for (place, i) in order.into_iter().enumerate() {
+            self.players[i].couch = u8::try_from(place).ok();
+        }
     }
 
     fn on_overlay_opened(&mut self, fx: &mut Vec<Effect>) {
@@ -1499,6 +1545,7 @@ impl GameNight {
 
     fn on_leave(&mut self, player_id: PlayerId, fx: &mut Vec<Effect>) {
         self.players.retain(|p| p.id != player_id);
+        self.arrange_couch(None);
         self.preferred_colors.remove(&player_id);
         self.profiles.remove(&player_id);
         self.player_settings

@@ -22,7 +22,7 @@ func _ready() -> void:
 	var players: Array = []
 	var seats: Array = []
 	for i in count:
-		players.append({"id": "p%d" % i, "name": NAMES[i], "color": COLORS[i], "skin_color": SKINS[i], "avatar": _face(i)})
+		players.append({"id": "p%d" % i, "name": NAMES[i], "color": COLORS[i], "skin_color": SKINS[i], "avatar": _face(i), "couch": i})
 		seats.append({"index": i, "occupant": {"kind": "local", "player_id": "p%d" % i}, "controller": "demo:%d" % i})
 	var library := [
 		{"id": "spaceracer", "title": "Space Racer", "color": "#38d6ff", "players": "1-8", "max_players": 8},
@@ -44,7 +44,7 @@ func _ready() -> void:
 	# Two players without a controller: one on a phone, one stale web join.
 	if scene == "phones":
 		for i in [4, 5]:
-			players.append({"id": "p%d" % i, "name": NAMES[i], "color": COLORS[i], "skin_color": SKINS[i], "avatar": _face(i)})
+			players.append({"id": "p%d" % i, "name": NAMES[i], "color": COLORS[i], "skin_color": SKINS[i], "avatar": _face(i), "couch": i})
 			seats.append({"index": i, "occupant": {"kind": "local", "player_id": "p%d" % i}, "controller": null})
 		party.phones.append("p4")
 	main.set_party(party)
@@ -53,6 +53,12 @@ func _ready() -> void:
 		party.update_ready = "0.2.300"
 		main.set_party(party)
 		main.menus.p0 = {"index": 0, "confirm": false}
+	# --couch-menu: one player's Start menu on Couch position, moved one place right.
+	if OS.get_cmdline_user_args().has("--couch-menu") and count >= 3:
+		players[1].couch = 2
+		players[2].couch = 1
+		main.set_party(party)
+		main.menus.p1 = {"index": 1, "confirm": false}
 	var links := {"room": {"room_code": "KJX4", "pending": [
 		{"id": "pend1", "profile": {"display_name": "Sanne", "skin_color": "#edc59a", "avatar": _face(8)}},
 		{"id": "pend2", "profile": {"display_name": "Thijs", "skin_color": "#b77b50", "avatar": _face(9)}},

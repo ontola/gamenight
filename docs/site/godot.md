@@ -101,6 +101,11 @@ Connect `GameNight.players_updated` too. It fires when someone picks up a
 profile in the lobby mid-match: the same players in the same seats, with a new
 name, colour, face or `profile_key`. Update labels and faces in place and keep
 the match going; never restart over it. Every game gets it, opted in or not.
+
+Split-screen and other left-to-right layouts follow the couch, not the seat:
+`GameNight.couch_order(seats, players)` returns the seats left to right as the
+players sit (they pick their place in the lobby's Start menu). Call it again on
+`players_updated`, because people can move mid-match; slide the views over.
 `devices_for_local_seats()` is only for standalone play and returns no native
 devices in managed mode. Back/Select belongs to the host; do not bind native
 Back to a second pause/resume handler.

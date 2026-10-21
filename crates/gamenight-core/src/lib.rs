@@ -1206,6 +1206,92 @@ mod night_tests {
     }
 
     #[test]
+    fn moving_on_the_couch_updates_the_running_game() {
+        let mut night = GameNight::default();
+        for name in ["A", "B", "C"] {
+            night.handle(join_cmd(name, None, None));
+        }
+        let couch = |night: &GameNight| -> Vec<(String, Option<u8>)> {
+            night
+                .snapshot()
+                .players
+                .iter()
+                .map(|p| (p.name.clone(), p.couch))
+                .collect()
+        };
+        // Newcomers sit down on the right.
+        assert_eq!(
+            couch(&night),
+            [
+                ("A".into(), Some(0)),
+                ("B".into(), Some(1)),
+                ("C".into(), Some(2))
+            ]
+        );
+        night.handle(Command::GameConnected {
+            game: GameId::new("g1"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("g1")],
+        });
+        let (_, s1) = prepared_session(&fx).unwrap();
+        night.handle(Command::SessionReady { session: s1 });
+        let c = night.snapshot().players[2].id;
+        night.handle(Command::OverlayOpened);
+
+        let fx = night.handle(Command::SetCouchPosition {
+            player_id: c,
+            position: 0,
+        });
+        assert_eq!(
+            couch(&night),
+            [
+                ("A".into(), Some(1)),
+                ("B".into(), Some(2)),
+                ("C".into(), Some(0))
+            ]
+        );
+        let update = fx.iter().find_map(|e| match e {
+            Effect::ToGame {
+                session,
+                command: GameCommand::PlayersUpdated { players },
+                ..
+            } if *session == s1 => Some(players.clone()),
+            _ => None,
+        });
+        let update = update.expect("the running game hears the new places");
+        assert_eq!(
+            update.iter().map(|p| p.couch).collect::<Vec<_>>(),
+            [Some(1), Some(2), Some(0)]
+        );
+
+        // Past the end is the rightmost place; the same place again is no change.
+        night.handle(Command::SetCouchPosition {
+            player_id: c,
+            position: 9,
+        });
+        assert_eq!(couch(&night)[2].1, Some(2));
+        let fx = night.handle(Command::SetCouchPosition {
+            player_id: c,
+            position: 2,
+        });
+        assert!(!fx.iter().any(|e| matches!(e, Effect::StateChanged)));
+
+        // Same people in the same seats: the round goes on.
+        let fx = night.handle(Command::OverlayClosed);
+        assert!(resume_effect(&fx), "back in the same round: {fx:?}");
+        assert_eq!(night.snapshot().active_session.unwrap().id, s1);
+
+        // Leaving closes the gap.
+        let a = night.snapshot().players[0].id;
+        night.handle(Command::LeaveParty { player_id: a });
+        assert_eq!(
+            couch(&night),
+            [("B".into(), Some(0)), ("C".into(), Some(1))]
+        );
+    }
+
+    #[test]
     fn closing_overlay_keeps_explicit_pause() {
         let (mut night, _s1) = night_in_progress();
         // Someone paused on purpose, then browsed the overlay.

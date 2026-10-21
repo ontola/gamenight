@@ -101,6 +101,7 @@ jobs:
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/eligibility.gd -- --demo --scene=stations
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/update.gd -- --demo
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/lobby_switch.gd -- --demo
+      - run: $GODOT --headless --path lobbies/game-room --script res://tests/couch.gd -- --demo
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/bench.gd -- --demo --scene=phones
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/weapons.gd
       - run: $GODOT --headless --path lobbies/game-room --script res://tests/carry.gd

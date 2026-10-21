@@ -136,6 +136,7 @@ extern "C" {
 #define GN_MSG_REQUEST_START "request_start"
 #define GN_MSG_RESUME "resume"
 #define GN_MSG_RETRY_LOBBY "retry_lobby"
+#define GN_MSG_SET_COUCH_POSITION "set_couch_position"
 #define GN_MSG_SET_PHONES "set_phones"
 #define GN_MSG_SET_PLAYER_AVATAR "set_player_avatar"
 #define GN_MSG_SET_PLAYER_COLOR "set_player_color"

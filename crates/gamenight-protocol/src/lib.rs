@@ -182,6 +182,15 @@ pub struct Player {
     /// data for the night only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile_key: Option<String>,
+    /// Where this player sits on the couch, counted from the left (0 is the
+    /// leftmost). Every player in the party has a distinct position; players
+    /// change it from their Start menu in the lobby, also during a match
+    /// (`players_updated`). Order split-screen views and anything else laid
+    /// out left to right by it, not by seat: a seat is a controller slot.
+    /// Sort by it rather than indexing with it, since a session's players
+    /// may be a part of the party. Older hosts leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub couch: Option<u8>,
 }
 
 /// The [`Player::profile_key`] a game sees for a profile: a SHA-256 of the
@@ -1221,6 +1230,13 @@ pub enum ClientMessage {
     SetPlayerProfile {
         player_id: PlayerId,
         profile: Option<String>,
+    },
+    /// Move a player to another place on the couch (see [`Player::couch`]),
+    /// shifting the people in between one place over. A position past the
+    /// end means the rightmost place.
+    SetCouchPosition {
+        player_id: PlayerId,
+        position: u8,
     },
     AssignSeat {
         seat: u8,

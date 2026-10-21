@@ -73,6 +73,7 @@ const String msgRequestOverlay = 'request_overlay';
 const String msgRequestStart = 'request_start';
 const String msgResume = 'resume';
 const String msgRetryLobby = 'retry_lobby';
+const String msgSetCouchPosition = 'set_couch_position';
 const String msgSetPhones = 'set_phones';
 const String msgSetPlayerAvatar = 'set_player_avatar';
 const String msgSetPlayerColor = 'set_player_color';

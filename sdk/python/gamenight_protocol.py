@@ -75,6 +75,7 @@ MSG_REQUEST_OVERLAY = "request_overlay"
 MSG_REQUEST_START = "request_start"
 MSG_RESUME = "resume"
 MSG_RETRY_LOBBY = "retry_lobby"
+MSG_SET_COUCH_POSITION = "set_couch_position"
 MSG_SET_PHONES = "set_phones"
 MSG_SET_PLAYER_AVATAR = "set_player_avatar"
 MSG_SET_PLAYER_COLOR = "set_player_color"
@@ -316,6 +317,16 @@ CLIENT_MESSAGES = {
         ],
         "required": [
             "player_id"
+        ]
+    },
+    "set_couch_position": {
+        "fields": [
+            "player_id",
+            "position"
+        ],
+        "required": [
+            "player_id",
+            "position"
         ]
     },
     "assign_seat": {

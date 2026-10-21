@@ -75,6 +75,7 @@ export const MSG = Object.freeze({
   "REQUEST_START": "request_start",
   "RESUME": "resume",
   "RETRY_LOBBY": "retry_lobby",
+  "SET_COUCH_POSITION": "set_couch_position",
   "SET_PHONES": "set_phones",
   "SET_PLAYER_AVATAR": "set_player_avatar",
   "SET_PLAYER_COLOR": "set_player_color",
@@ -240,6 +241,16 @@ export const CLIENT_MESSAGES = {
     ],
     "required": [
       "player_id"
+    ]
+  },
+  "set_couch_position": {
+    "fields": [
+      "player_id",
+      "position"
+    ],
+    "required": [
+      "player_id",
+      "position"
     ]
   },
   "assign_seat": {

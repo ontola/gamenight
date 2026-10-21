@@ -658,6 +658,8 @@ func menu_items(id: String) -> Array:
 	if menus.get(id, {}).get("page", "") == "lobbies": return lobby_items()
 	if menus.get(id, {}).get("page", "") == "remove": return remove_items(id)
 	var items := [{"label": "Close menu", "action": "close"}, {"label": "Leave the party", "action": "leave"}]
+	# Hosts that predate couch positions don't send them.
+	if profiles.get(id, {}).get("couch") != null: items.insert(1, {"label": "Couch position", "action": "couch"})
 	# The host restarts into the new version and brings the party back.
 	if not update_ready().is_empty(): items.push_front({"label": "Update GameNight now", "action": "update"})
 	if links.get("linked", {}).has(id): items.insert(1, {"label": "Unlink my phone profile", "action": "unlink"})
@@ -665,6 +667,22 @@ func menu_items(id: String) -> Array:
 	if party.get("lobbies", []).size() > 1: items.append({"label": "Switch lobby", "action": "lobbies"})
 	items.append({"label": "Quit GameNight", "action": "quit"})
 	return items
+
+## Where `id` sits on the couch, counted from the left, and how many places
+## there are: the host gives every player in the party a distinct one.
+func couch_place(id: String) -> int:
+	return int(profiles.get(id, {}).get("couch", 0))
+
+## Move one place left (-1) or right (+1) on the couch. The swap shows at once;
+## the host's next snapshot confirms it, and games hear it as players_updated.
+func _move_on_couch(id: String, step: int) -> void:
+	var from := couch_place(id)
+	var to := from + step
+	if to < 0 or to >= profiles.size(): return
+	for other in profiles:
+		if other != id and int(profiles[other].get("couch", -1)) == to: profiles[other].couch = from
+	profiles[id].couch = to
+	client.set_couch_position(id, to)
 
 ## Everyone else in the party, as a page of the Start menu, so a player who
 ## left without leaving (a phone, a web join, someone gone home) can be
@@ -699,9 +717,14 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 	menu.index = clampi(menu.index, 0, items.size() - 1)
 	var up: bool = pressed & World.BTN_UP or (stick.y < -0.6 and not menu.get("stick", false))
 	var down: bool = pressed & World.BTN_DOWN or (stick.y > 0.6 and not menu.get("stick", false))
+	var left: bool = pressed & World.BTN_LEFT or (stick.x < -0.6 and not menu.get("stick_x", false))
+	var right: bool = pressed & World.BTN_RIGHT or (stick.x > 0.6 and not menu.get("stick_x", false))
 	menu["stick"] = absf(stick.y) > 0.6
+	menu["stick_x"] = absf(stick.x) > 0.6
 	if up: menu.index = posmod(menu.index - 1, items.size()); menu.confirm = false
 	if down: menu.index = posmod(menu.index + 1, items.size()); menu.confirm = false
+	if (left or right) and not up and not down and items[menu.index].action == "couch":
+		_move_on_couch(id, -1 if left else 1)
 	if pressed & World.BTN_B:
 		if menu.get("page", "") != "": _menu_page(menu, "")
 		else: menus.erase(id)
@@ -1516,7 +1539,12 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 	var menu: Dictionary = menus[id]
 	var line := size + 16.0
 	var w := 0.0
-	for item in items: w = maxf(w, font.get_string_size(item.label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
+	var block := size * 0.8
+	var gap := size * 0.3
+	for item in items:
+		var item_w := font.get_string_size(item.label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		if item.action == "couch": item_w += size + profiles.size() * (block + gap)
+		w = maxf(w, item_w)
 	w += 80
 	var h := line * items.size() + 70
 	var rect := Rect2(at.x - w / 2, at.y - h, w, h)
@@ -1534,4 +1562,13 @@ func _draw_menu(canvas: Control, id: String, at: Vector2, size: int) -> void:
 		if items[i].action == "remove" and menu.confirm and selected: label = "Press A again to remove %s" % _short(items[i].name, 14)
 		if selected: canvas.draw_rect(Rect2(rect.position.x + 12, y, w - 24, line - 4), Color(VIOLET, 0.35))
 		_text(canvas, label, Vector2(rect.position.x + 32, y + size), size, TEXT if selected else DIM)
+		if items[i].action == "couch":
+			# One block per place on the couch; yours is filled.
+			var x := rect.position.x + 32 + font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + size
+			var mine := couch_place(id)
+			var colour := Color(str(profiles.get(id, {}).get("color", ""))) if str(profiles.get(id, {}).get("color", "")).begins_with("#") else AMBER
+			for place in profiles.size():
+				var cell := Rect2(x + place * (block + gap), y + (line - 4 - block) / 2, block, block)
+				if place == mine: canvas.draw_rect(cell, colour)
+				else: canvas.draw_rect(cell, Color(DIM, 0.8 if selected else 0.5), false, 2)
 
