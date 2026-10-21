@@ -1040,6 +1040,83 @@
           "type": "object"
         },
         {
+          "description": "Game only: accept plain-text requests from players (see\n[`GameCommands`]). Send after `welcome`, and again after reconnects.",
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "examples": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "declare_commands",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "description"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Overlay only: `player_id` asks `game` for something in plain text, as\ntyped or spoken. The game answers with `command_result` and the same `id`.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "id": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "game_command",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "id",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Game only: the outcome of `game_command` `id`, in words for the player.",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "type": {
+              "const": "command_result",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "id",
+            "ok",
+            "message"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Overlay only: a player's phone screen for `game` connected or left.",
           "properties": {
             "connected": {
@@ -1158,6 +1235,30 @@
         "controller",
         "axes",
         "buttons"
+      ],
+      "type": "object"
+    },
+    "GameCommands": {
+      "description": "Plain-text requests a game accepts with `declare_commands`, such as\n\"geef me 10 End Crystal\". Apps and the session assistant send them as\n`game_command`; the game itself decides what they mean.",
+      "properties": {
+        "description": {
+          "description": "What a player can ask for in plain words, for a person or an\nassistant that turns speech into one of these requests.",
+          "type": "string"
+        },
+        "examples": {
+          "description": "Requests the game understands as written, e.g. `geef me 10 End Crystal`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "game": {
+          "$ref": "#/$defs/GameId"
+        }
+      },
+      "required": [
+        "game",
+        "description"
       ],
       "type": "object"
     },
@@ -1541,6 +1642,13 @@
               "type": "null"
             }
           ]
+        },
+        "commands": {
+          "description": "Plain-text requests declared by connected games (see [`GameCommands`]).",
+          "items": {
+            "$ref": "#/$defs/GameCommands"
+          },
+          "type": "array"
         },
         "companions": {
           "description": "Phone screens declared by connected games (see [`CompanionScreen`]).",
@@ -2402,6 +2510,64 @@
             "type",
             "game",
             "data"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "To a game: a plain-text request from `player_id` (see\n`declare_commands`). Answer with `command_result` and the same `id`.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "id": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "game_command",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "id",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "To overlays: what a game answered to `game_command` `id`.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "id": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "ok": {
+              "type": "boolean"
+            },
+            "type": {
+              "const": "command_result",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "id",
+            "ok",
+            "message"
           ],
           "type": "object"
         },

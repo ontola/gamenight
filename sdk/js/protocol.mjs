@@ -30,17 +30,20 @@ export const MSG = Object.freeze({
   "ASSIGN_SEAT": "assign_seat",
   "BIND_CONTROLLER": "bind_controller",
   "CLOSE_OVERLAY": "close_overlay",
+  "COMMAND_RESULT": "command_result",
   "COMPANION_MESSAGE": "companion_message",
   "COMPANION_PRESENCE": "companion_presence",
   "CONTROL_SETTINGS": "control_settings",
   "CONTROLLER_FRAME": "controller_frame",
   "CONTROLLER_INPUT": "controller_input",
+  "DECLARE_COMMANDS": "declare_commands",
   "DECLARE_COMPANION": "declare_companion",
   "DECLARE_SETTINGS": "declare_settings",
   "DISPOSE": "dispose",
   "DOWNLOAD_GRANTS": "download_grants",
   "ERROR": "error",
   "FINISHED": "finished",
+  "GAME_COMMAND": "game_command",
   "HELLO": "hello",
   "JOIN_PARTY": "join_party",
   "JOIN_PHONE_PLAYER": "join_phone_player",
@@ -487,6 +490,41 @@ export const CLIENT_MESSAGES = {
       "data"
     ]
   },
+  "declare_commands": {
+    "fields": [
+      "description",
+      "examples"
+    ],
+    "required": [
+      "description"
+    ]
+  },
+  "game_command": {
+    "fields": [
+      "game",
+      "id",
+      "player_id",
+      "text"
+    ],
+    "required": [
+      "game",
+      "id",
+      "player_id",
+      "text"
+    ]
+  },
+  "command_result": {
+    "fields": [
+      "id",
+      "message",
+      "ok"
+    ],
+    "required": [
+      "id",
+      "message",
+      "ok"
+    ]
+  },
   "companion_presence": {
     "fields": [
       "connected",
@@ -653,6 +691,34 @@ export const SERVER_MESSAGES = {
     "required": [
       "data",
       "game"
+    ]
+  },
+  "game_command": {
+    "fields": [
+      "game",
+      "id",
+      "player_id",
+      "text"
+    ],
+    "required": [
+      "game",
+      "id",
+      "player_id",
+      "text"
+    ]
+  },
+  "command_result": {
+    "fields": [
+      "game",
+      "id",
+      "message",
+      "ok"
+    ],
+    "required": [
+      "game",
+      "id",
+      "message",
+      "ok"
     ]
   },
   "companion_presence": {

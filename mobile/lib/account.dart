@@ -21,12 +21,17 @@ class Account {
 
   /// The verified email this account signs in with.
   final String? email;
-  const Account({required this.id, this.displayName, this.email});
+
+  /// May use the AI Assistant; it is invite-only for now.
+  final bool assistant;
+  const Account(
+      {required this.id, this.displayName, this.email, this.assistant = false});
 
   static Account fromJson(Map<String, dynamic> j) => Account(
       id: j['id'] as String,
       displayName: (j['profile'] as Map?)?['display_name'] as String?,
-      email: j['email'] as String?);
+      email: j['email'] as String?,
+      assistant: j['assistant'] == true);
 }
 
 /// `GET /v1/me/studio`: the saved player and every face, in the studio's

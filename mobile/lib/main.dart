@@ -115,7 +115,7 @@ class _GameNightAppState extends State<GameNightApp> {
         Uri.tryParse(initial.fragment)?.path == '/assistant') {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         await widget.accountLoading;
-        if (mounted) _assistant();
+        if (mounted && widget.state.assistantAvailable) _assistant();
       });
     }
     if (kIsWeb) {
@@ -201,14 +201,15 @@ class _GameNightAppState extends State<GameNightApp> {
         context: context,
         builder: (context) => SafeArea(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                ListTile(
-                    leading: const Icon(Icons.auto_awesome),
-                    title: const Text('Assistant'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      Navigator.pop(context);
-                      _assistant();
-                    }),
+                if (widget.state.assistantAvailable)
+                  ListTile(
+                      leading: const Icon(Icons.auto_awesome),
+                      title: const Text('Assistant'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _assistant();
+                      }),
                 if (widget.reports != null)
                   ListTile(
                       leading: const Icon(Icons.mic_none),
@@ -292,10 +293,11 @@ class _GameNightAppState extends State<GameNightApp> {
               onTap: () => _selectDestination(2),
             ),
             const _SidebarHeading('Help'),
-            _SidebarItem(
-                label: 'Assistant',
-                icon: const Icon(Icons.auto_awesome_outlined),
-                onTap: _assistant),
+            if (widget.state.assistantAvailable)
+              _SidebarItem(
+                  label: 'Assistant',
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  onTap: _assistant),
             if (widget.reports != null)
               _SidebarItem(
                   label: 'Feedback',

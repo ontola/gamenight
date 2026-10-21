@@ -570,6 +570,9 @@ class AppState extends ChangeNotifier {
   bool _pushingAccount = false, _accountPending = false;
 
   bool get signedIn => cloud.signedIn;
+
+  /// Whether to show the Assistant: only for invited accounts.
+  bool get assistantAvailable => signedIn && account?.assistant == true;
   bool get isGuest => cloud.guestToken != null;
   Future<String>? _signInOperation;
   bool get signingIn => _signInOperation != null;

@@ -30,17 +30,20 @@ MSG_APPLY_UPDATE = "apply_update"
 MSG_ASSIGN_SEAT = "assign_seat"
 MSG_BIND_CONTROLLER = "bind_controller"
 MSG_CLOSE_OVERLAY = "close_overlay"
+MSG_COMMAND_RESULT = "command_result"
 MSG_COMPANION_MESSAGE = "companion_message"
 MSG_COMPANION_PRESENCE = "companion_presence"
 MSG_CONTROL_SETTINGS = "control_settings"
 MSG_CONTROLLER_FRAME = "controller_frame"
 MSG_CONTROLLER_INPUT = "controller_input"
+MSG_DECLARE_COMMANDS = "declare_commands"
 MSG_DECLARE_COMPANION = "declare_companion"
 MSG_DECLARE_SETTINGS = "declare_settings"
 MSG_DISPOSE = "dispose"
 MSG_DOWNLOAD_GRANTS = "download_grants"
 MSG_ERROR = "error"
 MSG_FINISHED = "finished"
+MSG_GAME_COMMAND = "game_command"
 MSG_HELLO = "hello"
 MSG_JOIN_PARTY = "join_party"
 MSG_JOIN_PHONE_PLAYER = "join_phone_player"
@@ -563,6 +566,41 @@ CLIENT_MESSAGES = {
             "data"
         ]
     },
+    "declare_commands": {
+        "fields": [
+            "description",
+            "examples"
+        ],
+        "required": [
+            "description"
+        ]
+    },
+    "game_command": {
+        "fields": [
+            "game",
+            "id",
+            "player_id",
+            "text"
+        ],
+        "required": [
+            "game",
+            "id",
+            "player_id",
+            "text"
+        ]
+    },
+    "command_result": {
+        "fields": [
+            "id",
+            "message",
+            "ok"
+        ],
+        "required": [
+            "id",
+            "message",
+            "ok"
+        ]
+    },
     "companion_presence": {
         "fields": [
             "connected",
@@ -729,6 +767,34 @@ SERVER_MESSAGES = {
         "required": [
             "data",
             "game"
+        ]
+    },
+    "game_command": {
+        "fields": [
+            "game",
+            "id",
+            "player_id",
+            "text"
+        ],
+        "required": [
+            "game",
+            "id",
+            "player_id",
+            "text"
+        ]
+    },
+    "command_result": {
+        "fields": [
+            "game",
+            "id",
+            "message",
+            "ok"
+        ],
+        "required": [
+            "game",
+            "id",
+            "message",
+            "ok"
         ]
     },
     "companion_presence": {

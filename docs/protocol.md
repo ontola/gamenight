@@ -678,6 +678,34 @@ game by its own means, for example LAN discovery; `companion_message` is for
 pages only. iPhones can't install apps from outside the App Store, so there
 the app must come from the App Store or TestFlight.
 
+## Plain-text requests
+
+A game can accept requests in plain words, such as "geef me 10 End Crystal",
+from the GameNight app and the session assistant (which turns speech or loose
+wording into a request the game understands). Declare it after `welcome`:
+
+```json
+{"type": "declare_commands", "description": "Ask for items for yourself or everyone.",
+ "examples": ["geef me 10 End Crystal", "geef iedereen 5 Torch"]}
+```
+
+The daemon lists it in the party snapshot under `commands`. The local web server
+then forwards a request from a seated player as
+
+```json
+{"type": "game_command", "game": "mineclonia", "player_id": "…", "id": "r-12", "text": "geef me 10 End Crystal"}
+```
+
+and the game answers once, in words for that player:
+
+```json
+{"type": "command_result", "id": "r-12", "ok": true, "message": "Alsjeblieft: 10× End Crystal."}
+```
+
+The game decides what text means; nothing is executed as code. Only the local
+web server sends `game_command`, only for a player who is in the party, and
+only to a game that declared commands. A declaration ends when the game disconnects.
+
 ## The night, end to end
 
 ```

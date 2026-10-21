@@ -977,6 +977,9 @@ pub struct PartySnapshot {
     /// Phone screens declared by connected games (see [`CompanionScreen`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub companions: Vec<CompanionScreen>,
+    /// Plain-text requests declared by connected games (see [`GameCommands`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub commands: Vec<GameCommands>,
     /// A newer version of the host app is downloaded and can be applied
     /// with `apply_update` between games. The value is its version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -995,6 +998,21 @@ pub struct LobbyChoice {
     pub title: String,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub current: bool,
+}
+
+/// Plain-text requests a game accepts with `declare_commands`, such as
+/// "geef me 10 End Crystal". Apps and the session assistant send them as
+/// `game_command`; the game itself decides what they mean.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GameCommands {
+    pub game: GameId,
+    /// What a player can ask for in plain words, for a person or an
+    /// assistant that turns speech into one of these requests.
+    pub description: String,
+    /// Requests the game understands as written, e.g. `geef me 10 End Crystal`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub examples: Vec<String>,
 }
 
 /// A game's own phone screen: a small web page that GameNight serves to the
@@ -1393,6 +1411,27 @@ pub enum ClientMessage {
         player_id: Option<PlayerId>,
         data: serde_json::Value,
     },
+    /// Game only: accept plain-text requests from players (see
+    /// [`GameCommands`]). Send after `welcome`, and again after reconnects.
+    DeclareCommands {
+        description: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        examples: Vec<String>,
+    },
+    /// Overlay only: `player_id` asks `game` for something in plain text, as
+    /// typed or spoken. The game answers with `command_result` and the same `id`.
+    GameCommand {
+        game: GameId,
+        player_id: PlayerId,
+        id: String,
+        text: String,
+    },
+    /// Game only: the outcome of `game_command` `id`, in words for the player.
+    CommandResult {
+        id: String,
+        ok: bool,
+        message: String,
+    },
     /// Overlay only: a player's phone screen for `game` connected or left.
     CompanionPresence {
         game: GameId,
@@ -1511,6 +1550,21 @@ pub enum ServerMessage {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         player_id: Option<PlayerId>,
         data: serde_json::Value,
+    },
+    /// To a game: a plain-text request from `player_id` (see
+    /// `declare_commands`). Answer with `command_result` and the same `id`.
+    GameCommand {
+        game: GameId,
+        player_id: PlayerId,
+        id: String,
+        text: String,
+    },
+    /// To overlays: what a game answered to `game_command` `id`.
+    CommandResult {
+        game: GameId,
+        id: String,
+        ok: bool,
+        message: String,
     },
     /// To a game: a player's phone screen connected or went away. A game
     /// sends that player its current view when `connected` is true.

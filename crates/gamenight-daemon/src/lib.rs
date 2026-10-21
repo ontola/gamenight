@@ -116,6 +116,7 @@ struct Shared {
     lobby_recovery_opened: bool,
     /// Phone screens declared by connected games, by game.
     companions: HashMap<GameId, gamenight_protocol::CompanionScreen>,
+    commands: HashMap<GameId, gamenight_protocol::GameCommands>,
     /// Playtests on this host, by game: the sha256 of the preview build being
     /// installed or on the shelf, and when its install last failed.
     playtests: HashMap<GameId, (String, Option<std::time::Instant>)>,
@@ -285,6 +286,7 @@ impl Shared {
             lobby_restarts: 0,
             lobby_recovery_opened: false,
             companions: HashMap::new(),
+            commands: HashMap::new(),
             playtests: HashMap::new(),
             update: None,
             update_ready: None,
@@ -309,6 +311,8 @@ impl Shared {
         party.game_issues.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.companions = self.companions.values().cloned().collect();
         party.companions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+        party.commands = self.commands.values().cloned().collect();
+        party.commands.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.update_ready = self.update_ready.clone();
         party.lobbies = self.lobbies.clone();
         party
@@ -779,6 +783,96 @@ impl Shared {
             if let Some(tx) = self.games.get(id) {
                 send(tx, &lobby_msg);
             }
+        }
+    }
+
+    /// Route plain-text requests: a game declares what it understands, the
+    /// local web server asks on behalf of a seated player, the game answers.
+    fn game_command(&mut self, msg: ClientMessage, registration: &Registration, tx: &Tx) {
+        let reject = |message: &str| {
+            send(
+                tx,
+                &ServerMessage::Error {
+                    message: message.into(),
+                },
+            )
+        };
+        match (msg, registration) {
+            (
+                ClientMessage::DeclareCommands {
+                    description,
+                    examples,
+                },
+                Registration::Game(game),
+            ) => {
+                if description.len() > 2000
+                    || examples.len() > 20
+                    || examples.iter().any(|e| e.len() > 200)
+                {
+                    return reject("command declaration too long");
+                }
+                info!(%game, "game accepts plain-text requests");
+                self.commands.insert(
+                    game.clone(),
+                    gamenight_protocol::GameCommands {
+                        game: game.clone(),
+                        description,
+                        examples,
+                    },
+                );
+                self.broadcast_party();
+            }
+            (
+                ClientMessage::GameCommand {
+                    game,
+                    player_id,
+                    id,
+                    text,
+                },
+                Registration::Overlay(_),
+            ) => {
+                if id.is_empty() || id.len() > 64 || text.trim().is_empty() || text.len() > 500 {
+                    return reject("invalid game command");
+                }
+                if !self.commands.contains_key(&game) {
+                    return reject("that game does not accept requests");
+                }
+                if !self
+                    .night
+                    .snapshot()
+                    .players
+                    .iter()
+                    .any(|p| p.id == player_id)
+                {
+                    return reject("unknown player");
+                }
+                if let Some(game_tx) = self.games.get(&game) {
+                    send(
+                        game_tx,
+                        &ServerMessage::GameCommand {
+                            game,
+                            player_id,
+                            id,
+                            text,
+                        },
+                    );
+                }
+            }
+            (ClientMessage::CommandResult { id, ok, message }, Registration::Game(game)) => {
+                let msg = ServerMessage::CommandResult {
+                    game: game.clone(),
+                    id,
+                    ok,
+                    message: message.chars().take(1000).collect(),
+                };
+                for overlay in self.overlays.values() {
+                    send(overlay, &msg);
+                }
+            }
+            (ClientMessage::DeclareCommands { .. } | ClientMessage::CommandResult { .. }, _) => {
+                reject("only games declare and answer requests")
+            }
+            _ => reject("only the local web server sends game commands"),
         }
     }
 
@@ -2271,6 +2365,15 @@ async fn serve(
                 shared.lock().await.companion(parsed, &registration, &tx);
                 continue;
             }
+            if matches!(
+                parsed,
+                ClientMessage::DeclareCommands { .. }
+                    | ClientMessage::GameCommand { .. }
+                    | ClientMessage::CommandResult { .. }
+            ) {
+                shared.lock().await.game_command(parsed, &registration, &tx);
+                continue;
+            }
             let command = match message_to_command(parsed, &registration) {
                 Ok(Some(c)) => c,
                 Ok(None) => continue,
@@ -2293,6 +2396,7 @@ async fn serve(
                 info!(game = %game_id, "game disconnected");
                 s.games.remove(game_id);
                 s.companions.remove(game_id);
+                s.commands.remove(game_id);
                 let mut kind = gamenight_protocol::GameIssueKind::Disconnected;
                 if let Some(mut child) = s.running_children.remove(game_id) {
                     if let Ok(Some(status)) = child.try_wait() {
@@ -2367,6 +2471,11 @@ fn message_to_command(
         | ClientMessage::CompanionMessage { .. }
         | ClientMessage::CompanionPresence { .. } => {
             return Err("phone screens require dedicated routing".into())
+        }
+        ClientMessage::DeclareCommands { .. }
+        | ClientMessage::GameCommand { .. }
+        | ClientMessage::CommandResult { .. } => {
+            return Err("game commands require dedicated routing".into())
         }
         ClientMessage::LobbyReady
         | ClientMessage::QuitParty
@@ -2841,6 +2950,84 @@ mod replacement_lobby_tests {
 
     /// A signed-in player's own setting is written to disk and reaches the
     /// game; a guest's is not written.
+    #[test]
+    fn game_commands_go_to_the_game_and_answers_to_overlays() {
+        let mut s = Shared::new(Vec::new(), "127.0.0.1:1".into(), None);
+        let game = GameId::new("mineclonia");
+        let (game_tx, mut game_rx) = mpsc::unbounded_channel();
+        let (web_tx, mut web_rx) = mpsc::unbounded_channel();
+        s.games.insert(game.clone(), game_tx.clone());
+        s.overlays.insert(0, web_tx.clone());
+        let next = |rx: &mut mpsc::UnboundedReceiver<String>| -> ServerMessage {
+            serde_json::from_str(&rx.try_recv().unwrap()).unwrap()
+        };
+        s.dispatch(
+            Command::JoinParty {
+                name: "Ada".into(),
+                seat: None,
+                color: None,
+                avatar: None,
+                library: vec![],
+            },
+            None,
+        );
+        while web_rx.try_recv().is_ok() {}
+        let ada = s.night.snapshot().players[0].id;
+        let ask = |text: &str| ClientMessage::GameCommand {
+            game: game.clone(),
+            player_id: ada,
+            id: "r1".into(),
+            text: text.into(),
+        };
+        // Nothing declared yet: the request is refused, not forwarded.
+        s.game_command(ask("geef me 10 brood"), &Registration::Overlay(0), &web_tx);
+        assert!(matches!(next(&mut web_rx), ServerMessage::Error { .. }));
+        s.game_command(
+            ClientMessage::DeclareCommands {
+                description: "Ask for items".into(),
+                examples: vec!["geef me 10 End Crystal".into()],
+            },
+            &Registration::Game(game.clone()),
+            &game_tx,
+        );
+        let ServerMessage::PartyState { party } = next(&mut web_rx) else {
+            panic!("expected a party update");
+        };
+        assert_eq!(party.commands[0].examples[0], "geef me 10 End Crystal");
+        s.game_command(ask("geef me 10 brood"), &Registration::Overlay(0), &web_tx);
+        assert!(matches!(
+            next(&mut game_rx),
+            ServerMessage::GameCommand { player_id, id, text, .. }
+                if player_id == ada && id == "r1" && text == "geef me 10 brood"
+        ));
+        s.game_command(
+            ClientMessage::CommandResult {
+                id: "r1".into(),
+                ok: true,
+                message: "Alsjeblieft: 10× Bread.".into(),
+            },
+            &Registration::Game(game.clone()),
+            &game_tx,
+        );
+        assert!(matches!(
+            next(&mut web_rx),
+            ServerMessage::CommandResult { game: g, id, ok: true, .. } if g == game && id == "r1"
+        ));
+        // A game cannot ask another game, and overlays cannot answer.
+        s.game_command(ask("geef"), &Registration::Game(game.clone()), &game_tx);
+        assert!(matches!(next(&mut game_rx), ServerMessage::Error { .. }));
+        s.game_command(
+            ClientMessage::CommandResult {
+                id: "r1".into(),
+                ok: true,
+                message: String::new(),
+            },
+            &Registration::Overlay(0),
+            &web_tx,
+        );
+        assert!(matches!(next(&mut web_rx), ServerMessage::Error { .. }));
+    }
+
     #[test]
     fn player_settings_are_saved_for_profiles_and_sent_to_the_game() {
         let dir = std::env::temp_dir().join(format!("gamenight-ps-{}", uuid::Uuid::new_v4()));

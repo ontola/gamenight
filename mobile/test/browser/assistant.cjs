@@ -19,7 +19,7 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
   const controls={game:'frog-fighter',instance:'test-frog',revision:1,can_undo:true,settings:{gravity:{label:'Gravity',kind:'number',value:80,min:20,max:200}}};
   await page.route('**/v1/**',route=>{
    const req=route.request(),p=new URL(req.url()).pathname;let data={};
-   if(p==='/v1/me')data={id:'synthetic',profile:{display_name:'Test player'}};
+   if(p==='/v1/me')data={id:'synthetic',assistant:true,profile:{display_name:'Test player'}};
    else if(p==='/v1/me/studio')data={revision:1,profile:{display_name:'Test player'},workspace:null};
    else if(p==='/v1/catalog')data=[];
    else if(p==='/v1/rooms/status')data={status:'connected',room_code:'ABC234',fresh:true,players:2,main_player:true,discovery:{current:'frog-fighter'}};

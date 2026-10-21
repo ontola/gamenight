@@ -54,6 +54,7 @@ pub async fn next(
         seat,
         expires,
         edit: None,
+        game_command: None,
         start: false,
     };
     if !discovery::apply(&state, &selection).await {

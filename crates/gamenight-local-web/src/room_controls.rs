@@ -158,6 +158,7 @@ pub(crate) async fn next(
     let selection = discovery::Selection {
         command: None,
         edit: None,
+        game_command: None,
         id: uuid::Uuid::new_v4().to_string(),
         game: request.game,
         seat,

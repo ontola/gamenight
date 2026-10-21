@@ -140,6 +140,13 @@ pub enum GameEvent {
         player_id: gamenight_protocol::PlayerId,
         connected: bool,
     },
+    /// A player asked for something in plain text (see
+    /// [`GameNight::declare_commands`]). Answer with [`GameNight::command_result`].
+    GameCommand {
+        player_id: gamenight_protocol::PlayerId,
+        id: String,
+        text: String,
+    },
 }
 
 /// A live connection from a game process to the GameNight daemon.
@@ -282,7 +289,18 @@ impl GameNight {
                         ServerMessage::ControllerFrame { controllers } => {
                             GameEvent::ControllerFrame { controllers }
                         }
-                        ServerMessage::SettingsAccepted { .. } => continue,
+                        ServerMessage::SettingsAccepted { .. }
+                        | ServerMessage::CommandResult { .. } => continue,
+                        ServerMessage::GameCommand {
+                            player_id,
+                            id,
+                            text,
+                            ..
+                        } => GameEvent::GameCommand {
+                            player_id,
+                            id,
+                            text,
+                        },
                         ServerMessage::CompanionMessage {
                             player_id: Some(player_id),
                             data,
@@ -460,6 +478,35 @@ impl GameNight {
             root,
             entry,
             app: Some(app),
+        })
+        .await
+    }
+
+    /// Accept plain-text requests ("geef me 10 End Crystal") from apps and
+    /// the session assistant. `examples` are requests you understand as written.
+    pub async fn declare_commands(
+        &mut self,
+        description: impl Into<String>,
+        examples: Vec<String>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::DeclareCommands {
+            description: description.into(),
+            examples,
+        })
+        .await
+    }
+
+    /// Answer a [`GameEvent::GameCommand`] in words for the player.
+    pub async fn command_result(
+        &mut self,
+        id: impl Into<String>,
+        ok: bool,
+        message: impl Into<String>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::CommandResult {
+            id: id.into(),
+            ok,
+            message: message.into(),
         })
         .await
     }

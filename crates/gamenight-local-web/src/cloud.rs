@@ -587,7 +587,19 @@ impl Bridge {
                 delivered_playtests = Some((key, std::time::Instant::now()));
             }
             if let Some(selection) = &updates.selection {
-                if selection.command.is_some() {
+                if selection.game_command.is_some() {
+                    if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {
+                        let result = if seats.contains(&selection.seat)
+                            && updates.updates.iter().any(|u| u.seat == selection.seat)
+                        {
+                            settings::run_command(&state, selection).await
+                        } else {
+                            Err("Player is no longer linked to this room".into())
+                        };
+                        receipt = Some(serde_json::json!({"id":selection.id,"ok":result.is_ok(),
+                            "message":match result {Ok(m)|Err(m)=>m}}));
+                    }
+                } else if selection.command.is_some() {
                     if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {
                         let result = if seats.contains(&selection.seat)
                             && updates.updates.iter().any(|u| u.seat == selection.seat)

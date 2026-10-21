@@ -99,11 +99,10 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
   }
   await tab('More').click();
   await page.getByText('Developer portal',{exact:true}).waitFor();
-  await page.getByText('Assistant',{exact:true}).click();
-  await page.waitForURL(/#\/assistant/);
-  await page.getByText('Your room, with a little help').waitFor();
-  await page.goBack(); await page.waitForURL(gamesURL);
-  assert(await page.evaluate(()=>document.querySelector('iframe')===window.originalPhone),'Assistant Back preserves the private game');
+  // The Assistant is invite-only: a guest does not see it.
+  assert.equal(await page.getByText('Assistant',{exact:true}).count(),0);
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300);
+  assert(await page.evaluate(()=>document.querySelector('iframe')===window.originalPhone),'More keeps the private game');
   assert.equal(joins,1);assert.deepEqual(errors,[]);
   // Existing website guest migrates into Flutter without another pickup.
   await page.evaluate(()=>{

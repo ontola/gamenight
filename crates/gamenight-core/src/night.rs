@@ -1112,6 +1112,7 @@ impl GameNight {
             onboarding_error: None,
             game_issues: Vec::new(),
             companions: Vec::new(),
+            commands: Vec::new(),
             update_ready: None,
             lobbies: Vec::new(),
             presence: self.presence_snapshot(),
