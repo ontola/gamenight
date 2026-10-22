@@ -27,7 +27,8 @@ const List<String> clothingColors = [
   '#4a5568',
 ];
 
-/// Name, face, saved faces and colours. Every change saves by itself.
+/// Name, face, saved faces and colours. Name and colours save by themselves;
+/// a face only on Save in the editor.
 class PlayerScreen extends StatefulWidget {
   final AppState state;
   const PlayerScreen({super.key, required this.state});
@@ -70,8 +71,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (_name.text != state.name) _name.text = state.name;
   }
 
-  Future<void> _openEditor() async {
-    await FaceEditorScreen.open(context, state);
+  Future<void> _openEditor({bool newFace = false}) async {
+    await FaceEditorScreen.open(context, state, newFace: newFace);
     if (mounted) setState(() {});
   }
 
@@ -207,11 +208,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ),
         ),
         const SizedBox(height: 12),
-        FilledButton.icon(
-          onPressed: _openEditor,
-          icon: const Icon(Icons.brush, size: 18),
-          label: const Text('Edit face'),
-        ),
+        Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton.icon(
+                onPressed: _openEditor,
+                icon: const Icon(Icons.brush, size: 18),
+                label: const Text('Edit face'),
+              ),
+              // Your last face stays: a character always has one.
+              if (state.artworks.length > 1)
+                OutlinedButton.icon(
+                  onPressed: _confirmDelete,
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: const Text('Delete face'),
+                ),
+            ]),
       ]);
 
   Widget _heading(String text) => Padding(
@@ -279,7 +293,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
         button: true,
         label: 'New face',
         child: GestureDetector(
-          onTap: () => state.newArtwork(),
+          onTap: () => _openEditor(newFace: true),
           child: Column(children: [
             Container(
               width: 72,
@@ -310,10 +324,11 @@ class _PlayerScreenState extends State<PlayerScreen> {
               leading: const Icon(Icons.copy),
               title: const Text('Make a copy'),
               onTap: () => Navigator.pop(context, 'copy')),
-          ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Delete'),
-              onTap: () => Navigator.pop(context, 'delete')),
+          if (state.artworks.length > 1)
+            ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Delete'),
+                onTap: () => Navigator.pop(context, 'delete')),
         ]),
       ),
     );
@@ -394,7 +409,9 @@ class _PlayerScreenState extends State<PlayerScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Delete ${art.name}?'),
-        content: const Text('This face is removed from this device.'),
+        content: Text(state.signedIn
+            ? 'This face is removed from this device and your account.'
+            : 'This face is removed from this device.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),

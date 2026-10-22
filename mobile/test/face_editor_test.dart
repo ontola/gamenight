@@ -45,7 +45,7 @@ void main() {
     expect(await CharacterSprite.bundled(), isNotNull);
   });
 
-  testWidgets('the You tab opens a full-screen editor and Done returns',
+  testWidgets('the You tab opens a full-screen editor and Save returns',
       (tester) async {
     tester.view.physicalSize = const Size(1080, 2340);
     tester.view.devicePixelRatio = 3;
@@ -71,7 +71,7 @@ void main() {
     }
     expect(find.text('Body guide').hitTestable(), findsOneWidget);
 
-    await tester.tap(find.text('Done'));
+    await tester.tap(find.text('Save'));
     await tester.pumpAndSettle();
     expect(find.byType(FaceEditorScreen), findsNothing);
     expect(find.byType(PlayerScreen), findsOneWidget);
@@ -104,29 +104,103 @@ void main() {
     expect(state.clothingColor, '#7ddf64');
     expect(find.byType(ColorSwatches), findsNothing);
 
+    // New opens the editor; the face only joins your faces on Save.
     final before = state.artworks.length;
     await tester.ensureVisible(find.text('New'));
     await tester.tap(find.text('New'));
     await tester.pumpAndSettle();
+    expect(find.byType(FaceEditorScreen), findsOneWidget);
+    expect(state.artworks.length, before);
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
     expect(state.artworks.length, before + 1);
+    await tester.pump(const Duration(seconds: 1));
     state.dispose();
   });
 
-  testWidgets('drawing in the editor saves the face', (tester) async {
+  testWidgets('a new face left without saving is not kept', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
     final state = await _state();
-    await tester.pumpWidget(MaterialApp(home: FaceEditorScreen(state: state)));
+    await tester.pumpWidget(GameNightApp(state: state));
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    final before = state.artworks.length;
+    await tester.ensureVisible(find.text('New'));
+    await tester.tap(find.text('New'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Save this face?'), findsOneWidget);
+    await tester.tap(find.text('Discard'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FaceEditorScreen), findsNothing);
+    expect(state.artworks.length, before);
+    state.dispose();
+  });
+
+  testWidgets('drawing changes the face only on Save', (tester) async {
+    final state = await _state();
+    final before = List.of(state.face);
+    await tester.pumpWidget(MaterialApp(
+        home: Builder(
+            builder: (context) => TextButton(
+                onPressed: () => FaceEditorScreen.open(context, state),
+                child: const Text('open')))));
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Clear'));
     await tester.pump();
-    expect(state.face.every((c) => c == null), isTrue);
+    expect(state.face, before, reason: 'nothing is saved while drawing');
 
     final canvas = find.byKey(const ValueKey('face-canvas'));
     await tester.tapAt(tester.getTopLeft(canvas) + const Offset(2, 2));
     await tester.pump();
-    expect(state.face[0], drawPalette.first);
-
     await tester.tap(find.text('Undo'));
     await tester.pump();
-    expect(state.face[0], isNull);
+    await tester.tapAt(tester.getTopLeft(canvas) + const Offset(2, 2));
+    await tester.pump();
+    expect(state.face, before);
+
+    await tester.tap(find.text('Save'));
+    await tester.pumpAndSettle();
+    expect(find.byType(FaceEditorScreen), findsNothing);
+    expect(state.face[0], drawPalette.first);
+    expect(state.face.where((c) => c != null), hasLength(1));
+    expect(state.currentArtwork.data, state.face);
+    await tester.pump(const Duration(seconds: 1));
+    state.dispose();
+  });
+
+  testWidgets('Delete face sits next to Edit face and asks first',
+      (tester) async {
+    tester.view.physicalSize = const Size(1080, 2340);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    final state = await _state();
+    await tester.pumpWidget(GameNightApp(state: state));
+    await tester.tap(find.text('You'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete face'), findsNothing,
+        reason: 'your only face cannot be deleted');
+
+    state.newArtwork(name: 'Second');
+    await tester.pumpAndSettle();
+    expect(find.text('Delete face'), findsOneWidget);
+    await tester.tap(find.text('Delete face'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete Second?'), findsOneWidget);
+    await tester.tap(find.text('Keep'));
+    await tester.pumpAndSettle();
+    expect(state.artworks, hasLength(2));
+
+    await tester.tap(find.text('Delete face'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+    await tester.pumpAndSettle();
+    expect(state.artworks.map((a) => a.name), isNot(contains('Second')));
+    expect(find.text('Delete face'), findsNothing);
     await tester.pump(const Duration(seconds: 1));
     state.dispose();
   });

@@ -186,6 +186,53 @@ void main() {
     expect((put['workspace']['artworks'] as List).length, 1);
   });
 
+  test('a face deleted on another device stays deleted here', () async {
+    final keep = Artwork(id: 'web1', name: 'Keep', data: randomFace());
+    final gone = Artwork(id: 'web2', name: 'Gone', data: randomFace());
+    Map<String, dynamic> workspace(List<Artwork> list) =>
+        jsonDecode(encodeBackup(Backup(
+            username: 'Joep',
+            skinColor: '#c58c85',
+            activeArtworkId: 'web1',
+            artworks: list))) as Map<String, dynamic>;
+    cloud.workspace = workspace([keep, gone]);
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect(state.artworks.map((a) => a.name), ['Keep', 'Gone']);
+    expect(state.prefs.getBool('account_dirty'), isNull);
+
+    // Another device deletes one; this phone takes that on its next look.
+    cloud.workspace = workspace([keep]);
+    cloud.revision++;
+    final puts = cloud.calls.where((c) => c == 'PUT /v1/me/studio').length;
+    await state.refreshFaces();
+    expect(state.artworks.map((a) => a.name), ['Keep']);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect((cloud.workspace!['artworks'] as List).length, 1,
+        reason: 'the deleted face is not merged back into the account');
+
+    // Nothing changed elsewhere: nothing is saved again.
+    final after = cloud.calls.where((c) => c == 'PUT /v1/me/studio').length;
+    expect(after, greaterThanOrEqualTo(puts));
+    await state.refreshFaces();
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect(cloud.calls.where((c) => c == 'PUT /v1/me/studio').length, after);
+  });
+
+  test('deleting a face you are not wearing reaches the account', () async {
+    await state.requestSignInCode('joep@example.com');
+    await state.verifySignInCode('12345678');
+    state.newArtwork(name: 'Second');
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect((cloud.workspace!['artworks'] as List).length, 2);
+    final other = state.artworks.firstWhere((a) => a.name != 'Second');
+    state.deleteArtwork(other.id);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    expect((cloud.workspace!['artworks'] as List).map((a) => a['name']),
+        ['Second']);
+  });
+
   test('a save that lost a race is retried on the newest revision', () async {
     await state.requestSignInCode('joep@example.com');
     await state.verifySignInCode('12345678');

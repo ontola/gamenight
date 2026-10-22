@@ -175,7 +175,10 @@ class AppState extends ChangeNotifier {
   }
 
   /// False while the face is still the random one from the first start.
-  bool get drewFace => prefs.getString('starter_artwork') == null;
+  bool get drewFace {
+    final starter = prefs.getString('starter_artwork');
+    return starter == null || artworks.any((a) => a.id != starter);
+  }
 
   Artwork get currentArtwork =>
       artworks.firstWhere((a) => a.id == currentArtworkId);
@@ -213,7 +216,7 @@ class AppState extends ChangeNotifier {
     if (artworks.isEmpty) return newArtwork();
     if (currentArtworkId == id) return selectArtwork(artworks.first.id);
     _saveArtworks();
-    notifyListeners();
+    scheduleSave();
   }
 
   /// A backup of every face, the name and the skin colour, as text the
@@ -226,9 +229,11 @@ class AppState extends ChangeNotifier {
       artworks: artworks));
 
   /// Adds the faces from a backup (skipping ones already here) and takes its
-  /// name and skin. Returns how many faces were new.
-  int importBackup(String text) {
+  /// name and skin. Returns how many faces were new. With [replace] the
+  /// backup's faces, ids included, take the place of the ones here.
+  int importBackup(String text, {bool replace = false}) {
     final backup = decodeBackup(text);
+    if (replace) artworks.clear();
     var added = 0;
     String? active;
     for (final incoming in backup.artworks) {
@@ -238,7 +243,9 @@ class AppState extends ChangeNotifier {
           .firstOrNull;
       if (same == null) {
         same = Artwork(
-            id: newArtworkId(), name: incoming.name, data: incoming.data);
+            id: replace ? incoming.id : newArtworkId(),
+            name: incoming.name,
+            data: incoming.data);
         artworks.add(same);
         added++;
       }
@@ -252,8 +259,11 @@ class AppState extends ChangeNotifier {
     }
     skinColor = backup.skinColor;
     prefs.setString('skin_color', skinColor);
+    active ??= artworks.any((a) => a.id == currentArtworkId)
+        ? currentArtworkId
+        : artworks.first.id;
     _saveArtworks();
-    selectArtwork(active ?? currentArtworkId);
+    selectArtwork(active);
     return added;
   }
 
@@ -308,6 +318,8 @@ class AppState extends ChangeNotifier {
   }
 
   void scheduleSave() {
+    _edits++;
+    prefs.setBool('account_dirty', true);
     _saveTimer?.cancel();
     _status(SyncState.saving, 'Saving…');
     _saveTimer = Timer(const Duration(milliseconds: 400), pushProfile);
@@ -619,7 +631,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// Step 2: the emailed code signs this phone in. The player saved on the
-  /// account comes to the phone (faces are merged, nothing is lost), and the
+  /// account comes to the phone (faces saved on this phone are merged in), and the
   /// result is saved back.
   Future<String> verifySignInCode(String code) {
     // Android can deliver an initial link through the live stream too. A
@@ -660,8 +672,66 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// Changes made since the account last confirmed a save.
+  int _edits = 0;
+
+  /// A change on this phone that has not reached the account yet. Until it
+  /// has, this phone's faces are not swapped for the account's.
+  bool get _accountDirty => prefs.getBool('account_dirty') ?? false;
+
+  /// Takes the account's faces when they changed elsewhere: the account is
+  /// where faces live, so one deleted on another device stays deleted here.
+  /// Only an edit this phone could not save yet is merged in instead.
+  void _syncFromAccount(StudioDocument doc) {
+    if (doc.workspace == null) return;
+    if (_accountDirty) {
+      _adoptStudio(doc);
+    } else if (_matchesAccount(doc)) {
+      _setStudioRevision(doc.revision);
+    } else {
+      _adoptStudio(doc, replace: true);
+    }
+  }
+
+  bool _matchesAccount(StudioDocument doc) {
+    final Backup backup;
+    try {
+      backup = decodeBackup(jsonEncode({
+        'username': doc.displayName ?? name,
+        'skinColor': doc.skinColor ?? skinColor,
+        ...doc.workspace!,
+      }));
+    } on BackupError {
+      return true;
+    }
+    String key(String? active, List<Artwork> list) => jsonEncode([
+          active,
+          for (final a in list) [a.id, a.name, encodeAvatar(a.data)]
+        ]);
+    return key(backup.activeArtworkId, backup.artworks) ==
+            key(currentArtworkId, artworks) &&
+        (doc.displayName == null || doc.displayName == name) &&
+        (doc.skinColor == null || doc.skinColor == skinColor) &&
+        (doc.preferredColor == null || doc.preferredColor == clothingColor);
+  }
+
+  /// Checks the account for faces saved or deleted on another device.
+  Future<void> refreshFaces() async {
+    if (!cloud.signedIn || isGuest || _pushingAccount) return;
+    try {
+      _syncFromAccount(await cloud.studio());
+      notifyListeners();
+    } on SignedOut {
+      await _forgetAccount(clearPlayer: true);
+      notifyListeners();
+    } on ApiError {
+      // Offline: the next resume tries again.
+    }
+  }
+
   /// Takes the account's name, skin and faces. False for a new account.
-  bool _adoptStudio(StudioDocument doc) {
+  /// Merges this phone's saved faces in, unless [replace].
+  bool _adoptStudio(StudioDocument doc, {bool replace = false}) {
     _setStudioRevision(doc.revision);
     if (doc.preferredColor case final color?) {
       clothingColor = color;
@@ -674,12 +744,15 @@ class AppState extends ChangeNotifier {
       return false;
     }
     try {
-      importBackup(jsonEncode({
-        'username': doc.displayName ?? name,
-        'skinColor': doc.skinColor ?? skinColor,
-        'preferredColor': doc.preferredColor ?? clothingColor,
-        ...workspace,
-      }));
+      importBackup(
+          jsonEncode({
+            'username': doc.displayName ?? name,
+            'skinColor': doc.skinColor ?? skinColor,
+            'preferredColor': doc.preferredColor ?? clothingColor,
+            ...workspace,
+          }),
+          replace: replace);
+      if (replace) prefs.remove('starter_artwork');
       _dropStarterFace();
       if (doc.displayName != null && doc.displayName!.trim().isNotEmpty) {
         name = doc.displayName!;
@@ -708,6 +781,7 @@ class AppState extends ChangeNotifier {
       return;
     }
     _pushingAccount = true;
+    final edits = _edits;
     try {
       if (isGuest) await cloud.updateGuestProfile(_guestProfile);
       if (!cloud.signedIn) return;
@@ -725,7 +799,10 @@ class AppState extends ChangeNotifier {
         _setStudioRevision((await cloud.studio()).revision);
         saved = await save();
       }
-      if (saved != null) _setStudioRevision(saved.revision);
+      if (saved != null) {
+        _setStudioRevision(saved.revision);
+        if (edits == _edits) prefs.remove('account_dirty');
+      }
     } on SignedOut {
       await _forgetAccount();
       _status(SyncState.warning,
@@ -792,7 +869,6 @@ class AppState extends ChangeNotifier {
     account = null;
     wantToPlay = null;
     lastPlayed = const {};
-    _accountProfileLoaded = false;
     if (!isGuest) {
       hostedRoom = null;
       companion = null;
@@ -827,13 +903,12 @@ class AppState extends ChangeNotifier {
       account = await cloud.me();
       unawaited(push.sync());
       unawaited(loadPlayLists());
-      if (!_accountProfileLoaded && !isGuest) {
-        _adoptStudio(await cloud.studio());
-        _accountProfileLoaded = true;
+      if (!isGuest && !_pushingAccount) {
+        _syncFromAccount(await cloud.studio());
       }
       await _upgradeGuestConnection();
       if (pendingRoomDestination != null) {
-        _adoptStudio(await cloud.studio());
+        _syncFromAccount(await cloud.studio());
         try {
           await resumeRoomInvitation();
         } on ApiError catch (e) {
@@ -888,7 +963,6 @@ class AppState extends ChangeNotifier {
   // ---- Hosted rooms (joined by room code over the internet) ------------
 
   bool inHostedRoom = false;
-  bool _accountProfileLoaded = false;
   HostedRoom? hostedRoom;
 
   /// Guest room credentials are deliberately separate from account sign-in.

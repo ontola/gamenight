@@ -546,6 +546,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         unawaited(widget.state.loadAccount());
       } else {
         unawaited(widget.state.findHostedRoom());
+        unawaited(widget.state.refreshFaces());
       }
     }
   }

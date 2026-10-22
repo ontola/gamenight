@@ -30,21 +30,29 @@ const Color guideMarkColor = Color(0x591E1E28);
 
 /// The face editor (inside the desktop sidebar), the app's version of the web studio's
 /// "Tap to edit" workspace: the 48x48 canvas as large as fits, with the
-/// palette and tools below it. Every stroke saves by itself.
+/// palette and tools below it. Nothing is kept until Save: a face only joins
+/// your saved faces (and your account) when you say so.
 class FaceEditorScreen extends StatefulWidget {
   final AppState state;
-  const FaceEditorScreen({super.key, required this.state});
 
-  static Future<void> open(BuildContext context, AppState state) =>
+  /// Draws a new face, starting from a random one, instead of editing the
+  /// face you wear.
+  final bool newFace;
+  const FaceEditorScreen(
+      {super.key, required this.state, this.newFace = false});
+
+  static Future<void> open(BuildContext context, AppState state,
+          {bool newFace = false}) =>
       Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => FaceEditorScreen(state: state)));
+          builder: (_) => FaceEditorScreen(state: state, newFace: newFace)));
 
   @override
   State<FaceEditorScreen> createState() => _FaceEditorScreenState();
 }
 
 class _FaceEditorScreenState extends State<FaceEditorScreen> {
-  late Pixels _grid = List.of(widget.state.face);
+  late Pixels _grid =
+      widget.newFace ? randomFace() : List.of(widget.state.face);
   final List<Pixels> _undo = [];
   Tool _tool = Tool.pencil;
   String _color = drawPalette.first;
@@ -82,7 +90,7 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
     _body.update(
         state.api?.characterSprite, state.clothingColor, state.skinColor);
     // Restoring a backup can switch faces underneath the editor.
-    if (_shownArtwork != state.currentArtworkId) {
+    if (!widget.newFace && _shownArtwork != state.currentArtworkId) {
       _shownArtwork = state.currentArtworkId;
       _grid = List.of(state.face);
       _undo.clear();
@@ -100,7 +108,50 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
     if (_undo.length > 40) _undo.removeAt(0);
   }
 
-  void _commit() => state.setFace(List.of(_grid));
+  /// The drawing differs from what is saved.
+  bool get _changed {
+    if (widget.newFace) return true;
+    final saved = state.face;
+    for (var i = 0; i < _grid.length; i++) {
+      if (_grid[i] != saved[i]) return true;
+    }
+    return false;
+  }
+
+  void _commit() => setState(() {});
+
+  void _save() {
+    if (widget.newFace) {
+      state.newArtwork(data: List.of(_grid));
+    } else if (_changed) {
+      state.setFace(List.of(_grid));
+    }
+    Navigator.of(context).pop();
+  }
+
+  /// Leaving with changes asks first, so nothing is saved or lost by accident.
+  Future<void> _leave() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(widget.newFace ? 'Save this face?' : 'Save your changes?'),
+        content: Text(widget.newFace
+            ? 'It is only added to your faces when you save it.'
+            : 'Your face stays as it was unless you save.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, 'discard'),
+              child: const Text('Discard')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, 'save'),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'save') _save();
+    if (choice == 'discard') Navigator.of(context).pop();
+  }
 
   void _replace(Pixels next) {
     _pushUndo();
@@ -185,60 +236,67 @@ class _FaceEditorScreenState extends State<FaceEditorScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Draw your face'),
-          Text(state.currentArtwork.name,
-              style: const TextStyle(fontSize: 13, color: GnColors.muted)),
-        ]),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilledButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              child: const Text('Done'),
+    return PopScope(
+      canPop: !_changed,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title:
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Draw your face'),
+            Text(widget.newFace ? 'New face' : state.currentArtwork.name,
+                style: const TextStyle(fontSize: 13, color: GnColors.muted)),
+          ]),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: FilledButton(
+                onPressed: _save,
+                child: const Text('Save'),
+              ),
             ),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(builder: (context, box) {
-          final wide = box.maxWidth > box.maxHeight * 1.1;
-          final canvas = Padding(
-            padding: const EdgeInsets.all(12),
-            child: LayoutBuilder(
-              builder: (context, area) =>
-                  Center(child: _canvas(min(area.maxWidth, area.maxHeight))),
-            ),
-          );
-          if (wide) {
-            return Row(
+          ],
+        ),
+        body: SafeArea(
+          child: LayoutBuilder(builder: (context, box) {
+            final wide = box.maxWidth > box.maxHeight * 1.1;
+            final canvas = Padding(
+              padding: const EdgeInsets.all(12),
+              child: LayoutBuilder(
+                builder: (context, area) =>
+                    Center(child: _canvas(min(area.maxWidth, area.maxHeight))),
+              ),
+            );
+            if (wide) {
+              return Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: canvas),
+                    SizedBox(
+                      width: min(380, box.maxWidth * .45),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+                        child: _controls(),
+                      ),
+                    ),
+                  ]);
+            }
+            return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(child: canvas),
-                  SizedBox(
-                    width: min(380, box.maxWidth * .45),
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: box.maxHeight * .55),
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                       child: _controls(),
                     ),
                   ),
                 ]);
-          }
-          return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: canvas),
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: box.maxHeight * .55),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                    child: _controls(),
-                  ),
-                ),
-              ]);
-        }),
+          }),
+        ),
       ),
     );
   }
