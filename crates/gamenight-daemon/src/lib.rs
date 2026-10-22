@@ -5,6 +5,7 @@
 //! logic lives in `gamenight-core`; this crate only does IO — decode incoming
 //! messages into [`Command`]s, execute the returned [`Effect`]s.
 
+mod focus;
 mod lobby_input;
 #[cfg(target_os = "macos")]
 mod macos;
@@ -104,6 +105,8 @@ struct Shared {
     /// Packaged app lifetime: quitting the lobby also quits its host.
     exit_with_lobby: bool,
     lobby_game: Option<GameId>,
+    /// Pauses the game when the party switches away from its window.
+    focus_watch: focus::FocusWatch,
     lobby_token: Option<String>,
     lobby_connections: std::collections::HashSet<GameId>,
     runtime_input: bool,
@@ -154,9 +157,9 @@ impl HostUpdate {
     }
 }
 
-/// Whether the window in front belongs to `executable`.
+/// The process that owns the window in front, and its executable.
 #[cfg(windows)]
-fn foreground_is(executable: &std::path::Path) -> bool {
+fn foreground_process() -> Option<(u32, std::path::PathBuf)> {
     use std::os::windows::ffi::OsStringExt;
     use windows_sys::Win32::{
         Foundation::CloseHandle,
@@ -166,19 +169,16 @@ fn foreground_is(executable: &std::path::Path) -> bool {
         },
         UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId},
     };
-    let Ok(wanted) = executable.canonicalize() else {
-        return false;
-    };
     unsafe {
         let window = GetForegroundWindow();
         if window.is_null() {
-            return false;
+            return None;
         }
         let mut pid = 0;
         GetWindowThreadProcessId(window, &mut pid);
         let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if process.is_null() {
-            return false;
+            return Some((pid, std::path::PathBuf::new()));
         }
         let mut buffer = [0u16; 1024];
         let mut length = buffer.len() as u32;
@@ -189,13 +189,64 @@ fn foreground_is(executable: &std::path::Path) -> bool {
             &mut length,
         );
         CloseHandle(process);
-        if ok == 0 {
-            return false;
-        }
-        let path =
-            std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length as usize]));
-        path.canonicalize().is_ok_and(|path| path == wanted)
+        let path = if ok == 0 {
+            std::path::PathBuf::new()
+        } else {
+            std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length as usize]))
+        };
+        Some((pid, path))
     }
+}
+
+/// `pid` and its parents, nearest first. Games launch through a helper (and
+/// some through a launcher of their own), so the process the host spawned is
+/// often an ancestor of the one that owns the window.
+#[cfg(windows)]
+fn process_ancestry(pid: u32) -> Vec<u32> {
+    use windows_sys::Win32::{
+        Foundation::{CloseHandle, INVALID_HANDLE_VALUE},
+        System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W,
+            TH32CS_SNAPPROCESS,
+        },
+    };
+    let mut parents = HashMap::new();
+    unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snapshot == INVALID_HANDLE_VALUE {
+            return vec![pid];
+        }
+        let mut entry: PROCESSENTRY32W = std::mem::zeroed();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
+        if Process32FirstW(snapshot, &mut entry) != 0 {
+            loop {
+                parents.insert(entry.th32ProcessID, entry.th32ParentProcessID);
+                if Process32NextW(snapshot, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+        CloseHandle(snapshot);
+    }
+    let mut chain = vec![pid];
+    while let Some(&parent) = parents.get(chain.last().expect("never empty")) {
+        // Parent ids are reused once a parent exits; stop at any loop.
+        if parent == 0 || chain.contains(&parent) || chain.len() > 16 {
+            break;
+        }
+        chain.push(parent);
+    }
+    chain
+}
+
+/// Whether the window in front belongs to `executable`.
+#[cfg(windows)]
+fn foreground_is(executable: &std::path::Path) -> bool {
+    let Ok(wanted) = executable.canonicalize() else {
+        return false;
+    };
+    foreground_process()
+        .is_some_and(|(_, path)| path.canonicalize().is_ok_and(|path| path == wanted))
 }
 
 #[cfg(not(windows))]
@@ -278,6 +329,7 @@ impl Shared {
             exit_with_lobby: false,
             player_settings_file: None,
             lobby_game: None,
+            focus_watch: Default::default(),
             lobby_token: None,
             lobby_connections: Default::default(),
             runtime_input: false,
@@ -447,6 +499,86 @@ impl Shared {
             return false;
         };
         foreground_is(std::path::Path::new(&spec.command))
+    }
+
+    /// Alt+Tab away from the game pauses it and hands the controllers to
+    /// the lobby; switching back to the game resumes it. See [`focus`].
+    fn watch_focus(&mut self) {
+        let active = self
+            .night
+            .active_session()
+            .map(|(game, session, phase)| (game.clone(), session, phase));
+        let watching = active.as_ref().is_some_and(|(_, _, phase)| {
+            *phase == gamenight_protocol::SessionPhase::Running
+                || (*phase == gamenight_protocol::SessionPhase::Paused
+                    && self.focus_watch.paused_by_us())
+        });
+        let front = match &active {
+            Some((game, _, _)) if watching => self.front(game),
+            _ => focus::Front::Neutral,
+        };
+        let step = self.focus_watch.step(
+            std::time::Instant::now(),
+            active
+                .as_ref()
+                .map(|(_, session, phase)| (*session, *phase)),
+            front,
+        );
+        match step {
+            Some(focus::FocusAction::Pause) => {
+                info!("the game lost the screen (Alt+Tab); pausing it for the lobby");
+                self.dispatch(Command::OverlayOpened, None);
+            }
+            Some(focus::FocusAction::Resume) => {
+                info!("the party switched back to the game; resuming it");
+                if self.night.snapshot().overlay_open {
+                    self.dispatch(Command::OverlayClosed, None);
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// Whose window is in front, from the point of view of `game`.
+    #[cfg(windows)]
+    fn front(&self, game: &GameId) -> focus::Front {
+        let Some((pid, path)) = foreground_process() else {
+            return focus::Front::Neutral;
+        };
+        let ancestry = process_ancestry(pid);
+        let path = path.canonicalize().ok();
+        let owns = |id: &GameId| {
+            let spawned = self
+                .running_children
+                .get(id)
+                .or_else(|| self.pending_launches.get(id).map(|p| &p.child))
+                .and_then(|child| child.id());
+            spawned.is_some_and(|child| ancestry.contains(&child))
+                || self.launch_specs.get(id).is_some_and(|spec| {
+                    path.is_some()
+                        && std::path::Path::new(&spec.command).canonicalize().ok() == path
+                })
+        };
+        if owns(game) {
+            return focus::Front::Game;
+        }
+        let other_game = self
+            .running_children
+            .keys()
+            .chain(self.pending_launches.keys())
+            .any(|id| Some(id) != self.lobby_game.as_ref() && owns(id));
+        if other_game {
+            focus::Front::Neutral
+        } else {
+            focus::Front::Other
+        }
+    }
+
+    /// Nothing to ask outside Windows: macOS games report Cmd+Tab
+    /// themselves with `request_start`.
+    #[cfg(not(windows))]
+    fn front(&self, _game: &GameId) -> focus::Front {
+        focus::Front::Neutral
     }
 
     /// A quiet lobby updates by itself: nobody bothered, party kept.
@@ -1917,6 +2049,7 @@ async fn run_inner(
                     return Ok(());
                 }
                 s.poll_pending_games();
+                s.watch_focus();
                 let Some(lobby) = watched_lobby.as_ref() else { continue };
                 if !s.exit_with_lobby && !s.runtime_input { continue; }
                 let child = if let Some(pending) = s.pending_launches.get_mut(lobby) {

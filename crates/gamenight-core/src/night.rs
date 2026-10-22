@@ -1180,6 +1180,11 @@ impl GameNight {
         }
     }
 
+    /// The session in front of the party, if any: its game, id and phase.
+    pub fn active_session(&self) -> Option<(&GameId, SessionId, SessionPhase)> {
+        self.active.as_ref().map(|s| (&s.game, s.id, s.phase))
+    }
+
     /// The lobby is on screen, so the host may restart without pulling
     /// anyone out of a game. Games stay active (paused) behind the lobby
     /// after a round, so a paused game here counts as between games; warm

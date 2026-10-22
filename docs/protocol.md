@@ -363,6 +363,21 @@ snapshot), so every screen shows the same thing. The rules:
 ] }
 ```
 
+### Switching windows is a pause
+
+On Windows the host watches which window is in front. When the party switches
+away from the running game (Alt+Tab, the Windows key, a click elsewhere) for
+half a second, the host opens the overlay exactly as Back would: the game gets
+`pause`, the lobby gets `lobby_focus` and the controllers. Switching back to
+the game's window resumes it, but only a pause the host made this way; a game
+paused on purpose stays paused. A game the host launched itself (the next one
+warming up) taking the foreground does not count as switching away, and a game
+whose window the host has never seen in front is never paused for it.
+
+Games need no code for this: the host owns the decision, so `request_start`
+on focus remains forbidden. On macOS games still report Cmd+Tab with
+`request_start` themselves.
+
 ## Party state (daemon → overlays)
 
 Every state change is broadcast as one snapshot — overlays are dumb renderers:

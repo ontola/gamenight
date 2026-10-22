@@ -139,7 +139,10 @@ lobby itself launches normally.</p>
 repeated pauses and games behind another app never grant that permission.
 The Game Room retries a new host focus handoff for at most one second because
 the pause and focus messages arrive in different processes. Acquiring or losing
-native focus cancels the retry; Alt-Tab never starts another handoff. The same
+native focus cancels the retry; Alt-Tab never starts another handoff. Alt-Tab
+away from a running game is a pause the host makes on its own (see
+<a href="/docs/protocol#switching-windows-is-a-pause">Switching windows is a pause</a>);
+the game only sees <code>pause</code> and, when the party switches back, <code>resume</code>. The same
 ordering applies when a game uses <code>automatic = false</code> and calls
 <code>take_the_screen()</code> / <code>go_quiet(&quot;pause&quot;)</code> itself. The Windows helper and native
 desktop focus policy still need real-device validation; headless tests cover
@@ -186,7 +189,7 @@ func _host_music(party: Dictionary):
 <p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
 soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="8f82d36278b3025b2783377f718e4f1c952d4f006f708f2637c8b15bbc5e0304">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="7edd4a5a5ea9f351aa661b3a4f05d30f707aaef1bb742e0a58174e5098459198">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#phone-screens">Phone screens</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

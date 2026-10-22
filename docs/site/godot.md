@@ -154,7 +154,10 @@ On Windows, a focused game grants foreground permission through the host's
 repeated pauses and games behind another app never grant that permission.
 The Game Room retries a new host focus handoff for at most one second because
 the pause and focus messages arrive in different processes. Acquiring or losing
-native focus cancels the retry; Alt-Tab never starts another handoff. The same
+native focus cancels the retry; Alt-Tab never starts another handoff. Alt-Tab
+away from a running game is a pause the host makes on its own (see
+[Switching windows is a pause](/docs/protocol#switching-windows-is-a-pause));
+the game only sees `pause` and, when the party switches back, `resume`. The same
 ordering applies when a game uses `automatic = false` and calls
 `take_the_screen()` / `go_quiet("pause")` itself. The Windows helper and native
 desktop focus policy still need real-device validation; headless tests cover
