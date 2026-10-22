@@ -181,6 +181,13 @@ func _run() -> void:
 	var queue: Array = main.upcoming()
 	check(main.cabinet_queue()[0] == queue[1], "With nothing running the TV shows the first game and the cabinet the one after it")
 	check(main.queue_title_rows()[0].number == 3, "Title rows number on from the cabinet's game")
+	party.warm_session = {"game": queue[0].game, "phase": "preparing", "progress": 30}
+	main.set_party(party)
+	check(not main.tv_station().enabled, "Y at the TV is off while the first game loads")
+	party.warm_session.phase = "ready"
+	main.set_party(party)
+	check(main.tv_station().enabled, "Y at the TV starts the first game once it has loaded")
+	party.erase("warm_session")
 	party.active_session = {"game": "spaceracer", "phase": "paused"}
 	main.set_party(party)
 	party.playlist.entries = []

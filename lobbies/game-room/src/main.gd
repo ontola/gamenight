@@ -557,6 +557,9 @@ func tv_station() -> Dictionary:
 			"quit": not upcoming().is_empty(), "extra": "X quit" if not upcoming().is_empty() else ""}
 	var queue := upcoming()
 	if queue.is_empty(): return {"label": "No queued games for this party", "short": "Start", "action": "next", "enabled": false}
+	# Y waits until the first game has loaded; the TV shows how far it is.
+	if not _loading_session(str(queue[0].game)).is_empty():
+		return {"label": "Loading %s" % queue[0].title, "short": "Start", "action": "next", "enabled": false}
 	return {"label": "Start %s" % queue[0].title, "short": "Start", "action": "next", "enabled": true}
 
 ## What the Up next cabinet shows. With nothing running the TV itself shows
@@ -1108,7 +1111,7 @@ func _draw_tv(canvas: Control) -> void:
 				# The first game loads right here, with what it is doing.
 				kicker = loading_kicker(str(game.id))
 				kicker_color = AMBER
-				detail = "%s  ·  Y at the TV starts it when ready" % str(loading.get("progress_label", "Preparing game"))
+				detail = str(loading.get("progress_label", "Preparing game"))
 			elif warm is Dictionary and str(warm.get("game")) == str(game.id) and warm.get("phase") == "ready":
 				kicker = "UP NEXT · READY"
 				kicker_color = GREEN
