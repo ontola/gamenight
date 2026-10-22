@@ -63,6 +63,13 @@ func _run() -> void:
 	main.input("p0", main.World.BTN_X, Vector2.ZERO)
 	check(recorder.commands[-1] == {"type": "next"}, "X at the TV quits the current game and starts the next")
 	check(not bool(p.held & main.World.BTN_X), "Quitting does not also punch")
+	check(main.current_game().is_empty(), "The quit game leaves the TV at once")
+	check(main.upcoming()[0].game == "ballkickers" and main.cabinet_queue()[0].game == "god-game", "The next game moves onto the TV at once, the one after it to Up next")
+	main.set_party(party)
+	check(main.current_game().is_empty(), "It stays gone while the host is still closing it")
+	main._time += 16.0
+	check(main.current_game().id == "spaceracer", "If the host never closes it, it comes back")
+	main._quitting = {}
 	main.input("p0", 0, Vector2.ZERO)
 	for x in [-3.1, 0.0, 3.1]:
 		p.x = x; p.y = main.Layout.TV_CONSOLE[2]

@@ -62,6 +62,9 @@ var _pickup_cooldown := 0.0
 ## door entry and when to give up. The host sends name, colour and face as
 ## separate updates, so without this the character changes in steps.
 var _claims: Dictionary = {}
+## A game quit with X at the TV, hidden at once while the host closes it:
+## {game, until}. Cleared when the host moves on, or after a while anyway.
+var _quitting: Dictionary = {}
 ## Y held at a door to swap profiles: player id -> {station, since}.
 var _holds: Dictionary = {}
 const HOLD_SECONDS := 0.8
@@ -240,6 +243,8 @@ func _fit_fullscreen() -> void:
 func set_party(snapshot: Dictionary) -> void:
 	var was_ready := update_ready()
 	party = snapshot
+	var active: Variant = party.get("active_session")
+	if not (active is Dictionary and str(active.get("game")) == str(_quitting.get("game", ""))): _quitting = {}
 	if was_ready.is_empty() and not update_ready().is_empty():
 		toast("New GameNight version ready. It installs when the room is quiet, or press Start.", GREEN)
 	profiles.clear()
@@ -310,8 +315,10 @@ func upcoming() -> Array:
 					break
 	if start >= entries.size(): start = 0 # Host playlists rotate after the last entry.
 	var result: Array = []
+	var quitting := str(_quitting.get("game", "")) if _time < float(_quitting.get("until", 0.0)) else ""
 	for index in range(start, entries.size()):
 		if str(entries[index].game) == client.lobby_id: continue
+		if str(entries[index].game) == quitting: continue  # on its way out
 		if not _fits_party(game_meta(str(entries[index].game))): continue
 		result.append({"index": index, "game": str(entries[index].game), "title": str(entries[index].get("title", "Game"))})
 	return result
@@ -363,6 +370,7 @@ func _fits_party(game: Dictionary) -> bool:
 func current_game() -> Dictionary:
 	var session: Variant = party.get("active_session")
 	if not session is Dictionary or session.is_empty() or str(session.get("game")) == client.lobby_id: return {}
+	if str(session.get("game")) == str(_quitting.get("game", "")) and _time < float(_quitting.until): return {}
 	var meta := game_meta(str(session.game))
 	if meta.is_empty(): meta = {"id": session.game, "title": str(session.game)}
 	meta = meta.duplicate()
@@ -620,8 +628,13 @@ func _use_station(id: String, queue := false) -> void:
 			if queue:
 				# X quits the current game: the next one loads straight away.
 				if not station.get("quit", false): return
-				toast("Quitting %s. The next game is loading." % current_game().get("title", "the game"), GREEN)
+				var quit := current_game()
+				toast("Quit %s. The next game is up." % quit.get("title", "the game"), GREEN)
 				client.start_next()
+				# Instant: the TV shows the next game now, while the host
+				# closes this one in the background.
+				_quitting = {"game": str(quit.id), "until": _time + 15.0}
+				_redraw_screens()
 				return
 			match station.action:
 				"resume": client.resume_game()
