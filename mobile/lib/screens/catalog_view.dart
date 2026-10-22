@@ -524,10 +524,16 @@ class _CatalogSectionState extends State<CatalogSection> {
   List<CatalogGame> get _visible {
     final store = _games ?? const <CatalogGame>[];
     final listed = {for (final game in store) game.id};
+    final mine = {for (final game in _mine) game.id};
     // Unreviewed games are not in the store yet; the filter shows them only
-    // under My games.
+    // under My games. Demo listings stay off the store unless this room's
+    // host can play them or they are yours.
     return _sorted([
-      ...store,
+      for (final game in store)
+        if (game.listed ||
+            mine.contains(game.id) ||
+            (_inRoom && (_host[game.id]?.playable ?? false)))
+          game,
       for (final game in _mine)
         if (!listed.contains(game.id)) game,
     ].where(_filter.matches).toList());

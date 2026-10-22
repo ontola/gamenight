@@ -124,6 +124,10 @@ class CatalogGame {
   /// playtest.
   final bool unreviewed;
 
+  /// In the store's lists. A `demo` listing is still playable (and has a
+  /// page) but stays off the store, like on the website.
+  final bool listed;
+
   /// When the game joined the store and last changed, in epoch seconds.
   final int? added, updated;
 
@@ -147,6 +151,7 @@ class CatalogGame {
     this.links = const {},
     this.matchMinutes,
     this.unreviewed = false,
+    this.listed = true,
     this.added,
     this.updated,
   });
@@ -286,6 +291,9 @@ class CatalogGame {
       links: links,
       matchMinutes: count(j['match_minutes']),
       unreviewed: j['unreviewed'] == true,
+      listed: j['listing'] == null ||
+          j['listing'] == 'featured' ||
+          j['listing'] == 'listed',
       added: count(j['added']),
       updated: count(j['updated']),
     );

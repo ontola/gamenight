@@ -279,6 +279,37 @@ void main() {
       await close(tester);
     });
 
+    testWidgets('demo listings stay off the list unless the host can play them',
+        (tester) async {
+      final catalog = [
+        for (final g
+            in jsonDecode(File('test/fixtures/catalog.json').readAsStringSync())
+                as List)
+          if (g is Map && g['id'] is String)
+            {
+              ...g,
+              if (g['id'] != 'growing-guns') 'listing': 'demo',
+            },
+      ];
+      Catalog.instance = Catalog(
+          client: MockClient((_) async =>
+              http.Response.bytes(utf8.encode(jsonEncode(catalog)), 200)));
+      await show(tester, catalogOnly: true);
+      expect(find.text('Ballkickers'), findsNothing,
+          reason: 'not in a room: demos are off the store');
+      expect(find.text('Growing Guns'), findsWidgets);
+
+      state.session = const SessionInfo(linked: true, playerId: 'p1');
+      await show(tester, catalogOnly: true);
+      expect(find.text('Ballkickers'), findsOneWidget,
+          reason: 'the host has it, so it can be queued');
+      expect(find.text('Stack Together'), findsNothing);
+      expect(find.text('Add to queue'), findsOneWidget);
+      expect(find.text('Not on this GameNight'), findsOneWidget,
+          reason: 'only the listed Growing Guns');
+      await close(tester);
+    });
+
     testWidgets(
         'in a room, games the host has can be queued and settings changed',
         (tester) async {
