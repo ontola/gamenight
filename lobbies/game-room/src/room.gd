@@ -706,7 +706,9 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font, base := 
 		pill.set_corner_radius_all(int(h / 2) - 6)
 		pill.anti_aliasing = true
 		canvas.draw_style_box(pill, Rect2(x, 6, badge_width + tw + 16, h - 12))
-		var color: Color = colors.get(key, Color("f2f1f8")) if state.enabled else Color("55516a")
+		# A third entry turns one button off while the others still work.
+		var on: bool = state.enabled and (item.size() < 3 or bool(item[2]))
+		var color: Color = colors.get(key, Color("f2f1f8")) if on else Color("55516a")
 		var pressed: float = state.get("pressed", {}).get(key, 0.0)
 		if bumper:
 			draw_bumper(canvas, Rect2(x + 12, 18, 122, 60), key, f, 0, pressed)
@@ -723,7 +725,7 @@ static func draw_prompt(canvas: CanvasItem, state: Dictionary, f: Font, base := 
 			canvas.draw_circle(Vector2.ZERO, h / 2 - 14, color.darkened(pressed * .12))
 			canvas.draw_set_transform_matrix(base)
 			canvas.draw_string(f, Vector2(x + 10, h / 2 + 17 + pressed * 10), key, HORIZONTAL_ALIGNMENT_CENTER, h - 28, 48, Color("0b0b12"))
-		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if state.enabled else Color("9a98ad"))
+		canvas.draw_string(f, Vector2(x + badge_width - 6, h / 2 + 16), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 44, Color("f2f1f8") if on else Color("9a98ad"))
 		x += badge_width + tw + 36
 
 func _shelves() -> void:

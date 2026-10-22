@@ -571,8 +571,10 @@ func cabinet_queue() -> Array:
 ## The queue cabinet always starts the next game, even while another is paused.
 func queue_station() -> Dictionary:
 	var entries := cabinet_queue()
-	return {"id": "queue", "kind": "queue", "action": "next", "short": "Play next",
-		"label": "Play %s" % entries[0].title if not entries.is_empty() else "Queue is empty",
+	# Y waits while that game loads; X can still skip it.
+	var loading := not entries.is_empty() and not _loading_session(str(entries[0].game)).is_empty()
+	return {"id": "queue", "kind": "queue", "action": "next", "short": "Loading…" if loading else "Play next", "loading": loading,
+		"label": "Loading %s" % entries[0].title if loading else ("Play %s" % entries[0].title if not entries.is_empty() else "Queue is empty"),
 		"enabled": not entries.is_empty() and (client.connected or demo != null)}
 
 func _unavailable(game: Dictionary) -> String:
@@ -584,6 +586,7 @@ func _unavailable(game: Dictionary) -> String:
 func _use_station(id: String, queue := false) -> void:
 	var station := station_for(id)
 	if station.is_empty() or not station.enabled: return
+	if not queue and station.get("loading", false): return
 	var now := Time.get_ticks_msec() / 1000.0
 	var key := "%s:%s:%s" % [station.id, station.get("action", ""), "X" if queue else "Y"]
 	if now < float(_station_cooldown.get(key, 0.0)): return
@@ -965,7 +968,7 @@ func _update_prompts() -> void:
 	var tv_buttons := [["Y", tv.short], ["X", "Quit"]] if tv.get("quit", false) else [["Y", tv.short]]
 	room.set_prompt("tv", tv_buttons, tv.enabled, occupied.has("tv"))
 	var queued := queue_station()
-	room.set_prompt("queue", [["Y", "Play next"], ["X", "Skip next"]], queued.enabled, occupied.has("queue"))
+	room.set_prompt("queue", [["Y", queued.short, not queued.get("loading", false)], ["X", "Skip next"]], queued.enabled, occupied.has("queue"))
 	var shelf_live := not shelf_games().is_empty()
 	room.featured_box.visible = shelf_live and occupied.has("shelf")
 	room.set_prompt("shelf", [["Y", "Play now"], ["X", "Queue"]], occupied.get("shelf", {}).get("enabled", shelf_live), occupied.has("shelf"))

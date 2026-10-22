@@ -97,12 +97,26 @@ func _run() -> void:
 	main.world.players.p2.grounded = true
 	main._update_prompts()
 	check(main.room._prompts.queue.node.visible, "Queue shows its floating Y action in range")
-	check(main.room._prompts.queue.state.items == [["Y", "Play next"], ["X", "Skip next"]], "Queue shows separate Play next and Skip next actions")
+	check(main.room._prompts.queue.state.items == [["Y", "Play next", true], ["X", "Skip next"]], "Queue shows separate Play next and Skip next actions")
 	check(main.room._prompts.shelf.state.items == [["Y", "Play now"], ["X", "Queue"]], "Selector offers Play now or Queue")
 	await capture(main, "queue-hierarchy")
 	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved."
 	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}
 	main.set_party(party)
+	main._update_prompts()
+	check(main.room._prompts.queue.state.items == [["Y", "Loading…", false], ["X", "Skip next"]], "Play next is off and says Loading while the next game loads")
+	var before_loading_press := recorder.commands.size()
+	var shelf_x: float = p.x
+	p.x = main.Layout.stand_x(-4.95)
+	main._station_cooldown.clear()
+	main.input("p0", main.World.BTN_Y, Vector2.ZERO)
+	check(recorder.commands.size() == before_loading_press, "Y at the queue does nothing while its game loads")
+	main.input("p0", 0, Vector2.ZERO)
+	main.input("p0", main.World.BTN_X, Vector2.ZERO)
+	check(recorder.commands.size() == before_loading_press + 1 and recorder.commands[-1].type == "remove_playlist_entry", "X still skips the loading game")
+	recorder.commands.pop_back()
+	main.input("p0", 0, Vector2.ZERO)
+	p.x = shelf_x
 	check(main._queue_status("ballkickers") == "0% · World ready. Loading 2 player views", "Queue shows real game loading progress")
 	for i in 120: tick(main)
 	var unreported: int = main.loading_percent("ballkickers")
