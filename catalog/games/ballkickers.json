@@ -2,7 +2,7 @@
   "$schema": "../schema.json",
   "id": "ballkickers",
   "title": "Ballkickers",
-  "tagline": "Chaotic party football: charge shots, dash tackles and diving keepers. Dual-stick 1v1, a three-goal 3-way for three, or single-unit 2v2 and 3v3.",
+  "tagline": "Chaotic party football: charge shots, dash tackles and diving keepers. Dual-stick 1v1, a three-goal dual-stick 3-way for three, or single-unit 2v2 and 3v3.",
   "developer": "Joep Meindertsma",
   "players": {
     "min": 1,
