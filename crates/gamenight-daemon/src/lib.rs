@@ -2340,7 +2340,9 @@ async fn serve(
             let mut s = shared.lock().await;
             let id = s.next_overlay_id;
             s.next_overlay_id += 1;
-            info!(overlay = id, "overlay connected");
+            // Local web helpers (the cloud poll every 3 s, room controls)
+            // connect as short-lived overlays; at info they buried the log.
+            debug!(overlay = id, "overlay connected");
             s.overlays.insert(id, tx.clone());
             send(
                 &tx,
@@ -2620,7 +2622,7 @@ async fn serve(
                 }
             }
             Registration::Overlay(id) => {
-                info!(overlay = id, "overlay disconnected");
+                debug!(overlay = id, "overlay disconnected");
                 s.overlays.remove(id);
             }
             Registration::Lobby(game_id) => {
