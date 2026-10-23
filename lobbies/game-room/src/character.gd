@@ -192,6 +192,40 @@ static func _rect(img: Image, rect: Rect2i, color: Color) -> void:
 	if clipped.size.x > 0 and clipped.size.y > 0:
 		img.fill_rect(clipped, color)
 
+## Just the head: skin disc and face art, outlined, on a transparent square.
+## Waiting profiles hang on the wall as these portraits.
+const PORTRAIT := 32
+
+static func portrait(player: Dictionary, face: Dictionary) -> ImageTexture:
+	var img := Image.create(PORTRAIT, PORTRAIT, false, Image.FORMAT_RGBA8)
+	img.fill(Color.TRANSPARENT)
+	var skin := Color.from_string(str(player.get("skin_color", "")), Color("f5e9be"))
+	var head := Vector2(PORTRAIT / 2.0, PORTRAIT / 2.0)
+	for y in PORTRAIT:
+		var dy := y + 0.5 - head.y
+		if dy * dy > RADIUS * RADIUS: continue
+		var half := sqrt(RADIUS * RADIUS - dy * dy)
+		var from := int(ceil(head.x - half - 0.5))
+		img.fill_rect(Rect2i(from, y, int(floor(head.x + half - 0.5)) - from + 1, 1), skin)
+	if face.has("image"):
+		var art := _solid(face.image)
+		img.blit_rect_mask(art, art, Rect2i(Vector2i.ZERO, art.get_size()), Vector2i(head - face.center))
+	else:
+		img.fill_rect(Rect2i(15, 13, 2, 2), INK)
+		img.fill_rect(Rect2i(21, 13, 2, 2), INK)
+		img.fill_rect(Rect2i(18, 21, 4, 1), INK)
+	var outlined := Image.create(PORTRAIT, PORTRAIT, false, Image.FORMAT_RGBA8)
+	outlined.fill(Color.TRANSPARENT)
+	var whole := Rect2i(0, 0, PORTRAIT, PORTRAIT)
+	for d in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		outlined.blend_rect(img, whole, d)
+	var ink := Image.create(PORTRAIT, PORTRAIT, false, Image.FORMAT_RGBA8)
+	ink.fill(INK)
+	var result := Image.create(PORTRAIT, PORTRAIT, false, Image.FORMAT_RGBA8)
+	result.blit_rect_mask(ink, outlined, whole, Vector2i.ZERO)
+	result.blend_rect(img, whole, Vector2i.ZERO)
+	return ImageTexture.create_from_image(result)
+
 ## Face art with its half-transparent pixels dropped, so it can be stamped
 ## with one masked blit per frame.
 static func _solid(art: Image) -> Image:

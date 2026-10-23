@@ -912,38 +912,38 @@ func _sync_doors() -> void:
 		if not shown.has(key): _door_nodes[key].queue_free()
 	_door_nodes = shown
 
+## A waiting profile hangs on the back wall as a framed portrait of just
+## their face, lit from above; stand under it and press Y to become them.
 func _make_door(x: float, profile: Dictionary) -> Node3D:
 	var node := Node3D.new()
 	room.add_child(node)
-	var z := Layout.BACK + 0.08
-	var frame: StandardMaterial3D = room.mat(Color("2a1d3a"), 0.5)
-	room.box(Vector3(Layout.DOOR_HALF * 2.0, 2.35, 0.14), Vector3(x, 1.17, z), frame, node)
-	# The doorway glows: someone is waiting on the other side.
-	room.box(Vector3(Layout.DOOR_HALF * 2.0 - 0.22, 2.1, 0.04), Vector3(x, 1.05, z + 0.08), room.mat(Color("6a3a1c"), 0.3, 0, AMBER, 0.55), node, false)
-	var color := Color.from_string(str(profile.get("skin_color", "")), AMBER)
-	var half := Layout.DOOR_HALF - 0.02
-	for p in [[Vector3(-half, 0, 0.12), Vector3(-half, 2.3, 0.12)], [Vector3(half, 0, 0.12), Vector3(half, 2.3, 0.12)], [Vector3(-half, 2.3, 0.12), Vector3(half, 2.3, 0.12)]]:
-		var tube: MeshInstance3D = room.neon_line(Vector3(x, 0, z) + p[0], Vector3(x, 0, z) + p[1], AMBER, 3.5, 0.05, 3.0)
-		tube.reparent(node)
-	var waiting := Sprite3D.new()
-	waiting.texture = Character.build({"color": "#8c9be6", "skin_color": profile.get("skin_color", "#f5e9be"), "avatar": profile.get("avatar", "")},
-		Character.decode_face(view.faces, profile))
-	waiting.hframes = Character.FRAMES.size()
-	waiting.frame = Character.frame_index("idle0")
-	waiting.pixel_size = 0.04
-	waiting.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
-	waiting.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-	waiting.shaded = true
-	waiting.offset = Vector2(0, Character.H / 2.0 - 2)
-	waiting.position = Vector3(x, 0.0, z + 0.14)
-	node.add_child(waiting)
-	var tag: Label3D = room.label(str(profile.get("display_name", "Player")).left(20), Vector3(x, 2.65, z + 0.2), 30, Color(2.2, 1.6, 0.8), node, 10)
+	var z := Layout.BACK + 0.06
+	var y := 2.05
+	var size := Layout.DOOR_HALF * 2.0 - 0.12
+	var skin := Color.from_string(str(profile.get("skin_color", "")), AMBER)
+	var gold: StandardMaterial3D = room.mat(Color("c9a24a"), 0.35, 0.8, Color("ffcf5a"), 0.35)
+	room.box(Vector3(size + 0.12, size + 0.12, 0.08), Vector3(x, y, z), gold, node)
+	# Dark canvas with a soft wash of the person's skin tone behind the head.
+	room.box(Vector3(size - 0.04, size - 0.04, 0.02), Vector3(x, y, z + 0.05), room.mat(Color("2a2140").lerp(skin, 0.25), 0.9, 0.0, Color("2a2140").lerp(skin, 0.3), 0.25), node, false)
+	var face := Sprite3D.new()
+	face.texture = Character.portrait(profile, Character.decode_face(view.faces, profile))
+	face.pixel_size = (size - 0.1) / Character.PORTRAIT
+	face.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	face.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+	face.shaded = true
+	face.position = Vector3(x, y, z + 0.07)
+	node.add_child(face)
+	var tag: Label3D = room.label(str(profile.get("display_name", "Player")).left(20), Vector3(x, y + size / 2.0 + 0.32, z + 0.2), 30, Color(2.2, 1.6, 0.8), node, 10)
 	tag.name = "tag"
-	var light := OmniLight3D.new()
-	light.light_color = color.lerp(AMBER, 0.5)
-	light.light_energy = 2.0
-	light.omni_range = 3.0
-	light.position = Vector3(x, 1.2, z + 0.9)
+	# A small picture light above the frame.
+	room.box(Vector3(0.36, 0.05, 0.1), Vector3(x, y + size / 2.0 + 0.1, z + 0.12), gold, node)
+	var light := SpotLight3D.new()
+	light.light_color = Color("ffd9a0").lerp(skin, 0.2)
+	light.light_energy = 7.0
+	light.spot_range = 2.6
+	light.spot_angle = 38.0
+	light.position = Vector3(x, y + size / 2.0 + 0.12, z + 0.35)
+	light.rotation_degrees = Vector3(-62, 0, 0)
 	node.add_child(light)
 	return node
 
