@@ -25,8 +25,14 @@ REQUIRED = ["gamenight.gd", "protocol.gd"]
 OPTIONAL = ["screen.gd", "lobby.gd", "face.gd", "artwork.gd", "plugin.gd", "plugin.cfg", "fake_host.py"]
 
 
+# plugin.gd registers the GameNightScreen autoload, so it needs screen.gd.
+NEEDS = {"plugin.gd": ["screen.gd"]}
+
+
 def wanted(addon: Path, everything: bool) -> list[str]:
-    return REQUIRED + [f for f in OPTIONAL if everything or (addon / f).exists()]
+    names = [f for f in OPTIONAL if everything or (addon / f).exists()]
+    names += [d for f in names for d in NEEDS.get(f, []) if d not in names]
+    return REQUIRED + names
 
 
 def sync(game: Path, check: bool, everything: bool) -> list[str]:
