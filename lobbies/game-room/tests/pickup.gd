@@ -74,6 +74,18 @@ func _run() -> void:
 	main.input(id, 0, Vector2.ZERO)
 	main.links.linked = {}
 	check(not main.station_for(id).get("hold", false), "An unlinked player picks up with a tap")
+	# The A Join hint sits above the table controllers, not as a notice.
+	main.room._pad_activity = 0.0
+	main._process(1.0 / 60.0)
+	check(not main.room._prompts.join.node.visible, "No join hint while people are in the room")
+	var empty: Dictionary = party.duplicate(true)
+	empty.players = []
+	empty.seats = []
+	main.set_party(empty)
+	main._process(1.0 / 60.0)
+	main.room._process(1.0 / 60.0)
+	check(main.room._prompts.join.node.visible, "An empty room shows A Join above the controllers")
+	check(main.room._prompts.join.state.items == [["A", "Join"]], "The hint is the A Join button")
 	print("GAME_ROOM_PICKUP_", "PASS" if failures == 0 else "FAIL")
 	main.free()
 	quit(0 if failures == 0 else 1)

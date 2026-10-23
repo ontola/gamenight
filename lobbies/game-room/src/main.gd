@@ -971,6 +971,7 @@ func _process(delta: float) -> void:
 	view.sync_profiles(profiles, world.players)
 	view.update(world, delta)
 	_update_holds()
+	room.join_hint = profiles.is_empty() and (demo != null or client.connected)
 	_update_prompts()
 	var next := current_game()
 	if next.is_empty():
@@ -1442,12 +1443,6 @@ func _draw_hud(canvas: Control) -> void:
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, 24, w, size + 28), Color(0.03, 0.03, 0.06, 0.9))
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, 24 + size + 6), size, AMBER)
-	if profiles.is_empty() and (demo != null or client.connected):
-		var size := int(28 * scale)
-		var msg := "Press A on a controller to jump in"
-		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
-		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, canvas.size.y * 0.42, w, size + 28), Color(0.03, 0.03, 0.06, 0.85))
-		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, canvas.size.y * 0.42 + size + 6), size, TEXT)
 
 ## Players without a controller, bottom left: a coloured dot, the name, and
 ## a small phone for those who play on one.

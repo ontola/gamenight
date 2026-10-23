@@ -16,6 +16,7 @@ const TEXT := Color("f2f1f8")
 
 var _pads: Array = []
 var _pad_activity := 0.0
+var join_hint := false  # nobody in the room yet: keep A Join up
 var font: FontFile
 var bold: FontFile
 var wordmark: FontFile              # Bungee, the GameNight wordmark only
@@ -956,7 +957,9 @@ func _foreground() -> void:
 	# The two controllers from the GameNight logo, put down mid-evening.
 	_logo_pad(AMBER, Vector3(0.3, 0.6, table_z - 0.1), 0.24)
 	_logo_pad(VIOLET, Vector3(0.75, 0.62, table_z + 0.2), -0.23)
-	# A controller nobody has joined with yet makes these jump: that is the hint.
+	# A controller nobody has joined with yet makes these jump, with A Join
+	# above them; with nobody in the room the A Join stays up.
+	prompt("join", [["A", "Join"]], Vector3(0.52, 1.45, table_z + 0.1))
 	for s in [-1, 1]:
 		var x: float = s * 11.0
 		cylinder(0.35, 0.6, Vector3(x, 0.3, 2.5), mat(Color("c46c4a"), 0.8))
@@ -1080,6 +1083,7 @@ func _animate_pads(delta: float) -> void:
 		node.position = p.pos + Vector3(0, absf(sin(_time * 13.0 + i * 1.3)) * 0.12 * k, 0)
 		node.rotation = Vector3(sin(_time * 19.0 + i) * 0.12 * k, p.yaw, sin(_time * 23.0 + i * 1.7) * 0.18 * k)
 		p.body.emission_energy_multiplier = 0.5 + 1.6 * k
+	set_prompt("join", [["A", "Join"]], true, join_hint or _pad_activity > 0.0)
 
 func _process(delta: float) -> void:
 	_time += delta
