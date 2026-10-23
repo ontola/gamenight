@@ -2273,7 +2273,9 @@ impl GameNight {
         }
         // Carry over values the party already chose, where still valid under
         // the new specs, and tell the (possibly freshly reconnected) game
-        // about every value that differs from its default.
+        // about every value that differs from its default. A value equal to
+        // the old default was never a choice: a game that changes its
+        // default must reach existing parties too.
         let old = self
             .settings
             .iter()
@@ -2283,7 +2285,15 @@ impl GameNight {
         for spec in specs.iter().filter(|s| s.scope.is_party()) {
             let carried = old
                 .as_ref()
-                .and_then(|o| o.values.get(&spec.key))
+                .and_then(|o| {
+                    let value = o.values.get(&spec.key)?;
+                    let old_default = o
+                        .specs
+                        .iter()
+                        .find(|s| s.key == spec.key)
+                        .map(|s| s.kind.default_value());
+                    (old_default.as_ref() != Some(value)).then_some(value)
+                })
                 .filter(|v| spec.kind.validate(v).is_ok())
                 .cloned();
             let value = carried.unwrap_or_else(|| spec.kind.default_value());

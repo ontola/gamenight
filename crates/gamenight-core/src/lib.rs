@@ -2113,6 +2113,37 @@ mod night_tests {
     }
 
     #[test]
+    fn a_changed_default_reaches_a_party_that_never_chose() {
+        // Frog Fighter moved its defaults; a party still holding the old
+        // default kept getting it, as if somebody had chosen it.
+        let mut night = GameNight::default();
+        let g = GameId::new("g1");
+        night.handle(Command::DeclareSettings {
+            game: g.clone(),
+            settings: vec![toggle("items", true), toggle("teams", false)],
+        });
+        night.handle(Command::SetSetting {
+            game: Some(g.clone()),
+            key: "teams".into(),
+            value: SettingValue::Toggle(true),
+        });
+        night.handle(Command::GameDisconnected { game: g.clone() });
+        let fx = night.handle(Command::DeclareSettings {
+            game: g.clone(),
+            settings: vec![toggle("items", false), toggle("teams", false)],
+        });
+        let values = &night.snapshot().settings[0].values;
+        assert_eq!(values["items"], SettingValue::Toggle(false), "new default");
+        assert_eq!(
+            values["teams"],
+            SettingValue::Toggle(true),
+            "real choice kept"
+        );
+        let (_, key, _) = setting_pushed(&fx).unwrap();
+        assert_eq!(key, "teams");
+    }
+
+    #[test]
     fn malformed_declarations_are_rejected() {
         let mut night = GameNight::default();
         let fx = night.handle(Command::DeclareSettings {
