@@ -110,6 +110,8 @@ func _ready() -> void:
 	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	layer.add_child(hud)
+	get_viewport().size_changed.connect(_apply_render_scale)
+	_apply_render_scale()
 	var args := OS.get_cmdline_user_args()
 	for argument in args:
 		if argument.begins_with("--capture="): _capture_path = argument.trim_prefix("--capture=")
@@ -237,6 +239,26 @@ func _fit_fullscreen() -> void:
 	if not window.borderless: window.borderless = true
 	if window.position != origin: window.position = origin
 	if window.size != size: window.size = size
+
+## The room renders its 3D at most 1440 lines high and upscales to the
+## screen: GI, fog and screen-space effects cost per pixel, and at 4K that
+## was more than a laptop GPU could do at 60 fps. Text, prompts and the HUD
+## stay native. GAMENIGHT_LOBBY_RENDER_SCALE overrides (1 = native).
+const RENDER_LINES := 1440.0
+
+func _apply_render_scale() -> void:
+	var viewport := get_viewport()
+	var lines := viewport.get_visible_rect().size.y
+	var scale := minf(1.0, RENDER_LINES / maxf(lines, 1.0))
+	var forced := OS.get_environment("GAMENIGHT_LOBBY_RENDER_SCALE")
+	if forced.is_valid_float(): scale = clampf(float(forced), 0.25, 1.0)
+	viewport.scaling_3d_scale = scale
+	if scale >= 1.0:
+		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+	elif OS.get_name() == "macOS" and RenderingServer.get_current_rendering_driver_name() == "metal":
+		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_METALFX_SPATIAL
+	else:
+		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
 
 # ---------------------------------------------------------------- party state
 
