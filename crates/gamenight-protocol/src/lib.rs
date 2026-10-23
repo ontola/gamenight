@@ -24,7 +24,7 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
 /// gamenight.gd). Bump both together when the addon gains a feature games
 /// rely on, so an older vendored copy warns at runtime.
-pub const GODOT_SDK_VERSION: u32 = 5;
+pub const GODOT_SDK_VERSION: u32 = 6;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -989,6 +989,9 @@ pub struct PartySnapshot {
     /// Plain-text requests declared by connected games (see [`GameCommands`]).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub commands: Vec<GameCommands>,
+    /// Phone buttons declared by connected games (see [`GameAction`]).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<GameActions>,
     /// A newer version of the host app is downloaded and can be applied
     /// with `apply_update` between games. The value is its version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1035,8 +1038,36 @@ pub enum ActivityKind {
     /// A round ended, or the game reported a new run or round.
     Round,
     Setting,
+    /// Someone pressed one of a game's actions, such as "New round".
+    Action,
     /// Something a game chose to report with `room_log`.
     Game,
+}
+
+/// A button a game offers on players' phones next to its settings, such as
+/// "New round" or "Restart level". Pressing it sends the game
+/// `action_triggered` with `key`, and puts a line in the room log.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GameAction {
+    /// Stable id the game matches on, e.g. `new_round`.
+    pub key: String,
+    /// The button text, e.g. `New round`.
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Ask "are you sure?" first: for actions that throw away play, like a
+    /// restart.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub confirm: bool,
+}
+
+/// The actions a connected game declared with `declare_actions`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct GameActions {
+    pub game: GameId,
+    pub actions: Vec<GameAction>,
 }
 
 /// A lobby the host can run: bundled with the app or installed locally.
@@ -1510,6 +1541,20 @@ pub enum ClientMessage {
         ok: bool,
         message: String,
     },
+    /// Game only: buttons players may press on their phones for this game,
+    /// such as "New round" (see [`GameAction`]). Replaces the previous set;
+    /// send after `welcome`, again after reconnects, and whenever they change.
+    DeclareActions {
+        #[serde(default)]
+        actions: Vec<GameAction>,
+    },
+    /// Overlay only: `player_id` pressed the action `key` of `game`, the game
+    /// being played. The game receives `action_triggered`.
+    TriggerAction {
+        game: GameId,
+        player_id: PlayerId,
+        key: String,
+    },
     /// Overlay only: a player's phone screen for `game` connected or left.
     CompanionPresence {
         game: GameId,
@@ -1643,6 +1688,12 @@ pub enum ServerMessage {
         id: String,
         ok: bool,
         message: String,
+    },
+    /// To a game: `player_id` pressed one of its declared actions on a phone
+    /// (see `declare_actions`). The room log already says so.
+    ActionTriggered {
+        key: String,
+        player_id: PlayerId,
     },
     /// To a game: a player's phone screen connected or went away. A game
     /// sends that player its current view when `connected` is true.

@@ -22,10 +22,11 @@ ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL"
 ENV_TOKEN = "GAMENIGHT_TOKEN"
 DEFAULT_ADDR = "127.0.0.1:7912"
 DEFAULT_WEB_PORT = 7913
-GODOT_SDK_VERSION = 5
+GODOT_SDK_VERSION = 6
 PROTOCOL_VERSION = 1
 
 # Message "type" tags, both directions.
+MSG_ACTION_TRIGGERED = "action_triggered"
 MSG_APPLY_UPDATE = "apply_update"
 MSG_ASSIGN_SEAT = "assign_seat"
 MSG_BIND_CONTROLLER = "bind_controller"
@@ -36,6 +37,7 @@ MSG_COMPANION_PRESENCE = "companion_presence"
 MSG_CONTROL_SETTINGS = "control_settings"
 MSG_CONTROLLER_FRAME = "controller_frame"
 MSG_CONTROLLER_INPUT = "controller_input"
+MSG_DECLARE_ACTIONS = "declare_actions"
 MSG_DECLARE_COMMANDS = "declare_commands"
 MSG_DECLARE_COMPANION = "declare_companion"
 MSG_DECLARE_SETTINGS = "declare_settings"
@@ -91,6 +93,7 @@ MSG_SETTINGS_ACCEPTED = "settings_accepted"
 MSG_START = "start"
 MSG_SWAP_SEATS = "swap_seats"
 MSG_SWITCH_LOBBY = "switch_lobby"
+MSG_TRIGGER_ACTION = "trigger_action"
 MSG_VOTE = "vote"
 MSG_WELCOME = "welcome"
 
@@ -103,6 +106,7 @@ ACTIVITY_KIND_GAME_STARTED = "game_started"
 ACTIVITY_KIND_SETTING = "setting"
 ACTIVITY_KIND_PROFILE = "profile"
 ACTIVITY_KIND_ROUND = "round"
+ACTIVITY_KIND_ACTION = "action"
 ACTIVITY_KIND_GAME = "game"
 
 # GameIssueKind
@@ -651,6 +655,24 @@ CLIENT_MESSAGES = {
             "ok"
         ]
     },
+    "declare_actions": {
+        "fields": [
+            "actions"
+        ],
+        "required": []
+    },
+    "trigger_action": {
+        "fields": [
+            "game",
+            "key",
+            "player_id"
+        ],
+        "required": [
+            "game",
+            "key",
+            "player_id"
+        ]
+    },
     "companion_presence": {
         "fields": [
             "connected",
@@ -847,6 +869,16 @@ SERVER_MESSAGES = {
             "ok"
         ]
     },
+    "action_triggered": {
+        "fields": [
+            "key",
+            "player_id"
+        ],
+        "required": [
+            "key",
+            "player_id"
+        ]
+    },
     "companion_presence": {
         "fields": [
             "connected",
@@ -878,6 +910,7 @@ ENUMS = {
         "setting",
         "profile",
         "round",
+        "action",
         "game"
     ],
     "GameIssueKind": [

@@ -140,6 +140,12 @@ pub enum GameEvent {
         player_id: gamenight_protocol::PlayerId,
         connected: bool,
     },
+    /// A player pressed one of your actions on their phone (see
+    /// [`GameNight::declare_actions`]), such as "New round".
+    ActionTriggered {
+        key: String,
+        player_id: gamenight_protocol::PlayerId,
+    },
     /// A player asked for something in plain text (see
     /// [`GameNight::declare_commands`]). Answer with [`GameNight::command_result`].
     GameCommand {
@@ -301,6 +307,9 @@ impl GameNight {
                             id,
                             text,
                         },
+                        ServerMessage::ActionTriggered { key, player_id } => {
+                            GameEvent::ActionTriggered { key, player_id }
+                        }
                         ServerMessage::CompanionMessage {
                             player_id: Some(player_id),
                             data,
@@ -492,6 +501,29 @@ impl GameNight {
         self.send(&ClientMessage::DeclareCommands {
             description: description.into(),
             examples,
+        })
+        .await
+    }
+
+    /// Offer buttons on players' phones, next to your settings, such as
+    /// "New round". A press arrives as [`GameEvent::ActionTriggered`] and goes
+    /// in the room log. Replaces the previous set; an empty list removes them.
+    pub async fn declare_actions(
+        &mut self,
+        actions: Vec<gamenight_protocol::GameAction>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::DeclareActions { actions }).await
+    }
+
+    /// Add one short line to the room log players read back on their phones.
+    pub async fn room_log(
+        &mut self,
+        session: SessionId,
+        text: impl Into<String>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::RoomLog {
+            session,
+            text: text.into(),
         })
         .await
     }

@@ -66,6 +66,11 @@
           "type": "string"
         },
         {
+          "const": "action",
+          "description": "Someone pressed one of a game's actions, such as \"New round\".",
+          "type": "string"
+        },
+        {
           "const": "game",
           "description": "Something a game chose to report with `room_log`.",
           "type": "string"
@@ -1278,6 +1283,51 @@
           "type": "object"
         },
         {
+          "description": "Game only: buttons players may press on their phones for this game,\nsuch as \"New round\" (see [`GameAction`]). Replaces the previous set;\nsend after `welcome`, again after reconnects, and whenever they change.",
+          "properties": {
+            "actions": {
+              "default": [],
+              "items": {
+                "$ref": "#/$defs/GameAction"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "declare_actions",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Overlay only: `player_id` pressed the action `key` of `game`, the game\nbeing played. The game receives `action_triggered`.",
+          "properties": {
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "key": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "trigger_action",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "key"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Overlay only: a player's phone screen for `game` connected or left.",
           "properties": {
             "connected": {
@@ -1396,6 +1446,53 @@
         "controller",
         "axes",
         "buttons"
+      ],
+      "type": "object"
+    },
+    "GameAction": {
+      "description": "A button a game offers on players' phones next to its settings, such as\n\"New round\" or \"Restart level\". Pressing it sends the game\n`action_triggered` with `key`, and puts a line in the room log.",
+      "properties": {
+        "confirm": {
+          "description": "Ask \"are you sure?\" first: for actions that throw away play, like a\nrestart.",
+          "type": "boolean"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "key": {
+          "description": "Stable id the game matches on, e.g. `new_round`.",
+          "type": "string"
+        },
+        "label": {
+          "description": "The button text, e.g. `New round`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "label"
+      ],
+      "type": "object"
+    },
+    "GameActions": {
+      "description": "The actions a connected game declared with `declare_actions`.",
+      "properties": {
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/GameAction"
+          },
+          "type": "array"
+        },
+        "game": {
+          "$ref": "#/$defs/GameId"
+        }
+      },
+      "required": [
+        "game",
+        "actions"
       ],
       "type": "object"
     },
@@ -1794,6 +1891,13 @@
     "PartySnapshot": {
       "description": "The one big object overlays render from. Sent whenever anything changes.",
       "properties": {
+        "actions": {
+          "description": "Phone buttons declared by connected games (see [`GameAction`]).",
+          "items": {
+            "$ref": "#/$defs/GameActions"
+          },
+          "type": "array"
+        },
         "active_session": {
           "anyOf": [
             {
@@ -2750,6 +2854,27 @@
           "type": "object"
         },
         {
+          "description": "To a game: `player_id` pressed one of its declared actions on a phone\n(see `declare_actions`). The room log already says so.",
+          "properties": {
+            "key": {
+              "type": "string"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "action_triggered",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "key",
+            "player_id"
+          ],
+          "type": "object"
+        },
+        {
           "description": "To a game: a player's phone screen connected or went away. A game\nsends that player its current view when `connected` is true.",
           "properties": {
             "connected": {
@@ -3206,7 +3331,7 @@
     "protocol": {
       "DEFAULT_ADDR": "127.0.0.1:7912",
       "DEFAULT_WEB_PORT": 7913,
-      "GODOT_SDK_VERSION": 5,
+      "GODOT_SDK_VERSION": 6,
       "PROTOCOL_VERSION": 1
     }
   },

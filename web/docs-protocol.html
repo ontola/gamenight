@@ -182,6 +182,11 @@ lobby. A later <code>lobby_ready</code> confirms readiness.</p>
 <td>apply it live, or from the next match — whichever is sensible</td>
 </tr>
 <tr>
+<td><code>action_triggered</code></td>
+<td>a player pressed one of your <a href="#phone-buttons">phone buttons</a></td>
+<td>do it, like starting a new round</td>
+</tr>
+<tr>
 <td><code>lobby_focus</code></td>
 <td><em>(lobby games only)</em> some other game took the screen, or gave it back</td>
 <td>mute and step out of the way on <code>active: false</code>; take over again on <code>true</code></td>
@@ -325,6 +330,10 @@ playing, in the lobby, and a second route in makes the two disagree.</p>
 <tr>
 <td><code>room_log</code> <em>(optional)</em></td>
 <td>one line for the room log players read back on their phones (see <a href="#room-log">Room log</a>)</td>
+</tr>
+<tr>
+<td><code>declare_actions</code> <em>(optional)</em></td>
+<td>buttons on the players' phones, like &quot;New round&quot; (see <a href="#phone-buttons">Phone buttons</a>)</td>
 </tr>
 </tbody>
 </table>
@@ -572,6 +581,27 @@ two seconds per game and cuts text after 120 characters.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;room_log&quot;, &quot;session&quot;: &quot;9be2…&quot;, &quot;text&quot;: &quot;New run&quot; }
 </code></pre></div>
 <p>In Godot, call <code>GameNight.add_room_log(&quot;New run&quot;)</code>.</p>
+<h2 id="phone-buttons">Phone buttons</h2>
+<p>Next to its settings, a game can offer buttons in the GameNight app for things
+that happen once: &quot;New round&quot;, &quot;New run&quot;, &quot;Skip level&quot;. Declare them any time
+after <code>hello</code>, and again after a reconnect; an empty list removes them.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;declare_actions&quot;, &quot;actions&quot;: [
+  { &quot;key&quot;: &quot;new_run&quot;, &quot;label&quot;: &quot;New run&quot;,
+    &quot;description&quot;: &quot;Ends this run for everyone.&quot;, &quot;confirm&quot;: true }
+] }
+</code></pre></div>
+<p>At most 12 buttons, keys of letters, digits, <code>_</code> and <code>-</code>, labels up to 40
+characters. With <code>confirm</code> the phone asks first. Phones see the buttons only
+while the game's session is the one being played, as <code>actions</code> in the party
+snapshot. A press reaches the game as</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;action_triggered&quot;, &quot;key&quot;: &quot;new_run&quot;, &quot;player_id&quot;: &quot;7f3c…&quot; }
+</code></pre></div>
+<p>and the host writes &quot;Ada: New run (Spellstorm)&quot; in the room log, so the game
+does not log it again. The local web server offers the buttons of the game
+being played at <code>GET /api/actions?profile=…</code> (<code>{game, title, actions}</code> or
+<code>null</code>) and presses one with <code>POST /api/actions {profile, game, key}</code>, as the
+phone's own player. In Godot, call <code>GameNight.declare_actions([...])</code> and
+connect <code>action_triggered(key, player_id)</code>.</p>
 <h2 id="the-hosts-music">The host's music</h2>
 <p>Somebody puts a record on before the first match, and for the rest of the
 evening they're the only one who can reach it — it's their laptop, in another
@@ -1079,7 +1109,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="b922db6fa765a149d3e34eced7ccc1b43537c0b1e97249f162604d2f84baef25">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="68f93d358e521c407635ee8d9df39454821e6d01ac295d5da7733bb35bb85bd9">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#phone-buttons">Phone buttons</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

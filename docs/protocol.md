@@ -119,6 +119,7 @@ The daemon drives the lifecycle; games only ever *report* two facts.
 | `pause` / `resume` | party paused the night | freeze / unfreeze |
 | `dispose` | session over, id never reused | tear down; a new `prepare` may follow |
 | `setting_changed` | the party turned one of your declared knobs | apply it live, or from the next match — whichever is sensible |
+| `action_triggered` | a player pressed one of your [phone buttons](#phone-buttons) | do it, like starting a new round |
 | `lobby_focus` | *(lobby games only)* some other game took the screen, or gave it back | mute and step out of the way on `active: false`; take over again on `true` |
 
 `lobby_focus` only ever reaches the game registered as the party's lobby
@@ -217,6 +218,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `companion_message` *(optional)* | JSON for one player's phone screen, or every phone |
 | `rumble` *(optional)* | vibrate the controller on one of your seats (see [Rumble](#rumble)) |
 | `room_log` *(optional)* | one line for the room log players read back on their phones (see [Room log](#room-log)) |
+| `declare_actions` *(optional)* | buttons on the players' phones, like "New round" (see [Phone buttons](#phone-buttons)) |
 
 ```json
 { "type": "ready",    "session": "9be2…" }
@@ -441,6 +443,35 @@ two seconds per game and cuts text after 120 characters.
 ```
 
 In Godot, call `GameNight.add_room_log("New run")`.
+
+## Phone buttons
+
+Next to its settings, a game can offer buttons in the GameNight app for things
+that happen once: "New round", "New run", "Skip level". Declare them any time
+after `hello`, and again after a reconnect; an empty list removes them.
+
+```json
+{ "type": "declare_actions", "actions": [
+  { "key": "new_run", "label": "New run",
+    "description": "Ends this run for everyone.", "confirm": true }
+] }
+```
+
+At most 12 buttons, keys of letters, digits, `_` and `-`, labels up to 40
+characters. With `confirm` the phone asks first. Phones see the buttons only
+while the game's session is the one being played, as `actions` in the party
+snapshot. A press reaches the game as
+
+```json
+{ "type": "action_triggered", "key": "new_run", "player_id": "7f3c…" }
+```
+
+and the host writes "Ada: New run (Spellstorm)" in the room log, so the game
+does not log it again. The local web server offers the buttons of the game
+being played at `GET /api/actions?profile=…` (`{game, title, actions}` or
+`null`) and presses one with `POST /api/actions {profile, game, key}`, as the
+phone's own player. In Godot, call `GameNight.declare_actions([...])` and
+connect `action_triggered(key, player_id)`.
 
 ## The host's music
 

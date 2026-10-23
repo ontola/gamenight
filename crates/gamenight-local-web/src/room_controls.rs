@@ -93,6 +93,95 @@ pub(crate) async fn activity(
     Ok(Json(json!({ "entries": party.activity })))
 }
 
+/// The buttons the game being played offers phones, like "New round", as
+/// `{game, title, actions}`, or `null` when it offers none.
+pub(crate) fn actions_for(party: &PartySnapshot) -> Option<Value> {
+    let session = party.active_session.as_ref()?;
+    let declared = party.actions.iter().find(|a| a.game == session.game)?;
+    if declared.actions.is_empty() || !party.connected_games.contains(&session.game) {
+        return None;
+    }
+    let title = party
+        .library
+        .iter()
+        .find(|meta| meta.id == session.game)
+        .map_or(session.game.0.as_str(), |meta| meta.title.as_str());
+    Some(json!({"game": session.game, "title": title, "actions": declared.actions}))
+}
+
+/// `GET /api/actions?profile=…`: see [`actions_for`].
+pub(crate) async fn get_actions(
+    State(state): State<SharedState>,
+    Query(query): Query<ProfileQuery>,
+) -> Result<Json<Option<Value>>, StatusCode> {
+    let party = daemon::party(&state).await?;
+    seat(&state, &party, &query.profile).ok_or(StatusCode::FORBIDDEN)?;
+    Ok(Json(actions_for(&party)))
+}
+
+#[derive(Deserialize)]
+pub struct ActionRequest {
+    profile: String,
+    game: String,
+    key: String,
+}
+
+/// `POST /api/actions`: presses one of the running game's buttons as the
+/// profile's player. The host tells the game and writes it in the room log.
+/// A refusal (the game moved on, no such button) is a 409 whose `error`
+/// says why.
+pub(crate) async fn trigger_action(
+    State(state): State<SharedState>,
+    Json(request): Json<ActionRequest>,
+) -> Response {
+    let (mut ws, party) = match daemon::connect(&state).await {
+        Ok(connected) => connected,
+        Err(status) => return status.into_response(),
+    };
+    let Some(seat) = seat(&state, &party, &request.profile) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let Ok(uuid) = uuid::Uuid::parse_str(&seat.player) else {
+        return StatusCode::FORBIDDEN.into_response();
+    };
+    let logged = party.activity.last().map(|e| e.id);
+    let message = ClientMessage::TriggerAction {
+        game: GameId(request.game),
+        player_id: gamenight_protocol::PlayerId(uuid),
+        key: request.key,
+    };
+    if ws.send(Message::Text(message.to_json())).await.is_err() {
+        return StatusCode::BAD_GATEWAY.into_response();
+    }
+    let result = tokio::time::timeout(daemon::REPLY_TIMEOUT * 2, async {
+        while let Some(Ok(message)) = ws.next().await {
+            let Message::Text(text) = message else {
+                continue;
+            };
+            match serde_json::from_str::<ServerMessage>(&text) {
+                Ok(ServerMessage::Error { message }) => return Err(message),
+                // The press is in the log once the host passed it on.
+                Ok(ServerMessage::PartyState { party })
+                    if party.activity.last().map(|e| e.id) != logged =>
+                {
+                    let _ = ws.close(None).await;
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+        Err("Host disconnected".to_string())
+    })
+    .await;
+    match result {
+        Ok(Ok(())) => Json(json!({ "ok": true })).into_response(),
+        Ok(Err(message)) => {
+            (StatusCode::CONFLICT, Json(json!({ "error": message }))).into_response()
+        }
+        Err(_) => StatusCode::GATEWAY_TIMEOUT.into_response(),
+    }
+}
+
 #[derive(Deserialize)]
 pub struct QueueRequest {
     profile: String,
@@ -395,6 +484,12 @@ mod tests {
         ))
         .await
         .unwrap();
+        game.send(Message::Text(
+            json!({"type":"declare_actions","actions":[{"key":"new_round","label":"New round"}]})
+                .to_string(),
+        ))
+        .await
+        .unwrap();
         let mut seated = overlay(&addr).await;
         seated
             .send(Message::Text(
@@ -559,6 +654,33 @@ mod tests {
             next("stranger", "test", true).await.unwrap_err(),
             StatusCode::FORBIDDEN
         );
+        tasks.iter().for_each(|t| t.abort());
+    }
+
+    #[tokio::test]
+    async fn actions_are_only_offered_while_their_game_is_played() {
+        let (state, _, tasks) = room().await;
+        assert_eq!(
+            get_actions(State(state.clone()), profile("stranger"))
+                .await
+                .unwrap_err(),
+            StatusCode::FORBIDDEN
+        );
+        // "test" is only warmed up: nothing to press yet.
+        let Json(none) = get_actions(State(state.clone()), profile("phone"))
+            .await
+            .unwrap();
+        assert!(none.is_none());
+        let press = trigger_action(
+            State(state.clone()),
+            Json(ActionRequest {
+                profile: "phone".into(),
+                game: "test".into(),
+                key: "new_round".into(),
+            }),
+        )
+        .await;
+        assert_eq!(press.status(), StatusCode::CONFLICT);
         tasks.iter().for_each(|t| t.abort());
     }
 

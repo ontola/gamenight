@@ -79,7 +79,7 @@ extern "C" {
 #define GN_ENV_TOKEN "GAMENIGHT_TOKEN"
 #define GN_DEFAULT_ADDR "127.0.0.1:7912"
 #define GN_DEFAULT_WEB_PORT 7913
-#define GN_GODOT_SDK_VERSION 5
+#define GN_GODOT_SDK_VERSION 6
 #define GN_PROTOCOL_VERSION 1
 
 /* Initialisers, e.g. static const char *colors[] = GN_GUEST_COLORS; */
@@ -87,6 +87,7 @@ extern "C" {
 #define GN_GUEST_SKINS { "#f5e9be", "#efc39a", "#d99b72", "#bf855b", "#905c40", "#654332" }
 
 /* Message "type" tags, both directions. */
+#define GN_MSG_ACTION_TRIGGERED "action_triggered"
 #define GN_MSG_APPLY_UPDATE "apply_update"
 #define GN_MSG_ASSIGN_SEAT "assign_seat"
 #define GN_MSG_BIND_CONTROLLER "bind_controller"
@@ -97,6 +98,7 @@ extern "C" {
 #define GN_MSG_CONTROL_SETTINGS "control_settings"
 #define GN_MSG_CONTROLLER_FRAME "controller_frame"
 #define GN_MSG_CONTROLLER_INPUT "controller_input"
+#define GN_MSG_DECLARE_ACTIONS "declare_actions"
 #define GN_MSG_DECLARE_COMMANDS "declare_commands"
 #define GN_MSG_DECLARE_COMPANION "declare_companion"
 #define GN_MSG_DECLARE_SETTINGS "declare_settings"
@@ -152,6 +154,7 @@ extern "C" {
 #define GN_MSG_START "start"
 #define GN_MSG_SWAP_SEATS "swap_seats"
 #define GN_MSG_SWITCH_LOBBY "switch_lobby"
+#define GN_MSG_TRIGGER_ACTION "trigger_action"
 #define GN_MSG_VOTE "vote"
 #define GN_MSG_WELCOME "welcome"
 
@@ -164,6 +167,7 @@ extern "C" {
 #define GN_ACTIVITY_KIND_SETTING "setting"
 #define GN_ACTIVITY_KIND_PROFILE "profile"
 #define GN_ACTIVITY_KIND_ROUND "round"
+#define GN_ACTIVITY_KIND_ACTION "action"
 #define GN_ACTIVITY_KIND_GAME "game"
 
 /* GameIssueKind */

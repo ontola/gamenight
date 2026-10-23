@@ -172,6 +172,7 @@ class ActivityRow extends StatelessWidget {
         'game_started' => Icons.play_circle_outline,
         'round' => Icons.flag_outlined,
         'setting' => Icons.tune,
+        'action' => Icons.touch_app_outlined,
         _ => Icons.notes,
       };
 

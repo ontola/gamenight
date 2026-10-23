@@ -50,6 +50,8 @@ Call `GameNight.notify_ready(session_id)` only after your level and first frame 
 
 `GameNight.add_room_log("New run")` adds a line to the room log players read back in the GameNight app (never on the TV). Use it for a new run, a level or a winner, not every frame.
 
+`GameNight.declare_actions([{"key": "new_round", "label": "New round", "confirm": true}])` puts buttons on the players' phones, next to your settings. A press arrives as `action_triggered(key, player_id)` while your session is being played, and the room log says who pressed it.
+
 To get live roster updates, opt in from `prepared`, before Ready:
 
 ```gdscript

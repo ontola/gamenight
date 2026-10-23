@@ -74,6 +74,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     ])
     .await?;
+    // A button on the players' phones; the host logs who pressed it.
+    gn.declare_actions(vec![gamenight_protocol::GameAction {
+        key: "new_round".into(),
+        label: "New round".into(),
+        description: Some("Ends this match and starts a fresh one.".into()),
+        confirm: true,
+    }])
+    .await?;
 
     // The match currently in play: (session, when it ends).
     let mut playing: Option<(SessionId, Instant)> = None;
@@ -102,6 +110,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                         Some(GameEvent::SettingChanged { key, value }) => {
                             apply_setting(&game_id, &mut match_seconds, &key, &value);
+                        }
+                        Some(GameEvent::ActionTriggered { key, .. }) if key == "new_round" => {
+                            println!("[{game_id}] new round, from a phone");
+                            playing = Some((session, Instant::now() + Duration::from_secs(match_seconds)));
                         }
                         Some(other) => println!("[{game_id}] ignoring {other:?} mid-match"),
                         None => break,

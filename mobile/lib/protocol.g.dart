@@ -20,10 +20,11 @@ const String envOverlayUrl = 'GAMENIGHT_OVERLAY_URL';
 const String envToken = 'GAMENIGHT_TOKEN';
 const String defaultAddr = '127.0.0.1:7912';
 const int defaultWebPort = 7913;
-const int godotSdkVersion = 5;
+const int godotSdkVersion = 6;
 const int protocolVersion = 1;
 
 /// Message "type" tags, both directions.
+const String msgActionTriggered = 'action_triggered';
 const String msgApplyUpdate = 'apply_update';
 const String msgAssignSeat = 'assign_seat';
 const String msgBindController = 'bind_controller';
@@ -34,6 +35,7 @@ const String msgCompanionPresence = 'companion_presence';
 const String msgControlSettings = 'control_settings';
 const String msgControllerFrame = 'controller_frame';
 const String msgControllerInput = 'controller_input';
+const String msgDeclareActions = 'declare_actions';
 const String msgDeclareCommands = 'declare_commands';
 const String msgDeclareCompanion = 'declare_companion';
 const String msgDeclareSettings = 'declare_settings';
@@ -89,11 +91,12 @@ const String msgSettingsAccepted = 'settings_accepted';
 const String msgStart = 'start';
 const String msgSwapSeats = 'swap_seats';
 const String msgSwitchLobby = 'switch_lobby';
+const String msgTriggerAction = 'trigger_action';
 const String msgVote = 'vote';
 const String msgWelcome = 'welcome';
 
 /// ActivityKind
-const List<String> activityKindValues = ['joined', 'left', 'controller', 'phone', 'game_started', 'setting', 'profile', 'round', 'game'];
+const List<String> activityKindValues = ['joined', 'left', 'controller', 'phone', 'game_started', 'setting', 'profile', 'round', 'action', 'game'];
 
 /// GameIssueKind
 const List<String> gameIssueKindValues = ['closed', 'disconnected', 'exited_unexpectedly', 'failed_to_start', 'startup_timeout'];

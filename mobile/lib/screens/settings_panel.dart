@@ -625,3 +625,135 @@ class _MySettingsSectionState extends State<MySettingsSection> {
     }
   }
 }
+
+/// The buttons the game being played offers phones, like "New round". Each
+/// press lands in the room log. Hidden when the game offers none.
+class GameActionsSection extends StatefulWidget {
+  final RoomControls? controls;
+  const GameActionsSection({super.key, this.controls});
+
+  @override
+  State<GameActionsSection> createState() => _GameActionsSectionState();
+}
+
+class _GameActionsSectionState extends State<GameActionsSection> {
+  GameActions? _actions;
+  String? _busy;
+  String? _status;
+  bool _failed = false;
+  Timer? _poll;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _poll = Timer.periodic(const Duration(seconds: 4), (_) => _load());
+  }
+
+  @override
+  void didUpdateWidget(GameActionsSection old) {
+    super.didUpdateWidget(old);
+    if (old.controls?.target != widget.controls?.target) {
+      _actions = null;
+      _status = null;
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _poll?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final controls = widget.controls;
+    if (controls == null) return;
+    try {
+      final actions = await controls.actions();
+      if (!mounted) return;
+      setState(() {
+        if (actions?.game != _actions?.game) _status = null;
+        _actions = actions;
+      });
+    } catch (_) {
+      // Keep showing what we had; the next poll tries again.
+    }
+  }
+
+  Future<void> _press(GameActions actions, GameAction action) async {
+    final controls = widget.controls;
+    if (controls == null || _busy != null) return;
+    if (action.confirm) {
+      final sure = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('${action.label}?'),
+          content: Text(action.description.isEmpty
+              ? 'Everyone in ${actions.title} is affected.'
+              : action.description),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                key: const ValueKey('action-confirm'),
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(action.label)),
+          ],
+        ),
+      );
+      if (sure != true || !mounted) return;
+    }
+    setState(() {
+      _busy = action.key;
+      _status = null;
+    });
+    try {
+      await controls.triggerAction(actions.game, action.key);
+      if (!mounted) return;
+      setState(() {
+        _failed = false;
+        _status = '${action.label}: sent to the game.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _status = e is ApiError ? e.message : 'The game did not take that.';
+      });
+      unawaited(_load());
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = _actions;
+    if (actions == null) return const SizedBox.shrink();
+    return Section(title: actions.title, children: [
+      Wrap(spacing: 8, runSpacing: 8, children: [
+        for (final action in actions.actions)
+          Tooltip(
+            message: action.description,
+            child: FilledButton.tonalIcon(
+              key: ValueKey('action-${action.key}'),
+              onPressed: _busy == null ? () => _press(actions, action) : null,
+              icon: _busy == action.key
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.play_arrow, size: 18),
+              label: Text(action.label),
+            ),
+          ),
+      ]),
+      const SizedBox(height: 8),
+      if (_failed && _status != null)
+        Text(_status!, style: const TextStyle(color: GnColors.warn))
+      else
+        Hint(_status ?? 'The room log says who pressed it.'),
+    ]);
+  }
+}

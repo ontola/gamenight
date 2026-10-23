@@ -252,6 +252,10 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/games", get(room_controls::games))
         .route("/api/activity", get(room_controls::activity))
         .route(
+            "/api/actions",
+            get(room_controls::get_actions).post(room_controls::trigger_action),
+        )
+        .route(
             "/api/settings",
             get(room_controls::get_settings).post(room_controls::set_settings),
         )

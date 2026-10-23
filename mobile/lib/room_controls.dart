@@ -38,6 +38,56 @@ class HostGame {
   }
 }
 
+/// A button the game being played offers phones, like "New round".
+class GameAction {
+  final String key;
+  final String label;
+  final String description;
+
+  /// Ask "are you sure?" first: it throws away the round being played.
+  final bool confirm;
+
+  const GameAction(
+      {required this.key,
+      required this.label,
+      this.description = '',
+      this.confirm = false});
+
+  static GameAction? fromJson(Object? j) {
+    if (j is! Map || j['key'] is! String || j['label'] is! String) return null;
+    return GameAction(
+        key: j['key'] as String,
+        label: j['label'] as String,
+        description:
+            j['description'] is String ? j['description'] as String : '',
+        confirm: j['confirm'] == true);
+  }
+}
+
+/// The buttons of the game being played.
+class GameActions {
+  final String game;
+  final String title;
+  final List<GameAction> actions;
+
+  const GameActions(
+      {required this.game, required this.title, required this.actions});
+
+  static GameActions? fromJson(Object? j) {
+    if (j is! Map || j['game'] is! String || j['actions'] is! List) return null;
+    final actions = [
+      for (final a in j['actions'] as List)
+        if (GameAction.fromJson(a) case final action?) action,
+    ];
+    if (actions.isEmpty) return null;
+    return GameActions(
+        game: j['game'] as String,
+        title:
+            j['title'] is String ? j['title'] as String : j['game'] as String,
+        actions: actions);
+  }
+}
+
 /// One line of the room log: who joined, which game started, what changed.
 class ActivityEntry {
   final int id;
@@ -236,6 +286,14 @@ abstract class RoomControls {
 
   /// The room log, oldest first. Empty when the host keeps none yet.
   Future<List<ActivityEntry>> activity();
+
+  /// The buttons the game being played offers, or null when it has none
+  /// or the room cannot say.
+  Future<GameActions?> actions() async => null;
+
+  /// Presses one of [game]'s buttons as this player. The room log says so.
+  Future<void> triggerAction(String game, String key) async =>
+      throw const ApiError('This room cannot do that yet.', 409);
 }
 
 /// The room on a GameNight computer on this Wi-Fi. The host knows this phone
@@ -351,6 +409,24 @@ class LocalRoomControls implements RoomControls {
       rethrow;
     }
   }
+
+  @override
+  Future<GameActions?> actions() async {
+    try {
+      return GameActions.fromJson(
+          await api.request('GET', '/api/actions?$_query'));
+    } on ApiError catch (e) {
+      // Hosts from before game buttons, and phones not in the room.
+      if (e.status == 404 || e.status == 403 || e.status == 405) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> triggerAction(String game, String key) =>
+      api.request('POST', '/api/actions',
+          body: {'profile': profile, 'game': game, 'key': key},
+          failure: 'The game did not take that. It may have moved on.');
 }
 
 /// An online room joined by code. The website relays to the GameNight
@@ -537,6 +613,14 @@ class CloudRoomControls implements RoomControls {
   Future<List<ActivityEntry>> activity() async => ActivityEntry.listFromJson(
       await cloud.request('GET', '/v1/rooms/activity',
           errors: {403: 'Join the room first.'}));
+
+  // Online rooms do not relay game buttons yet.
+  @override
+  Future<GameActions?> actions() async => null;
+
+  @override
+  Future<void> triggerAction(String game, String key) async =>
+      throw const ApiError('Online rooms cannot do that yet.', 409);
 
   // Online rooms do not relay players' own settings yet.
   @override

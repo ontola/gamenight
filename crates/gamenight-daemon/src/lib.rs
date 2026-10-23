@@ -121,6 +121,8 @@ struct Shared {
     /// Phone screens declared by connected games, by game.
     companions: HashMap<GameId, gamenight_protocol::CompanionScreen>,
     commands: HashMap<GameId, gamenight_protocol::GameCommands>,
+    /// Phone buttons declared by connected games, by game.
+    actions: HashMap<GameId, Vec<gamenight_protocol::GameAction>>,
     /// Playtests on this host, by game: the sha256 of the preview build being
     /// installed or on the shelf, and when its install last failed.
     playtests: HashMap<GameId, (String, Option<std::time::Instant>)>,
@@ -344,6 +346,7 @@ impl Shared {
             lobby_recovery_opened: false,
             companions: HashMap::new(),
             commands: HashMap::new(),
+            actions: HashMap::new(),
             playtests: HashMap::new(),
             update: None,
             update_ready: None,
@@ -371,6 +374,15 @@ impl Shared {
         party.companions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.commands = self.commands.values().cloned().collect();
         party.commands.sort_by(|a, b| a.game.0.cmp(&b.game.0));
+        party.actions = self
+            .actions
+            .iter()
+            .map(|(game, actions)| gamenight_protocol::GameActions {
+                game: game.clone(),
+                actions: actions.clone(),
+            })
+            .collect();
+        party.actions.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.update_ready = self.update_ready.clone();
         party.lobbies = self.lobbies.clone();
         party.activity = self.room_log.entries();
@@ -1031,9 +1043,71 @@ impl Shared {
                     send(overlay, &msg);
                 }
             }
+            (ClientMessage::DeclareActions { actions }, Registration::Game(game)) => {
+                let valid_key = |key: &str| {
+                    !key.is_empty()
+                        && key.len() <= 64
+                        && key
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+                };
+                if actions.len() > 12
+                    || actions.iter().any(|a| {
+                        !valid_key(&a.key)
+                            || a.label.trim().is_empty()
+                            || a.label.chars().count() > 40
+                            || a.description.as_ref().is_some_and(|d| d.len() > 300)
+                    })
+                {
+                    return reject("invalid action declaration");
+                }
+                if actions.is_empty() {
+                    self.actions.remove(game);
+                } else {
+                    self.actions.insert(game.clone(), actions);
+                }
+                self.broadcast_party();
+            }
+            (
+                ClientMessage::TriggerAction {
+                    game,
+                    player_id,
+                    key,
+                },
+                Registration::Overlay(_),
+            ) => {
+                let Some(action) = self
+                    .actions
+                    .get(&game)
+                    .and_then(|actions| actions.iter().find(|a| a.key == key))
+                    .cloned()
+                else {
+                    return reject("that game has no such action");
+                };
+                if self.night.active_session().map(|(g, _, _)| g) != Some(&game) {
+                    return reject("that game is not being played");
+                }
+                let party = self.night.snapshot();
+                let Some(player) = party.players.iter().find(|p| p.id == player_id) else {
+                    return reject("unknown player");
+                };
+                let Some(game_tx) = self.games.get(&game) else {
+                    return reject("that game is not connected");
+                };
+                send(game_tx, &ServerMessage::ActionTriggered { key, player_id });
+                let title = gamenight_core::activity::title(&party, &game);
+                let mut change = gamenight_core::activity::Change::new(
+                    gamenight_protocol::ActivityKind::Action,
+                    format!("{}: {} ({title})", player.name, action.label),
+                );
+                change.game = Some(game);
+                self.room_log.push(change);
+                self.broadcast_party();
+            }
             (ClientMessage::DeclareCommands { .. } | ClientMessage::CommandResult { .. }, _) => {
                 reject("only games declare and answer requests")
             }
+            (ClientMessage::DeclareActions { .. }, _) => reject("only games declare actions"),
             _ => reject("only the local web server sends game commands"),
         }
     }
@@ -2623,6 +2697,8 @@ async fn serve(
                 ClientMessage::DeclareCommands { .. }
                     | ClientMessage::GameCommand { .. }
                     | ClientMessage::CommandResult { .. }
+                    | ClientMessage::DeclareActions { .. }
+                    | ClientMessage::TriggerAction { .. }
             ) {
                 shared.lock().await.game_command(parsed, &registration, &tx);
                 continue;
@@ -2650,6 +2726,7 @@ async fn serve(
                 s.games.remove(game_id);
                 s.companions.remove(game_id);
                 s.commands.remove(game_id);
+                s.actions.remove(game_id);
                 let mut kind = gamenight_protocol::GameIssueKind::Disconnected;
                 if let Some(mut child) = s.running_children.remove(game_id) {
                     if let Ok(Some(status)) = child.try_wait() {
@@ -2728,7 +2805,9 @@ fn message_to_command(
         }
         ClientMessage::DeclareCommands { .. }
         | ClientMessage::GameCommand { .. }
-        | ClientMessage::CommandResult { .. } => {
+        | ClientMessage::CommandResult { .. }
+        | ClientMessage::DeclareActions { .. }
+        | ClientMessage::TriggerAction { .. } => {
             return Err("game commands require dedicated routing".into())
         }
         ClientMessage::LobbyReady
@@ -3241,6 +3320,98 @@ mod replacement_lobby_tests {
         overlay.close(None).await.unwrap();
         new_overlay.close(None).await.unwrap();
         server.abort();
+    }
+
+    #[test]
+    fn phone_actions_reach_the_running_game_and_the_room_log() {
+        let game = GameId::new("ballkickers");
+        let meta: GameMeta =
+            serde_json::from_value(serde_json::json!({"id":"ballkickers","title":"Ballkickers"}))
+                .unwrap();
+        let mut s = Shared::new(vec![meta], "127.0.0.1:1".into(), None);
+        let (game_tx, mut game_rx) = mpsc::unbounded_channel();
+        let (web_tx, mut web_rx) = mpsc::unbounded_channel();
+        s.overlays.insert(0, web_tx.clone());
+        let messages = |rx: &mut mpsc::UnboundedReceiver<String>| -> Vec<ServerMessage> {
+            std::iter::from_fn(|| rx.try_recv().ok())
+                .map(|m| serde_json::from_str(&m).unwrap())
+                .collect()
+        };
+        s.dispatch(
+            Command::JoinParty {
+                name: "Ada".into(),
+                seat: None,
+                color: None,
+                avatar: None,
+                library: vec![],
+            },
+            None,
+        );
+        let ada = s.night.snapshot().players[0].id;
+        let press = |key: &str| ClientMessage::TriggerAction {
+            game: game.clone(),
+            player_id: ada,
+            key: key.into(),
+        };
+        s.games.insert(game.clone(), game_tx.clone());
+        s.game_command(
+            ClientMessage::DeclareActions {
+                actions: vec![gamenight_protocol::GameAction {
+                    key: "new_round".into(),
+                    label: "New round".into(),
+                    description: None,
+                    confirm: true,
+                }],
+            },
+            &Registration::Game(game.clone()),
+            &game_tx,
+        );
+        assert_eq!(s.snapshot().actions[0].actions[0].label, "New round");
+        messages(&mut web_rx);
+        // Not being played yet: refused, not forwarded.
+        s.game_command(press("new_round"), &Registration::Overlay(0), &web_tx);
+        assert!(matches!(
+            messages(&mut web_rx)[..],
+            [ServerMessage::Error { .. }]
+        ));
+        s.dispatch(Command::GameConnected { game: game.clone() }, None);
+        let session = messages(&mut game_rx)
+            .into_iter()
+            .find_map(|m| match m {
+                ServerMessage::Prepare { session, .. } => Some(session),
+                _ => None,
+            })
+            .expect("the game warms up");
+        // Without a lobby, the first game starts once it is ready.
+        s.dispatch(Command::SessionReady { session }, None);
+        assert_eq!(
+            s.night.active_session().map(|(g, _, _)| g.clone()),
+            Some(game.clone())
+        );
+        messages(&mut game_rx);
+        s.game_command(press("missing"), &Registration::Overlay(0), &web_tx);
+        assert!(messages(&mut web_rx)
+            .iter()
+            .any(|m| matches!(m, ServerMessage::Error { .. })));
+        s.game_command(press("new_round"), &Registration::Overlay(0), &web_tx);
+        assert!(messages(&mut game_rx).iter().any(|m| matches!(
+            m,
+            ServerMessage::ActionTriggered { key, player_id } if key == "new_round" && *player_id == ada
+        )));
+        assert_eq!(
+            s.snapshot().activity.last().unwrap().text,
+            "Ada: New round (Ballkickers)"
+        );
+        // A game cannot press buttons, also not its own.
+        s.game_command(
+            press("new_round"),
+            &Registration::Game(game.clone()),
+            &game_tx,
+        );
+        assert!(matches!(
+            messages(&mut game_rx)[..],
+            [ServerMessage::Error { .. }]
+        ));
     }
 
     /// A signed-in player's own setting is written to disk and reaches the

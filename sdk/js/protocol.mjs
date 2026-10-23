@@ -21,11 +21,12 @@ export const ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL";
 export const ENV_TOKEN = "GAMENIGHT_TOKEN";
 export const DEFAULT_ADDR = "127.0.0.1:7912";
 export const DEFAULT_WEB_PORT = 7913;
-export const GODOT_SDK_VERSION = 5;
+export const GODOT_SDK_VERSION = 6;
 export const PROTOCOL_VERSION = 1;
 
 /** Message "type" tags, both directions. */
 export const MSG = Object.freeze({
+  "ACTION_TRIGGERED": "action_triggered",
   "APPLY_UPDATE": "apply_update",
   "ASSIGN_SEAT": "assign_seat",
   "BIND_CONTROLLER": "bind_controller",
@@ -36,6 +37,7 @@ export const MSG = Object.freeze({
   "CONTROL_SETTINGS": "control_settings",
   "CONTROLLER_FRAME": "controller_frame",
   "CONTROLLER_INPUT": "controller_input",
+  "DECLARE_ACTIONS": "declare_actions",
   "DECLARE_COMMANDS": "declare_commands",
   "DECLARE_COMPANION": "declare_companion",
   "DECLARE_SETTINGS": "declare_settings",
@@ -91,6 +93,7 @@ export const MSG = Object.freeze({
   "START": "start",
   "SWAP_SEATS": "swap_seats",
   "SWITCH_LOBBY": "switch_lobby",
+  "TRIGGER_ACTION": "trigger_action",
   "VOTE": "vote",
   "WELCOME": "welcome"
 });
@@ -564,6 +567,24 @@ export const CLIENT_MESSAGES = {
       "ok"
     ]
   },
+  "declare_actions": {
+    "fields": [
+      "actions"
+    ],
+    "required": []
+  },
+  "trigger_action": {
+    "fields": [
+      "game",
+      "key",
+      "player_id"
+    ],
+    "required": [
+      "game",
+      "key",
+      "player_id"
+    ]
+  },
   "companion_presence": {
     "fields": [
       "connected",
@@ -760,6 +781,16 @@ export const SERVER_MESSAGES = {
       "ok"
     ]
   },
+  "action_triggered": {
+    "fields": [
+      "key",
+      "player_id"
+    ],
+    "required": [
+      "key",
+      "player_id"
+    ]
+  },
   "companion_presence": {
     "fields": [
       "connected",
@@ -791,6 +822,7 @@ export const ENUMS = {
     "setting",
     "profile",
     "round",
+    "action",
     "game"
   ],
   "GameIssueKind": [
@@ -881,6 +913,7 @@ export const ActivityKind = Object.freeze({
   "SETTING": "setting",
   "PROFILE": "profile",
   "ROUND": "round",
+  "ACTION": "action",
   "GAME": "game"
 });
 

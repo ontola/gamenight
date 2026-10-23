@@ -1126,6 +1126,7 @@ impl GameNight {
             game_issues: Vec::new(),
             companions: Vec::new(),
             commands: Vec::new(),
+            actions: Vec::new(),
             update_ready: None,
             lobbies: Vec::new(),
             activity: Vec::new(),

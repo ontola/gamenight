@@ -225,8 +225,12 @@ class GameScreen extends StatelessWidget {
       builder: (context) => SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: SettingsSection(
-              controls: controls, title: title, showEmpty: true),
+          child:
+              Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            GameActionsSection(
+                key: const ValueKey('game-actions'), controls: controls),
+            SettingsSection(controls: controls, title: title, showEmpty: true),
+          ]),
         ),
       ),
     );
