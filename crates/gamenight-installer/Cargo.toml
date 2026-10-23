@@ -9,7 +9,7 @@ repository.workspace = true
 [dependencies]
 gamenight-catalog = { path = "../gamenight-catalog" }
 gamenight-protocol = { workspace = true }
-tokio = { workspace = true, features = ["fs", "rt"] }
+tokio = { workspace = true, features = ["fs", "rt", "sync"] }
 futures-util = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

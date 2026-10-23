@@ -1530,7 +1530,13 @@ fn spawn_install_progress_pump(
                     // An explicit shelf entry belongs to this running host. A
                     // background catalogue refresh must not replace its launch
                     // command with a different build while people are playing.
-                    if s.launch_specs.contains_key(&meta.id) {
+                    // An older catalogue version kept playable at startup is
+                    // not explicit: the new one takes over from the next launch.
+                    let explicit = s
+                        .launch_specs
+                        .get(&meta.id)
+                        .is_some_and(|spec| !catalogue_install(spec, &root, &meta.id));
+                    if explicit {
                         info!(game = %status.game, "background install kept explicit shelf entry");
                     } else {
                         info!(game = %status.game, "background install joined the shelf");
@@ -1547,6 +1553,14 @@ fn spawn_install_progress_pump(
             s.apply_effects(fx, None);
         }
     });
+}
+
+/// Whether `spec` launches a catalogue install of `game` under `root`, as
+/// opposed to an explicit shelf entry or a playtest build.
+fn catalogue_install(spec: &LaunchSpec, root: &std::path::Path, game: &GameId) -> bool {
+    spec.cwd
+        .as_deref()
+        .is_some_and(|cwd| std::path::Path::new(cwd).starts_with(root.join(&game.0)))
 }
 
 /// How long a failed playtest download waits before the next poll retries it.
@@ -2879,6 +2893,37 @@ fn message_to_command(
 #[cfg(test)]
 mod replacement_lobby_tests {
     use super::*;
+    #[test]
+    fn only_catalogue_installs_give_way_to_a_newer_build() {
+        let root = std::path::Path::new("/data/games");
+        let game = GameId::new("bubble-buddies");
+        let spec = |cwd: &str| LaunchSpec {
+            command: "love".into(),
+            args: Vec::new(),
+            cwd: Some(cwd.into()),
+            env: Default::default(),
+        };
+        assert!(catalogue_install(
+            &spec("/data/games/bubble-buddies/317fe8"),
+            root,
+            &game
+        ));
+        assert!(!catalogue_install(
+            &spec("/data/games/.playtests/bubble-buddies/aa"),
+            root,
+            &game
+        ));
+        assert!(!catalogue_install(
+            &spec("/Applications/GameNight.app/games"),
+            root,
+            &game
+        ));
+        assert!(!catalogue_install(
+            &spec("/data/games/bubble-buddies-2/aa"),
+            root,
+            &game
+        ));
+    }
     #[test]
     fn onboarding_error_is_visible_without_a_phantom_game_and_clears() {
         let file =

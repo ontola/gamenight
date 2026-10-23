@@ -193,6 +193,24 @@ async fn shared_runtime_first_install_offline_restart_and_missing_file_repair() 
 }
 
 #[tokio::test]
+async fn concurrent_installs_of_one_version_both_succeed() {
+    // Startup prewarm and a catalogue refresh used to race: the loser's
+    // rename into the finished directory failed with "Directory not empty".
+    let game = archive("game/main.lua", b"game");
+    let runtime = archive("runtime/engine.exe", b"runtime");
+    let server = Server::new(game.clone(), runtime.clone());
+    let entry = entry(&server, &game, &runtime);
+    let root = std::env::temp_dir().join(format!("gamenight-download-{}", uuid::Uuid::new_v4()));
+    let (first, second) = tokio::join!(
+        ensure_installed(&entry, &root),
+        ensure_installed(&entry, &root)
+    );
+    assert_eq!(first.unwrap().executable, second.unwrap().executable);
+    assert_eq!(server.requests.load(Ordering::SeqCst), 2, "downloaded once");
+    tokio::fs::remove_dir_all(root).await.unwrap();
+}
+
+#[tokio::test]
 async fn bad_update_keeps_previous_version_and_never_reports_ready() {
     let game = archive("game/main.lua", b"game");
     let runtime = archive("runtime/engine.exe", b"runtime");

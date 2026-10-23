@@ -403,6 +403,18 @@ async fn cached_artifact(dl: &Download, dir: &Path) -> Option<PathBuf> {
     Some(executable)
 }
 
+/// One lock per install directory, shared by every install in this process.
+fn install_lock(destination: &Path) -> std::sync::Arc<tokio::sync::Mutex<()>> {
+    type Locks = std::sync::Mutex<HashMap<PathBuf, std::sync::Arc<tokio::sync::Mutex<()>>>>;
+    static LOCKS: std::sync::OnceLock<Locks> = std::sync::OnceLock::new();
+    let mut locks = LOCKS
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    locks.retain(|_, lock| std::sync::Arc::strong_count(lock) > 1);
+    locks.entry(destination.to_path_buf()).or_default().clone()
+}
+
 /// Publish a complete immutable version only after verification and extraction.
 /// Other versions remain usable while downloading an update or after a failure.
 async fn ensure_artifact(
@@ -411,6 +423,11 @@ async fn ensure_artifact(
     grant: Option<&str>,
     progress: &Progress<'_>,
 ) -> Result<PathBuf, InstallError> {
+    // Two passes can want the same version at once (startup prewarm and a
+    // catalogue refresh, or two LÖVE games sharing a runtime). The second
+    // waits and then finds it installed instead of renaming over it.
+    let lock = install_lock(destination);
+    let _installing = lock.lock().await;
     if let Some(executable) = cached_artifact(dl, destination).await {
         return Ok(executable);
     }
@@ -450,7 +467,14 @@ async fn ensure_artifact(
             )
             .await?;
         }
-        tokio::fs::rename(&staging, destination).await?;
+        if let Err(error) = tokio::fs::rename(&staging, destination).await {
+            // Another process published this version meanwhile: the rename
+            // then fails (ENOTEMPTY), but the verified copy is right there.
+            if let Some(executable) = cached_artifact(dl, destination).await {
+                return Ok(executable);
+            }
+            return Err(error.into());
+        }
         Ok(resolve_executable(dl, destination))
     }
     .await;
