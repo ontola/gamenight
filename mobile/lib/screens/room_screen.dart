@@ -9,6 +9,7 @@ import '../widgets/room_code_field.dart';
 import 'scanner_screen.dart';
 import 'game_screen.dart';
 import 'playlist_screen.dart';
+import 'room_log_screen.dart';
 
 /// Connect to a GameNight on this network and see where you stand in it.
 class RoomScreen extends StatefulWidget {
@@ -376,6 +377,7 @@ class RoomScreenState extends State<RoomScreen> {
                 ),
             ],
           ]),
+      if (connected) RoomLogPeek(state: state),
       if (room != null && (waiting || room.choosingPlayer))
         _phoneSeatCard(asked: room.phoneSeat),
       if (room != null && room.none)
@@ -569,6 +571,7 @@ class RoomScreenState extends State<RoomScreen> {
           ),
         ],
       ]),
+      if (linked) RoomLogPeek(state: state),
       if (waiting) _phoneSeatCard(asked: false),
       if (!linked && !waiting)
         Section(title: 'Room code', children: [

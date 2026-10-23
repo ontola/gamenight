@@ -216,6 +216,7 @@ playing, in the lobby, and a second route in makes the two disagree.
 | `declare_companion` *(optional)* | a phone screen for this game (see [Phone screens](#phone-screens)) |
 | `companion_message` *(optional)* | JSON for one player's phone screen, or every phone |
 | `rumble` *(optional)* | vibrate the controller on one of your seats (see [Rumble](#rumble)) |
+| `room_log` *(optional)* | one line for the room log players read back on their phones (see [Room log](#room-log)) |
 
 ```json
 { "type": "ready",    "session": "9be2…" }
@@ -407,6 +408,39 @@ requested first game. Lobbies should show it visibly without inventing a library
 or queue entry. It disappears when the request succeeds or another game is
 chosen. Games cannot submit this field. See [catalog onboarding](catalog-onboarding.md)
 for saved-choice recovery and local game registration.
+
+## Room log
+
+The host keeps a log of the evening for phones to read back: who joined and
+when, new names, controllers picked up or put down, phones linked, games
+started, rounds ended (`finished`) and match settings changed. It is never
+shown on the TV. Overlays find it as `activity` in the party snapshot, oldest
+first and at most 200 lines; games and lobbies never receive it.
+
+```json
+"activity": [
+  { "id": 0, "at": 1792785600, "kind": "joined", "text": "Ada joined" },
+  { "id": 1, "at": 1792785660, "kind": "game_started", "text": "Started Neon Trails",
+    "game": "neon-trails" }
+]
+```
+
+`at` is in Unix seconds. `kind` is one of `joined`, `left`, `profile`,
+`controller`, `phone`, `game_started`, `round`, `setting` or `game`; show
+unknown kinds as plain lines. The host writes `text` so every phone reads the
+same words. The local web server serves the log at `GET /api/activity?profile=…`
+to a player in the room, and the cloud relays the newest 100 lines of an online
+room at `GET /v1/rooms/activity`.
+
+A game may add a line of its own about its running session, such as a new run
+or a winner. Keep it to moments worth remembering: the host keeps one line per
+two seconds per game and cuts text after 120 characters.
+
+```json
+{ "type": "room_log", "session": "9be2…", "text": "New run" }
+```
+
+In Godot, call `GameNight.add_room_log("New run")`.
 
 ## The host's music
 

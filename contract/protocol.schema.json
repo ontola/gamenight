@@ -1,5 +1,77 @@
 {
   "$defs": {
+    "ActivityEntry": {
+      "description": "One line of the room log: someone joined, a game started, a setting\nchanged. The host writes the text, so every phone reads the same words.",
+      "properties": {
+        "at": {
+          "description": "When it happened, in Unix seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "game": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GameId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "id": {
+          "description": "Increasing within one host run (and carried over host updates).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ActivityKind"
+        },
+        "text": {
+          "description": "One short sentence, e.g. \"Joep picked up a controller\".",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "kind",
+        "text"
+      ],
+      "type": "object"
+    },
+    "ActivityKind": {
+      "description": "What a room log line is about, for an icon next to it.",
+      "oneOf": [
+        {
+          "enum": [
+            "joined",
+            "left",
+            "controller",
+            "phone",
+            "game_started",
+            "setting"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "profile",
+          "description": "A new name or profile for someone already in the room.",
+          "type": "string"
+        },
+        {
+          "const": "round",
+          "description": "A round ended, or the game reported a new run or round.",
+          "type": "string"
+        },
+        {
+          "const": "game",
+          "description": "Something a game chose to report with `room_log`.",
+          "type": "string"
+        }
+      ]
+    },
     "ClientMessage": {
       "oneOf": [
         {
@@ -939,6 +1011,27 @@
           "type": "object"
         },
         {
+          "description": "Optional: one short line for the room log that phones read back,\nsuch as \"New run\" or \"Joep won round 3\". Not shown on the TV. Keep it\nrare (a round, a run, a level), never per frame; the host drops\nfloods and cuts text after 120 characters.",
+          "properties": {
+            "session": {
+              "$ref": "#/$defs/SessionId"
+            },
+            "text": {
+              "type": "string"
+            },
+            "type": {
+              "const": "room_log",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "session",
+            "text"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Optional factual diagnostics, without accounts or recommendation data.",
           "properties": {
             "sample": {
@@ -1710,6 +1803,13 @@
               "type": "null"
             }
           ]
+        },
+        "activity": {
+          "description": "What happened in the room tonight, oldest first (see\n[`ActivityEntry`]). For phones to read back later; only trusted local\nUIs see it, it is stripped from game and lobby snapshots.",
+          "items": {
+            "$ref": "#/$defs/ActivityEntry"
+          },
+          "type": "array"
         },
         "commands": {
           "description": "Plain-text requests declared by connected games (see [`GameCommands`]).",

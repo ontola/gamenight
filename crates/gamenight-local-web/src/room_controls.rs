@@ -82,6 +82,17 @@ pub(crate) async fn games(
     Ok(Json(json!({ "games": games })))
 }
 
+/// `GET /api/activity?profile=…`: the room log, oldest first, for a player
+/// in the room to read back what happened tonight.
+pub(crate) async fn activity(
+    State(state): State<SharedState>,
+    Query(query): Query<ProfileQuery>,
+) -> Result<Json<Value>, StatusCode> {
+    let party = daemon::party(&state).await?;
+    seat(&state, &party, &query.profile).ok_or(StatusCode::FORBIDDEN)?;
+    Ok(Json(json!({ "entries": party.activity })))
+}
+
 #[derive(Deserialize)]
 pub struct QueueRequest {
     profile: String,

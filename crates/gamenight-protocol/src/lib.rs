@@ -997,6 +997,46 @@ pub struct PartySnapshot {
     /// marked `current`. Empty when the host cannot switch (development runs).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lobbies: Vec<LobbyChoice>,
+    /// What happened in the room tonight, oldest first (see
+    /// [`ActivityEntry`]). For phones to read back later; only trusted local
+    /// UIs see it, it is stripped from game and lobby snapshots.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activity: Vec<ActivityEntry>,
+}
+
+/// One line of the room log: someone joined, a game started, a setting
+/// changed. The host writes the text, so every phone reads the same words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+pub struct ActivityEntry {
+    /// Increasing within one host run (and carried over host updates).
+    pub id: u64,
+    /// When it happened, in Unix seconds.
+    pub at: u64,
+    pub kind: ActivityKind,
+    /// One short sentence, e.g. "Joep picked up a controller".
+    pub text: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game: Option<GameId>,
+}
+
+/// What a room log line is about, for an icon next to it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum ActivityKind {
+    Joined,
+    Left,
+    /// A new name or profile for someone already in the room.
+    Profile,
+    Controller,
+    Phone,
+    GameStarted,
+    /// A round ended, or the game reported a new run or round.
+    Round,
+    Setting,
+    /// Something a game chose to report with `room_log`.
+    Game,
 }
 
 /// A lobby the host can run: bundled with the app or installed locally.
@@ -1371,6 +1411,14 @@ pub enum ClientMessage {
     /// A round ended. Informational: keep playing; no focus or playlist change.
     Finished {
         session: SessionId,
+    },
+    /// Optional: one short line for the room log that phones read back,
+    /// such as "New run" or "Joep won round 3". Not shown on the TV. Keep it
+    /// rare (a round, a run, a level), never per frame; the host drops
+    /// floods and cuts text after 120 characters.
+    RoomLog {
+        session: SessionId,
+        text: String,
     },
     /// Optional factual diagnostics, without accounts or recommendation data.
     Performance {

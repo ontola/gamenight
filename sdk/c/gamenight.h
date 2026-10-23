@@ -136,6 +136,7 @@ extern "C" {
 #define GN_MSG_REQUEST_START "request_start"
 #define GN_MSG_RESUME "resume"
 #define GN_MSG_RETRY_LOBBY "retry_lobby"
+#define GN_MSG_ROOM_LOG "room_log"
 #define GN_MSG_RUMBLE "rumble"
 #define GN_MSG_SET_COUCH_POSITION "set_couch_position"
 #define GN_MSG_SET_PHONES "set_phones"
@@ -153,6 +154,17 @@ extern "C" {
 #define GN_MSG_SWITCH_LOBBY "switch_lobby"
 #define GN_MSG_VOTE "vote"
 #define GN_MSG_WELCOME "welcome"
+
+/* ActivityKind */
+#define GN_ACTIVITY_KIND_JOINED "joined"
+#define GN_ACTIVITY_KIND_LEFT "left"
+#define GN_ACTIVITY_KIND_CONTROLLER "controller"
+#define GN_ACTIVITY_KIND_PHONE "phone"
+#define GN_ACTIVITY_KIND_GAME_STARTED "game_started"
+#define GN_ACTIVITY_KIND_SETTING "setting"
+#define GN_ACTIVITY_KIND_PROFILE "profile"
+#define GN_ACTIVITY_KIND_ROUND "round"
+#define GN_ACTIVITY_KIND_GAME "game"
 
 /* GameIssueKind */
 #define GN_GAME_ISSUE_KIND_CLOSED "closed"

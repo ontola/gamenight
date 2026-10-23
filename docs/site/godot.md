@@ -48,6 +48,8 @@ The addon provides this implementation:
 
 Call `GameNight.notify_ready(session_id)` only after your level and first frame are prepared. `notify_finished` reports a round; your game still owns the results screen and next round.
 
+`GameNight.add_room_log("New run")` adds a line to the room log players read back in the GameNight app (never on the TV). Use it for a new run, a level or a winner, not every frame.
+
 To get live roster updates, opt in from `prepared`, before Ready:
 
 ```gdscript

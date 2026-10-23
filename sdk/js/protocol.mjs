@@ -75,6 +75,7 @@ export const MSG = Object.freeze({
   "REQUEST_START": "request_start",
   "RESUME": "resume",
   "RETRY_LOBBY": "retry_lobby",
+  "ROOM_LOG": "room_log",
   "RUMBLE": "rumble",
   "SET_COUCH_POSITION": "set_couch_position",
   "SET_PHONES": "set_phones",
@@ -463,6 +464,16 @@ export const CLIENT_MESSAGES = {
       "session"
     ]
   },
+  "room_log": {
+    "fields": [
+      "session",
+      "text"
+    ],
+    "required": [
+      "session",
+      "text"
+    ]
+  },
   "performance": {
     "fields": [
       "sample",
@@ -771,6 +782,17 @@ export const SERVER_MESSAGES = {
 
 /** String enums by type name. */
 export const ENUMS = {
+  "ActivityKind": [
+    "joined",
+    "left",
+    "controller",
+    "phone",
+    "game_started",
+    "setting",
+    "profile",
+    "round",
+    "game"
+  ],
   "GameIssueKind": [
     "closed",
     "disconnected",
@@ -849,6 +871,18 @@ export const ENUMS = {
     "quit"
   ]
 };
+
+export const ActivityKind = Object.freeze({
+  "JOINED": "joined",
+  "LEFT": "left",
+  "CONTROLLER": "controller",
+  "PHONE": "phone",
+  "GAME_STARTED": "game_started",
+  "SETTING": "setting",
+  "PROFILE": "profile",
+  "ROUND": "round",
+  "GAME": "game"
+});
 
 export const GameIssueKind = Object.freeze({
   "CLOSED": "closed",

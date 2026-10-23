@@ -75,6 +75,7 @@ MSG_REQUEST_OVERLAY = "request_overlay"
 MSG_REQUEST_START = "request_start"
 MSG_RESUME = "resume"
 MSG_RETRY_LOBBY = "retry_lobby"
+MSG_ROOM_LOG = "room_log"
 MSG_RUMBLE = "rumble"
 MSG_SET_COUCH_POSITION = "set_couch_position"
 MSG_SET_PHONES = "set_phones"
@@ -92,6 +93,17 @@ MSG_SWAP_SEATS = "swap_seats"
 MSG_SWITCH_LOBBY = "switch_lobby"
 MSG_VOTE = "vote"
 MSG_WELCOME = "welcome"
+
+# ActivityKind
+ACTIVITY_KIND_JOINED = "joined"
+ACTIVITY_KIND_LEFT = "left"
+ACTIVITY_KIND_CONTROLLER = "controller"
+ACTIVITY_KIND_PHONE = "phone"
+ACTIVITY_KIND_GAME_STARTED = "game_started"
+ACTIVITY_KIND_SETTING = "setting"
+ACTIVITY_KIND_PROFILE = "profile"
+ACTIVITY_KIND_ROUND = "round"
+ACTIVITY_KIND_GAME = "game"
 
 # GameIssueKind
 GAME_ISSUE_KIND_CLOSED = "closed"
@@ -539,6 +551,16 @@ CLIENT_MESSAGES = {
             "session"
         ]
     },
+    "room_log": {
+        "fields": [
+            "session",
+            "text"
+        ],
+        "required": [
+            "session",
+            "text"
+        ]
+    },
     "performance": {
         "fields": [
             "sample",
@@ -847,6 +869,17 @@ SERVER_MESSAGES = {
 
 # String enums by type name.
 ENUMS = {
+    "ActivityKind": [
+        "joined",
+        "left",
+        "controller",
+        "phone",
+        "game_started",
+        "setting",
+        "profile",
+        "round",
+        "game"
+    ],
     "GameIssueKind": [
         "closed",
         "disconnected",

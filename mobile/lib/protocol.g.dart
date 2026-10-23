@@ -73,6 +73,7 @@ const String msgRequestOverlay = 'request_overlay';
 const String msgRequestStart = 'request_start';
 const String msgResume = 'resume';
 const String msgRetryLobby = 'retry_lobby';
+const String msgRoomLog = 'room_log';
 const String msgRumble = 'rumble';
 const String msgSetCouchPosition = 'set_couch_position';
 const String msgSetPhones = 'set_phones';
@@ -90,6 +91,9 @@ const String msgSwapSeats = 'swap_seats';
 const String msgSwitchLobby = 'switch_lobby';
 const String msgVote = 'vote';
 const String msgWelcome = 'welcome';
+
+/// ActivityKind
+const List<String> activityKindValues = ['joined', 'left', 'controller', 'phone', 'game_started', 'setting', 'profile', 'round', 'game'];
 
 /// GameIssueKind
 const List<String> gameIssueKindValues = ['closed', 'disconnected', 'exited_unexpectedly', 'failed_to_start', 'startup_timeout'];

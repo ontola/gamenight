@@ -250,6 +250,7 @@ pub fn create_router(state: SharedState) -> Router {
         .route("/api/playlist/queue", post(room_controls::queue))
         .route("/api/playlist/next", post(room_controls::next))
         .route("/api/games", get(room_controls::games))
+        .route("/api/activity", get(room_controls::activity))
         .route(
             "/api/settings",
             get(room_controls::get_settings).post(room_controls::set_settings),

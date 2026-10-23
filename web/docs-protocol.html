@@ -322,6 +322,10 @@ playing, in the lobby, and a second route in makes the two disagree.</p>
 <td><code>rumble</code> <em>(optional)</em></td>
 <td>vibrate the controller on one of your seats (see <a href="#rumble">Rumble</a>)</td>
 </tr>
+<tr>
+<td><code>room_log</code> <em>(optional)</em></td>
+<td>one line for the room log players read back on their phones (see <a href="#room-log">Room log</a>)</td>
+</tr>
 </tbody>
 </table>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;ready&quot;,    &quot;session&quot;: &quot;9be2…&quot; }
@@ -544,6 +548,30 @@ requested first game. Lobbies should show it visibly without inventing a library
 or queue entry. It disappears when the request succeeds or another game is
 chosen. Games cannot submit this field. See <a href="https://github.com/ontola/gamenight/blob/main/docs/catalog-onboarding.md">catalog onboarding</a>
 for saved-choice recovery and local game registration.</p>
+<h2 id="room-log">Room log</h2>
+<p>The host keeps a log of the evening for phones to read back: who joined and
+when, new names, controllers picked up or put down, phones linked, games
+started, rounds ended (<code>finished</code>) and match settings changed. It is never
+shown on the TV. Overlays find it as <code>activity</code> in the party snapshot, oldest
+first and at most 200 lines; games and lobbies never receive it.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">&quot;activity&quot;: [
+  { &quot;id&quot;: 0, &quot;at&quot;: 1792785600, &quot;kind&quot;: &quot;joined&quot;, &quot;text&quot;: &quot;Ada joined&quot; },
+  { &quot;id&quot;: 1, &quot;at&quot;: 1792785660, &quot;kind&quot;: &quot;game_started&quot;, &quot;text&quot;: &quot;Started Neon Trails&quot;,
+    &quot;game&quot;: &quot;neon-trails&quot; }
+]
+</code></pre></div>
+<p><code>at</code> is in Unix seconds. <code>kind</code> is one of <code>joined</code>, <code>left</code>, <code>profile</code>,
+<code>controller</code>, <code>phone</code>, <code>game_started</code>, <code>round</code>, <code>setting</code> or <code>game</code>; show
+unknown kinds as plain lines. The host writes <code>text</code> so every phone reads the
+same words. The local web server serves the log at <code>GET /api/activity?profile=…</code>
+to a player in the room, and the cloud relays the newest 100 lines of an online
+room at <code>GET /v1/rooms/activity</code>.</p>
+<p>A game may add a line of its own about its running session, such as a new run
+or a winner. Keep it to moments worth remembering: the host keeps one line per
+two seconds per game and cuts text after 120 characters.</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{ &quot;type&quot;: &quot;room_log&quot;, &quot;session&quot;: &quot;9be2…&quot;, &quot;text&quot;: &quot;New run&quot; }
+</code></pre></div>
+<p>In Godot, call <code>GameNight.add_room_log(&quot;New run&quot;)</code>.</p>
 <h2 id="the-hosts-music">The host's music</h2>
 <p>Somebody puts a record on before the first match, and for the rest of the
 evening they're the only one who can reach it — it's their laptop, in another
@@ -1051,7 +1079,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="9915ae11bd7e8916ef1df3f540605d9ae089d6471f52ca5b2ccbfe28351781eb">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="b922db6fa765a149d3e34eced7ccc1b43537c0b1e97249f162604d2f84baef25">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

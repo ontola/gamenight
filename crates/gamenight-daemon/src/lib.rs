@@ -5,6 +5,7 @@
 //! logic lives in `gamenight-core`; this crate only does IO — decode incoming
 //! messages into [`Command`]s, execute the returned [`Effect`]s.
 
+mod activity;
 mod focus;
 mod lobby_input;
 #[cfg(target_os = "macos")]
@@ -133,6 +134,8 @@ struct Shared {
     /// The launcher's lobby choice files, and the lobbies they offer.
     lobby_paths: Option<gamenight_local_web::host_lobby::Paths>,
     lobbies: Vec<gamenight_protocol::LobbyChoice>,
+    /// What happened tonight, for phones to read back.
+    room_log: activity::RoomLog,
 }
 
 /// The update handoff with the desktop launcher. The launcher downloads in
@@ -307,6 +310,8 @@ impl Shared {
             .collect();
         let mut night = GameNight::default();
         night.set_library(library);
+        let mut room_log = activity::RoomLog::default();
+        room_log.settle(night.snapshot());
         Self {
             night,
             games: HashMap::new(),
@@ -346,6 +351,7 @@ impl Shared {
             unattended_since: None,
             lobby_paths: None,
             lobbies: Vec::new(),
+            room_log,
         }
     }
 
@@ -367,6 +373,7 @@ impl Shared {
         party.commands.sort_by(|a, b| a.game.0.cmp(&b.game.0));
         party.update_ready = self.update_ready.clone();
         party.lobbies = self.lobbies.clone();
+        party.activity = self.room_log.entries();
         party
     }
 
@@ -415,8 +422,10 @@ impl Shared {
         let Some(update) = &self.update else {
             return Err("this host cannot restart itself".into());
         };
+        let mut party = self.night.carry();
+        party.activity = self.room_log.entries();
         let resume = Resume {
-            party: self.night.carry(),
+            party,
             web: None,
             lobby,
         };
@@ -425,6 +434,15 @@ impl Shared {
             .map_err(|error| format!("could not save the party: {error}"))?;
         self.shutdown_requested = true;
         Ok(())
+    }
+
+    /// Bring a carried party back (see `restart_with_party`), log included.
+    fn restore_party(&mut self, mut carry: PartyCarry) {
+        self.room_log.restore(std::mem::take(&mut carry.activity));
+        let fx = self.night.restore(carry);
+        // The same party, back: nobody joined.
+        self.room_log.settle(self.night.snapshot());
+        self.apply_effects(fx, None);
     }
 
     /// Re-read which lobbies the launcher offers; the running one is current.
@@ -702,6 +720,17 @@ impl Shared {
                 self.apply_effects(vec![Effect::StateChanged], None);
             }
         }
+        if let Command::SessionFinished { session } = &command {
+            if let Some((game, _, _)) = self
+                .night
+                .active_session()
+                .filter(|(_, id, _)| id == session)
+            {
+                let game = game.clone();
+                let title = gamenight_core::activity::title(&self.night.snapshot(), &game);
+                self.room_log.round_over(*session, &game, &title);
+            }
+        }
         let previous_music = self.night.now_playing().cloned();
         // `Effect::Launch` only ever fires for a library entry that already
         // has a launch spec (`gamenight_core::maybe_warm`'s guard) — a
@@ -901,7 +930,8 @@ impl Shared {
         }
     }
 
-    fn broadcast_party(&self) {
+    fn broadcast_party(&mut self) {
+        self.room_log.observe(&self.night.snapshot());
         let msg = ServerMessage::PartyState {
             party: self.snapshot(),
         };
@@ -1358,6 +1388,7 @@ fn game_welcome_snapshot(
     }
     // A game only needs its own screen, not where other games live on disk.
     party.companions.clear();
+    party.activity.clear();
     party
 }
 
@@ -1372,6 +1403,8 @@ fn lobby_snapshot(
     for companion in &mut party.companions {
         companion.root = None;
     }
+    // For phones to read back, not for the TV.
+    party.activity.clear();
     party
 }
 
@@ -1983,8 +2016,7 @@ async fn run_inner(
         s.lobby_paths = gamenight_local_web::host_lobby::host_paths();
         if let Some(carry) = desktop.carry {
             info!(players = carry.players.len(), "party restored after update");
-            let fx = s.night.restore(carry);
-            s.apply_effects(fx, None);
+            s.restore_party(carry);
         }
     }
     let watched_lobby = lobby_game.clone();
@@ -2551,6 +2583,32 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::RoomLog { session, text } = &parsed {
+                // A game's own line for the room log, about its own session.
+                let mut s = shared.lock().await;
+                let current = match &registration {
+                    Registration::Game(game) => s
+                        .night
+                        .active_session()
+                        .filter(|(active, id, _)| *active == game && id == session)
+                        .map(|(game, _, _)| game.clone()),
+                    _ => None,
+                };
+                match current {
+                    Some(game) => {
+                        if s.room_log.note(&game, text) {
+                            s.broadcast_party();
+                        }
+                    }
+                    None => send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the game being played adds to the room log".into(),
+                        },
+                    ),
+                }
+                continue;
+            }
             if matches!(
                 parsed,
                 ClientMessage::DeclareCompanion { .. }
@@ -2682,6 +2740,9 @@ fn message_to_command(
         }
         ClientMessage::DownloadGrants { .. } | ClientMessage::Playtests { .. } => {
             return Err("download grants require dedicated routing".into())
+        }
+        ClientMessage::RoomLog { .. } => {
+            return Err("room log lines require dedicated routing".into())
         }
         ClientMessage::Participation {
             session,
@@ -3976,6 +4037,33 @@ mod update_restart_tests {
     }
 
     #[test]
+    fn room_log_reaches_overlays_but_not_games_or_the_lobby() {
+        let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        let ada = join(&mut s, "Ada", "xinput:0");
+        s.dispatch(
+            Command::RenamePlayer {
+                player_id: ada,
+                name: "Joep".into(),
+            },
+            None,
+        );
+        s.dispatch(Command::LeaveParty { player_id: ada }, None);
+        let party = s.snapshot();
+        let texts: Vec<_> = party.activity.iter().map(|e| e.text.as_str()).collect();
+        assert_eq!(texts, ["Ada joined", "Ada is now Joep", "Joep left"]);
+        assert!(party
+            .activity
+            .windows(2)
+            .all(|w| w[0].id < w[1].id && w[0].at <= w[1].at));
+        assert!(game_welcome_snapshot(s.snapshot()).activity.is_empty());
+        assert!(lobby_snapshot(s.snapshot()).activity.is_empty());
+        let game = GameId::new("pocket-aces");
+        assert!(s.room_log.note(&game, "New run"));
+        assert!(!s.room_log.note(&game, "Again"), "one line per interval");
+        assert_eq!(s.snapshot().activity.last().unwrap().text, "New run");
+    }
+
+    #[test]
     fn update_restart_brings_the_same_party_back() {
         let update = host_update();
         let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
@@ -4003,9 +4091,17 @@ mod update_restart_tests {
         let resume = Resume::take(&update.resume).expect("fresh resume file");
         assert!(!update.resume.exists(), "a resume file is used once");
         let mut next = Shared::new(vec![], "127.0.0.1:0".into(), None);
-        let fx = next.night.restore(resume.party);
-        next.apply_effects(fx, None);
+        next.restore_party(resume.party);
         let after = next.night.snapshot();
+        let log = |s: &Shared| -> Vec<String> {
+            s.snapshot().activity.into_iter().map(|e| e.text).collect()
+        };
+        assert_eq!(
+            log(&next),
+            log(&s),
+            "the room log comes along, nobody rejoins"
+        );
+        assert_eq!(log(&next)[..2], ["Ada joined", "Bo joined"]);
         assert_eq!(after.players, before.players);
         assert_eq!(after.seats, before.seats);
         assert_eq!(after.playlist.entries, before.playlist.entries);

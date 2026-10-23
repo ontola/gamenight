@@ -315,6 +315,10 @@ pub struct PartyCarry {
     pub history: Vec<GameId>,
     #[serde(default)]
     pub settings: Vec<GameSettings>,
+    /// The room log so far. Kept by the daemon, not the night: `carry`
+    /// leaves it empty for the daemon to fill.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activity: Vec<gamenight_protocol::ActivityEntry>,
 }
 
 /// Players' own setting values: owner -> game -> key -> value. The owner is a
@@ -1124,6 +1128,7 @@ impl GameNight {
             commands: Vec::new(),
             update_ready: None,
             lobbies: Vec::new(),
+            activity: Vec::new(),
             presence: self.presence_snapshot(),
             phones: self.party_phones(),
             players: self.players.clone(),
@@ -1225,6 +1230,7 @@ impl GameNight {
             queued: self.playlist.queued(),
             history: self.history.clone(),
             settings: self.settings.clone(),
+            activity: Vec::new(),
         }
     }
 

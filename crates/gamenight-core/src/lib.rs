@@ -5,6 +5,7 @@
 //! execute. Every rule of the evening — seat assignment, warm sessions,
 //! instant transitions, avatar voting — lives here and is tested here.
 
+pub mod activity;
 mod night;
 mod playlist;
 mod session;

@@ -123,6 +123,8 @@ fn playtest_key(playtests: &[gamenight_protocol::Playtest]) -> PlaytestKey {
         .map(|p| (p.entry.clone(), p.versions.clone()))
         .collect()
 }
+/// The room log lines the cloud keeps for phones in an online room.
+const CLOUD_ACTIVITY: usize = 100;
 /// Resend unchanged playtests this often, so a failed download retries with a
 /// fresh grant.
 const PLAYTEST_RESEND: Duration = Duration::from_secs(300);
@@ -374,6 +376,10 @@ impl Bridge {
         let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
         // Waiting phones that asked for a seat of their own, tried once each.
         let mut phone_seats: HashMap<String, Option<PlayerId>> = HashMap::new();
+        // The newest room log line the cloud has, and when it got it. The log
+        // is the largest part of a poll: sent when it changed, and now and
+        // then in case the cloud restarted.
+        let mut sent_activity: Option<(Option<u64>, std::time::Instant)> = None;
         loop {
             tokio::select! {
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {},
@@ -406,19 +412,31 @@ impl Bridge {
                 applied.clear();
                 acknowledged = None;
                 receipt = None;
+                sent_activity = None;
             }
             let mut discovery = discovery::snapshot(&party, &acknowledged);
             discovery["agent_receipt"] = receipt.clone().unwrap_or(serde_json::Value::Null);
+            let newest = party.activity.last().map(|entry| entry.id);
+            let mut body = serde_json::json!({"seats":seats,"discovery":discovery});
+            if sent_activity
+                .is_none_or(|(sent, at)| sent != newest || at.elapsed() > PLAYTEST_RESEND)
+            {
+                let skip = party.activity.len().saturating_sub(CLOUD_ACTIVITY);
+                body["activity"] = serde_json::json!(&party.activity[skip..]);
+            }
             let Ok(response) = self
                 .http
                 .post(format!("{}/v1/lobbies/poll", self.origin))
                 .bearer_auth(token.unwrap())
-                .json(&serde_json::json!({"seats":seats,"discovery":discovery}))
+                .json(&body)
                 .send()
                 .await
             else {
                 continue;
             };
+            if response.status().is_success() && body.get("activity").is_some() {
+                sent_activity = Some((newest, std::time::Instant::now()));
+            }
             if response.status() == 401 {
                 *self.session.lock().unwrap() = None;
                 self.pairing.lock().unwrap().clear();

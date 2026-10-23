@@ -38,6 +38,44 @@ class HostGame {
   }
 }
 
+/// One line of the room log: who joined, which game started, what changed.
+class ActivityEntry {
+  final int id;
+  final DateTime at;
+
+  /// "joined", "left", "profile", "controller", "phone", "game_started",
+  /// "round", "setting" or "game"; unknown kinds from newer hosts are kept.
+  final String kind;
+  final String text;
+  final String? game;
+
+  const ActivityEntry(
+      {required this.id,
+      required this.at,
+      required this.kind,
+      required this.text,
+      this.game});
+
+  static ActivityEntry? fromJson(Object? j) {
+    if (j is! Map || j['text'] is! String || j['at'] is! num) return null;
+    return ActivityEntry(
+      id: (j['id'] as num?)?.toInt() ?? 0,
+      at: DateTime.fromMillisecondsSinceEpoch((j['at'] as num).toInt() * 1000),
+      kind: j['kind']?.toString() ?? '',
+      text: j['text'] as String,
+      game: j['game'] as String?,
+    );
+  }
+
+  static List<ActivityEntry> listFromJson(Object? j) {
+    final list = j is Map && j['entries'] is List ? j['entries'] as List : [];
+    return [
+      for (final e in list)
+        if (fromJson(e) case final entry?) entry
+    ];
+  }
+}
+
 enum SettingKind { toggle, number, choice }
 
 /// One knob the current game lets the party turn.
@@ -195,6 +233,9 @@ abstract class RoomControls {
   Future<PlayerSettings?> setPlayerSetting(
           String game, String key, Object value) async =>
       null;
+
+  /// The room log, oldest first. Empty when the host keeps none yet.
+  Future<List<ActivityEntry>> activity();
 }
 
 /// The room on a GameNight computer on this Wi-Fi. The host knows this phone
@@ -298,6 +339,18 @@ class LocalRoomControls implements RoomControls {
       PlayerSettings.fromJson(await api.request('POST', '/api/player-settings',
           body: {'profile': profile, 'game': game, 'key': key, 'value': value},
           failure: 'The game did not take that change.'));
+
+  @override
+  Future<List<ActivityEntry>> activity() async {
+    try {
+      return ActivityEntry.listFromJson(
+          await api.request('GET', '/api/activity?$_query'));
+    } on ApiError catch (e) {
+      // Hosts from before the room log.
+      if (e.status == 404 || e.status == 405) return const [];
+      rethrow;
+    }
+  }
 }
 
 /// An online room joined by code. The website relays to the GameNight
@@ -479,6 +532,11 @@ class CloudRoomControls implements RoomControls {
     }
     throw unconfirmed;
   }
+
+  @override
+  Future<List<ActivityEntry>> activity() async => ActivityEntry.listFromJson(
+      await cloud.request('GET', '/v1/rooms/activity',
+          errors: {403: 'Join the room first.'}));
 
   // Online rooms do not relay players' own settings yet.
   @override
