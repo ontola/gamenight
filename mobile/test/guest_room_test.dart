@@ -193,6 +193,7 @@ void main() {
 
   testWidgets('a wrong room code says so; Host a room is offered',
       (tester) async {
+    state.keepName();
     await tester.pumpWidget(GameNightApp(state: state));
     await tester.pumpAndSettle();
     expect(find.text('Host a room'), findsOneWidget);
@@ -215,10 +216,16 @@ void main() {
   testWidgets('cold scanned URL shows player picker, never email form',
       (tester) async {
     server.phone = false;
+    final random = state.name;
     await tester.pumpWidget(GameNightApp(
         state: state,
         initialLink: Uri.parse('$hostedOrigin/app/?room=ABC234')));
     await tester.pumpAndSettle();
+    // Leaving the name empty keeps the random one, and it asks only once.
+    await tester.tap(find.text('Join room'));
+    await tester.pumpAndSettle();
+    expect(state.name, random);
+    expect(state.choseName, isTrue);
     expect(find.text('Choose your player'), findsOneWidget);
     expect(find.text('Email me a code'), findsNothing);
     await tester.tap(find.text('Player 2'));

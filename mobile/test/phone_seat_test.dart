@@ -21,6 +21,7 @@ class FullRoom {
   String status = 'waiting';
   bool phoneSeat = false;
   final calls = <String>[];
+  String? joinedAs;
   Map<String, dynamic> get room => {
         'status': status,
         'guest': true,
@@ -52,6 +53,7 @@ class FullRoom {
         calls.add(key);
         switch (key) {
           case 'POST /v1/rooms/guest':
+            joinedAs = jsonDecode(r.body)['profile']['display_name'];
             return http.Response(
                 jsonEncode({'token': guest, 'status': room, 'profile': {}}),
                 200);
@@ -123,6 +125,15 @@ void main() {
             state: state,
             initialLink: Uri.parse('$hostedOrigin/app/?room=ABC234'))));
     await tester.pumpAndSettle();
+    // A new phone names its player before the room shows it.
+    expect(find.byKey(const ValueKey('name-dialog')), findsOneWidget);
+    expect(server.calls, isNot(contains('POST /v1/rooms/guest')));
+    await _capture(tester, 'name-step');
+    await tester.enterText(find.byType(TextField).last, 'Joep');
+    await tester.tap(find.text('Join room'));
+    await tester.pumpAndSettle();
+    expect(server.joinedAs, 'Joep');
+    expect(state.name, 'Joep');
     final button = find.text('Play on this phone');
     await tester.scrollUntilVisible(button, 200,
         scrollable: find.byType(Scrollable).first);

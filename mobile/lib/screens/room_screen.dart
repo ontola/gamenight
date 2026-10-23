@@ -5,6 +5,7 @@ import '../link.dart';
 import '../navigation/open_website.dart';
 import '../theme.dart';
 import '../layout.dart';
+import '../widgets/name_dialog.dart';
 import '../widgets/room_code_field.dart';
 import 'scanner_screen.dart';
 import 'game_screen.dart';
@@ -78,13 +79,21 @@ class RoomScreenState extends State<RoomScreen> {
           return;
         }
         await state.rememberRoomInvitation(link);
+        await _askNameOnce();
         await _joinAction(state.resumeRoomInvitation);
       } else {
+        await _askNameOnce();
         await _joinAction(() => state.connect(link));
       }
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
     }
+  }
+
+  /// A new, signed-out player names themselves before the room shows them.
+  Future<void> _askNameOnce() async {
+    if (state.choseName || !mounted) return;
+    await askName(context, state);
   }
 
   Future<void> _joinAction(Future<String> Function() action) => _run(action);
@@ -105,6 +114,7 @@ class RoomScreenState extends State<RoomScreen> {
       _code.clear();
       return;
     }
+    await _askNameOnce();
     // On a GameNight's Wi-Fi the code picks up a character there; otherwise
     // it is an online room, like the website's join page.
     if (state.host != null) {

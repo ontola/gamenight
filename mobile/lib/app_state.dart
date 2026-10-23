@@ -39,6 +39,10 @@ class AppState extends ChangeNotifier {
     profileId = prefs.getString('profile_id') ?? _newProfileId();
     prefs.setString('profile_id', profileId);
     name = prefs.getString('player_name') ?? randomName();
+    // Phones that already played kept their name: do not ask them again.
+    if (prefs.getBool('chose_name') == null && joinedRoom) {
+      prefs.setBool('chose_name', true);
+    }
     skinColor = prefs.getString('skin_color') ?? defaultSkin;
     clothingColor = prefs.getString('clothing_color') ?? '#55a0ff';
     final firstRun = prefs.getString('face') == null;
@@ -253,6 +257,7 @@ class AppState extends ChangeNotifier {
     }
     name = backup.username;
     prefs.setString('player_name', name);
+    prefs.setBool('chose_name', true);
     if (backup.preferredColor case final color?) {
       clothingColor = color;
       prefs.setString('clothing_color', color);
@@ -289,9 +294,20 @@ class AppState extends ChangeNotifier {
 
   void setName(String value) {
     name = value;
-    if (value.trim().isNotEmpty) prefs.setString('player_name', value);
+    if (value.trim().isNotEmpty) {
+      prefs.setString('player_name', value);
+      prefs.setBool('chose_name', true);
+    }
     scheduleSave();
   }
+
+  /// The player picked a name, or kept the random one when asked. Until
+  /// then a scanned room asks for a name before joining. A signed-in phone
+  /// has the account's name.
+  bool get choseName => signedIn || (prefs.getBool('chose_name') ?? false);
+
+  /// Kept the random name when asked: do not ask again.
+  void keepName() => prefs.setBool('chose_name', true);
 
   void setSkin(String color) {
     skinColor = color;
@@ -834,6 +850,7 @@ class AppState extends ChangeNotifier {
     clothingColor = '#55a0ff';
     face = randomFace();
     prefs.setString('player_name', name);
+    prefs.setBool('chose_name', false);
     prefs.setString('skin_color', skinColor);
     prefs.setString('clothing_color', clothingColor);
     prefs.setString('face', encodeAvatar(face));
