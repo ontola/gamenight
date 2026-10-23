@@ -47,6 +47,9 @@ signal setting_changed(key: String, value: Variant)
 ## declare_settings(), with every prepare and roster update, and whenever that
 ## player changes one. Saved with their profile between nights.
 signal player_settings_changed(player_id: String, values: Dictionary)
+## A player pressed one of your [method declare_actions] buttons on their
+## phone, like "New round". The host already wrote it in the room log.
+signal action_triggered(key: String, player_id: String)
 
 const PROTOCOL := preload("protocol.gd")
 const PROTOCOL_VERSION := PROTOCOL.PROTOCOL_VERSION
@@ -205,6 +208,14 @@ func notify_ready(session_id: String) -> void:
 func notify_finished(session_id: String) -> void:
 	_send({"type": PROTOCOL.MSG_FINISHED, "session": session_id})
 
+## Add one short line to the room log that players read back in the
+## GameNight app ("New run", "Ann won round 3"). It never shows on the TV.
+## Use it for things worth remembering, a round or a run, never per frame:
+## the host keeps one line per two seconds and cuts it at 120 characters.
+func add_room_log(text: String) -> void:
+	if session.is_empty() or phase != "running": return
+	_send({"type": PROTOCOL.MSG_ROOM_LOG, "session": session, "text": text})
+
 ## Opt into live roster updates ([signal roster_changed]) for this session.
 ## Call it from [signal prepared], before [method notify_ready]. Pass
 ## `instant_join = true` only when a running match can take a new player at
@@ -271,6 +282,21 @@ func declare_settings(settings: Array) -> void:
 	_send({"type": PROTOCOL.MSG_DECLARE_SETTINGS, "settings": settings})
 
 var _declared_settings: Array = []
+
+## Offer buttons on the players' phones, next to your settings: things that
+## happen once, like "New round" or "Skip level". Call once, any time after
+## _ready(); the addon re-declares after every reconnect, and an empty Array
+## removes them. Each entry is a Dictionary:
+##   { "key": "new_round", "label": "New round",
+##     "description": "Ends this round for everyone.", "confirm": true }
+## `confirm` makes the phone ask first. At most 12, labels up to 40
+## characters. Presses arrive via [signal action_triggered], only while your
+## session is the one being played, and the room log says who pressed it.
+func declare_actions(actions: Array) -> void:
+	_declared_actions = actions
+	_send({"type": PROTOCOL.MSG_DECLARE_ACTIONS, "actions": actions})
+
+var _declared_actions: Array = []
 
 ## Change one of this game's declared settings, for example from its own
 ## Start menu, so the party's apps (and an LLM) show the same value. The daemon
@@ -596,6 +622,8 @@ func _handle(msg: Variant) -> void:
 			# party changed while we were away.
 			if not _declared_settings.is_empty():
 				_send({"type": PROTOCOL.MSG_DECLARE_SETTINGS, "settings": _declared_settings})
+			if not _declared_actions.is_empty():
+				_send({"type": PROTOCOL.MSG_DECLARE_ACTIONS, "actions": _declared_actions})
 			if not _declared_companion.is_empty():
 				_send(_declared_companion)
 		PROTOCOL.MSG_PARTY_STATE:
@@ -674,6 +702,8 @@ func _handle(msg: Variant) -> void:
 					values[key] = int(value) if value is float else value
 			_player_settings[player_id] = values
 			player_settings_changed.emit(player_id, values)
+		PROTOCOL.MSG_ACTION_TRIGGERED:
+			action_triggered.emit(str(msg.get("key", "")), str(msg.get("player_id", "")))
 		PROTOCOL.MSG_COMPANION_MESSAGE:
 			companion_message.emit(str(msg.get("player_id", "")), msg.get("data"))
 		PROTOCOL.MSG_COMPANION_PRESENCE:
