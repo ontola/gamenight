@@ -62,6 +62,7 @@ var _pickup_cooldown := 0.0
 ## door entry and when to give up. The host sends name, colour and face as
 ## separate updates, so without this the character changes in steps.
 var _claims: Dictionary = {}
+var _unjoined_input: Dictionary = {}  # controller token -> last buttons/stick, before joining
 ## A game quit with X at the TV, hidden at once while the host closes it:
 ## {game, until}. Cleared when the host moves on, or after a while anyway.
 var _quitting: Dictionary = {}
@@ -455,7 +456,13 @@ func _controllers_changed(frames: Array) -> void:
 		var axes: Array = frame.get("axes", [0, 0, 0, 0, 0, 0])
 		if id.is_empty():
 			# A controller that hasn't joined: show it's heard on the table.
-			if _accepts_input() and (buttons != 0 or axes.any(func(a): return absf(float(a)) > 12000.0)): room.nudge_pads()
+			# One hop per new input: a fresh button press (A joins, so not A)
+			# or a stick/trigger pushed out of rest. Holding does not repeat.
+			var pushed: bool = axes.any(func(a): return absf(float(a)) > 12000.0)
+			var before: Dictionary = _unjoined_input.get(token, {"buttons": 0, "pushed": false})
+			var fresh: bool = (buttons & ~int(before.buttons) & ~World.BTN_A) != 0 or (pushed and not before.pushed)
+			_unjoined_input[token] = {"buttons": buttons, "pushed": pushed}
+			if _accepts_input() and fresh: room.nudge_pads()
 			continue
 		var stick := Vector2(float(axes[0]) / 32767.0, float(axes[1]) / 32767.0) if axes.size() >= 2 else Vector2.ZERO
 		# Items are used with the right trigger, so it becomes a button here.

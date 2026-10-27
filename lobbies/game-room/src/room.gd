@@ -15,7 +15,9 @@ const BG := Color("0b0b12")
 const TEXT := Color("f2f1f8")
 
 var _pads: Array = []
-var _pad_activity := 0.0
+var _pad_activity := 0.0  # seconds the A Join hint stays up
+var _pad_hop := 99.0  # seconds since the last nudge: one hop, then still
+const PAD_HOP := 0.35
 var join_hint := false  # nobody in the room yet: keep A Join up
 var font: FontFile
 var bold: FontFile
@@ -1071,18 +1073,24 @@ func set_mood(color: Color) -> void:
 
 ## Shows that an unjoined controller is being heard: the table pads jump
 ## and "A Join" appears for a moment. Called on every frame of its input.
+## One short hop of the table controllers per input; the A Join hint
+## lingers a little longer.
 func nudge_pads() -> void:
 	_pad_activity = 2.0
+	_pad_hop = 0.0
 
 func _animate_pads(delta: float) -> void:
 	_pad_activity = maxf(0.0, _pad_activity - delta)
-	var k := clampf(_pad_activity / 0.6, 0.0, 1.0)
+	_pad_hop += delta
+	var t := clampf(_pad_hop / PAD_HOP, 0.0, 1.0)
+	var k := sin(PI * t)  # 0 -> 1 -> 0 over one hop
 	for i in _pads.size():
 		var p: Dictionary = _pads[i]
 		var node: Node3D = p.node
-		node.position = p.pos + Vector3(0, absf(sin(_time * 13.0 + i * 1.3)) * 0.12 * k, 0)
-		node.rotation = Vector3(sin(_time * 19.0 + i) * 0.12 * k, p.yaw, sin(_time * 23.0 + i * 1.7) * 0.18 * k)
-		p.body.emission_energy_multiplier = 0.5 + 1.6 * k
+		var side := 1.0 if i % 2 == 0 else -1.0
+		node.position = p.pos + Vector3(0, 0.12 * k, 0)
+		node.rotation = Vector3(0.1 * k, p.yaw, 0.16 * k * side)
+		p.body.emission_energy_multiplier = 0.5 + 1.6 * maxf(k, clampf(_pad_activity / 0.6, 0.0, 1.0) * 0.4)
 	set_prompt("join", [["A", "Join"]], true, join_hint or _pad_activity > 0.0)
 
 func _process(delta: float) -> void:

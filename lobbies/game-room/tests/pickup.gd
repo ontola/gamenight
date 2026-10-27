@@ -74,9 +74,30 @@ func _run() -> void:
 	main.input(id, 0, Vector2.ZERO)
 	main.links.linked = {}
 	check(not main.station_for(id).get("hold", false), "An unlinked player picks up with a tap")
+	# An unjoined controller makes the table pads hop once per new input.
+	var rest := {"controller": "stranger", "buttons": 0, "axes": [0, 0, 0, 0, 0, 0]}
+	var push := {"controller": "stranger", "buttons": 0, "axes": [20000, 0, 0, 0, 0, 0]}
+	var press_b := {"controller": "stranger", "buttons": main.World.BTN_B, "axes": [0, 0, 0, 0, 0, 0]}
+	var press_a := {"controller": "stranger", "buttons": main.World.BTN_A, "axes": [0, 0, 0, 0, 0, 0]}
+	main._controllers_changed([rest])
+	main.room._pad_hop = 99.0
+	main._controllers_changed([push])
+	check(main.room._pad_hop == 0.0, "Pushing the stick makes the pads hop")
+	main.room._process(0.2)
+	main._controllers_changed([push])
+	check(main.room._pad_hop > 0.1, "Holding the stick does not restart the hop")
+	main.room._process(0.5)
+	var pad: Dictionary = main.room._pads[0]
+	check(pad.node.position.is_equal_approx(pad.pos), "After one hop the pads are still again")
+	main._controllers_changed([rest, press_b])
+	check(main.room._pad_hop == 0.0, "Each new button press hops again")
+	main.room._process(0.5)
+	main._controllers_changed([rest, press_a])
+	check(main.room._pad_hop > 0.4, "A joins instead of hopping")
 	# The A Join hint sits above the table controllers, not as a notice.
 	main.room._pad_activity = 0.0
 	main._process(1.0 / 60.0)
+	main.room._process(1.0 / 60.0)
 	check(not main.room._prompts.join.node.visible, "No join hint while people are in the room")
 	var empty: Dictionary = party.duplicate(true)
 	empty.players = []
