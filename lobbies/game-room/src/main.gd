@@ -87,6 +87,7 @@ var demo                            # demo.gd when running with --demo
 var _capture_path := ""
 var _capture_at := 4.0
 var _captured := false
+var _warp_export := ""
 var _fullscreen := false
 var _display_active: Variant = null
 var _focus_handoff := 0
@@ -117,6 +118,9 @@ func _ready() -> void:
 	for argument in args:
 		if argument.begins_with("--capture="): _capture_path = argument.trim_prefix("--capture=")
 		if argument.begins_with("--capture-at="): _capture_at = float(argument.trim_prefix("--capture-at="))
+		if argument.begins_with("--warp-export="):
+			_warp_export = argument.trim_prefix("--warp-export=")
+			hud.visible = false
 	# Fullscreen like the other lobbies; GAMENIGHT_LOBBY_FULLSCREEN=0 keeps a window.
 	_fullscreen = OS.get_environment("GAMENIGHT_LOBBY_FULLSCREEN") != "0"
 	if _fullscreen and DisplayServer.get_name() != "headless" and _capture_path.is_empty() and not args.has("--demo"):
@@ -998,6 +1002,7 @@ func _process(delta: float) -> void:
 		await RenderingServer.frame_post_draw
 		var error := get_viewport().get_texture().get_image().save_png(_capture_path)
 		print("LOBBY_CAPTURE ", _capture_path, " ", error)
+		if not _warp_export.is_empty(): load("res://tools/warp_export.gd").run(self, _warp_export, room.camera, room.environment)
 		if demo != null: get_tree().quit()
 
 ## The floating buttons light up while someone stands where they work.
