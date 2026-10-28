@@ -539,9 +539,11 @@ impl Shared {
             .active_session()
             .map(|(game, session, phase)| (game.clone(), session, phase));
         let watching = active.as_ref().is_some_and(|(_, _, phase)| {
-            *phase == gamenight_protocol::SessionPhase::Running
-                || (*phase == gamenight_protocol::SessionPhase::Paused
-                    && self.focus_watch.paused_by_us())
+            matches!(
+                phase,
+                gamenight_protocol::SessionPhase::Running
+                    | gamenight_protocol::SessionPhase::Paused
+            )
         });
         let front = match &active {
             Some((game, _, _)) if watching => self.front(game),

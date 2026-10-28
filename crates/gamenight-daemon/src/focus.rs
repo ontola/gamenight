@@ -1,8 +1,10 @@
 //! Alt+Tab is a pause. When the party switches away from the game in front
 //! (Alt+Tab, the Windows key, a click on another window), the host pauses it
 //! exactly as if Back had been pressed: the lobby takes the controllers.
-//! Switching back to the game's window resumes it — but only a pause this
-//! watcher caused, so a game paused on purpose stays paused.
+//! Switching back to the game's window resumes it, also after Back: once
+//! another window was in front, the game coming back in front means the
+//! party picked it (Joep, 2026-10-28: Alt+Tab always pauses on blur and
+//! resumes on focus).
 //!
 //! The host asks the window server which process is in front; the game never
 //! has to report its own focus. That keeps every engine covered, and keeps
@@ -22,7 +24,8 @@ pub(crate) const BACK_AFTER: Duration = Duration::from_millis(300);
 /// Whose window is in front.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Front {
-    /// The active game's.
+    /// The active game's. Only Windows can tell.
+    #[cfg_attr(not(windows), allow(dead_code))]
     Game,
     /// Nobody's in particular: no window at all (mid-switch), or a game the
     /// host launched itself, such as the next one warming up. Neither says
@@ -52,15 +55,13 @@ pub(crate) struct FocusWatch {
     away_since: Option<Instant>,
     /// The current pause is ours to undo.
     paused_by_us: bool,
+    /// Another window was in front during the current pause (the lobby
+    /// after Back, Alt+Tab): the game coming back in front resumes it.
+    away_while_paused: bool,
     back_since: Option<Instant>,
 }
 
 impl FocusWatch {
-    /// Whether this watcher paused the session in front.
-    pub(crate) fn paused_by_us(&self) -> bool {
-        self.paused_by_us
-    }
-
     pub(crate) fn step(
         &mut self,
         now: Instant,
@@ -79,6 +80,7 @@ impl FocusWatch {
         }
         match phase {
             SessionPhase::Running => {
+                self.away_while_paused = false;
                 if self.paused_by_us {
                     // Resumed some other way (the lobby's Resume): it has to
                     // be seen in front again before switching away counts.
@@ -104,21 +106,27 @@ impl FocusWatch {
                     Front::Other => {}
                 }
             }
-            SessionPhase::Paused if self.paused_by_us => {
-                if front == Front::Game {
+            SessionPhase::Paused => match front {
+                // Still in front right after Back (minimising): not a choice.
+                Front::Game if self.paused_by_us || self.away_while_paused => {
                     let since = *self.back_since.get_or_insert(now);
                     if now.duration_since(since) >= BACK_AFTER {
                         self.paused_by_us = false;
+                        self.away_while_paused = false;
                         self.back_since = None;
                         self.armed = true;
                         return Some(FocusAction::Resume);
                     }
-                } else {
+                }
+                Front::Other => {
+                    self.away_while_paused = true;
                     self.back_since = None;
                 }
-            }
+                _ => self.back_since = None,
+            },
             _ => {
                 self.paused_by_us = false;
+                self.away_while_paused = false;
                 self.armed = false;
                 self.away_since = None;
                 self.back_since = None;
@@ -183,18 +191,24 @@ mod tests {
     }
 
     #[test]
-    fn a_pause_someone_else_made_is_left_alone() {
+    fn back_then_switching_to_the_game_resumes_it() {
         let t = Instant::now();
         let s = SessionId::new();
         let mut w = FocusWatch::default();
         w.step(t, Some((s, SessionPhase::Running)), Front::Game);
-        // Back pressed: paused by the party, then the lobby comes up.
+        // Back pressed: paused by the party while the game is still in
+        // front (minimising), which must not resume it.
         let paused = Some((s, SessionPhase::Paused));
-        w.step(ms(t, 100), paused, Front::Game);
-        w.step(ms(t, 200), paused, Front::Other);
-        for i in 0..10 {
-            assert_eq!(w.step(ms(t, 300 + i * 200), paused, Front::Game), None);
+        for i in 0..5 {
+            assert_eq!(w.step(ms(t, 100 + i * 100), paused, Front::Game), None);
         }
+        // The lobby comes up; later the party Alt+Tabs to the game.
+        assert_eq!(w.step(ms(t, 700), paused, Front::Other), None);
+        assert_eq!(w.step(ms(t, 900), paused, Front::Game), None);
+        assert_eq!(
+            w.step(ms(t, 1200), paused, Front::Game),
+            Some(FocusAction::Resume)
+        );
     }
 
     #[test]
