@@ -1002,7 +1002,12 @@ func _process(delta: float) -> void:
 		await RenderingServer.frame_post_draw
 		var error := get_viewport().get_texture().get_image().save_png(_capture_path)
 		print("LOBBY_CAPTURE ", _capture_path, " ", error)
-		if not _warp_export.is_empty(): load("res://tools/warp_export.gd").run(self, _warp_export, room.camera, room.environment)
+		if not _warp_export.is_empty():
+			# Pose the room's animation at time zero, so the Warp port can
+			# compare against a frame that does not depend on the clock.
+			room._time = 0.0
+			room._process(0.0)
+			load("res://tools/warp_export.gd").run(self, _warp_export, room.camera, room.environment)
 		if demo != null: get_tree().quit()
 
 ## The floating buttons light up while someone stands where they work.
