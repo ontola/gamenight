@@ -138,14 +138,15 @@ func _mesh(mesh: Mesh) -> int:
 	return index
 
 func _mesh_instance(node: MeshInstance3D) -> void:
-	# Shadow-only stand-ins (the players' capsule bodies) are not drawn.
-	if node.mesh == null or node.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY: return
+	# Shadow-only stand-ins (the players' capsule bodies) cast shadows but are not drawn.
+	if node.mesh == null: return
 	var mats := []
 	for s in node.mesh.get_surface_count():
 		var m := node.get_active_material(s)
 		mats.append(_material(m))
 	out.instances.append({"name": str(node.get_path()), "mesh": _mesh(node.mesh), "materials": mats, "transform": _xf(node.global_transform),
-		"shadow": node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "transparency": node.transparency})
+		"shadow": node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "transparency": node.transparency,
+		"shadow_only": node.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY})
 
 func _light(node: Light3D) -> void:
 	var d := {"name": str(node.get_path()), "type": node.get_class(), "transform": _xf(node.global_transform), "color": _c(node.light_color),
@@ -188,5 +189,12 @@ func _particles(node: CPUParticles3D) -> void:
 		"velocity_min": node.initial_velocity_min, "velocity_max": node.initial_velocity_max, "gravity": [node.gravity.x, node.gravity.y, node.gravity.z],
 		"direction": [node.direction.x, node.direction.y, node.direction.z], "spread": node.spread, "mesh": _mesh(node.mesh) if node.mesh else -1,
 		"material": _material(node.mesh.surface_get_material(0)) if node.mesh else -1}
-	# Where the particles are right now, for a still frame.
+	# Where the particles are right now, for a still frame: the multimesh the
+	# emitter draws with (per instance a 3x4 row-major transform, then colour
+	# and custom data; dead particles have a zero transform).
+	var mm := node.get_base()
+	var count := RenderingServer.multimesh_get_instance_count(mm)
+	var buffer := RenderingServer.multimesh_get_buffer(mm)
+	d.merge({"instances": count, "stride": buffer.size() / count if count > 0 else 0, "buffer": _floats(buffer),
+		"quad_size": [node.mesh.size.x, node.mesh.size.y] if node.mesh is QuadMesh else [1.0, 1.0]})
 	out.particles.append(d)
