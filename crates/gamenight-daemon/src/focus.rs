@@ -11,7 +11,7 @@
 //! the decision in one place, where a stray focus event can be debounced.
 use std::time::{Duration, Instant};
 
-use gamenight_protocol::{SessionId, SessionPhase};
+use gamenight_protocol::{GameId, SessionId, SessionPhase};
 
 /// How long another window must stay in front before the game pauses. Long
 /// enough to ride out a launch flashing a window, short enough that the game
@@ -136,6 +136,55 @@ impl FocusWatch {
     }
 }
 
+/// Alt+Tab to a game that is loaded and waiting (warm, ready) starts it,
+/// as if the party pressed Next; macOS games report the same with
+/// `request_start`. Only a switch counts: the game must have been seen
+/// behind something else since it became ready, so a launch that grabs
+/// the foreground never starts a game by itself.
+#[derive(Debug, Default)]
+pub(crate) struct WarmWatch {
+    game: Option<GameId>,
+    away: bool,
+    front_since: Option<Instant>,
+}
+
+impl WarmWatch {
+    /// `warm`: the ready warm game, if any; `in_front`: its window is in front.
+    /// Returns the game to start.
+    pub(crate) fn step(
+        &mut self,
+        now: Instant,
+        warm: Option<&GameId>,
+        in_front: bool,
+    ) -> Option<GameId> {
+        let Some(warm) = warm else {
+            *self = Self::default();
+            return None;
+        };
+        if self.game.as_ref() != Some(warm) {
+            *self = Self {
+                game: Some(warm.clone()),
+                ..Self::default()
+            };
+        }
+        if !in_front {
+            self.away = true;
+            self.front_since = None;
+            return None;
+        }
+        if !self.away {
+            return None;
+        }
+        let since = *self.front_since.get_or_insert(now);
+        if now.duration_since(since) < BACK_AFTER {
+            return None;
+        }
+        self.away = false;
+        self.front_since = None;
+        Some(warm.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -247,5 +296,24 @@ mod tests {
         for i in 1..10 {
             assert_eq!(w.step(ms(t, i * 200), next, Front::Other), None);
         }
+    }
+
+    #[test]
+    fn switching_to_a_ready_warm_game_starts_it() {
+        let t = Instant::now();
+        let game = GameId::new("towerfall");
+        let mut w = WarmWatch::default();
+        // Launched and in front from the start: never started by that.
+        for i in 0..5 {
+            assert_eq!(w.step(ms(t, i * 200), Some(&game), true), None);
+        }
+        // Behind the lobby, then the party Alt+Tabs to it.
+        assert_eq!(w.step(ms(t, 1000), Some(&game), false), None);
+        assert_eq!(w.step(ms(t, 1100), Some(&game), true), None);
+        assert_eq!(w.step(ms(t, 1500), Some(&game), true), Some(game.clone()));
+        // Only once per switch.
+        assert_eq!(w.step(ms(t, 1700), Some(&game), true), None);
+        // Nothing warm: nothing to start.
+        assert_eq!(w.step(ms(t, 1900), None, true), None);
     }
 }

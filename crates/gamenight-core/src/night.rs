@@ -1191,6 +1191,14 @@ impl GameNight {
         self.active.as_ref().map(|s| (&s.game, s.id, s.phase))
     }
 
+    /// The warm game, once it is loaded and waiting to be started.
+    pub fn warm_ready_game(&self) -> Option<&GameId> {
+        self.warm
+            .as_ref()
+            .filter(|w| w.phase == SessionPhase::Ready)
+            .map(|w| &w.game)
+    }
+
     /// The lobby is on screen, so the host may restart without pulling
     /// anyone out of a game. Games stay active (paused) behind the lobby
     /// after a round, so a paused game here counts as between games; warm

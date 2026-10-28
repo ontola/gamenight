@@ -108,6 +108,7 @@ struct Shared {
     lobby_game: Option<GameId>,
     /// Pauses the game when the party switches away from its window.
     focus_watch: focus::FocusWatch,
+    warm_watch: focus::WarmWatch,
     lobby_token: Option<String>,
     lobby_connections: std::collections::HashSet<GameId>,
     runtime_input: bool,
@@ -337,6 +338,7 @@ impl Shared {
             player_settings_file: None,
             lobby_game: None,
             focus_watch: Default::default(),
+            warm_watch: Default::default(),
             lobby_token: None,
             lobby_connections: Default::default(),
             runtime_input: false,
@@ -568,6 +570,17 @@ impl Shared {
                 }
             }
             None => {}
+        }
+        let warm = self.night.warm_ready_game().cloned();
+        let in_front = warm
+            .as_ref()
+            .is_some_and(|game| self.front(game) == focus::Front::Game);
+        if let Some(game) = self
+            .warm_watch
+            .step(std::time::Instant::now(), warm.as_ref(), in_front)
+        {
+            info!(%game, "the party switched to the waiting game; starting it");
+            self.dispatch(Command::RequestStart { game }, None);
         }
     }
 
