@@ -312,6 +312,11 @@ impl Shared {
         addr: String,
         prewarm: Option<gamenight_installer::PrewarmHandle>,
     ) -> Self {
+        let library = if local_shelf_only() {
+            registered_here(library, &gamenight_installer::install_dir())
+        } else {
+            library
+        };
         let launch_specs = library
             .iter()
             .filter_map(|m| m.launch.clone().map(|l| (m.id.clone(), l)))
@@ -1711,7 +1716,7 @@ fn spawn_install_progress_pump(
                         .launch_specs
                         .get(&meta.id)
                         .is_some_and(|spec| !catalogue_install(spec, &root, &meta.id));
-                    if explicit {
+                    if explicit || local_shelf_only() {
                         info!(game = %status.game, "background install kept explicit shelf entry");
                     } else {
                         info!(game = %status.game, "background install joined the shelf");
@@ -1736,6 +1741,42 @@ fn catalogue_install(spec: &LaunchSpec, root: &std::path::Path, game: &GameId) -
     spec.cwd
         .as_deref()
         .is_some_and(|cwd| std::path::Path::new(cwd).starts_with(root.join(&game.0)))
+}
+
+/// `GAMENIGHT_LOCAL_SHELF=1`: the shelf holds only the games registered on
+/// this machine (local-games.json); no store installs and no cloud playtest
+/// builds, while the cloud room (player choice in the app) keeps working.
+fn local_shelf_only() -> bool {
+    std::env::var("GAMENIGHT_LOCAL_SHELF").as_deref() == Ok("1")
+}
+
+/// A launch command registered on this machine (local-games.json): it runs
+/// outside the install folder, where store installs and playtests live.
+fn registered_launch(spec: &LaunchSpec, root: &std::path::Path) -> bool {
+    !spec
+        .cwd
+        .as_deref()
+        .is_some_and(|cwd| std::path::Path::new(cwd).starts_with(root))
+}
+
+/// The games registered on this machine ([`registered_launch`]).
+fn registered_here(library: Vec<GameMeta>, root: &std::path::Path) -> Vec<GameMeta> {
+    library
+        .into_iter()
+        .filter(|m| {
+            m.launch
+                .as_ref()
+                .is_some_and(|spec| registered_launch(spec, root))
+        })
+        .collect()
+}
+
+/// A local registration always wins over a cloud playtest build of the
+/// same game, for this launch and every later one.
+fn registered_locally(s: &Shared, game: &GameId) -> bool {
+    s.launch_specs
+        .get(game)
+        .is_some_and(|spec| registered_launch(spec, &gamenight_installer::install_dir()))
 }
 
 /// How long a failed playtest download waits before the next poll retries it.
@@ -1801,7 +1842,14 @@ fn start_playtest(
         }
     };
     let game = GameId::new(&entry.id);
-    if s.lobby_game.as_ref() == Some(&game) || entry.id == "lobby" {
+    if s.lobby_game.as_ref() == Some(&game) || entry.id == "lobby" || local_shelf_only() {
+        return;
+    }
+    if registered_locally(s, &game) {
+        if !s.playtests.contains_key(&game) {
+            info!(%game, "playtest build ignored: this machine registers the game itself");
+            s.playtests.insert(game, (String::new(), None));
+        }
         return;
     }
     let Some(sha256) = entry
@@ -1843,7 +1891,7 @@ fn start_playtest(
         let _ = forward.await;
         let mut s = shared.lock().await;
         // A newer build may have been announced while this one downloaded.
-        if s.playtests.get(&game).map(|p| &p.0) != Some(&sha256) {
+        if s.playtests.get(&game).map(|p| &p.0) != Some(&sha256) || registered_locally(&s, &game) {
             return;
         }
         match result {
@@ -3221,6 +3269,28 @@ mod replacement_lobby_tests {
         std::fs::remove_file(file).unwrap();
     }
     type Ws = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
+
+    #[test]
+    fn a_local_shelf_keeps_only_games_registered_here() {
+        let game = |id: &str, cwd: Option<&str>| -> GameMeta {
+            serde_json::from_value(serde_json::json!({"id": id, "title": id,
+                "launch": cwd.map(|cwd| serde_json::json!({"command": "game", "cwd": cwd}))}))
+            .unwrap()
+        };
+        let root = std::path::Path::new("/data/games");
+        let kept = registered_here(
+            vec![
+                game("neon-siege-warp", Some("/dev/warp-gg")),
+                game("pocket-aces", Some("/data/games/pocket-aces/1.2")),
+                game("no-launch", None),
+            ],
+            root,
+        );
+        assert_eq!(
+            kept.iter().map(|m| m.id.0.as_str()).collect::<Vec<_>>(),
+            ["neon-siege-warp"]
+        );
+    }
 
     fn test_game(launch: serde_json::Value) -> GameMeta {
         serde_json::from_value(serde_json::json!({"id":"test", "title":"Test", "launch":launch}))
