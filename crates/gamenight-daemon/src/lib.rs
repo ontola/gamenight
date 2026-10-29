@@ -991,12 +991,14 @@ impl Shared {
                 ClientMessage::DeclareCommands {
                     description,
                     examples,
+                    mcp,
                 },
                 Registration::Game(game),
             ) => {
                 if description.len() > 2000
                     || examples.len() > 20
                     || examples.iter().any(|e| e.len() > 200)
+                    || mcp.as_ref().is_some_and(|p| p.len() > 1024)
                 {
                     return reject("command declaration too long");
                 }
@@ -1007,6 +1009,7 @@ impl Shared {
                         game: game.clone(),
                         description,
                         examples,
+                        mcp,
                     },
                 );
                 self.broadcast_party();
@@ -3467,6 +3470,7 @@ mod replacement_lobby_tests {
             ClientMessage::DeclareCommands {
                 description: "Ask for items".into(),
                 examples: vec!["geef me 10 End Crystal".into()],
+                mcp: None,
             },
             &Registration::Game(game.clone()),
             &game_tx,

@@ -1,6 +1,7 @@
 //! Optional outbound profile and discovery relay. Offline studios never require cloud availability.
 mod companion;
 pub(crate) mod discovery;
+pub(crate) mod live;
 pub(crate) mod settings;
 use crate::{daemon, join_session, JoinSessionRequest, Profile, SharedState};
 use axum::{
@@ -227,6 +228,29 @@ impl Bridge {
         *self.session.lock().unwrap() = Some(token);
     }
 
+    /// The model's next step for a live-control request (see `live`).
+    async fn live_step(&self, body: serde_json::Value) -> Result<serde_json::Value, String> {
+        let token = self.session_token().ok_or("Not connected to GameNight")?;
+        let response = self
+            .http
+            .post(format!("{}/v1/lobbies/assistant", self.origin))
+            .bearer_auth(token)
+            .timeout(Duration::from_secs(90))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|_| "The assistant did not respond")?;
+        match response.status().as_u16() {
+            200 => response
+                .json()
+                .await
+                .map_err(|_| "The assistant answered garbage".into()),
+            404 | 409 | 410 => Err("This request is no longer open".into()),
+            429 => Err("The assistant needed too many steps and stopped".into()),
+            _ => Err("The assistant did not respond".into()),
+        }
+    }
+
     pub fn waiting(&self) -> serde_json::Value {
         self.waiting.lock().unwrap().clone()
     }
@@ -371,6 +395,8 @@ impl Bridge {
         let mut applied: HashMap<String, (Seat, u64)> = HashMap::new();
         let mut acknowledged: Option<String> = None;
         let mut receipt: Option<serde_json::Value> = None;
+        // The plain-text request being carried out, and its answer to come.
+        let mut running: Option<(String, tokio::task::JoinHandle<Result<String, String>>)> = None;
         // What the daemon last accepted; resent only when the set changes.
         let mut delivered_grants: Option<BTreeMap<String, String>> = None;
         let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
@@ -604,18 +630,35 @@ impl Bridge {
             {
                 delivered_playtests = Some((key, std::time::Instant::now()));
             }
+            if let Some((id, task)) = running.take_if(|(_, task)| task.is_finished()) {
+                let result = task
+                    .await
+                    .unwrap_or_else(|_| Err("The request failed".into()));
+                receipt = Some(serde_json::json!({"id":id,"ok":result.is_ok(),
+                    "message":match result {Ok(m)|Err(m)=>m}}));
+                self.refresh.notify_one();
+            }
             if let Some(selection) = &updates.selection {
                 if selection.game_command.is_some() {
-                    if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {
-                        let result = if seats.contains(&selection.seat)
+                    // A request may take a minute (live control); polls go on.
+                    if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id)
+                        && running.as_ref().is_none_or(|(id, _)| *id != selection.id)
+                    {
+                        if seats.contains(&selection.seat)
                             && updates.updates.iter().any(|u| u.seat == selection.seat)
                         {
-                            settings::run_command(&state, selection).await
+                            let (bridge, state, selection) =
+                                (self.clone(), state.clone(), selection.clone());
+                            running = Some((
+                                selection.id.clone(),
+                                tokio::spawn(async move {
+                                    settings::run_command(&state, &selection, Some(&bridge)).await
+                                }),
+                            ));
                         } else {
-                            Err("Player is no longer linked to this room".into())
-                        };
-                        receipt = Some(serde_json::json!({"id":selection.id,"ok":result.is_ok(),
-                            "message":match result {Ok(m)|Err(m)=>m}}));
+                            receipt = Some(serde_json::json!({"id":selection.id,"ok":false,
+                                "message":"Player is no longer linked to this room"}));
+                        }
                     }
                 } else if selection.command.is_some() {
                     if receipt.as_ref().and_then(|r| r["id"].as_str()) != Some(&selection.id) {

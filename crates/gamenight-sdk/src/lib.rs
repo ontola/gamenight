@@ -501,6 +501,7 @@ impl GameNight {
         self.send(&ClientMessage::DeclareCommands {
             description: description.into(),
             examples,
+            mcp: None,
         })
         .await
     }

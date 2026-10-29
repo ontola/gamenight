@@ -901,6 +901,20 @@ then forwards a request from a seated player as</p>
 <p>The game decides what text means; nothing is executed as code. Only the local
 web server sends <code>game_command</code>, only for a player who is in the party, and
 only to a game that declared commands. A declaration ends when the game disconnects.</p>
+<h3 id="live-changes-through-the-games-own-tools">Live changes through the game's own tools</h3>
+<p>A game that serves <a href="https://modelcontextprotocol.io">MCP</a> tools on this
+computer while it runs (Warp's live control) can let the session assistant
+change it during play: &quot;make the enemies slower&quot;, &quot;give the ship a red trail&quot;.
+Add the path of its token file, a JSON file with <code>url</code> (a loopback
+<code>http://…/mcp</code> address) and <code>token</code>, readable by the same user:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">{&quot;type&quot;: &quot;declare_commands&quot;, &quot;description&quot;: &quot;Change this game while you play: …&quot;,
+ &quot;mcp&quot;: &quot;C:\\Users\\joep\\AppData\\Local\\Temp\\warp-live\\neon-siege.json&quot;}
+</code></pre></div>
+<p>The local web server then sends no <code>game_command</code> for a request. It reads the
+token file, lists the game's tools and carries out the request with them, one
+model step at a time from the GameNight cloud, and the model's last words are
+the answer. The token stays on the host. Warp games do this by themselves when
+GameNight launches them.</p>
 <h2 id="the-night-end-to-end">The night, end to end</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>overlay: set_playlist [neon-trails, neon-siege]
 daemon → neon-trails: prepare      (warm the first game)
@@ -1109,7 +1123,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="68f93d358e521c407635ee8d9df39454821e6d01ac295d5da7733bb35bb85bd9">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="ba9dc6f44afaa892adec3631a0afe4807f95762668d6322c2c6b35bf4fbdcc22">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#phone-buttons">Phone buttons</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

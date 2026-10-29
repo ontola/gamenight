@@ -805,6 +805,25 @@ The game decides what text means; nothing is executed as code. Only the local
 web server sends `game_command`, only for a player who is in the party, and
 only to a game that declared commands. A declaration ends when the game disconnects.
 
+### Live changes through the game's own tools
+
+A game that serves [MCP](https://modelcontextprotocol.io) tools on this
+computer while it runs (Warp's live control) can let the session assistant
+change it during play: "make the enemies slower", "give the ship a red trail".
+Add the path of its token file, a JSON file with `url` (a loopback
+`http://…/mcp` address) and `token`, readable by the same user:
+
+```json
+{"type": "declare_commands", "description": "Change this game while you play: …",
+ "mcp": "C:\\Users\\joep\\AppData\\Local\\Temp\\warp-live\\neon-siege.json"}
+```
+
+The local web server then sends no `game_command` for a request. It reads the
+token file, lists the game's tools and carries out the request with them, one
+model step at a time from the GameNight cloud, and the model's last words are
+the answer. The token stays on the host. Warp games do this by themselves when
+GameNight launches them.
+
 ## The night, end to end
 
 ```

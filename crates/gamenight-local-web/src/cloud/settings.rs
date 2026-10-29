@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::collections::BTreeMap;
 use tokio_tungstenite::tungstenite::Message;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Command {
     pub action: SettingsAction,
@@ -20,7 +20,7 @@ pub(crate) struct Command {
     #[serde(default)]
     pub values: BTreeMap<String, SettingValue>,
 }
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct GameCommand {
     pub text: String,
@@ -237,9 +237,12 @@ pub(crate) async fn control(
 
 /// Asks the running game for `text` as the player at `seat`, and returns
 /// the game's own answer for that player.
+/// A game that serves live-control tools (`GameCommands::mcp`) is changed
+/// through those, with `bridge` for the model's steps.
 pub(crate) async fn run_command(
     state: &SharedState,
     selection: &Selection,
+    bridge: Option<&super::Bridge>,
 ) -> Result<String, String> {
     let request = selection
         .game_command
@@ -261,7 +264,7 @@ pub(crate) async fn run_command(
         }
         local.daemon_addr.clone()
     };
-    tokio::time::timeout(daemon::REPLY_TIMEOUT * 3, async {
+    let routed = tokio::time::timeout(daemon::REPLY_TIMEOUT * 3, async {
         let (mut ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
             .await
             .map_err(|_| "Host unavailable")?;
@@ -294,6 +297,15 @@ pub(crate) async fn run_command(
         {
             return Err("That game is no longer running".into());
         }
+        let live = party
+            .commands
+            .iter()
+            .find(|c| c.game == game)
+            .and_then(|c| c.mcp.clone());
+        if let (Some(path), Some(_)) = (live, bridge) {
+            let _ = ws.close(None).await;
+            return Ok(Err(path));
+        }
         ws.send(Message::Text(
             ClientMessage::GameCommand {
                 game: game.clone(),
@@ -315,7 +327,7 @@ pub(crate) async fn run_command(
                     message,
                 }) if answered == game && id == selection.id => {
                     let _ = ws.close(None).await;
-                    return if ok { Ok(message) } else { Err(message) };
+                    return if ok { Ok(Ok(message)) } else { Err(message) };
                 }
                 _ => {}
             }
@@ -323,7 +335,21 @@ pub(crate) async fn run_command(
         Err("Host disconnected before the game answered".into())
     })
     .await
-    .map_err(|_| "The game did not answer in time".to_string())?
+    .map_err(|_| "The game did not answer in time".to_string())??;
+    // Ok(answer), or Err(token file) for live control.
+    match (routed, bridge) {
+        (Ok(answer), _) => Ok(answer),
+        (Err(path), Some(bridge)) => {
+            let left = selection.expires.saturating_sub(now).saturating_sub(10);
+            tokio::time::timeout(
+                std::time::Duration::from_secs(left),
+                super::live::run(bridge, &selection.id, &path),
+            )
+            .await
+            .map_err(|_| "The assistant ran out of time".to_string())?
+        }
+        (Err(_), None) => unreachable!("live control needs the cloud bridge"),
+    }
 }
 
 #[cfg(test)]
@@ -356,11 +382,23 @@ mod tests {
         ))
         .await
         .unwrap();
-        // The game answers every request with what it was asked.
+        let (bridge, live_file, live_calls) =
+            super::super::live::tests::fake_cloud_and_game().await;
+        // The game answers every request with what it was asked. "go live"
+        // makes it offer live-control tools from then on.
+        let mcp = live_file.clone();
         let answering = tokio::spawn(async move {
             while let Some(Ok(Message::Text(text))) = game.next().await {
                 if let Ok(ServerMessage::GameCommand { id, text, .. }) = serde_json::from_str(&text)
                 {
+                    if text == "go live" {
+                        game.send(Message::Text(
+                            json!({"type":"declare_commands","description":"Change the game","mcp":mcp})
+                                .to_string(),
+                        ))
+                        .await
+                        .unwrap();
+                    }
                     let ok = text != "nonsense";
                     game.send(Message::Text(
                         json!({"type":"command_result","id":id,"ok":ok,"message":format!("heard {text}")})
@@ -422,7 +460,7 @@ mod tests {
                 + 60,
         };
         assert_eq!(
-            run_command(&state, &selection).await.unwrap(),
+            run_command(&state, &selection, None).await.unwrap(),
             "heard geef me 1 Bread"
         );
         selection.id = "ask-2".into();
@@ -430,11 +468,34 @@ mod tests {
             text: "nonsense".into(),
         });
         assert_eq!(
-            run_command(&state, &selection).await.unwrap_err(),
+            run_command(&state, &selection, None).await.unwrap_err(),
             "heard nonsense"
         );
         selection.seat.index = 3;
-        assert!(run_command(&state, &selection).await.is_err(), "wrong seat");
+        assert!(
+            run_command(&state, &selection, None).await.is_err(),
+            "wrong seat"
+        );
+        // A game with live control is changed through its own tools.
+        selection.seat.index = 0;
+        selection.id = "ask-3".into();
+        selection.game_command = Some(GameCommand {
+            text: "go live".into(),
+        });
+        run_command(&state, &selection, Some(&bridge))
+            .await
+            .unwrap();
+        selection.id = "ask-4".into();
+        selection.game_command = Some(GameCommand {
+            text: "make it faster".into(),
+        });
+        assert_eq!(
+            run_command(&state, &selection, Some(&bridge))
+                .await
+                .unwrap(),
+            "Ik heb de snelheid verdubbeld."
+        );
+        assert_eq!(live_calls.lock().unwrap().len(), 1);
         answering.abort();
         server.abort();
     }

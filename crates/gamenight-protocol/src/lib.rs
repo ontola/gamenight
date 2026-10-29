@@ -1093,6 +1093,12 @@ pub struct GameCommands {
     /// Requests the game understands as written, e.g. `geef me 10 End Crystal`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub examples: Vec<String>,
+    /// The game serves MCP tools that change it while it runs (Warp live
+    /// control): the path of its local token file, `{"url", "token"}`. The
+    /// session assistant then works through those tools on the host instead
+    /// of sending `game_command` text to the game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp: Option<String>,
 }
 
 /// A game's own phone screen: a small web page that GameNight serves to the
@@ -1526,6 +1532,9 @@ pub enum ClientMessage {
         description: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         examples: Vec<String>,
+        /// See [`GameCommands::mcp`].
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mcp: Option<String>,
     },
     /// Overlay only: `player_id` asks `game` for something in plain text, as
     /// typed or spoken. The game answers with `command_result` and the same `id`.

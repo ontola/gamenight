@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio_tungstenite::tungstenite::Message;
 
-#[derive(Deserialize)]
+#[derive(Clone, Deserialize)]
 pub(crate) struct Selection {
     #[serde(default)]
     pub command: Option<super::settings::Command>,

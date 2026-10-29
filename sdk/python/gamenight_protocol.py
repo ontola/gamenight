@@ -623,7 +623,8 @@ CLIENT_MESSAGES = {
     "declare_commands": {
         "fields": [
             "description",
-            "examples"
+            "examples",
+            "mcp"
         ],
         "required": [
             "description"

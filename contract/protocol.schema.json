@@ -1217,6 +1217,13 @@
               },
               "type": "array"
             },
+            "mcp": {
+              "description": "See [`GameCommands::mcp`].",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "type": {
               "const": "declare_commands",
               "type": "string"
@@ -1512,6 +1519,13 @@
         },
         "game": {
           "$ref": "#/$defs/GameId"
+        },
+        "mcp": {
+          "description": "The game serves MCP tools that change it while it runs (Warp live\ncontrol): the path of its local token file, `{\"url\", \"token\"}`. The\nsession assistant then works through those tools on the host instead\nof sending `game_command` text to the game.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
