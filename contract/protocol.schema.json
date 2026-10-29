@@ -900,6 +900,33 @@
           "type": "object"
         },
         {
+          "description": "Save one player's own progress for this game (unlocks, stats, a\ngrimoire): any JSON up to [`PLAYER_DATA_MAX_BYTES`], replacing what was\nthere. Kept with the player's profile between nights; a guest's data\nlasts the night, and moves to their profile when they sign in.\n`expected_revision` is the `revision` of the last `player_data` the\ngame saw (0 when there was none); a stale write is rejected, so two\nhosts or two menus never silently overwrite each other. Games only.",
+          "properties": {
+            "data": true,
+            "expected_revision": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "type": {
+              "const": "save_player_data",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "player_id",
+            "data"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Atomically validate a settings batch against a live session and revision.\nUndo restores the last batch. Keep discards that undo snapshot.",
           "properties": {
             "action": {
@@ -2764,6 +2791,35 @@
           "type": "object"
         },
         {
+          "description": "One player's saved progress for this game, as the game last stored it\nwith `save_player_data`. Sent with every `prepare`, `party_updated` and\n`players_updated` for players that have any, and after each accepted\nsave (with the new `revision`). No message means no saved data yet.",
+          "properties": {
+            "data": true,
+            "game": {
+              "$ref": "#/$defs/GameId"
+            },
+            "player_id": {
+              "$ref": "#/$defs/PlayerId"
+            },
+            "revision": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "player_data",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "game",
+            "player_id",
+            "data",
+            "revision"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Sent to the persistent lobby game specifically (see\n`GameNight::set_lobby_game`) — `active: false` the moment some other\ngame actually starts, so the lobby can mute itself and step out of\nthe way; `true` once the party's back with nothing else running. Not\nsession-scoped: the lobby never has a tracked session of its own to\nhang this off of.",
           "properties": {
             "active": {
@@ -3345,7 +3401,7 @@
     "protocol": {
       "DEFAULT_ADDR": "127.0.0.1:7912",
       "DEFAULT_WEB_PORT": 7913,
-      "GODOT_SDK_VERSION": 6,
+      "GODOT_SDK_VERSION": 7,
       "PROTOCOL_VERSION": 1
     }
   },

@@ -145,12 +145,42 @@ GameNight.player_settings_changed.connect(func(player_id, values):
   value}` (Godot `GameNight.set_player_setting`, Rust `set_player_setting`).
   Phones send the same message for their own player.
 - A player with a profile keeps their values between nights: the host saves them
-  in `gamenight/player-settings.json` in the user data directory (override with
-  `GAMENIGHT_PLAYER_SETTINGS`). A guest's values last for the night; when the
-  guest signs in, they move to their profile.
+  in its [player store](player-store.md). A guest's values last for the night;
+  when the guest signs in, they move to their profile.
 - Party writes (`set_setting`, `control_settings`) cannot change a per-player
   key, and `GameSettings.values` only holds party values. `GameSettings.players`
   shows each present player's own values, for the apps.
+
+## Saved progress
+
+Settings are knobs. Progress (unlocked characters, a spell book, best times)
+is data only the game understands. Save it per player and per game:
+
+```gdscript
+GameNight.player_data_changed.connect(func(player_id, data):
+    grimoire[player_id] = data.get("spells", []))
+GameNight.save_player_data(player_id, {"spells": grimoire[player_id]})
+```
+
+- `save_player_data {player_id, data, expected_revision}` stores any JSON up to
+  64 KB, replacing what was there. The host answers with `player_data
+  {game, player_id, data, revision}`, and sends the same with every `prepare`,
+  `party_updated` and `players_updated` for players that have any. No message
+  means nothing is saved yet. Godot: `player_data(player_id)`,
+  `save_player_data(player_id, data)` and the `player_data_changed` signal; Rust
+  `save_player_data` and `GameEvent::PlayerData`.
+- `expected_revision` is the revision of the last `player_data` you got (0 for
+  none). A save against an older copy is refused, so two hosts never silently
+  overwrite each other: merge in the newer data and save again. The Godot addon
+  fills it in for you.
+- Unlocks belong to a person. While playing, everyone in the room may use what
+  anyone has unlocked (`GameNight.party_union("unlocks")`), but never save that
+  union into a player's own data. What the group earns together counts for
+  everyone present: `GameNight.unlock_for_present(item)` adds it to each of
+  their `unlocks` lists.
+- Like settings: a guest's progress lasts the night and moves to their profile
+  when they sign in (unless that profile already has progress in this game).
+  Worlds and other large saves do not belong here.
 
 ## Phone and lobby assistant
 

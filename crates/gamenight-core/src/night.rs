@@ -201,6 +201,13 @@ pub enum Command {
         key: String,
         value: SettingValue,
     },
+    /// A game saves one player's own progress (see `PlayerData`).
+    SavePlayerData {
+        game: GameId,
+        player_id: PlayerId,
+        data: serde_json::Value,
+        expected_revision: Option<u64>,
+    },
     /// The party turns a knob. `game` defaults to the active game.
     SetSetting {
         game: Option<GameId>,
@@ -286,6 +293,16 @@ pub enum Effect {
     },
     /// Saved player settings changed: write [`GameNight::saved_player_settings`].
     PlayerSettingsStored,
+    /// Deliver one player's saved progress to `game`.
+    PlayerData {
+        game: GameId,
+        player_id: PlayerId,
+        data: serde_json::Value,
+        revision: u64,
+    },
+    /// A profile's progress for `game` changed: write
+    /// [`GameNight::saved_player_data`] for that owner and game.
+    PlayerDataStored { owner: String, game: GameId },
     /// The command was rejected; inform the sender only.
     Reject { reason: String },
 }
@@ -304,6 +321,8 @@ pub struct PartyCarry {
     pub profiles: HashMap<PlayerId, String>,
     #[serde(default)]
     pub player_settings: PlayerSettingsStore,
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub player_data: PlayerDataStore,
     pub seats: Vec<Seat>,
     /// The games still to come, the player queue first.
     #[serde(default)]
@@ -329,6 +348,19 @@ pub type PlayerSettingsStore = std::collections::BTreeMap<
     std::collections::BTreeMap<String, std::collections::BTreeMap<String, SettingValue>>,
 >;
 
+/// One owner's saved progress for one game: what the game last stored, and
+/// how many times it has been stored (0 = never).
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SavedPlayerData {
+    pub data: serde_json::Value,
+    pub revision: u64,
+}
+
+/// Players' own progress: owner -> game -> data. Owners as in
+/// [`PlayerSettingsStore`].
+pub type PlayerDataStore =
+    std::collections::BTreeMap<String, std::collections::BTreeMap<String, SavedPlayerData>>;
+
 /// Seats including those added for phone-only players.
 const MAX_SEATS: usize = 8;
 /// How many playable games autoplay keeps lined up after the one on screen.
@@ -347,6 +379,8 @@ pub struct GameNight {
     /// Each owner's own setting values: owner (a profile, or `party:<id>` for
     /// a guest) -> game -> key -> value. Only explicitly chosen values.
     player_settings: PlayerSettingsStore,
+    /// Each owner's saved progress per game, keyed like `player_settings`.
+    player_data: PlayerDataStore,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
     /// Players with a linked phone, as the host's web server last reported.
     phones: Vec<PlayerId>,
@@ -418,6 +452,7 @@ impl GameNight {
             preferred_colors: HashMap::new(),
             profiles: HashMap::new(),
             player_settings: PlayerSettingsStore::new(),
+            player_data: PlayerDataStore::new(),
             presence: HashMap::new(),
             phones: Vec::new(),
             participation: HashMap::new(),
@@ -874,6 +909,12 @@ impl GameNight {
                 key,
                 value,
             } => self.on_set_player_setting(game, player_id, key, value, &mut fx),
+            Command::SavePlayerData {
+                game,
+                player_id,
+                data,
+                expected_revision,
+            } => self.on_save_player_data(game, player_id, data, expected_revision, &mut fx),
         }
         self.refresh_autoplay(&mut fx);
         if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
@@ -1230,6 +1271,7 @@ impl GameNight {
             preferred_colors: self.preferred_colors.clone(),
             profiles: self.profiles.clone(),
             player_settings: self.player_settings.clone(),
+            player_data: self.player_data.clone(),
             seats: self.seats.clone(),
             playlist: self.playlist.entries()[self
                 .playlist
@@ -1267,6 +1309,9 @@ impl GameNight {
         self.profiles = carry.profiles;
         for (owner, games) in carry.player_settings {
             self.player_settings.entry(owner).or_insert(games);
+        }
+        for (owner, games) in carry.player_data {
+            self.player_data.entry(owner).or_insert(games);
         }
         self.profiles
             .retain(|id, _| self.players.iter().any(|p| p.id == *id));
@@ -1570,6 +1615,7 @@ impl GameNight {
         self.profiles.remove(&player_id);
         self.player_settings
             .remove(&format!("party:{}", player_id.0));
+        self.player_data.remove(&format!("party:{}", player_id.0));
         self.assign_player_colors();
         for seat in &mut self.seats {
             if seat.occupant.player_id() == Some(player_id) {
@@ -1625,12 +1671,27 @@ impl GameNight {
                     }
                     fx.push(Effect::PlayerSettingsStored);
                 }
+                // Progress made as a guest likewise, for games the profile
+                // has nothing saved for.
+                if let Some(guest) = self.player_data.remove(&format!("party:{}", player_id.0)) {
+                    let saved = self.player_data.entry(profile.clone()).or_default();
+                    for (game, data) in guest {
+                        if !saved.contains_key(&game) {
+                            saved.insert(game.clone(), data);
+                            fx.push(Effect::PlayerDataStored {
+                                owner: profile.clone(),
+                                game: GameId::new(game),
+                            });
+                        }
+                    }
+                }
                 self.profiles.insert(player_id, profile.clone()) != Some(profile)
             }
             None => self.profiles.remove(&player_id).is_some(),
         };
         if changed {
             self.push_player_settings(None, Some(player_id), fx);
+            self.push_player_data(player_id, fx);
             fx.push(Effect::StateChanged);
             self.send_participation(fx);
             // The warm game was prepared without this player's key: prepare
@@ -2360,6 +2421,110 @@ impl GameNight {
             })
             .collect();
         (!values.is_empty()).then_some(values)
+    }
+
+    /// A player's saved progress for `game`, if any.
+    pub fn player_data(&self, game: &GameId, player_id: PlayerId) -> Option<&SavedPlayerData> {
+        self.player_data
+            .get(&self.settings_owner(player_id))
+            .and_then(|games| games.get(&game.0))
+    }
+
+    /// What a profile saved for `game`, for writing to disk.
+    pub fn saved_player_data(&self, owner: &str, game: &GameId) -> Option<&SavedPlayerData> {
+        self.player_data
+            .get(owner)
+            .and_then(|games| games.get(&game.0))
+    }
+
+    /// Load progress saved on an earlier night. What was saved tonight wins.
+    pub fn load_player_data(&mut self, saved: PlayerDataStore) {
+        for (owner, games) in saved {
+            if owner.starts_with("party:") {
+                continue;
+            }
+            let entry = self.player_data.entry(owner).or_default();
+            for (game, data) in games {
+                entry.entry(game).or_insert(data);
+            }
+        }
+    }
+
+    /// Queue `PlayerData` for every game connected tonight that `player`
+    /// has progress in (after they picked up or dropped a profile).
+    fn push_player_data(&self, player_id: PlayerId, fx: &mut Vec<Effect>) {
+        for game in &self.connected_games {
+            if let Some(saved) = self.player_data(game, player_id) {
+                fx.push(Effect::PlayerData {
+                    game: game.clone(),
+                    player_id,
+                    data: saved.data.clone(),
+                    revision: saved.revision,
+                });
+            }
+        }
+    }
+
+    fn on_save_player_data(
+        &mut self,
+        game: GameId,
+        player_id: PlayerId,
+        data: serde_json::Value,
+        expected_revision: Option<u64>,
+        fx: &mut Vec<Effect>,
+    ) {
+        if !self.players.iter().any(|p| p.id == player_id) {
+            fx.push(Effect::Reject {
+                reason: "unknown player".into(),
+            });
+            return;
+        }
+        let size = serde_json::to_vec(&data)
+            .map(|b| b.len())
+            .unwrap_or(usize::MAX);
+        if size > gamenight_protocol::PLAYER_DATA_MAX_BYTES {
+            fx.push(Effect::Reject {
+                reason: format!(
+                    "player data is {size} bytes; the limit is {}",
+                    gamenight_protocol::PLAYER_DATA_MAX_BYTES
+                ),
+            });
+            return;
+        }
+        let owner = self.settings_owner(player_id);
+        let games = self.player_data.entry(owner.clone()).or_default();
+        let current = games.get(&game.0).map_or(0, |saved| saved.revision);
+        if let Some(expected) = expected_revision {
+            if expected != current {
+                fx.push(Effect::Reject {
+                    reason: format!(
+                        "player data changed since revision {expected} (now {current}); \
+                         merge with the newer player_data and save again"
+                    ),
+                });
+                return;
+            }
+        }
+        let revision = current + 1;
+        games.insert(
+            game.0.clone(),
+            SavedPlayerData {
+                data: data.clone(),
+                revision,
+            },
+        );
+        if !owner.starts_with("party:") {
+            fx.push(Effect::PlayerDataStored {
+                owner,
+                game: game.clone(),
+            });
+        }
+        fx.push(Effect::PlayerData {
+            game,
+            player_id,
+            data,
+            revision,
+        });
     }
 
     /// Saved values of players with a profile, for writing to disk.

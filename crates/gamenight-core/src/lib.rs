@@ -11,7 +11,10 @@ mod playlist;
 mod session;
 mod vote;
 
-pub use night::{Command, Effect, GameCommand, GameNight, PartyCarry, PlayerSettingsStore};
+pub use night::{
+    Command, Effect, GameCommand, GameNight, PartyCarry, PlayerDataStore, PlayerSettingsStore,
+    SavedPlayerData,
+};
 pub use playlist::Playlist;
 pub use session::{IllegalTransition, Session};
 pub use vote::VoteBoard;
@@ -1811,6 +1814,77 @@ mod night_tests {
             } if *player_id == who => values.get("sensitivity"),
             _ => None,
         })
+    }
+
+    #[test]
+    fn player_data_is_revisioned_and_follows_the_profile() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ada", Some(0), None));
+        let ada = night.snapshot().players[0].id;
+        let spells = GameId::new("spellstorm");
+        let save = |night: &mut GameNight, data: serde_json::Value, expected: Option<u64>| {
+            night.handle(Command::SavePlayerData {
+                game: GameId::new("spellstorm"),
+                player_id: ada,
+                data,
+                expected_revision: expected,
+            })
+        };
+
+        // A guest's progress is kept tonight but not stored.
+        let fx = save(&mut night, serde_json::json!({"spells": ["fire"]}), Some(0));
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::PlayerData { revision: 1, .. })));
+        assert!(!fx
+            .iter()
+            .any(|e| matches!(e, Effect::PlayerDataStored { .. })));
+
+        // A stale write is refused; a current one moves the revision on.
+        let fx = save(&mut night, serde_json::json!({"spells": []}), Some(0));
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+        let fx = save(
+            &mut night,
+            serde_json::json!({"spells": ["fire", "ice"]}),
+            Some(1),
+        );
+        assert!(fx
+            .iter()
+            .any(|e| matches!(e, Effect::PlayerData { revision: 2, .. })));
+        let fx = save(&mut night, serde_json::json!("x".repeat(70 * 1024)), None);
+        assert!(fx.iter().any(|e| matches!(e, Effect::Reject { .. })));
+
+        // Signing in takes the guest's progress along and stores it.
+        let fx = night.handle(Command::SetPlayerProfile {
+            player_id: ada,
+            profile: Some("account:ada".into()),
+        });
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::PlayerDataStored { owner, .. } if owner == "account:ada"
+        )));
+        let saved = night
+            .saved_player_data("account:ada", &spells)
+            .unwrap()
+            .clone();
+        assert_eq!(saved.revision, 2);
+
+        // Another night: it comes back once the profile is picked up.
+        let mut later = GameNight::default();
+        let mut store = PlayerDataStore::new();
+        store
+            .entry("account:ada".into())
+            .or_default()
+            .insert("spellstorm".into(), saved.clone());
+        later.load_player_data(store);
+        later.handle(join_cmd("Ada", Some(0), None));
+        let again = later.snapshot().players[0].id;
+        assert!(later.player_data(&spells, again).is_none());
+        later.handle(Command::SetPlayerProfile {
+            player_id: again,
+            profile: Some("account:ada".into()),
+        });
+        assert_eq!(later.player_data(&spells, again), Some(&saved));
     }
 
     #[test]

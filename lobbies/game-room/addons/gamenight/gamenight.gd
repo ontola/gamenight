@@ -47,6 +47,11 @@ signal setting_changed(key: String, value: Variant)
 ## declare_settings(), with every prepare and roster update, and whenever that
 ## player changes one. Saved with their profile between nights.
 signal player_settings_changed(player_id: String, values: Dictionary)
+## One player's saved progress (unlocks, stats), as you last stored it with
+## [method save_player_data]. Arrives with every prepare and roster update for
+## players that have any, and after each save. Kept with their profile
+## between nights; a guest's lasts the night and moves along when they sign in.
+signal player_data_changed(player_id: String, data: Variant)
 ## A player pressed one of your [method declare_actions] buttons on their
 ## phone, like "New round". The host already wrote it in the room log.
 signal action_triggered(key: String, player_id: String)
@@ -314,6 +319,51 @@ func player_setting(player_id: String, key: String, fallback: Variant = null) ->
 	return _player_settings.get(player_id, {}).get(key, fallback)
 
 var _player_settings: Dictionary = {}
+
+## A player's saved progress, or `fallback` when nothing is saved yet.
+func player_data(player_id: String, fallback: Variant = {}) -> Variant:
+	return _player_data.get(player_id, fallback)
+
+## Save one player's own progress: any JSON-able value up to 64 KB, replacing
+## what was there. Answered with [signal player_data_changed]. A save made
+## against an older copy than the host has is refused (a warning is printed),
+## so two hosts never overwrite each other: merge in the newer data and save
+## again.
+func save_player_data(player_id: String, data: Variant) -> void:
+	_player_data[player_id] = data
+	_send({"type": PROTOCOL.MSG_SAVE_PLAYER_DATA, "player_id": player_id, "data": data,
+		"expected_revision": int(_player_data_revision.get(player_id, 0))})
+
+## Everything in list `key` of the saved progress of the players here now,
+## for the session only: one player's unlock is everyone's tonight. Never save
+## this back into a player's own data.
+func party_union(key: String = "unlocks") -> Array:
+	var union: Array = []
+	for player in party.get("players", []):
+		var data: Variant = _player_data.get(str(player.get("id", "")), {})
+		if data is Dictionary:
+			for item in data.get(key, []):
+				if not union.has(item):
+					union.append(item)
+	return union
+
+## Add `item` to list `key` in the saved progress of every player here now:
+## what the group earns together counts for everyone who was there.
+func unlock_for_present(item: Variant, key: String = "unlocks") -> void:
+	for player in party.get("players", []):
+		var id := str(player.get("id", ""))
+		var data: Variant = _player_data.get(id, {})
+		if not data is Dictionary:
+			data = {}
+		var list: Array = data.get(key, [])
+		if list.has(item):
+			continue
+		list.append(item)
+		data[key] = list
+		save_player_data(id, data)
+
+var _player_data: Dictionary = {}
+var _player_data_revision: Dictionary = {}
 
 ## Optional: give each player a screen of their own on their phone (see
 ## "Phone screens" in docs/protocol.md). `root` is an absolute directory the
@@ -702,6 +752,11 @@ func _handle(msg: Variant) -> void:
 					values[key] = int(value) if value is float else value
 			_player_settings[player_id] = values
 			player_settings_changed.emit(player_id, values)
+		PROTOCOL.MSG_PLAYER_DATA:
+			var player_id := str(msg.get("player_id", ""))
+			_player_data[player_id] = msg.get("data")
+			_player_data_revision[player_id] = int(msg.get("revision", 0))
+			player_data_changed.emit(player_id, msg.get("data"))
 		PROTOCOL.MSG_ACTION_TRIGGERED:
 			action_triggered.emit(str(msg.get("key", "")), str(msg.get("player_id", "")))
 		PROTOCOL.MSG_COMPANION_MESSAGE:

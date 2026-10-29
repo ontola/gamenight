@@ -52,7 +52,7 @@ development connections may reconnect automatically.</p>
 		msg[&quot;label&quot;] = label
 	_send(msg)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L400">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/godot/addons/gamenight/gamenight.gd#L450">Source: sdk/godot/addons/gamenight/gamenight.gd</a></p>
 <p>Call <code>GameNight.notify_ready(session_id)</code> only after your level and first frame are prepared. <code>notify_finished</code> reports a round; your game still owns the results screen and next round.</p>
 <p><code>GameNight.add_room_log(&quot;New run&quot;)</code> adds a line to the room log players read back in the GameNight app (never on the TV). Use it for a new run, a level or a winner, not every frame.</p>
 <p><code>GameNight.declare_actions([{&quot;key&quot;: &quot;new_round&quot;, &quot;label&quot;: &quot;New round&quot;, &quot;confirm&quot;: true}])</code> puts buttons on the players' phones, next to your settings. A press arrives as <code>action_triggered(key, player_id)</code> while your session is being played, and the room log says who pressed it.</p>
@@ -191,7 +191,7 @@ func _host_music(party: Dictionary):
 <p>Use a dedicated <code>Music</code> bus. Growing Guns uses <code>MusicA</code> and <code>MusicB</code> for its two
 soundtrack layers. Do not mute <code>Master</code>: that also silences game effects.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="706bd1933854b6e35f884f7a44a28321aa3c5283bc4f8d28acc0ee2fdf3c021a">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/godot.md">Edit this page</a><span data-source-fingerprint="0558121b285e3528820215eabeae1b84a439cfb4d2b845f2eed12bb95e12d129">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/rust"><small>Previous</small>Rust / Bevy</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#lifecycle-signals">Lifecycle signals</a><a href="#report-preparation-progress">Report preparation progress</a><a href="#controllers-and-live-profiles">Controllers and live profiles</a><a href="#screen-ownership">Screen ownership</a><a href="#phone-screens">Phone screens</a><a href="#godot-lobby-example">Godot lobby example</a><a href="#before-release">Before release</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a><a href="#yield-your-soundtrack-to-host-music">Yield your soundtrack to host music</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

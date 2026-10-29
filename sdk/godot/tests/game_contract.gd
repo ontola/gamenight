@@ -53,6 +53,16 @@ func run():
 	check(seen.size()==1 and seen[0][0]=="p1","player settings are announced")
 	check(sdk.player_setting("p1","sensitivity") is int and sdk.player_setting("p1","sensitivity")==150,"player numbers are ints")
 	check(sdk.player_setting("p1","character")=="cat" and sdk.player_setting("p2","character","frog")=="frog","player settings are per player with a fallback")
+	var progress := []
+	sdk.player_data_changed.connect(func(id, data): progress.append([id, data]))
+	check(sdk.player_data("p1").is_empty(),"no saved progress is an empty dictionary")
+	sdk._handle({"type":"player_data","game":"test","player_id":"p1","data":{"unlocks":["rocket"]},"revision":3})
+	check(progress.size()==1 and sdk.player_data("p1")["unlocks"]==["rocket"],"saved progress is announced and kept")
+	sdk.party = {"players":[{"id":"p1"},{"id":"p2"}]}
+	sdk._handle({"type":"player_data","game":"test","player_id":"p2","data":{"unlocks":["shield","rocket"]},"revision":1})
+	check(sdk.party_union()==["rocket","shield"],"the party shares unlocks for the session")
+	sdk.unlock_for_present("laser")
+	check(sdk.player_data("p1")["unlocks"]==["rocket","laser"] and sdk.player_data("p2")["unlocks"].has("laser"),"a shared unlock is saved for everyone present")
 	sdk._handle({"type":"dispose","session":"s1"})
 	check(sdk.session.is_empty() and sdk.phase=="idle","dispose clears session")
 	sdk.free()

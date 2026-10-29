@@ -120,6 +120,15 @@ pub enum GameEvent {
         player_id: gamenight_protocol::PlayerId,
         values: std::collections::BTreeMap<String, SettingValue>,
     },
+    /// One player's saved progress, as you last stored it with
+    /// [`GameNight::save_player_data`]. Sent with every `Prepare`,
+    /// `PartyUpdated` and `PlayersUpdated` for players that have any, and
+    /// after each accepted save. No event means nothing saved yet.
+    PlayerData {
+        player_id: gamenight_protocol::PlayerId,
+        data: serde_json::Value,
+        revision: u64,
+    },
     /// Only ever sent to the process registered as the persistent lobby
     /// (`GAMENIGHT_GAME_ID` matching what the daemon was told via
     /// `set_lobby_game`) — `active: false` the moment some other game
@@ -283,6 +292,16 @@ impl GameNight {
                         ServerMessage::PlayerSettings {
                             player_id, values, ..
                         } => GameEvent::PlayerSettings { player_id, values },
+                        ServerMessage::PlayerData {
+                            player_id,
+                            data,
+                            revision,
+                            ..
+                        } => GameEvent::PlayerData {
+                            player_id,
+                            data,
+                            revision,
+                        },
                         ServerMessage::LobbyFocus { active } => GameEvent::LobbyFocus { active },
                         ServerMessage::PartyState { party } => {
                             self.party = party;
@@ -438,6 +457,25 @@ impl GameNight {
             player_id,
             key: key.into(),
             value,
+        })
+        .await
+    }
+
+    /// Save one player's own progress (unlocks, stats): any JSON up to
+    /// 64 KB, kept with their profile between nights. Pass the `revision` of
+    /// the last [`GameEvent::PlayerData`] you got (0 if none); a stale save
+    /// is rejected so two hosts never overwrite each other. Answered with
+    /// [`GameEvent::PlayerData`] carrying the new revision.
+    pub async fn save_player_data(
+        &mut self,
+        player_id: gamenight_protocol::PlayerId,
+        data: serde_json::Value,
+        expected_revision: Option<u64>,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::SavePlayerData {
+            player_id,
+            data,
+            expected_revision,
         })
         .await
     }

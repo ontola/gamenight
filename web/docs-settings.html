@@ -192,12 +192,38 @@ player changes one. In Godot: the <code>player_settings_changed</code> signal an
 <li>Change one from the game's own menu with <code>set_player_setting {player_id, key, value}</code> (Godot <code>GameNight.set_player_setting</code>, Rust <code>set_player_setting</code>).
 Phones send the same message for their own player.</li>
 <li>A player with a profile keeps their values between nights: the host saves them
-in <code>gamenight/player-settings.json</code> in the user data directory (override with
-<code>GAMENIGHT_PLAYER_SETTINGS</code>). A guest's values last for the night; when the
-guest signs in, they move to their profile.</li>
+in its <a href="https://github.com/ontola/gamenight/blob/main/docs/player-store.md">player store</a>. A guest's values last for the night;
+when the guest signs in, they move to their profile.</li>
 <li>Party writes (<code>set_setting</code>, <code>control_settings</code>) cannot change a per-player
 key, and <code>GameSettings.values</code> only holds party values. <code>GameSettings.players</code>
 shows each present player's own values, for the apps.</li>
+</ul>
+<h2 id="saved-progress">Saved progress</h2>
+<p>Settings are knobs. Progress (unlocked characters, a spell book, best times)
+is data only the game understands. Save it per player and per game:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-gdscript">GameNight.player_data_changed.connect(func(player_id, data):
+    grimoire[player_id] = data.get(&quot;spells&quot;, []))
+GameNight.save_player_data(player_id, {&quot;spells&quot;: grimoire[player_id]})
+</code></pre></div>
+<ul>
+<li><code>save_player_data {player_id, data, expected_revision}</code> stores any JSON up to
+64 KB, replacing what was there. The host answers with <code>player_data {game, player_id, data, revision}</code>, and sends the same with every <code>prepare</code>,
+<code>party_updated</code> and <code>players_updated</code> for players that have any. No message
+means nothing is saved yet. Godot: <code>player_data(player_id)</code>,
+<code>save_player_data(player_id, data)</code> and the <code>player_data_changed</code> signal; Rust
+<code>save_player_data</code> and <code>GameEvent::PlayerData</code>.</li>
+<li><code>expected_revision</code> is the revision of the last <code>player_data</code> you got (0 for
+none). A save against an older copy is refused, so two hosts never silently
+overwrite each other: merge in the newer data and save again. The Godot addon
+fills it in for you.</li>
+<li>Unlocks belong to a person. While playing, everyone in the room may use what
+anyone has unlocked (<code>GameNight.party_union(&quot;unlocks&quot;)</code>), but never save that
+union into a player's own data. What the group earns together counts for
+everyone present: <code>GameNight.unlock_for_present(item)</code> adds it to each of
+their <code>unlocks</code> lists.</li>
+<li>Like settings: a guest's progress lasts the night and moves to their profile
+when they sign in (unless that profile already has progress in this game).
+Worlds and other large saves do not belong here.</li>
 </ul>
 <h2 id="phone-and-lobby-assistant">Phone and lobby assistant</h2>
 <p>The standard desktop cloud bridge and the custom lobby relay publish these same
@@ -239,7 +265,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="1098965e37d9d449a112148288ec20fdbed31a271d679aff1a735754789d0f09">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="3fdfdd825b8b179510ed820f3d74dd923f81e26ac5771614b6088f9f99ab12ea">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/store-clip"><small>Previous</small>Store clip</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#per-player-settings">Per-player settings</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#per-player-settings">Per-player settings</a><a href="#saved-progress">Saved progress</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

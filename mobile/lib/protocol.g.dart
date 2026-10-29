@@ -20,7 +20,7 @@ const String envOverlayUrl = 'GAMENIGHT_OVERLAY_URL';
 const String envToken = 'GAMENIGHT_TOKEN';
 const String defaultAddr = '127.0.0.1:7912';
 const int defaultWebPort = 7913;
-const int godotSdkVersion = 6;
+const int godotSdkVersion = 7;
 const int protocolVersion = 1;
 
 /// Message "type" tags, both directions.
@@ -60,6 +60,7 @@ const String msgPartyUpdated = 'party_updated';
 const String msgPause = 'pause';
 const String msgPerformance = 'performance';
 const String msgPlayNext = 'play_next';
+const String msgPlayerData = 'player_data';
 const String msgPlayerSettings = 'player_settings';
 const String msgPlayersUpdated = 'players_updated';
 const String msgPlaytests = 'playtests';
@@ -77,6 +78,7 @@ const String msgResume = 'resume';
 const String msgRetryLobby = 'retry_lobby';
 const String msgRoomLog = 'room_log';
 const String msgRumble = 'rumble';
+const String msgSavePlayerData = 'save_player_data';
 const String msgSetCouchPosition = 'set_couch_position';
 const String msgSetPhones = 'set_phones';
 const String msgSetPlayerAvatar = 'set_player_avatar';

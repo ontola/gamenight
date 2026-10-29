@@ -13,6 +13,7 @@ gamenight-core = { workspace = true }
 gamenight-catalog = { path = "../gamenight-catalog" }
 gamenight-installer = { path = "../gamenight-installer" }
 gamenight-local-web = { path = "../gamenight-local-web" }
+gamenight-store = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 uuid = { workspace = true }

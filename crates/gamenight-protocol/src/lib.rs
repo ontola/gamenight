@@ -24,7 +24,11 @@ pub const PROTOCOL_VERSION: u32 = 1;
 /// The current Godot addon (`sdk/godot/addons/gamenight`, `SDK_VERSION` in
 /// gamenight.gd). Bump both together when the addon gains a feature games
 /// rely on, so an older vendored copy warns at runtime.
-pub const GODOT_SDK_VERSION: u32 = 6;
+pub const GODOT_SDK_VERSION: u32 = 7;
+
+/// Largest `save_player_data` payload, as serialized JSON. Progress, not
+/// worlds: worlds are save directories the host manages.
+pub const PLAYER_DATA_MAX_BYTES: usize = 64 * 1024;
 
 /// Default address the daemon listens on.
 pub const DEFAULT_ADDR: &str = "127.0.0.1:7912";
@@ -1411,6 +1415,20 @@ pub enum ClientMessage {
         value: SettingValue,
     },
 
+    /// Save one player's own progress for this game (unlocks, stats, a
+    /// grimoire): any JSON up to [`PLAYER_DATA_MAX_BYTES`], replacing what was
+    /// there. Kept with the player's profile between nights; a guest's data
+    /// lasts the night, and moves to their profile when they sign in.
+    /// `expected_revision` is the `revision` of the last `player_data` the
+    /// game saw (0 when there was none); a stale write is rejected, so two
+    /// hosts or two menus never silently overwrite each other. Games only.
+    SavePlayerData {
+        player_id: PlayerId,
+        data: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        expected_revision: Option<u64>,
+    },
+
     /// Atomically validate a settings batch against a live session and revision.
     /// Undo restores the last batch. Keep discards that undo snapshot.
     ControlSettings {
@@ -1662,6 +1680,17 @@ pub enum ServerMessage {
         game: GameId,
         player_id: PlayerId,
         values: std::collections::BTreeMap<String, SettingValue>,
+    },
+
+    /// One player's saved progress for this game, as the game last stored it
+    /// with `save_player_data`. Sent with every `prepare`, `party_updated` and
+    /// `players_updated` for players that have any, and after each accepted
+    /// save (with the new `revision`). No message means no saved data yet.
+    PlayerData {
+        game: GameId,
+        player_id: PlayerId,
+        data: serde_json::Value,
+        revision: u64,
     },
 
     /// Sent to the persistent lobby game specifically (see

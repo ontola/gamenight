@@ -55,9 +55,11 @@ struct PendingLaunch {
 /// Everything shared between connections.
 struct Shared {
     night: GameNight,
-    /// Where players' own settings are saved between nights; `None` keeps
-    /// them in memory (tests).
-    player_settings_file: Option<std::path::PathBuf>,
+    /// Where players' own settings and progress are saved between nights
+    /// (the host's Atomic store); `None` keeps them in memory (tests).
+    store: Option<gamenight_store::StoreHandle>,
+    /// Profile settings as last handed to `store`, to write only what changed.
+    stored_settings: gamenight_core::PlayerSettingsStore,
     /// One connection per game title. Second connection for the same title is
     /// rejected.
     games: HashMap<GameId, Tx>,
@@ -335,7 +337,8 @@ impl Shared {
             // front keeps the first real join the first signal ever sent.
             prewarm_players: Some(0),
             exit_with_lobby: false,
-            player_settings_file: None,
+            store: None,
+            stored_settings: Default::default(),
             lobby_game: None,
             focus_watch: Default::default(),
             warm_watch: Default::default(),
@@ -870,6 +873,31 @@ impl Shared {
                     }
                 }
                 Effect::PlayerSettingsStored => self.save_player_settings(),
+                Effect::PlayerData {
+                    game,
+                    player_id,
+                    data,
+                    revision,
+                } => {
+                    if let Some(tx) = self.games.get(&game) {
+                        send(
+                            tx,
+                            &ServerMessage::PlayerData {
+                                game,
+                                player_id,
+                                data,
+                                revision,
+                            },
+                        );
+                    }
+                }
+                Effect::PlayerDataStored { owner, game } => {
+                    if let (Some(store), Some(saved)) =
+                        (&self.store, self.night.saved_player_data(&owner, &game))
+                    {
+                        store.put_data(&owner, &game, saved.clone());
+                    }
+                }
                 Effect::LobbyFocus { game, active } => {
                     // Same reasoning as `SettingChanged`: not session-scoped,
                     // and if the lobby process is away there's nothing to
@@ -1218,28 +1246,40 @@ impl Shared {
         }
     }
 
-    /// Write players' own settings, replacing the file atomically. A failed
-    /// write keeps tonight's values in memory and is logged.
-    fn save_player_settings(&self) {
-        let Some(path) = &self.player_settings_file else {
+    /// Hand profiles' changed settings to the store. A failed write is
+    /// logged by the store and tonight's values stay in memory.
+    fn save_player_settings(&mut self) {
+        let Some(store) = &self.store else {
             return;
         };
-        let write = || -> std::io::Result<()> {
-            if let Some(dir) = path.parent() {
-                std::fs::create_dir_all(dir)?;
+        let saved = self.night.saved_player_settings();
+        for (owner, games) in &saved {
+            for (game, values) in games {
+                if self.stored_settings.get(owner).and_then(|g| g.get(game)) != Some(values) {
+                    store.put_settings(owner, game, values.clone());
+                }
             }
-            let temporary = path.with_extension("tmp");
-            std::fs::write(
-                &temporary,
-                serde_json::to_vec_pretty(&serde_json::json!({
-                    "version": 1,
-                    "players": self.night.saved_player_settings(),
-                }))?,
-            )?;
-            std::fs::rename(temporary, path)
+        }
+        self.stored_settings = saved;
+    }
+
+    /// Send every player's saved progress in `game` to it.
+    fn send_player_data(&self, game: &GameId, players: &[gamenight_protocol::Player]) {
+        let Some(tx) = self.games.get(game) else {
+            return;
         };
-        if let Err(error) = write() {
-            warn!(%error, path = %path.display(), "could not save player settings");
+        for player in players {
+            if let Some(saved) = self.night.player_data(game, player.id) {
+                send(
+                    tx,
+                    &ServerMessage::PlayerData {
+                        game: game.clone(),
+                        player_id: player.id,
+                        data: saved.data.clone(),
+                        revision: saved.revision,
+                    },
+                );
+            }
         }
     }
 
@@ -1320,6 +1360,12 @@ impl Shared {
         | ServerMessage::PartyUpdated { players, .. } = &msg
         {
             self.send_player_settings(game, players);
+        }
+        if let ServerMessage::Prepare { players, .. }
+        | ServerMessage::PartyUpdated { players, .. }
+        | ServerMessage::PlayersUpdated { players, .. } = &msg
+        {
+            self.send_player_data(game, players);
         }
     }
 
@@ -2037,32 +2083,31 @@ pub async fn run_desktop(
     .await
 }
 
-/// The file players' own settings are kept in between nights.
-#[derive(serde::Deserialize)]
-struct SavedPlayerSettings {
-    version: u32,
-    #[serde(default)]
-    players: gamenight_core::PlayerSettingsStore,
-}
-
-/// `GAMENIGHT_PLAYER_SETTINGS`, else `gamenight/player-settings.json` in the
-/// user data directory (next to the remembered players) for the evening's
-/// daemon; test daemons keep settings in memory.
-fn player_settings_path(real: bool) -> Option<std::path::PathBuf> {
-    if let Some(path) = std::env::var_os("GAMENIGHT_PLAYER_SETTINGS") {
-        return Some(path.into());
+/// Open the host's Atomic store (`GAMENIGHT_STORE`, else `gamenight/store`
+/// in the user data directory), bring in settings from the JSON file older
+/// hosts kept, and read everything saved. Without a store the night still
+/// runs, keeping settings and progress in memory.
+async fn open_store() -> Option<(gamenight_store::StoreHandle, gamenight_store::Saved)> {
+    let dir = gamenight_store::default_dir();
+    let mut store = match gamenight_store::Store::open(&dir).await {
+        Ok(store) => store,
+        Err(error) => {
+            warn!(%error, dir = %dir.display(), "player store unavailable; saving nothing tonight");
+            return None;
+        }
+    };
+    let old = gamenight_store::data_root().join("gamenight/player-settings.json");
+    if let Err(error) = gamenight_store::migrate_settings_file(&mut store, &old).await {
+        warn!(%error, path = %old.display(), "could not move old player settings into the store");
     }
-    if !real {
-        return None;
-    }
-    let root = std::env::var_os("LOCALAPPDATA")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("XDG_DATA_HOME").map(std::path::PathBuf::from))
-        .unwrap_or_else(|| {
-            std::path::PathBuf::from(std::env::var_os("HOME").unwrap_or_default())
-                .join(".local/share")
-        });
-    Some(root.join("gamenight/player-settings.json"))
+    let saved = match store.load().await {
+        Ok(saved) => saved,
+        Err(error) => {
+            warn!(%error, "could not read the player store");
+            gamenight_store::Saved::default()
+        }
+    };
+    Some((gamenight_store::StoreHandle::spawn(store), saved))
 }
 
 /// What only the packaged desktop app has: quitting with its lobby, and
@@ -2090,15 +2135,14 @@ async fn run_inner(
     let addr = listener.local_addr()?;
     info!(%addr, "gamenight daemon listening");
     let shared = Arc::new(Mutex::new(Shared::new(library, addr.to_string(), prewarm)));
-    if let Some(path) = player_settings_path(music) {
-        let mut s = shared.lock().await;
-        if let Ok(bytes) = std::fs::read(&path) {
-            match serde_json::from_slice::<SavedPlayerSettings>(&bytes) {
-                Ok(saved) if saved.version == 1 => s.night.load_player_settings(saved.players),
-                _ => warn!(path = %path.display(), "ignoring unreadable player settings"),
-            }
+    if music {
+        if let Some((store, saved)) = open_store().await {
+            let mut s = shared.lock().await;
+            s.stored_settings = saved.settings.clone();
+            s.night.load_player_settings(saved.settings);
+            s.night.load_player_data(saved.data);
+            s.store = Some(store);
         }
-        s.player_settings_file = Some(path);
     }
     let exit_with_lobby = desktop.is_some();
     if let Some(desktop) = desktop {
@@ -2934,6 +2978,19 @@ fn message_to_command(
             },
             _ => return Err("only games change their own settings".into()),
         },
+        ClientMessage::SavePlayerData {
+            player_id,
+            data,
+            expected_revision,
+        } => match registration {
+            Registration::Game(game) if is_game => Command::SavePlayerData {
+                game: game.clone(),
+                player_id,
+                data,
+                expected_revision,
+            },
+            _ => return Err("only games save player data".into()),
+        },
         ClientMessage::Ready { .. }
         | ClientMessage::Finished { .. }
         | ClientMessage::Progress { .. } => return Err("only games report session state".into()),
@@ -3513,16 +3570,17 @@ mod replacement_lobby_tests {
         assert!(matches!(next(&mut web_rx), ServerMessage::Error { .. }));
     }
 
-    #[test]
-    fn player_settings_are_saved_for_profiles_and_sent_to_the_game() {
+    #[tokio::test]
+    async fn player_settings_are_saved_for_profiles_and_sent_to_the_game() {
         let dir = std::env::temp_dir().join(format!("gamenight-ps-{}", uuid::Uuid::new_v4()));
-        let path = dir.join("player-settings.json");
         let mut s = Shared::new(
             vec![test_game(serde_json::Value::Null)],
             "127.0.0.1:0".into(),
             None,
         );
-        s.player_settings_file = Some(path.clone());
+        let store =
+            gamenight_store::StoreHandle::spawn(gamenight_store::Store::open(&dir).await.unwrap());
+        s.store = Some(store.clone());
         let (tx, mut rx) = mpsc::unbounded_channel();
         let game = GameId::new("test");
         s.games.insert(game.clone(), tx);
@@ -3560,7 +3618,10 @@ mod replacement_lobby_tests {
             )
         };
         set(&mut s);
-        assert!(!path.exists(), "a guest's choice stays in memory");
+        assert!(
+            s.stored_settings.is_empty(),
+            "a guest's choice stays in memory"
+        );
         s.dispatch(
             Command::SetPlayerProfile {
                 player_id: ada,
@@ -3568,9 +3629,17 @@ mod replacement_lobby_tests {
             },
             None,
         );
-        let saved: serde_json::Value =
-            serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
-        assert_eq!(saved["players"]["local:ada"]["test"]["character"], "cat");
+        // Progress the game saves goes to the store too, and comes back to it.
+        s.dispatch(
+            Command::SavePlayerData {
+                game: game.clone(),
+                player_id: ada,
+                data: serde_json::json!({"unlocked": ["cat"]}),
+                expected_revision: Some(0),
+            },
+            None,
+        );
+        store.flush().await;
         let mut got = None;
         while let Ok(message) = rx.try_recv() {
             if let Ok(ServerMessage::PlayerSettings {
@@ -3586,6 +3655,20 @@ mod replacement_lobby_tests {
             got,
             Some(gamenight_protocol::SettingValue::Choice("cat".into()))
         );
+        drop(s);
+        drop(store);
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        let saved = gamenight_store::Store::open(&dir)
+            .await
+            .unwrap()
+            .load()
+            .await
+            .unwrap();
+        assert_eq!(
+            saved.settings["local:ada"]["test"]["character"],
+            gamenight_protocol::SettingValue::Choice("cat".into())
+        );
+        assert_eq!(saved.data["local:ada"]["test"].revision, 1);
         let _ = std::fs::remove_dir_all(dir);
     }
 

@@ -21,7 +21,7 @@ export const ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL";
 export const ENV_TOKEN = "GAMENIGHT_TOKEN";
 export const DEFAULT_ADDR = "127.0.0.1:7912";
 export const DEFAULT_WEB_PORT = 7913;
-export const GODOT_SDK_VERSION = 6;
+export const GODOT_SDK_VERSION = 7;
 export const PROTOCOL_VERSION = 1;
 
 /** Message "type" tags, both directions. */
@@ -62,6 +62,7 @@ export const MSG = Object.freeze({
   "PAUSE": "pause",
   "PERFORMANCE": "performance",
   "PLAY_NEXT": "play_next",
+  "PLAYER_DATA": "player_data",
   "PLAYER_SETTINGS": "player_settings",
   "PLAYERS_UPDATED": "players_updated",
   "PLAYTESTS": "playtests",
@@ -79,6 +80,7 @@ export const MSG = Object.freeze({
   "RETRY_LOBBY": "retry_lobby",
   "ROOM_LOG": "room_log",
   "RUMBLE": "rumble",
+  "SAVE_PLAYER_DATA": "save_player_data",
   "SET_COUCH_POSITION": "set_couch_position",
   "SET_PHONES": "set_phones",
   "SET_PLAYER_AVATAR": "set_player_avatar",
@@ -422,6 +424,17 @@ export const CLIENT_MESSAGES = {
       "value"
     ]
   },
+  "save_player_data": {
+    "fields": [
+      "data",
+      "expected_revision",
+      "player_id"
+    ],
+    "required": [
+      "data",
+      "player_id"
+    ]
+  },
   "control_settings": {
     "fields": [
       "action",
@@ -733,6 +746,20 @@ export const SERVER_MESSAGES = {
       "game",
       "player_id",
       "values"
+    ]
+  },
+  "player_data": {
+    "fields": [
+      "data",
+      "game",
+      "player_id",
+      "revision"
+    ],
+    "required": [
+      "data",
+      "game",
+      "player_id",
+      "revision"
     ]
   },
   "lobby_focus": {

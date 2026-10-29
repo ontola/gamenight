@@ -22,7 +22,7 @@ ENV_OVERLAY_URL = "GAMENIGHT_OVERLAY_URL"
 ENV_TOKEN = "GAMENIGHT_TOKEN"
 DEFAULT_ADDR = "127.0.0.1:7912"
 DEFAULT_WEB_PORT = 7913
-GODOT_SDK_VERSION = 6
+GODOT_SDK_VERSION = 7
 PROTOCOL_VERSION = 1
 
 # Message "type" tags, both directions.
@@ -62,6 +62,7 @@ MSG_PARTY_UPDATED = "party_updated"
 MSG_PAUSE = "pause"
 MSG_PERFORMANCE = "performance"
 MSG_PLAY_NEXT = "play_next"
+MSG_PLAYER_DATA = "player_data"
 MSG_PLAYER_SETTINGS = "player_settings"
 MSG_PLAYERS_UPDATED = "players_updated"
 MSG_PLAYTESTS = "playtests"
@@ -79,6 +80,7 @@ MSG_RESUME = "resume"
 MSG_RETRY_LOBBY = "retry_lobby"
 MSG_ROOM_LOG = "room_log"
 MSG_RUMBLE = "rumble"
+MSG_SAVE_PLAYER_DATA = "save_player_data"
 MSG_SET_COUCH_POSITION = "set_couch_position"
 MSG_SET_PHONES = "set_phones"
 MSG_SET_PLAYER_AVATAR = "set_player_avatar"
@@ -510,6 +512,17 @@ CLIENT_MESSAGES = {
             "value"
         ]
     },
+    "save_player_data": {
+        "fields": [
+            "data",
+            "expected_revision",
+            "player_id"
+        ],
+        "required": [
+            "data",
+            "player_id"
+        ]
+    },
     "control_settings": {
         "fields": [
             "action",
@@ -821,6 +834,20 @@ SERVER_MESSAGES = {
             "game",
             "player_id",
             "values"
+        ]
+    },
+    "player_data": {
+        "fields": [
+            "data",
+            "game",
+            "player_id",
+            "revision"
+        ],
+        "required": [
+            "data",
+            "game",
+            "player_id",
+            "revision"
         ]
     },
     "lobby_focus": {
