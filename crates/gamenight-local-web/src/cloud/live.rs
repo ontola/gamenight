@@ -75,13 +75,53 @@ impl Game {
     }
 }
 
-/// The model's view of an MCP tool.
+/// Tools that save into the game's own files. A request from the app only
+/// changes the running game, gone after a restart (Joep: "als ik in de app
+/// vraag wil ik eigenlijk temporary changes"); keeping a change is the game's
+/// own explicit tool (such as `keep`), asked for by the player.
+const SAVES: [&str; 2] = ["write_file", "load_mod"];
+
+/// The model's view of an MCP tool, without the ones that save.
 fn tool(t: &Value) -> Option<Value> {
+    let name = t["name"].as_str()?;
+    let mut schema = t
+        .get("inputSchema")
+        .cloned()
+        .unwrap_or(json!({"type":"object"}));
+    if SAVES.contains(&name) {
+        return None;
+    }
+    if name == "set_knob" {
+        // Only a set_knob that can leave main.luau alone; the host says so.
+        schema["properties"].as_object_mut()?.remove("persist")?;
+    }
     Some(json!({
-        "name": t["name"].as_str()?,
+        "name": name,
         "description": cut(t["description"].as_str().unwrap_or(""), 1500),
-        "input_schema": t.get("inputSchema").cloned().unwrap_or(json!({"type":"object"})),
+        "input_schema": schema,
     }))
+}
+
+/// The arguments the game gets: never a saving variant of a tool.
+fn temporary(name: &str, mut args: Value) -> Result<Value, String> {
+    if SAVES.contains(&name) {
+        return Err(format!(
+            "{name} saves into the game's files, which the assistant may not do"
+        ));
+    }
+    if name == "set_knob" {
+        args["persist"] = json!(false);
+    }
+    if name == "command"
+        && args["line"]
+            .as_str()
+            .is_some_and(|l| l.trim_start().starts_with("knob ") || l.trim() == "keep")
+    {
+        return Err(
+            "Saving console commands are not available; use set_knob, which is temporary".into(),
+        );
+    }
+    Ok(args)
 }
 
 /// An MCP tool result as the content of the model's `tool_result`.
@@ -167,13 +207,14 @@ pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str) -> Result<String,
         let mut results = Vec::new();
         for call in calls {
             let name = call["name"].as_str().unwrap_or("");
-            let (content, error) = match game
-                .rpc(
-                    "tools/call",
-                    json!({"name":name,"arguments":call["input"].clone()}),
-                )
-                .await
-            {
+            let called = match temporary(name, call["input"].clone()) {
+                Ok(args) => {
+                    game.rpc("tools/call", json!({"name":name,"arguments":args}))
+                        .await
+                }
+                Err(e) => Err(e),
+            };
+            let (content, error) = match called {
                 Ok(r) => (result_content(&r), r["isError"] == true),
                 Err(e) => (vec![json!({"type":"text","text":e})], true),
             };
@@ -213,7 +254,7 @@ pub(crate) mod tests {
             let result = match m["method"].as_str().unwrap() {
                 "initialize" => json!({"instructions":"Call knobs first."}),
                 "tools/list" => json!({"tools":[{"name":"set_knob","description":"Set one knob",
-                    "inputSchema":{"type":"object","properties":{"name":{"type":"string"}}}}]}),
+                    "inputSchema":{"type":"object","properties":{"name":{"type":"string"},"persist":{"type":"boolean"}}}}]}),
                 "tools/call" => {
                     calls.lock().unwrap().push(m["params"].clone());
                     json!({"content":[{"type":"text","text":"speed = 2"}],"isError":false})
@@ -277,7 +318,7 @@ pub(crate) mod tests {
         );
         assert_eq!(
             calls.lock().unwrap()[0],
-            json!({"name":"set_knob","arguments":{"name":"speed","value":"2"}})
+            json!({"name":"set_knob","arguments":{"name":"speed","value":"2","persist":false}})
         );
     }
 
@@ -293,6 +334,32 @@ pub(crate) mod tests {
         forget_old_images(&mut messages);
         assert_eq!(messages[0]["content"][0]["content"][1]["type"], "text");
         assert_eq!(cut("ééé", 3), "é…");
+    }
+
+    #[test]
+    fn app_requests_never_save_into_the_games_files() {
+        let schema = |props: Value| json!({"type":"object","properties":props});
+        assert!(tool(&json!({"name":"write_file","inputSchema":schema(json!({}))})).is_none());
+        assert!(
+            tool(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{}}))})).is_none(),
+            "a set_knob that always writes main.luau"
+        );
+        let knob =
+            tool(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{},"persist":{}}))}))
+                .unwrap();
+        assert!(knob["input_schema"]["properties"].get("persist").is_none());
+        assert_eq!(
+            temporary(
+                "set_knob",
+                json!({"name":"speed","value":"2","persist":true})
+            )
+            .unwrap()["persist"],
+            false
+        );
+        assert!(temporary("command", json!({"line":"knob speed 2"})).is_err());
+        assert!(temporary("command", json!({"line":"lua state.speed = 2"})).is_ok());
+        assert!(temporary("write_file", json!({})).is_err());
+        assert!(tool(&json!({"name":"run_luau","inputSchema":schema(json!({}))})).is_some());
     }
 
     #[test]

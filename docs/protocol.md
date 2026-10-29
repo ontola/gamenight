@@ -821,7 +821,11 @@ Add the path of its token file, a JSON file with `url` (a loopback
 The local web server then sends no `game_command` for a request. It reads the
 token file, lists the game's tools and carries out the request with them, one
 model step at a time from the GameNight cloud, and the model's last words are
-the answer. The token stays on the host. Warp games do this by themselves when
+the answer. The token stays on the host. Such a change is temporary: the host
+hides tools that save into the game's files (`write_file`, `load_mod`), asks
+`set_knob` for `persist: false`, and offers `set_knob` only when the game
+supports that. A restart brings back the saved game; keeping a change is the
+game's own explicit tool, used only when the player asks to keep it. Warp games do this by themselves when
 GameNight launches them.
 
 ## The night, end to end

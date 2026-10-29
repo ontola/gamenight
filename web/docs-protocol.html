@@ -913,7 +913,11 @@ Add the path of its token file, a JSON file with <code>url</code> (a loopback
 <p>The local web server then sends no <code>game_command</code> for a request. It reads the
 token file, lists the game's tools and carries out the request with them, one
 model step at a time from the GameNight cloud, and the model's last words are
-the answer. The token stays on the host. Warp games do this by themselves when
+the answer. The token stays on the host. Such a change is temporary: the host
+hides tools that save into the game's files (<code>write_file</code>, <code>load_mod</code>), asks
+<code>set_knob</code> for <code>persist: false</code>, and offers <code>set_knob</code> only when the game
+supports that. A restart brings back the saved game; keeping a change is the
+game's own explicit tool, used only when the player asks to keep it. Warp games do this by themselves when
 GameNight launches them.</p>
 <h2 id="the-night-end-to-end">The night, end to end</h2>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code>overlay: set_playlist [neon-trails, neon-siege]
@@ -1123,7 +1127,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="ba9dc6f44afaa892adec3631a0afe4807f95762668d6322c2c6b35bf4fbdcc22">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="a26fbb31d6657308ed650bfb22506dd8f93c80fbcc5762b7b7745312d663536f">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#phone-buttons">Phone buttons</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
