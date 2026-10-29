@@ -64,6 +64,7 @@ MSG_PERFORMANCE = "performance"
 MSG_PLAY_NEXT = "play_next"
 MSG_PLAYER_DATA = "player_data"
 MSG_PLAYER_SETTINGS = "player_settings"
+MSG_PLAYER_STORE_DRIVES = "player_store_drives"
 MSG_PLAYERS_UPDATED = "players_updated"
 MSG_PLAYTESTS = "playtests"
 MSG_PREPARE = "prepare"
@@ -546,6 +547,15 @@ CLIENT_MESSAGES = {
         ],
         "required": []
     },
+    "player_store_drives": {
+        "fields": [
+            "drives",
+            "url"
+        ],
+        "required": [
+            "url"
+        ]
+    },
     "playtests": {
         "fields": [
             "playtests"
@@ -739,7 +749,8 @@ SERVER_MESSAGES = {
         "fields": [
             "godot_sdk",
             "party",
-            "protocol_version"
+            "protocol_version",
+            "store_agent"
         ],
         "required": [
             "party",

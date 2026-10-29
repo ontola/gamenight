@@ -208,6 +208,13 @@ pub enum Command {
         data: serde_json::Value,
         expected_revision: Option<u64>,
     },
+    /// Profiles' records changed on another device and reached this host
+    /// through the player store's sync: newer progress replaces tonight's,
+    /// and synced setting values replace tonight's. Never sent by a client.
+    PlayerStoreSynced {
+        settings: PlayerSettingsStore,
+        data: PlayerDataStore,
+    },
     /// The party turns a knob. `game` defaults to the active game.
     SetSetting {
         game: Option<GameId>,
@@ -915,6 +922,9 @@ impl GameNight {
                 data,
                 expected_revision,
             } => self.on_save_player_data(game, player_id, data, expected_revision, &mut fx),
+            Command::PlayerStoreSynced { settings, data } => {
+                self.on_player_store_synced(settings, data, &mut fx)
+            }
         }
         self.refresh_autoplay(&mut fx);
         if fx.iter().any(|e| matches!(e, Effect::StateChanged)) {
@@ -2447,6 +2457,49 @@ impl GameNight {
             for (game, data) in games {
                 entry.entry(game).or_insert(data);
             }
+        }
+    }
+
+    fn on_player_store_synced(
+        &mut self,
+        settings: PlayerSettingsStore,
+        data: PlayerDataStore,
+        fx: &mut Vec<Effect>,
+    ) {
+        let mut changed: HashSet<String> = HashSet::new();
+        for (owner, games) in data {
+            if owner.starts_with("party:") {
+                continue;
+            }
+            let entry = self.player_data.entry(owner.clone()).or_default();
+            for (game, saved) in games {
+                if entry.get(&game).is_none_or(|s| s.revision < saved.revision) {
+                    entry.insert(game, saved);
+                    changed.insert(owner.clone());
+                }
+            }
+        }
+        for (owner, games) in settings {
+            if owner.starts_with("party:") {
+                continue;
+            }
+            let entry = self.player_settings.entry(owner.clone()).or_default();
+            for (game, values) in games {
+                if entry.get(&game) != Some(&values) {
+                    entry.insert(game, values);
+                    changed.insert(owner.clone());
+                }
+            }
+        }
+        let players: Vec<PlayerId> = self
+            .profiles
+            .iter()
+            .filter(|(_, owner)| changed.contains(*owner))
+            .map(|(id, _)| *id)
+            .collect();
+        for player in players {
+            self.push_player_data(player, fx);
+            self.push_player_settings(None, Some(player), fx);
         }
     }
 

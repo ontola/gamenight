@@ -58,6 +58,9 @@ struct Shared {
     /// Where players' own settings and progress are saved between nights
     /// (the host's Atomic store); `None` keeps them in memory (tests).
     store: Option<gamenight_store::StoreHandle>,
+    /// The player store's Atomic agent, for the local web server to hand the
+    /// cloud (see `PlayerStoreDrives`).
+    store_agent: Option<String>,
     /// Profile settings as last handed to `store`, to write only what changed.
     stored_settings: gamenight_core::PlayerSettingsStore,
     /// One connection per game title. Second connection for the same title is
@@ -339,6 +342,7 @@ impl Shared {
             exit_with_lobby: false,
             store: None,
             stored_settings: Default::default(),
+            store_agent: None,
             lobby_game: None,
             focus_watch: Default::default(),
             warm_watch: Default::default(),
@@ -2087,7 +2091,12 @@ pub async fn run_desktop(
 /// in the user data directory), bring in settings from the JSON file older
 /// hosts kept, and read everything saved. Without a store the night still
 /// runs, keeping settings and progress in memory.
-async fn open_store() -> Option<(gamenight_store::StoreHandle, gamenight_store::Saved)> {
+async fn open_store() -> Option<(
+    gamenight_store::StoreHandle,
+    Option<String>,
+    gamenight_store::Saved,
+    mpsc::UnboundedReceiver<gamenight_store::Saved>,
+)> {
     let dir = gamenight_store::default_dir();
     let mut store = match gamenight_store::Store::open(&dir).await {
         Ok(store) => store,
@@ -2107,7 +2116,9 @@ async fn open_store() -> Option<(gamenight_store::StoreHandle, gamenight_store::
             gamenight_store::Saved::default()
         }
     };
-    Some((gamenight_store::StoreHandle::spawn(store), saved))
+    let agent = store.agent();
+    let (handle, synced) = gamenight_store::StoreHandle::spawn_with_updates(store);
+    Some((handle, agent, saved, synced))
 }
 
 /// What only the packaged desktop app has: quitting with its lobby, and
@@ -2136,12 +2147,33 @@ async fn run_inner(
     info!(%addr, "gamenight daemon listening");
     let shared = Arc::new(Mutex::new(Shared::new(library, addr.to_string(), prewarm)));
     if music {
-        if let Some((store, saved)) = open_store().await {
+        if let Some((store, agent, saved, mut synced)) = open_store().await {
             let mut s = shared.lock().await;
             s.stored_settings = saved.settings.clone();
             s.night.load_player_settings(saved.settings);
             s.night.load_player_data(saved.data);
             s.store = Some(store);
+            s.store_agent = agent;
+            let shared = shared.clone();
+            tokio::spawn(async move {
+                // What a sync brought in from the player's other devices.
+                while let Some(saved) = synced.recv().await {
+                    let mut s = shared.lock().await;
+                    for (owner, games) in &saved.settings {
+                        let stored = s.stored_settings.entry(owner.clone()).or_default();
+                        for (game, values) in games {
+                            stored.insert(game.clone(), values.clone());
+                        }
+                    }
+                    s.dispatch(
+                        Command::PlayerStoreSynced {
+                            settings: saved.settings,
+                            data: saved.data,
+                        },
+                        None,
+                    );
+                }
+            });
         }
     }
     let exit_with_lobby = desktop.is_some();
@@ -2484,6 +2516,7 @@ async fn serve(
                     } else {
                         s.game_snapshot(&game_id)
                     },
+                    store_agent: None,
                 },
             );
             if role == Role::Lobby {
@@ -2518,6 +2551,7 @@ async fn serve(
                     protocol_version: PROTOCOL_VERSION,
                     godot_sdk: GODOT_SDK_VERSION,
                     party: s.snapshot(),
+                    store_agent: s.store_agent.clone(),
                 },
             );
             Registration::Overlay(id)
@@ -2701,6 +2735,23 @@ async fn serve(
                 }
                 continue;
             }
+            if let ClientMessage::PlayerStoreDrives { url, drives } = parsed {
+                // Like grants: only the cloud bridge says which account
+                // drives this host may sync.
+                let s = shared.lock().await;
+                if !matches!(registration, Registration::Overlay(_)) {
+                    send(
+                        &tx,
+                        &ServerMessage::Error {
+                            message: "only the local web server hands over account drives".into(),
+                        },
+                    );
+                } else if let Some(store) = &s.store {
+                    debug!(owners = drives.len(), "player store drives updated");
+                    store.sync_with(&url, drives);
+                }
+                continue;
+            }
             if let ClientMessage::Playtests { playtests } = parsed {
                 // Like grants: only the cloud bridge may put private builds
                 // on the shelf.
@@ -2879,7 +2930,9 @@ fn message_to_command(
         | ClientMessage::SwitchLobby { .. } => {
             return Err("lobby lifecycle requires dedicated routing".into())
         }
-        ClientMessage::DownloadGrants { .. } | ClientMessage::Playtests { .. } => {
+        ClientMessage::DownloadGrants { .. }
+        | ClientMessage::Playtests { .. }
+        | ClientMessage::PlayerStoreDrives { .. } => {
             return Err("download grants require dedicated routing".into())
         }
         ClientMessage::RoomLog { .. } => {

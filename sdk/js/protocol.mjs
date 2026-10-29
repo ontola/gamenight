@@ -64,6 +64,7 @@ export const MSG = Object.freeze({
   "PLAY_NEXT": "play_next",
   "PLAYER_DATA": "player_data",
   "PLAYER_SETTINGS": "player_settings",
+  "PLAYER_STORE_DRIVES": "player_store_drives",
   "PLAYERS_UPDATED": "players_updated",
   "PLAYTESTS": "playtests",
   "PREPARE": "prepare",
@@ -458,6 +459,15 @@ export const CLIENT_MESSAGES = {
     ],
     "required": []
   },
+  "player_store_drives": {
+    "fields": [
+      "drives",
+      "url"
+    ],
+    "required": [
+      "url"
+    ]
+  },
   "playtests": {
     "fields": [
       "playtests"
@@ -651,7 +661,8 @@ export const SERVER_MESSAGES = {
     "fields": [
       "godot_sdk",
       "party",
-      "protocol_version"
+      "protocol_version",
+      "store_agent"
     ],
     "required": [
       "party",

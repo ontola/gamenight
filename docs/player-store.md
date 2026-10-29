@@ -32,5 +32,32 @@ preferences move in. The web app has no store and keeps using browser storage.
 After changing `mobile/rust/src/api`, run `flutter_rust_bridge_codegen generate`
 in `mobile/`.
 
-Next: syncing phone, host and a hub with Atomic's sync protocol, and progress
-for signed-out phones.
+## Sync through the cloud's hub
+
+Signed-in players' records follow them between their phone and the hosts
+they play on, with Atomic's own sync protocol (`atomic_lib::sync`: version
+vectors, Loro merges, so edits made offline on two devices both survive).
+
+- The cloud (`gamenight-internal`, `atomic_hub.rs`) runs the hub at
+  `wss://gamenight.ontola.io/atomic/ws`, with its own Atomic store next to
+  the cloud database. Every account gets one drive there, owned by the hub's
+  agent.
+- Devices keep their own key pairs; nobody gets the account's credential.
+  The hub lists who may read and write the drive: the account's signed-in
+  phones, and a host only while that account holds a seat there.
+- A phone registers its agent after signing in (`POST /v1/me/atomic-device`,
+  answer: `drive`, `owner` = `account:<id>`, `path`), pulls the drive, moves
+  its own `me` records in and syncs after every change and when the app
+  opens. Signing out makes it `me` again.
+- A host's local web server sends the store's agent (from the daemon's
+  `welcome`, overlays only) with each cloud poll as `atomic_agent`; the poll
+  answers with `atomic.drives` for the accounts seated there, which reach
+  the daemon as `player_store_drives`. The store pulls each new drive, moves
+  that profile's local records in, then syncs two seconds after a save and
+  every minute. What came in from elsewhere reaches running games as
+  `player_settings` / `player_data` (newer revisions only).
+- `cargo run -p gamenight-store --example hub_client` tries a store against
+  a real hub by hand.
+
+Local profiles (`local:<id>`) and offline hosts never sync; they keep their
+records in the host's own drive.

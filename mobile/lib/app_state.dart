@@ -18,6 +18,7 @@ import 'faces.dart';
 import 'link.dart';
 import 'room_controls.dart';
 import 'push_notifications.dart';
+import 'storage/phone_store.dart';
 
 enum SyncState { idle, saving, savedLocally, synced, joined, warning }
 
@@ -666,6 +667,7 @@ class AppState extends ChangeNotifier {
     try {
       account = await cloud.me();
       unawaited(push.sync());
+      unawaited(PhoneStore.instance?.connect(cloud));
       unawaited(loadPlayLists());
       final doc = await cloud.studio();
       final adopted = _adoptStudio(doc);
@@ -836,6 +838,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> signOut() async {
     await push.signOut();
+    await PhoneStore.instance?.signOut();
     await cloud.signOut();
     await _forgetAccount(clearPlayer: true);
     notifyListeners();
@@ -919,6 +922,7 @@ class AppState extends ChangeNotifier {
       }
       account = await cloud.me();
       unawaited(push.sync());
+      unawaited(PhoneStore.instance?.connect(cloud));
       unawaited(loadPlayLists());
       if (!isGuest && !_pushingAccount) {
         _syncFromAccount(await cloud.studio());

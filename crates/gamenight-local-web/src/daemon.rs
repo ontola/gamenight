@@ -47,8 +47,17 @@ async fn read_matching<T>(
 }
 
 pub(crate) async fn read_welcome(ws: &mut DaemonWs) -> Result<PartySnapshot, DaemonError> {
+    read_welcome_with_agent(ws).await.map(|(party, _)| party)
+}
+
+/// The welcome, with the Atomic agent of the host's player store.
+pub(crate) async fn read_welcome_with_agent(
+    ws: &mut DaemonWs,
+) -> Result<(PartySnapshot, Option<String>), DaemonError> {
     read_matching(ws, |message| match message {
-        ServerMessage::Welcome { party, .. } => Some(party),
+        ServerMessage::Welcome {
+            party, store_agent, ..
+        } => Some((party, store_agent)),
         _ => None,
     })
     .await

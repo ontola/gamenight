@@ -989,6 +989,30 @@
           "type": "object"
         },
         {
+          "description": "Trusted local web server only: the account drives this host may sync\nits player store with right now, profile owner (`account:<id>`) to\nAtomic drive, on the hub at `url` (`wss://host/atomic/ws`). Replaces\nthe previous set. See `docs/player-store.md`.",
+          "properties": {
+            "drives": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {},
+              "type": "object"
+            },
+            "type": {
+              "const": "player_store_drives",
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "url"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Trusted local web server only: preview builds the cloud lets this\ntable play, because someone seated owns or tests the game. The daemon\ninstalls each one and puts it on the shelf as a playtest.",
           "properties": {
             "playtests": {
@@ -2579,6 +2603,13 @@
               "format": "uint32",
               "minimum": 0,
               "type": "integer"
+            },
+            "store_agent": {
+              "description": "Overlays only: the Atomic agent of the host's player store, which\nthe cloud lets sync the drives of the accounts seated here.",
+              "type": [
+                "string",
+                "null"
+              ]
             },
             "type": {
               "const": "welcome",

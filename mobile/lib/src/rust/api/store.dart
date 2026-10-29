@@ -14,6 +14,13 @@ abstract class PhoneStore implements RustOpaqueInterface {
   /// Every game's saved settings, as a JSON object: game -> key -> value.
   Future<String> allSettings();
 
+  /// After signing in: the account's records live in `drive` on the hub
+  /// at `url` (`wss://host/atomic/ws`) from now on. Takes what the account
+  /// already has, moves this phone's own player's values in, and sends
+  /// them up.
+  Future<void> linkAccount(
+      {required String url, required String owner, required String drive});
+
   /// Open (or create) the store in `dir`, the app's private documents
   /// directory.
   static Future<PhoneStore> open({required String dir}) =>
@@ -28,6 +35,14 @@ abstract class PhoneStore implements RustOpaqueInterface {
 
   /// Replace this player's settings for `game` with `json` (key -> value).
   Future<void> setSettings({required String game, required String json});
+
+  /// Sync the signed-in account's drive with the hub at `url`. True when
+  /// something came in.
+  Future<bool> sync_({required String url});
+
+  /// Be the signed-in account's player (`account:<id>`), whose drive was
+  /// linked before; `None` after signing out.
+  Future<void> useAccount({String? owner});
 }
 
 /// Saved progress for one game: the game's JSON and its revision.

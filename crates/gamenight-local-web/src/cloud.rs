@@ -115,6 +115,29 @@ struct Updates {
     /// tests the game. Each carries a secret grant: never log them.
     #[serde(default)]
     playtests: Vec<gamenight_protocol::Playtest>,
+    /// The account drives on the cloud's Atomic hub this host's player
+    /// store may sync while those accounts are seated here.
+    #[serde(default)]
+    atomic: Option<AtomicDrives>,
+}
+#[derive(Deserialize)]
+struct AtomicDrives {
+    path: String,
+    #[serde(default)]
+    drives: BTreeMap<String, String>,
+}
+/// `wss://host/atomic/ws` for the cloud at `origin`.
+fn hub_url(origin: &str, path: &str) -> String {
+    let origin = origin
+        .strip_prefix("https://")
+        .map(|rest| format!("wss://{rest}"))
+        .or_else(|| {
+            origin
+                .strip_prefix("http://")
+                .map(|rest| format!("ws://{rest}"))
+        })
+        .unwrap_or_else(|| origin.to_string());
+    format!("{origin}{path}")
 }
 /// What a playtest announcement says, without its short-lived grant.
 type PlaytestKey = Vec<(serde_json::Value, BTreeMap<String, String>)>;
@@ -270,7 +293,7 @@ impl Bridge {
         {
             return StatusCode::CONFLICT;
         }
-        let Some((seats, _)) = self.snapshot(state).await else {
+        let Some((seats, _, _)) = self.snapshot(state).await else {
             return StatusCode::SERVICE_UNAVAILABLE;
         };
         let Some(seat) = seats.iter().find(|s| s.player == player.0.to_string()) else {
@@ -353,7 +376,7 @@ impl Bridge {
     async fn snapshot(
         &self,
         state: &SharedState,
-    ) -> Option<(Vec<Seat>, gamenight_protocol::PartySnapshot)> {
+    ) -> Option<(Vec<Seat>, gamenight_protocol::PartySnapshot, Option<String>)> {
         let addr = state.lock().ok()?.daemon_addr.clone();
         let (mut ws, _) = tokio::time::timeout(
             Duration::from_secs(3),
@@ -372,7 +395,7 @@ impl Bridge {
         ))
         .await
         .ok()?;
-        let party = daemon::read_welcome(&mut ws).await.ok()?;
+        let (party, store_agent) = daemon::read_welcome_with_agent(&mut ws).await.ok()?;
         let _ = ws.close(None).await;
         let local = state.lock().ok()?;
         Some((
@@ -388,6 +411,7 @@ impl Bridge {
                 })
                 .collect(),
             party,
+            store_agent,
         ))
     }
     pub async fn run(self, state: SharedState) {
@@ -399,6 +423,8 @@ impl Bridge {
         let mut running: Option<(String, tokio::task::JoinHandle<Result<String, String>>)> = None;
         // What the daemon last accepted; resent only when the set changes.
         let mut delivered_grants: Option<BTreeMap<String, String>> = None;
+        // The account drives the daemon last took, to resend only changes.
+        let mut delivered_drives: Option<BTreeMap<String, String>> = None;
         let mut delivered_playtests: Option<(PlaytestKey, std::time::Instant)> = None;
         // Waiting phones that asked for a seat of their own, tried once each.
         let mut phone_seats: HashMap<String, Option<PlayerId>> = HashMap::new();
@@ -411,7 +437,7 @@ impl Bridge {
                 _ = tokio::time::sleep(Duration::from_secs(3)) => {},
                 _ = self.refresh.notified() => {},
             }
-            let Some((seats, party)) = self.snapshot(&state).await else {
+            let Some((seats, party, store_agent)) = self.snapshot(&state).await else {
                 continue;
             };
             *self.seats.lock().unwrap() = seats.clone();
@@ -444,6 +470,9 @@ impl Bridge {
             discovery["agent_receipt"] = receipt.clone().unwrap_or(serde_json::Value::Null);
             let newest = party.activity.last().map(|entry| entry.id);
             let mut body = serde_json::json!({"seats":seats,"discovery":discovery});
+            if let Some(agent) = &store_agent {
+                body["atomic_agent"] = serde_json::json!(agent);
+            }
             if sent_activity
                 .is_none_or(|(sent, at)| sent != newest || at.elapsed() > PLAYTEST_RESEND)
             {
@@ -614,6 +643,20 @@ impl Bridge {
                 && deliver_grants(&state, &updates.grants).await
             {
                 delivered_grants = Some(updates.grants.clone());
+            }
+            if let Some(atomic) = &updates.atomic {
+                if delivered_drives.as_ref() != Some(&atomic.drives)
+                    && deliver(
+                        &state,
+                        ClientMessage::PlayerStoreDrives {
+                            url: hub_url(&self.origin, &atomic.path),
+                            drives: atomic.drives.clone(),
+                        },
+                    )
+                    .await
+                {
+                    delivered_drives = Some(atomic.drives.clone());
+                }
             }
             let key = playtest_key(&updates.playtests);
             if !updates.playtests.is_empty()
@@ -835,7 +878,7 @@ mod pickup_tests {
         state.lock().unwrap().cloud = Some(bridge.clone());
         let seats = tokio::time::timeout(Duration::from_secs(2), async {
             loop {
-                let (seats, _) = bridge.snapshot(&state).await.unwrap();
+                let (seats, _, _) = bridge.snapshot(&state).await.unwrap();
                 if seats.len() == 2 {
                     break seats;
                 }
@@ -913,7 +956,7 @@ mod pickup_tests {
             tokio::time::timeout(Duration::from_secs(2), ticket_started.notified())
                 .await
                 .unwrap();
-            let (_, party) = bridge.snapshot(&state).await.unwrap();
+            let (_, party, _) = bridge.snapshot(&state).await.unwrap();
             assert_ne!(
                 party.players.iter().find(|p| p.id == player).unwrap().name,
                 "Ada"
@@ -922,7 +965,7 @@ mod pickup_tests {
         } else {
             tokio::time::timeout(Duration::from_secs(2), async {
                 loop {
-                    let (_, party) = bridge.snapshot(&state).await.unwrap();
+                    let (_, party, _) = bridge.snapshot(&state).await.unwrap();
                     let p = party.players.iter().find(|p| p.id == player).unwrap();
                     // Name and avatar arrive as separate daemon commands. Wait
                     // for the complete profile within the same latency bound.

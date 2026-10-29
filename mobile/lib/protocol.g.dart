@@ -62,6 +62,7 @@ const String msgPerformance = 'performance';
 const String msgPlayNext = 'play_next';
 const String msgPlayerData = 'player_data';
 const String msgPlayerSettings = 'player_settings';
+const String msgPlayerStoreDrives = 'player_store_drives';
 const String msgPlayersUpdated = 'players_updated';
 const String msgPlaytests = 'playtests';
 const String msgPrepare = 'prepare';

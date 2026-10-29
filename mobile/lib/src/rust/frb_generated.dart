@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1625354064;
+  int get rustContentHash => 1890915928;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -86,6 +86,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<String> crateApiStorePhoneStoreAllSettings({required PhoneStore that});
 
+  Future<void> crateApiStorePhoneStoreLinkAccount(
+      {required PhoneStore that,
+      required String url,
+      required String owner,
+      required String drive});
+
   Future<PhoneStore> crateApiStorePhoneStoreOpen({required String dir});
 
   Future<PhoneProgress?> crateApiStorePhoneStoreProgress(
@@ -99,6 +105,12 @@ abstract class RustLibApi extends BaseApi {
 
   Future<void> crateApiStorePhoneStoreSetSettings(
       {required PhoneStore that, required String game, required String json});
+
+  Future<bool> crateApiStorePhoneStoreSync(
+      {required PhoneStore that, required String url});
+
+  Future<void> crateApiStorePhoneStoreUseAccount(
+      {required PhoneStore that, String? owner});
 
   Future<void> crateApiStoreInitApp();
 
@@ -173,13 +185,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiStorePhoneStoreLinkAccount(
+      {required PhoneStore that,
+      required String url,
+      required String owner,
+      required String drive}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(url, serializer);
+        sse_encode_String(owner, serializer);
+        sse_encode_String(drive, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 3, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreLinkAccountConstMeta,
+      argValues: [that, url, owner, drive],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreLinkAccountConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_link_account",
+        argNames: ["that", "url", "owner", "drive"],
+      );
+
+  @override
   Future<PhoneStore> crateApiStorePhoneStoreOpen({required String dir}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(dir, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 3, port: port_);
+            funcId: 4, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -208,7 +253,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(game, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 4, port: port_);
+            funcId: 5, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_box_autoadd_phone_progress,
@@ -241,7 +286,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(json, serializer);
         sse_encode_u_64(revision, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 6, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -270,7 +315,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(game, serializer);
         sse_encode_String(json, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -289,12 +334,68 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<bool> crateApiStorePhoneStoreSync(
+      {required PhoneStore that, required String url}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(url, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 8, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_bool,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreSyncConstMeta,
+      argValues: [that, url],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreSyncConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_sync",
+        argNames: ["that", "url"],
+      );
+
+  @override
+  Future<void> crateApiStorePhoneStoreUseAccount(
+      {required PhoneStore that, String? owner}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_opt_String(owner, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 9, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: null,
+      ),
+      constMeta: kCrateApiStorePhoneStoreUseAccountConstMeta,
+      argValues: [that, owner],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreUseAccountConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_use_account",
+        argNames: ["that", "owner"],
+      );
+
+  @override
   Future<void> crateApiStoreInitApp() {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 7, port: port_);
+            funcId: 10, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -347,6 +448,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
+  }
+
+  @protected
+  bool dco_decode_bool(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as bool;
   }
 
   @protected
@@ -444,6 +551,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  bool sse_decode_bool(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint8() != 0;
+  }
+
+  @protected
   PhoneProgress sse_decode_box_autoadd_phone_progress(
       SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -518,12 +631,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  bool sse_decode_bool(SseDeserializer deserializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    return deserializer.buffer.getUint8() != 0;
-  }
-
-  @protected
   void
       sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
           PhoneStore self, SseSerializer serializer) {
@@ -554,6 +661,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_String(String self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_list_prim_u_8_strict(utf8.encoder.convert(self), serializer);
+  }
+
+  @protected
+  void sse_encode_bool(bool self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint8(self ? 1 : 0);
   }
 
   @protected
@@ -627,12 +740,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putInt32(self);
   }
-
-  @protected
-  void sse_encode_bool(bool self, SseSerializer serializer) {
-    // Codec=Sse (Serialization based), see doc to use other codecs
-    serializer.buffer.putUint8(self ? 1 : 0);
-  }
 }
 
 @sealed
@@ -665,6 +772,17 @@ class PhoneStoreImpl extends RustOpaque implements PhoneStore {
         that: this,
       );
 
+  /// After signing in: the account's records live in `drive` on the hub
+  /// at `url` (`wss://host/atomic/ws`) from now on. Takes what the account
+  /// already has, moves this phone's own player's values in, and sends
+  /// them up.
+  Future<void> linkAccount(
+          {required String url,
+          required String owner,
+          required String drive}) =>
+      RustLib.instance.api.crateApiStorePhoneStoreLinkAccount(
+          that: this, url: url, owner: owner, drive: drive);
+
   /// This player's saved progress in `game`, if any.
   Future<PhoneProgress?> progress({required String game}) =>
       RustLib.instance.api
@@ -682,4 +800,14 @@ class PhoneStoreImpl extends RustOpaque implements PhoneStore {
   Future<void> setSettings({required String game, required String json}) =>
       RustLib.instance.api.crateApiStorePhoneStoreSetSettings(
           that: this, game: game, json: json);
+
+  /// Sync the signed-in account's drive with the hub at `url`. True when
+  /// something came in.
+  Future<bool> sync_({required String url}) =>
+      RustLib.instance.api.crateApiStorePhoneStoreSync(that: this, url: url);
+
+  /// Be the signed-in account's player (`account:<id>`), whose drive was
+  /// linked before; `None` after signing out.
+  Future<void> useAccount({String? owner}) => RustLib.instance.api
+      .crateApiStorePhoneStoreUseAccount(that: this, owner: owner);
 }

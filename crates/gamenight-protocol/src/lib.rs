@@ -1450,6 +1450,16 @@ pub enum ClientMessage {
         grants: std::collections::BTreeMap<String, String>,
     },
 
+    /// Trusted local web server only: the account drives this host may sync
+    /// its player store with right now, profile owner (`account:<id>`) to
+    /// Atomic drive, on the hub at `url` (`wss://host/atomic/ws`). Replaces
+    /// the previous set. See `docs/player-store.md`.
+    PlayerStoreDrives {
+        url: String,
+        #[serde(default)]
+        drives: std::collections::BTreeMap<String, String>,
+    },
+
     /// Trusted local web server only: preview builds the cloud lets this
     /// table play, because someone seated owns or tests the game. The daemon
     /// installs each one and puts it on the shelf as a playtest.
@@ -1627,6 +1637,10 @@ pub enum ServerMessage {
         /// The Godot addon version this host ships; older copies warn.
         #[serde(default)]
         godot_sdk: u32,
+        /// Overlays only: the Atomic agent of the host's player store, which
+        /// the cloud lets sync the drives of the accounts seated here.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        store_agent: Option<String>,
     },
     /// Broadcast to overlays whenever party state changes.
     PartyState {

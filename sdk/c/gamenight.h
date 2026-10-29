@@ -125,6 +125,7 @@ extern "C" {
 #define GN_MSG_PLAY_NEXT "play_next"
 #define GN_MSG_PLAYER_DATA "player_data"
 #define GN_MSG_PLAYER_SETTINGS "player_settings"
+#define GN_MSG_PLAYER_STORE_DRIVES "player_store_drives"
 #define GN_MSG_PLAYERS_UPDATED "players_updated"
 #define GN_MSG_PLAYTESTS "playtests"
 #define GN_MSG_PREPARE "prepare"

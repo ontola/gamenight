@@ -1888,6 +1888,49 @@ mod night_tests {
     }
 
     #[test]
+    fn progress_synced_from_another_device_reaches_the_game() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ada", Some(0), None));
+        let ada = night.snapshot().players[0].id;
+        night.handle(Command::SetPlayerProfile {
+            player_id: ada,
+            profile: Some("account:ada".into()),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("spellstorm"),
+        });
+        let synced = |revision: u64| {
+            let mut data = PlayerDataStore::new();
+            data.entry("account:ada".into()).or_default().insert(
+                "spellstorm".into(),
+                SavedPlayerData {
+                    data: serde_json::json!({ "level": revision }),
+                    revision,
+                },
+            );
+            Command::PlayerStoreSynced {
+                settings: Default::default(),
+                data,
+            }
+        };
+        let fx = night.handle(synced(3));
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::PlayerData { player_id, revision: 3, .. } if *player_id == ada
+        )));
+        // Older progress from a device that lagged behind changes nothing.
+        let fx = night.handle(synced(2));
+        assert!(!fx.iter().any(|e| matches!(e, Effect::PlayerData { .. })));
+        assert_eq!(
+            night
+                .player_data(&GameId::new("spellstorm"), ada)
+                .unwrap()
+                .revision,
+            3
+        );
+    }
+
+    #[test]
     fn player_settings_are_per_player_and_follow_the_profile() {
         let mut night = GameNight::default();
         night.handle(join_cmd("Ada", Some(0), None));

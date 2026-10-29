@@ -12,6 +12,8 @@ gamenight-protocol = { workspace = true }
 atomic_lib = { version = "=0.41.0-beta.8", default-features = false, features = ["db-redb"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
+futures-util = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
