@@ -950,15 +950,23 @@ class AppState extends ChangeNotifier {
 
   Timer? _roomWatch;
 
+  /// Linked (or waiting at a door) through the local network session.
+  bool get _linkedLocally =>
+      _api != null &&
+      ((session?.linked ?? false) || (session?.waiting ?? false));
+
   /// Signed in without a room on this phone: a player picked up at its door
   /// on the TV, or waiting there, brings this phone into that room without
   /// scanning anything.
   Future<void> findHostedRoom() async {
-    // A scanned invitation still being resumed decides the room itself.
+    // A scanned invitation still being resumed decides the room itself. A
+    // phone that knows the GameNight PC on the local network but is not
+    // linked there still looks: the lobby may have picked this account up
+    // through the cloud room.
     if (!cloud.signedIn ||
         isGuest ||
         inHostedRoom ||
-        _api != null ||
+        _linkedLocally ||
         pendingRoomDestination != null) {
       return;
     }
@@ -967,7 +975,7 @@ class AppState extends ChangeNotifier {
       final room = await cloud.roomStatus();
       if (room.none ||
           inHostedRoom ||
-          _api != null ||
+          _linkedLocally ||
           token != cloud.roomIdentity ||
           _disposed) {
         return;
