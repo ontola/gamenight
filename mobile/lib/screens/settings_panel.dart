@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api.dart';
 import '../room_controls.dart';
+import '../storage/phone_store.dart';
 import '../theme.dart';
 
 /// The match settings of the game being played or warmed up: toggles,
@@ -373,7 +374,8 @@ class _SettingsSectionState extends State<SettingsSection> {
 }
 
 /// Where this phone keeps its player's own settings, per game, so they come
-/// back on any GameNight computer even without signing in.
+/// back on any GameNight computer even without signing in. On a phone they
+/// are kept in its Atomic store ([PhoneStore]); this is the readable copy.
 class PhoneSettingsStore {
   final SharedPreferences prefs;
   const PhoneSettingsStore(this.prefs);
@@ -402,8 +404,10 @@ class PhoneSettingsStore {
     } on FormatException {
       all = {};
     }
-    all[settings.game] = {for (final s in settings.settings) s.key: s.value};
+    final values = {for (final s in settings.settings) s.key: s.value};
+    all[settings.game] = values;
     await prefs.setString(_key, jsonEncode(all));
+    await PhoneStore.instance?.saveSettings(settings.game, values);
   }
 }
 

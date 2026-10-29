@@ -20,6 +20,17 @@ redb on disk), in `crates/gamenight-store`.
 - Hosts that kept settings in `gamenight/player-settings.json` move them into the
   store on first start and rename the file to `player-settings.json.migrated`.
 
-Next: the same store in the phone app (so a guest's settings and progress live
-on their own phone), and syncing phone, host and a hub with Atomic's sync
-protocol.
+## On the phone
+
+The app (`mobile/`) has the same store, through `flutter_rust_bridge`:
+`mobile/rust` wraps `gamenight-store` and `mobile/rust_builder` (cargokit)
+builds it with the APK and the iOS app. It lives in the app's support
+directory as `gamenight-store`, with the phone's own agent, and holds this
+phone's player's settings per game (owner `me`). `lib/storage/phone_store.dart`
+opens it at startup; on first start the settings the phone kept in its
+preferences move in. The web app has no store and keeps using browser storage.
+After changing `mobile/rust/src/api`, run `flutter_rust_bridge_codegen generate`
+in `mobile/`.
+
+Next: syncing phone, host and a hub with Atomic's sync protocol, and progress
+for signed-out phones.

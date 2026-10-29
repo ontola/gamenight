@@ -31,6 +31,13 @@ jobs:
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: python3 tool/configure_push.py android
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mobile/rust
+      # The phone's Atomic store (mobile/rust) for the native store test;
+      # the APK and IPA builds compile it again for their own targets.
+      - run: cargo build --locked --manifest-path rust/Cargo.toml
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test

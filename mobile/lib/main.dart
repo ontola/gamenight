@@ -27,6 +27,7 @@ import 'screens/assistant_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/room_screen.dart';
+import 'storage/phone_store.dart';
 import 'theme.dart';
 
 Future<void> main() async {
@@ -40,6 +41,7 @@ Future<void> main() async {
   });
   final prefs = await SharedPreferences.getInstance();
   if (kIsWeb) await migrateWebsiteRoom(prefs);
+  await PhoneStore.start(prefs);
   final push = await FirebasePushDevice.create();
   final state = AppState(prefs, pushDevice: push);
   final reports = ReportService(prefs,
