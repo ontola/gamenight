@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import zipfile
 
-GAMES = {"neon-trails": "Neon Trails", "blast-party": "Blast Party", "neon-siege": "Neon Siege", "ricochet-club": "Ricochet Club", "volley-trouble": "Volley Trouble", "stack-together": "Stack Together", "bubble-buddies": "Bubble Buddies"}
+GAMES = {"neon-trails": "Neon Trails", "blast-party": "Blast Party", "neon-siege": "Neon Siege", "volley-trouble": "Volley Trouble", "stack-together": "Stack Together", "bubble-buddies": "Bubble Buddies"}
 RUNTIME = {
     "id": "love-11-5",
     "url": "https://github.com/love2d/love/releases/download/11.5/love-11.5-win64.zip",
@@ -39,7 +39,7 @@ def main():
     output.mkdir(parents=True, exist_ok=False)
     files = {str(p.relative_to(source)).replace("\\", "/"): p.read_bytes()
              for p in source.rglob("*") if p.is_file() and "tests" not in p.relative_to(source).parts}
-    for retired in ("games/bumper.lua", "games/orbit.lua", "games/meteor.lua"):
+    for retired in ("games/bumper.lua",):
         files.pop(retired, None)
     shelf, sums = [], []
     for game, title in GAMES.items():

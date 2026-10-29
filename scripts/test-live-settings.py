@@ -63,7 +63,6 @@ CASES={
  "neon-trails":{"speed":75,"round_pause":"2.0 s"},
  "blast-party":{"pickups":10,"fuse":"3.0 s"},
  "neon-siege":{"difficulty":"intense","gravity":50},
- "ricochet-club":{"bounces":2,"cover":False},
  "volley-trouble":{"arena":"lava","target":3,"bomb":True},
  "stack-together":{"target":8,"speed":75},
  "bubble-buddies":{"hearts":8,"waves":3},

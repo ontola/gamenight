@@ -14,7 +14,6 @@ installed releases need newly built packages before the controls appear.
 | Neon Trails | Speed 50–175%; round pause 0.5–5 seconds | Next round |
 | Blast Party | Crate density 20–85%; crate pickup chance 0–60%; bomb fuse 1–4 seconds | Next round |
 | Neon Siege | Relaxed, standard or intense enemy pressure; gravity 0–175% | Next run, not the next wave |
-| Ricochet Club | 0–10 wall bounces; shot speed 50–160%; destructible cover on/off | Next round |
 | Volley Trouble | Court; exploding ball; rotating rules; 1–21 points to win | Next match, not the next point |
 | Stack Together | 4–40 rows to win; falling speed 50–175% | Next round |
 | Bubble Buddies | 2–12 shared hearts; 1–10 waves; 30–150 seconds per wave | Next run |

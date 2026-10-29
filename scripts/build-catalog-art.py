@@ -16,8 +16,6 @@ SOURCES = {
  'neon-trails': 'gamenight-love-party/catalog-neon-trails.png',
  'blast-party': 'gamenight-love-party/catalog-blast-party.png',
  'neon-siege': 'gamenight-love-party/catalog-neon-siege.png',
- 'ricochet-club': 'gamenight-love-party/catalog-ricochet-club.png',
- 'paint-rush': 'gamenight-love-party/catalog-paint-rush.png',
  'volley-trouble': 'volley-trouble/preview-beach.png',
  'stack-together': 'gamenight-coop-arcade/preview-stack.png',
  'bubble-buddies': 'gamenight-coop-arcade/preview-bubbles.png',
@@ -36,8 +34,6 @@ def icon(game):
   if game=='volley-trouble':d.arc((7,5,22,27),-80,90,fill=ink,width=2);d.line([(7,21),(25,12)],fill=ink,width=2)
  elif game=='stack-together':
   for x,y in [(5,21),(14,21),(14,12),(23,12)]:d.rectangle((x,y,x+7,y+7),fill=accent)
- elif game=='paint-rush':d.polygon([(16,3),(6,20),(7,26),(16,29),(25,26),(26,20)],fill=accent)
- elif game=='ricochet-club':d.line([(4,26),(15,12),(28,23)],fill=accent,width=2);d.ellipse((12,8,18,14),fill=ink)
  else:d.rectangle((6,24,26,28),fill=accent);d.ellipse((12,6,20,14),fill=ink)
  return im.resize((64,64),Image.Resampling.NEAREST)
 

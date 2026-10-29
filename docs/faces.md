@@ -61,8 +61,8 @@ See the [Godot lobby example](site/lobbies.md#faces-and-names) for usage. The
 Living Room shows each current player's name beside their face and repaints
 when a profile changes.
 
-Blast Party and Bubble Buddies draw the face on the character. Neon Trails,
-Neon Siege and Ricochet Club use player portraits beside their names, preserving
+Blast Party and Bubble Buddies draw the face on the character. Neon Trails
+and Neon Siege use player portraits beside their names, preserving
 the shape of the vehicle or trail. Stack Together uses its player cards.
 
 Pass `{outline = player.color}` for a small clothing-coloured portrait rim.
