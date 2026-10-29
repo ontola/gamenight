@@ -68,9 +68,19 @@ impl Store {
     pub async fn open(dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(dir)?;
         let secret_path = dir.join("agent.secret");
-        let db = Db::init_redb_file(dir, None, &dir.join("uploads"))
-            .await
-            .map_err(atomic)?;
+        // A store closed a moment ago may still be held by atomic_lib's own
+        // background work for a little while.
+        let mut tries = 0;
+        let db = loop {
+            match Db::init_redb_file(dir, None, &dir.join("uploads")).await {
+                Ok(db) => break db,
+                Err(error) if tries < 50 && error.to_string().contains("already open") => {
+                    tries += 1;
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                }
+                Err(error) => return Err(atomic(error)),
+            }
+        };
         let drive = match std::fs::read_to_string(&secret_path) {
             Ok(secret) => {
                 db.load_agent_from_secret(secret.trim())
