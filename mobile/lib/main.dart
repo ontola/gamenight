@@ -24,6 +24,7 @@ import 'diagnostics.dart';
 import 'screens/feedback_screen.dart';
 import 'screens/about_screen.dart';
 import 'screens/assistant_screen.dart';
+import 'screens/mods_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/player_screen.dart';
 import 'screens/room_screen.dart';
@@ -202,6 +203,13 @@ class _GameNightAppState extends State<GameNightApp> {
     ));
   }
 
+  void _mods() {
+    _navigator.currentState?.push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'mods'),
+      builder: (_) => ModsScreen(state: widget.state),
+    ));
+  }
+
   void _about() {
     final navigator = _navigator.currentState;
     if (navigator == null) return;
@@ -244,6 +252,15 @@ class _GameNightAppState extends State<GameNightApp> {
                       onTap: () {
                         Navigator.pop(context);
                         _assistant();
+                      }),
+                if (widget.state.assistantAvailable)
+                  ListTile(
+                      leading: const Icon(Icons.extension_outlined),
+                      title: const Text('Mods'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _mods();
                       }),
                 if (widget.reports != null)
                   ListTile(
@@ -333,6 +350,11 @@ class _GameNightAppState extends State<GameNightApp> {
                   label: 'Assistant',
                   icon: const Icon(Icons.auto_awesome_outlined),
                   onTap: _assistant),
+            if (widget.state.assistantAvailable)
+              _SidebarItem(
+                  label: 'Mods',
+                  icon: const Icon(Icons.extension_outlined),
+                  onTap: _mods),
             if (widget.reports != null)
               _SidebarItem(
                   label: 'Feedback',

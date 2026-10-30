@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 pub mod avatar;
 pub mod guest_face;
+pub mod project;
 #[cfg(feature = "schema")]
 pub mod schema;
 pub use avatar::Avatar;

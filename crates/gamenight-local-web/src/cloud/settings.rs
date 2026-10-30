@@ -243,6 +243,8 @@ pub(crate) async fn run_command(
     state: &SharedState,
     selection: &Selection,
     bridge: Option<&super::Bridge>,
+    // Who asked (`account:<id>`): their own mod may be changed for good.
+    asker: Option<&str>,
 ) -> Result<String, String> {
     let request = selection
         .game_command
@@ -343,7 +345,12 @@ pub(crate) async fn run_command(
             let left = selection.expires.saturating_sub(now).saturating_sub(10);
             tokio::time::timeout(
                 std::time::Duration::from_secs(left),
-                super::live::run(bridge, &selection.id, &path),
+                super::live::run(
+                    bridge,
+                    &selection.id,
+                    &path,
+                    asker.is_some_and(|a| gamenight_protocol::project::owned_by(&selection.game, a)),
+                ),
             )
             .await
             .map_err(|_| "The assistant ran out of time".to_string())?
@@ -460,7 +467,7 @@ mod tests {
                 + 60,
         };
         assert_eq!(
-            run_command(&state, &selection, None).await.unwrap(),
+            run_command(&state, &selection, None, None).await.unwrap(),
             "heard geef me 1 Bread"
         );
         selection.id = "ask-2".into();
@@ -468,12 +475,12 @@ mod tests {
             text: "nonsense".into(),
         });
         assert_eq!(
-            run_command(&state, &selection, None).await.unwrap_err(),
+            run_command(&state, &selection, None, None).await.unwrap_err(),
             "heard nonsense"
         );
         selection.seat.index = 3;
         assert!(
-            run_command(&state, &selection, None).await.is_err(),
+            run_command(&state, &selection, None, None).await.is_err(),
             "wrong seat"
         );
         // A game with live control is changed through its own tools.
@@ -482,7 +489,7 @@ mod tests {
         selection.game_command = Some(GameCommand {
             text: "go live".into(),
         });
-        run_command(&state, &selection, Some(&bridge))
+        run_command(&state, &selection, Some(&bridge), None)
             .await
             .unwrap();
         selection.id = "ask-4".into();
@@ -490,7 +497,7 @@ mod tests {
             text: "make it faster".into(),
         });
         assert_eq!(
-            run_command(&state, &selection, Some(&bridge))
+            run_command(&state, &selection, Some(&bridge), None)
                 .await
                 .unwrap(),
             "Ik heb de snelheid verdubbeld."

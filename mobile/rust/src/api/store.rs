@@ -173,4 +173,102 @@ impl PhoneStore {
             .await
             .map_err(|e| e.to_string())
     }
+
+    /// The signed-in player's mods (their own copies of games, kept in the
+    /// account's drive), as JSON: `[{id, title, base, game, changes}]`, where
+    /// `game` is the mod's id on a host's shelf.
+    pub async fn mods(&self) -> Result<String, String> {
+        let owner = self.owner.lock().await.clone();
+        let projects = self
+            .store
+            .lock()
+            .await
+            .projects(&owner)
+            .await
+            .map_err(|e| e.to_string())?;
+        let mods: Vec<serde_json::Value> = projects
+            .into_iter()
+            .filter_map(|p| {
+                let base = p.base?;
+                Some(serde_json::json!({
+                    "id": p.id,
+                    "title": p.title,
+                    "base": base,
+                    "game": gamenight_protocol::project::game_id(&owner, &p.id),
+                    "changes": p.changes,
+                }))
+            })
+            .collect();
+        serde_json::to_string(&mods).map_err(|e| e.to_string())
+    }
+
+    /// A new mod of the game `base`, called `title`; returns its id. Only
+    /// for a signed-in player: a host makes it from the game it has, for a
+    /// player whose drive it can reach.
+    pub async fn new_mod(&self, base: String, title: String) -> Result<String, String> {
+        let owner = self.signed_in().await?;
+        let project = self
+            .store
+            .lock()
+            .await
+            .new_mod(&owner, &base, &title)
+            .await
+            .map_err(|e| e.to_string())?;
+        Ok(project.id)
+    }
+
+    pub async fn rename_mod(&self, id: String, title: String) -> Result<(), String> {
+        let owner = self.signed_in().await?;
+        self.store
+            .lock()
+            .await
+            .rename_project(&owner, &id, &title)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn remove_mod(&self, id: String) -> Result<(), String> {
+        let owner = self.signed_in().await?;
+        self.store
+            .lock()
+            .await
+            .remove_project(&owner, &id)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    /// Remember a change asked of the mod `id` (`at`: seconds since 1970).
+    pub async fn note_mod_change(
+        &self,
+        id: String,
+        at: u64,
+        asked: String,
+        answer: String,
+        ok: bool,
+    ) -> Result<(), String> {
+        let owner = self.signed_in().await?;
+        self.store
+            .lock()
+            .await
+            .note_change(
+                &owner,
+                &id,
+                gamenight_store::projects::Change {
+                    at,
+                    asked,
+                    answer,
+                    ok,
+                },
+            )
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    async fn signed_in(&self) -> Result<String, String> {
+        let owner = self.owner.lock().await.clone();
+        if owner == OWNER {
+            return Err("Sign in to make mods".into());
+        }
+        Ok(owner)
+    }
 }

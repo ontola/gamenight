@@ -10,8 +10,12 @@ use std::time::Duration;
 
 /// Model turns for one request; each may call several tools.
 const MAX_STEPS: usize = 10;
+/// And for a change to the player's own mod, which reads and edits code.
+const MOD_STEPS: usize = 30;
 /// Bytes of tool output per call that go to the model (images excepted).
 const MAX_TEXT: usize = 12_000;
+/// And for a mod, so a few hundred lines of code come through whole.
+const MOD_TEXT: usize = 40_000;
 /// What the model sees of the game's own guide.
 const MAX_GUIDE: usize = 6_000;
 
@@ -78,20 +82,23 @@ impl Game {
 /// Tools that save into the game's own files. A request from the app only
 /// changes the running game, gone after a restart (Joep: "als ik in de app
 /// vraag wil ik eigenlijk temporary changes"); keeping a change is the game's
-/// own explicit tool (such as `keep`), asked for by the player.
-const SAVES: [&str; 2] = ["write_file", "load_mod"];
+/// own explicit tool (such as `keep`), asked for by the player. A player's
+/// own mod is the exception: changing its files is what it is for, and they
+/// go to the player's drive.
+const SAVES: [&str; 3] = ["write_file", "edit_file", "load_mod"];
 
-/// The model's view of an MCP tool, without the ones that save.
-fn tool(t: &Value) -> Option<Value> {
+/// The model's view of an MCP tool, without the ones that save (unless
+/// `own`, the player's own mod).
+fn tool(t: &Value, own: bool) -> Option<Value> {
     let name = t["name"].as_str()?;
     let mut schema = t
         .get("inputSchema")
         .cloned()
         .unwrap_or(json!({"type":"object"}));
-    if SAVES.contains(&name) {
+    if SAVES.contains(&name) && !own {
         return None;
     }
-    if name == "set_knob" {
+    if name == "set_knob" && !own {
         // Only a set_knob that can leave main.luau alone; the host says so.
         schema["properties"].as_object_mut()?.remove("persist")?;
     }
@@ -102,8 +109,12 @@ fn tool(t: &Value) -> Option<Value> {
     }))
 }
 
-/// The arguments the game gets: never a saving variant of a tool.
-fn temporary(name: &str, mut args: Value) -> Result<Value, String> {
+/// The arguments the game gets: never a saving variant of a tool, except in
+/// the player's own mod (`own`).
+fn temporary(name: &str, mut args: Value, own: bool) -> Result<Value, String> {
+    if own {
+        return Ok(args);
+    }
     if SAVES.contains(&name) {
         return Err(format!(
             "{name} saves into the game's files, which the assistant may not do"
@@ -125,12 +136,12 @@ fn temporary(name: &str, mut args: Value) -> Result<Value, String> {
 }
 
 /// An MCP tool result as the content of the model's `tool_result`.
-fn result_content(result: &Value) -> Vec<Value> {
+fn result_content(result: &Value, max_text: usize) -> Vec<Value> {
     let mut out = Vec::new();
     for part in result["content"].as_array().into_iter().flatten() {
         match part["type"].as_str() {
             Some("text") => out.push(
-                json!({"type":"text","text":cut(part["text"].as_str().unwrap_or(""), MAX_TEXT)}),
+                json!({"type":"text","text":cut(part["text"].as_str().unwrap_or(""), max_text)}),
             ),
             Some("image") => out.push(json!({"type":"image","source":{"type":"base64",
                 "media_type":part["mimeType"].as_str().unwrap_or("image/png"),
@@ -166,8 +177,10 @@ fn cut(text: &str, max: usize) -> String {
 }
 
 /// Carries out `text` for the request `id` with the game's tools, and returns
-/// what the model says it did.
-pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str) -> Result<String, String> {
+/// what the model says it did. `own`: the game is the asking player's own
+/// mod, so the change may be saved in its files.
+pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str, own: bool) -> Result<String, String> {
+    let (max_steps, max_text) = if own { (MOD_STEPS, MOD_TEXT) } else { (MAX_STEPS, MAX_TEXT) };
     let mut game = Game::open(path)?;
     let hello = game
         .rpc(
@@ -181,12 +194,12 @@ pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str) -> Result<String,
         .as_array()
         .into_iter()
         .flatten()
-        .filter_map(tool)
+        .filter_map(|t| tool(t, own))
         .take(64)
         .collect();
     let mut messages: Vec<Value> = Vec::new();
     let mut said = String::new();
-    for _ in 0..MAX_STEPS {
+    for _ in 0..max_steps {
         let step = bridge
             .live_step(json!({"request_id":id,"guide":guide,"tools":tools,"messages":messages}))
             .await?;
@@ -207,7 +220,7 @@ pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str) -> Result<String,
         let mut results = Vec::new();
         for call in calls {
             let name = call["name"].as_str().unwrap_or("");
-            let called = match temporary(name, call["input"].clone()) {
+            let called = match temporary(name, call["input"].clone(), own) {
                 Ok(args) => {
                     game.rpc("tools/call", json!({"name":name,"arguments":args}))
                         .await
@@ -215,7 +228,7 @@ pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str) -> Result<String,
                 Err(e) => Err(e),
             };
             let (content, error) = match called {
-                Ok(r) => (result_content(&r), r["isError"] == true),
+                Ok(r) => (result_content(&r, max_text), r["isError"] == true),
                 Err(e) => (vec![json!({"type":"text","text":e})], true),
             };
             results.push(json!({"type":"tool_result","tool_use_id":call["id"],
@@ -313,7 +326,7 @@ pub(crate) mod tests {
     async fn requests_run_the_games_own_tools_with_steps_from_the_cloud() {
         let (bridge, file, calls) = fake_cloud_and_game().await;
         assert_eq!(
-            run(&bridge, "ask-1", &file).await.unwrap(),
+            run(&bridge, "ask-1", &file, false).await.unwrap(),
             "Ik heb de snelheid verdubbeld."
         );
         assert_eq!(
@@ -325,7 +338,7 @@ pub(crate) mod tests {
     #[test]
     fn tool_results_keep_text_and_images_and_only_the_newest_image_stays() {
         let r = json!({"content":[{"type":"text","text":"ok"},{"type":"image","mimeType":"image/png","data":"QUJD"}]});
-        let content = result_content(&r);
+        let content = result_content(&r, MAX_TEXT);
         assert_eq!(content[0]["text"], "ok");
         assert_eq!(content[1]["source"]["data"], "QUJD");
         let mut messages = vec![
@@ -336,30 +349,49 @@ pub(crate) mod tests {
         assert_eq!(cut("ééé", 3), "é…");
     }
 
+    fn tool_(t: &Value) -> Option<Value> {
+        tool(t, false)
+    }
+
+    fn temporary_(name: &str, args: Value) -> Result<Value, String> {
+        temporary(name, args, false)
+    }
+
+    #[test]
+    fn a_players_own_mod_may_be_changed_for_good() {
+        let schema = json!({"type":"object","properties":{"name":{},"persist":{}}});
+        assert!(tool(&json!({"name":"edit_file","inputSchema":schema}), true).is_some());
+        assert!(tool(&json!({"name":"edit_file","inputSchema":schema}), false).is_none());
+        let knob = tool(&json!({"name":"set_knob","inputSchema":schema}), true).unwrap();
+        assert!(knob["input_schema"]["properties"].get("persist").is_some());
+        let args = json!({"path":"game/main.luau","old":"a","new":"b"});
+        assert_eq!(temporary("edit_file", args.clone(), true).unwrap(), args);
+    }
+
     #[test]
     fn app_requests_never_save_into_the_games_files() {
         let schema = |props: Value| json!({"type":"object","properties":props});
-        assert!(tool(&json!({"name":"write_file","inputSchema":schema(json!({}))})).is_none());
+        assert!(tool_(&json!({"name":"write_file","inputSchema":schema(json!({}))})).is_none());
         assert!(
-            tool(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{}}))})).is_none(),
+            tool_(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{}}))})).is_none(),
             "a set_knob that always writes main.luau"
         );
         let knob =
-            tool(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{},"persist":{}}))}))
+            tool_(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{},"persist":{}}))}))
                 .unwrap();
         assert!(knob["input_schema"]["properties"].get("persist").is_none());
         assert_eq!(
-            temporary(
+            temporary_(
                 "set_knob",
                 json!({"name":"speed","value":"2","persist":true})
             )
             .unwrap()["persist"],
             false
         );
-        assert!(temporary("command", json!({"line":"knob speed 2"})).is_err());
-        assert!(temporary("command", json!({"line":"lua state.speed = 2"})).is_ok());
-        assert!(temporary("write_file", json!({})).is_err());
-        assert!(tool(&json!({"name":"run_luau","inputSchema":schema(json!({}))})).is_some());
+        assert!(temporary_("command", json!({"line":"knob speed 2"})).is_err());
+        assert!(temporary_("command", json!({"line":"lua state.speed = 2"})).is_ok());
+        assert!(temporary_("write_file", json!({})).is_err());
+        assert!(tool_(&json!({"name":"run_luau","inputSchema":schema(json!({}))})).is_some());
     }
 
     #[test]

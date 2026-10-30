@@ -158,4 +158,84 @@ class PhoneStore {
 
   /// The phone's Atomic agent, which signs its changes.
   Future<String?> agent() => _store.agent();
+
+  /// Whether this phone keeps the signed-in player's records (mods need
+  /// that: a host gets them from the account's drive).
+  bool get signedIn => _account != null;
+
+  /// The signed-in player's mods, newest name order.
+  Future<List<GameMod>> mods() async => [
+        for (final m in jsonDecode(await _store.mods()) as List)
+          GameMod.fromJson(m as Map)
+      ];
+
+  /// A new mod of the game `base`; a host where the player sits and that
+  /// has the game makes it. Returns its id.
+  Future<String> newMod(String base, String title) async {
+    final id = await _store.newMod(base: base, title: title);
+    unawaited(syncNow());
+    return id;
+  }
+
+  Future<void> renameMod(String id, String title) async {
+    await _store.renameMod(id: id, title: title);
+    unawaited(syncNow());
+  }
+
+  Future<void> removeMod(String id) async {
+    await _store.removeMod(id: id);
+    unawaited(syncNow());
+  }
+
+  /// Remember what was asked of a mod and what came of it.
+  Future<void> noteModChange(String id, ModChange change) async {
+    await _store.noteModChange(
+        id: id,
+        at: BigInt.from(change.at.millisecondsSinceEpoch ~/ 1000),
+        asked: change.asked,
+        answer: change.answer,
+        ok: change.ok);
+    _syncSoon();
+  }
+}
+
+/// A player's own copy of a game, kept in their account's drive. A host
+/// they sit at puts it on its shelf as [game].
+class GameMod {
+  final String id, title, base, game;
+  final List<ModChange> changes;
+  const GameMod(
+      {required this.id,
+      required this.title,
+      required this.base,
+      required this.game,
+      this.changes = const []});
+
+  factory GameMod.fromJson(Map j) => GameMod(
+      id: j['id'] as String,
+      title: j['title'] as String,
+      base: j['base'] as String,
+      game: j['game'] as String,
+      changes: [
+        for (final c in j['changes'] as List? ?? []) ModChange.fromJson(c as Map)
+      ]);
+}
+
+/// One change asked of a mod, and how it went.
+class ModChange {
+  final DateTime at;
+  final String asked, answer;
+  final bool ok;
+  const ModChange(
+      {required this.at,
+      required this.asked,
+      required this.answer,
+      required this.ok});
+
+  factory ModChange.fromJson(Map j) => ModChange(
+      at: DateTime.fromMillisecondsSinceEpoch(
+          ((j['at'] as num?) ?? 0).toInt() * 1000),
+      asked: j['asked']?.toString() ?? '',
+      answer: j['answer']?.toString() ?? '',
+      ok: j['ok'] == true);
 }

@@ -121,3 +121,31 @@ home and play it at a friend's (`gamenight-store/src/projects.rs`).
   the shelf (logged).
 - Luau runs in Warp's sandbox (no os, io or network); a host only sees the
   drives of people seated there.
+
+### Mods
+
+A mod is a project made from a game the player did not write: their own
+copy of a Warp game (Neon Siege for now), which Claude changes while they
+play it. The app's Mods page (Menu, next to Assistant) makes, opens, renames
+and deletes them.
+
+- The app makes a mod as an empty project with `projectBase` (the game it is
+  made of), `<game>-mod-<8 hex>` as its id. A host where the player sits and
+  that has that game as a Warp folder (found from its launch: a folder
+  argument, the working folder, or `game/` beside `warp.exe`; known by its
+  shelf id and its `game.toml` id) fills it with the game's files, with the
+  mod's own id and title in `game.toml`.
+- On the shelf the mod is `project-<id>-<tag>` (`gamenight-protocol`
+  `project::game_id`), with the game's player counts.
+- A change asked on the mod page goes to `POST /v1/rooms/agent/game` (no
+  routing model). The host runs it with the game's live tools; for the
+  asking player's own mod the saving tools stay on (`write_file`,
+  `edit_file`, persisting `set_knob`), with 30 steps. The edited files are
+  in the project's folder under `project-cache`, which the host saves back
+  to the drive every two seconds and before every sync, so what Claude
+  changed is in the account and comes along to the next host.
+- Renaming rewrites the `title` in the mod's `game.toml` (where a host reads
+  the name); deleting marks the project removed. Each asked change and its
+  answer is kept on the project (`projectChanges`, the last 50).
+- The app checks the hub when the page opens; a host syncs about once a
+  minute, so a new mod or name can take that long to reach the shelf.

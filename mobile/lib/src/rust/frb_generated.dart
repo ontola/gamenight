@@ -70,7 +70,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 1890915928;
+  int get rustContentHash => -2061189858;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -92,10 +92,29 @@ abstract class RustLibApi extends BaseApi {
       required String owner,
       required String drive});
 
+  Future<String> crateApiStorePhoneStoreMods({required PhoneStore that});
+
+  Future<String> crateApiStorePhoneStoreNewMod(
+      {required PhoneStore that, required String base, required String title});
+
+  Future<void> crateApiStorePhoneStoreNoteModChange(
+      {required PhoneStore that,
+      required String id,
+      required BigInt at,
+      required String asked,
+      required String answer,
+      required bool ok});
+
   Future<PhoneStore> crateApiStorePhoneStoreOpen({required String dir});
 
   Future<PhoneProgress?> crateApiStorePhoneStoreProgress(
       {required PhoneStore that, required String game});
+
+  Future<void> crateApiStorePhoneStoreRemoveMod(
+      {required PhoneStore that, required String id});
+
+  Future<void> crateApiStorePhoneStoreRenameMod(
+      {required PhoneStore that, required String id, required String title});
 
   Future<void> crateApiStorePhoneStoreSetProgress(
       {required PhoneStore that,
@@ -218,13 +237,105 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<String> crateApiStorePhoneStoreMods({required PhoneStore that}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 4, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreModsConstMeta,
+      argValues: [that],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreModsConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_mods",
+        argNames: ["that"],
+      );
+
+  @override
+  Future<String> crateApiStorePhoneStoreNewMod(
+      {required PhoneStore that, required String base, required String title}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(base, serializer);
+        sse_encode_String(title, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 5, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_String,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreNewModConstMeta,
+      argValues: [that, base, title],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreNewModConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_new_mod",
+        argNames: ["that", "base", "title"],
+      );
+
+  @override
+  Future<void> crateApiStorePhoneStoreNoteModChange(
+      {required PhoneStore that,
+      required String id,
+      required BigInt at,
+      required String asked,
+      required String answer,
+      required bool ok}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(id, serializer);
+        sse_encode_u_64(at, serializer);
+        sse_encode_String(asked, serializer);
+        sse_encode_String(answer, serializer);
+        sse_encode_bool(ok, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 6, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreNoteModChangeConstMeta,
+      argValues: [that, id, at, asked, answer, ok],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreNoteModChangeConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_note_mod_change",
+        argNames: ["that", "id", "at", "asked", "answer", "ok"],
+      );
+
+  @override
   Future<PhoneStore> crateApiStorePhoneStoreOpen({required String dir}) {
     return handler.executeNormal(NormalTask(
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         sse_encode_String(dir, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 4, port: port_);
+            funcId: 7, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData:
@@ -253,7 +364,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(game, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 5, port: port_);
+            funcId: 8, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_opt_box_autoadd_phone_progress,
@@ -272,6 +383,63 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       );
 
   @override
+  Future<void> crateApiStorePhoneStoreRemoveMod(
+      {required PhoneStore that, required String id}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(id, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 9, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreRemoveModConstMeta,
+      argValues: [that, id],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreRemoveModConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_remove_mod",
+        argNames: ["that", "id"],
+      );
+
+  @override
+  Future<void> crateApiStorePhoneStoreRenameMod(
+      {required PhoneStore that, required String id, required String title}) {
+    return handler.executeNormal(NormalTask(
+      callFfi: (port_) {
+        final serializer = SseSerializer(generalizedFrbRustBinding);
+        sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerPhoneStore(
+            that, serializer);
+        sse_encode_String(id, serializer);
+        sse_encode_String(title, serializer);
+        pdeCallFfi(generalizedFrbRustBinding, serializer,
+            funcId: 10, port: port_);
+      },
+      codec: SseCodec(
+        decodeSuccessData: sse_decode_unit,
+        decodeErrorData: sse_decode_String,
+      ),
+      constMeta: kCrateApiStorePhoneStoreRenameModConstMeta,
+      argValues: [that, id, title],
+      apiImpl: this,
+    ));
+  }
+
+  TaskConstMeta get kCrateApiStorePhoneStoreRenameModConstMeta =>
+      const TaskConstMeta(
+        debugName: "PhoneStore_rename_mod",
+        argNames: ["that", "id", "title"],
+      );
+
+  @override
   Future<void> crateApiStorePhoneStoreSetProgress(
       {required PhoneStore that,
       required String game,
@@ -286,7 +454,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(json, serializer);
         sse_encode_u_64(revision, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 6, port: port_);
+            funcId: 11, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -315,7 +483,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         sse_encode_String(game, serializer);
         sse_encode_String(json, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 7, port: port_);
+            funcId: 12, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -343,7 +511,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_String(url, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 8, port: port_);
+            funcId: 13, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_bool,
@@ -371,7 +539,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             that, serializer);
         sse_encode_opt_String(owner, serializer);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 9, port: port_);
+            funcId: 14, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -395,7 +563,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       callFfi: (port_) {
         final serializer = SseSerializer(generalizedFrbRustBinding);
         pdeCallFfi(generalizedFrbRustBinding, serializer,
-            funcId: 10, port: port_);
+            funcId: 15, port: port_);
       },
       codec: SseCodec(
         decodeSuccessData: sse_decode_unit,
@@ -783,10 +951,41 @@ class PhoneStoreImpl extends RustOpaque implements PhoneStore {
       RustLib.instance.api.crateApiStorePhoneStoreLinkAccount(
           that: this, url: url, owner: owner, drive: drive);
 
+  /// The signed-in player's mods (their own copies of games, kept in the
+  /// account's drive), as JSON: `[{id, title, base, game, changes}]`, where
+  /// `game` is the mod's id on a host's shelf.
+  Future<String> mods() => RustLib.instance.api.crateApiStorePhoneStoreMods(
+        that: this,
+      );
+
+  /// A new mod of the game `base`, called `title`; returns its id. Only
+  /// for a signed-in player: a host makes it from the game it has, for a
+  /// player whose drive it can reach.
+  Future<String> newMod({required String base, required String title}) =>
+      RustLib.instance.api
+          .crateApiStorePhoneStoreNewMod(that: this, base: base, title: title);
+
+  /// Remember a change asked of the mod `id` (`at`: seconds since 1970).
+  Future<void> noteModChange(
+          {required String id,
+          required BigInt at,
+          required String asked,
+          required String answer,
+          required bool ok}) =>
+      RustLib.instance.api.crateApiStorePhoneStoreNoteModChange(
+          that: this, id: id, at: at, asked: asked, answer: answer, ok: ok);
+
   /// This player's saved progress in `game`, if any.
   Future<PhoneProgress?> progress({required String game}) =>
       RustLib.instance.api
           .crateApiStorePhoneStoreProgress(that: this, game: game);
+
+  Future<void> removeMod({required String id}) =>
+      RustLib.instance.api.crateApiStorePhoneStoreRemoveMod(that: this, id: id);
+
+  Future<void> renameMod({required String id, required String title}) =>
+      RustLib.instance.api
+          .crateApiStorePhoneStoreRenameMod(that: this, id: id, title: title);
 
   /// Keep this player's progress in `game`.
   Future<void> setProgress(

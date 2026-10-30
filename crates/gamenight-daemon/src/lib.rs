@@ -307,6 +307,13 @@ impl Resume {
 }
 
 impl Shared {
+    /// Tell the store which installed Warp games new mods can be copied from.
+    fn share_project_bases(&self) {
+        if let Some(store) = &self.store {
+            store.project_bases(project_bases(self));
+        }
+    }
+
     fn new(
         library: Vec<GameMeta>,
         addr: String,
@@ -1725,6 +1732,7 @@ fn spawn_install_progress_pump(
                         }
                         let fx = s.night.add_to_library(meta);
                         s.apply_effects(fx, None);
+                        s.share_project_bases();
                     }
                 }
             }
@@ -2186,27 +2194,84 @@ fn warp_runtime(s: &Shared) -> Option<String> {
         .cloned()
 }
 
+/// The folder of the Warp game `spec` runs (its `game.toml` and `main.luau`):
+/// a folder argument, the working folder, or the packaged `game/` beside
+/// `warp.exe`.
+fn warp_game_dir(spec: &LaunchSpec) -> Option<std::path::PathBuf> {
+    use std::path::{Path, PathBuf};
+    let command = Path::new(&spec.command);
+    if !command
+        .file_stem()
+        .is_some_and(|stem| stem.eq_ignore_ascii_case("warp"))
+    {
+        return None;
+    }
+    let cwd = spec.cwd.as_ref().map(PathBuf::from);
+    let mut candidates: Vec<PathBuf> = spec
+        .args
+        .iter()
+        .map(|a| match &cwd {
+            Some(cwd) if Path::new(a).is_relative() => cwd.join(a),
+            _ => PathBuf::from(a),
+        })
+        .collect();
+    candidates.extend(cwd.iter().flat_map(|c| [c.clone(), c.join("game")]));
+    candidates.extend(command.parent().map(|p| p.join("game")));
+    candidates
+        .into_iter()
+        .find(|d| d.join("game.toml").is_file() && d.join("main.luau").is_file())
+}
+
+/// The Warp games on this shelf that a mod can be made from, by their shelf
+/// id and by the id in their `game.toml`.
+fn project_bases(s: &Shared) -> std::collections::BTreeMap<String, std::path::PathBuf> {
+    let mut bases = std::collections::BTreeMap::new();
+    for (game, spec) in &s.launch_specs {
+        if game.0.starts_with("project-") {
+            continue;
+        }
+        let Some(dir) = warp_game_dir(spec) else {
+            continue;
+        };
+        let own_id = std::fs::read_to_string(dir.join("game.toml"))
+            .ok()
+            .and_then(|toml| {
+                toml.lines().find_map(|line| {
+                    let (k, v) = line.split_once('=')?;
+                    (k.trim() == "id").then(|| v.trim().trim_matches('"').to_string())
+                })
+            });
+        bases.insert(game.0.clone(), dir.clone());
+        if let Some(id) = own_id {
+            bases.entry(id).or_insert(dir);
+        }
+    }
+    bases
+}
+
 /// The shelf entry for a seated player's own Warp project.
-fn project_meta(project: &gamenight_store::ShelfProject, warp: &str) -> GameMeta {
-    let owner: String = project
-        .owner
-        .bytes()
-        .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b.into()))
-        .to_string();
+fn project_meta(
+    project: &gamenight_store::ShelfProject,
+    warp: &str,
+    base: Option<&GameMeta>,
+) -> GameMeta {
     let dir = project.dir.display().to_string();
     GameMeta {
-        id: GameId::new(format!("project-{}-{}", project.id, owner)),
+        id: GameId::new(gamenight_protocol::project::game_id(&project.owner, &project.id)),
         title: project.title.clone(),
-        tagline: Some("A player's own Warp project".into()),
+        tagline: Some(match base {
+            Some(base) => format!("A player's mod of {}", base.title),
+            None => "A player's own Warp project".into(),
+        }),
         cover: None,
         icon: None,
         screenshot: None,
         color: None,
         emoji: Some("🛠️".into()),
-        players: None,
-        min_players: Some(1),
-        max_players: None,
-        best_players: None,
+        players: base.and_then(|b| b.players.clone()),
+        min_players: base.and_then(|b| b.min_players).or(Some(1)),
+        max_players: base.and_then(|b| b.max_players),
+        best_players: base.and_then(|b| b.best_players),
         play_with: Default::default(),
         min_phones: None,
         launch: Some(LaunchSpec {
@@ -2225,7 +2290,8 @@ fn spawn_project_shelf(
     mut projects: mpsc::UnboundedReceiver<Vec<gamenight_store::ShelfProject>>,
 ) {
     tokio::spawn(async move {
-        let mut shown: std::collections::HashSet<GameId> = Default::default();
+        // On the shelf now, with the title it has there.
+        let mut shown: std::collections::HashMap<GameId, String> = Default::default();
         while let Some(list) = projects.recv().await {
             let mut s = shared.lock().await;
             let Some(warp) = warp_runtime(&s) else {
@@ -2237,27 +2303,33 @@ fn spawn_project_shelf(
                 }
                 continue;
             };
-            let mut now = std::collections::HashSet::new();
+            s.share_project_bases();
+            let mut now = std::collections::HashMap::new();
             for project in &list {
-                let meta = project_meta(project, &warp);
-                now.insert(meta.id.clone());
+                let base = project
+                    .base
+                    .as_ref()
+                    .and_then(|b| s.night.library().iter().find(|g| g.id.0 == *b).cloned());
+                let meta = project_meta(project, &warp, base.as_ref());
+                now.insert(meta.id.clone(), meta.title.clone());
                 if let Some(launch) = &meta.launch {
                     s.launch_specs.insert(meta.id.clone(), launch.clone());
                 }
-                if !shown.contains(&meta.id) {
-                    info!(game = %meta.id, title = meta.title, "a player's project joined the shelf");
+                if shown.get(&meta.id) != Some(&meta.title) {
+                    info!(game = %meta.id, title = meta.title, "a player's project is on the shelf");
                     let fx = s.night.add_to_library(meta);
                     s.apply_effects(fx, None);
                 }
             }
-            for gone in shown.difference(&now).cloned().collect::<Vec<_>>() {
+            let gone: Vec<_> = shown.into_iter().filter(|(g, _)| !now.contains_key(g)).collect();
+            for (gone, title) in gone {
                 let (removed, fx) = s.night.remove_from_library(&gone);
                 s.apply_effects(fx, None);
                 if removed {
                     s.launch_specs.remove(&gone);
                     info!(game = %gone, "a player's project left the shelf");
                 } else {
-                    now.insert(gone);
+                    now.insert(gone, title);
                 }
             }
             shown = now;
@@ -4622,5 +4694,38 @@ mod update_restart_tests {
         assert!(Resume::take(&update.resume).is_none());
         assert!(!update.resume.exists());
         std::fs::remove_dir_all(update.ready.parent().unwrap()).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod project_base_tests {
+    use super::*;
+
+    #[test]
+    fn a_warp_game_on_the_shelf_is_found_by_its_folder() {
+        let root = std::env::temp_dir().join(format!("gn-bases-{}", std::process::id()));
+        let game = root.join("game");
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(game.join("game.toml"), "id = \"neon-siege-warp\"\n").unwrap();
+        std::fs::write(game.join("main.luau"), "").unwrap();
+        let spec = |command: &str, args: Vec<String>, cwd: Option<String>| LaunchSpec {
+            command: command.into(),
+            args,
+            cwd,
+            env: Default::default(),
+        };
+        let warp = root.join("warp.exe").display().to_string();
+        // `warp run <folder>`, the packaged game/ beside warp.exe, and a cwd.
+        let by_arg = spec("warp", vec!["run".into(), game.display().to_string()], None);
+        assert_eq!(warp_game_dir(&by_arg), Some(game.clone()));
+        assert_eq!(warp_game_dir(&spec(&warp, vec![], None)), Some(game.clone()));
+        let by_cwd = spec("warp", vec![".".into()], Some(game.display().to_string()));
+        assert_eq!(
+            warp_game_dir(&by_cwd).map(|d| d.canonicalize().unwrap()),
+            Some(game.canonicalize().unwrap())
+        );
+        let love = spec("love", vec![game.display().to_string()], None);
+        assert_eq!(warp_game_dir(&love), None, "only Warp games");
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

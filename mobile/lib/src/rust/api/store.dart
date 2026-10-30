@@ -6,6 +6,8 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `signed_in`
+
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<PhoneStore>>
 abstract class PhoneStore implements RustOpaqueInterface {
   /// This phone's Atomic agent, which signs every change.
@@ -21,6 +23,24 @@ abstract class PhoneStore implements RustOpaqueInterface {
   Future<void> linkAccount(
       {required String url, required String owner, required String drive});
 
+  /// The signed-in player's mods (their own copies of games, kept in the
+  /// account's drive), as JSON: `[{id, title, base, game, changes}]`, where
+  /// `game` is the mod's id on a host's shelf.
+  Future<String> mods();
+
+  /// A new mod of the game `base`, called `title`; returns its id. Only
+  /// for a signed-in player: a host makes it from the game it has, for a
+  /// player whose drive it can reach.
+  Future<String> newMod({required String base, required String title});
+
+  /// Remember a change asked of the mod `id` (`at`: seconds since 1970).
+  Future<void> noteModChange(
+      {required String id,
+      required BigInt at,
+      required String asked,
+      required String answer,
+      required bool ok});
+
   /// Open (or create) the store in `dir`, the app's private documents
   /// directory.
   static Future<PhoneStore> open({required String dir}) =>
@@ -28,6 +48,10 @@ abstract class PhoneStore implements RustOpaqueInterface {
 
   /// This player's saved progress in `game`, if any.
   Future<PhoneProgress?> progress({required String game});
+
+  Future<void> removeMod({required String id});
+
+  Future<void> renameMod({required String id, required String title});
 
   /// Keep this player's progress in `game`.
   Future<void> setProgress(

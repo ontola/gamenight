@@ -524,6 +524,11 @@ impl GameNight {
         }
     }
 
+    /// The games on the shelf.
+    pub fn library(&self) -> &[GameMeta] {
+        &self.library
+    }
+
     /// Put one more game on the shelf mid-night — a background install that
     /// just finished, and is playable from this moment rather than after a
     /// restart.

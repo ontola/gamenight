@@ -692,10 +692,21 @@ impl Bridge {
                         {
                             let (bridge, state, selection) =
                                 (self.clone(), state.clone(), selection.clone());
+                            let asker = updates
+                                .updates
+                                .iter()
+                                .find(|u| u.seat == selection.seat)
+                                .map(|u| format!("account:{}", u.account));
                             running = Some((
                                 selection.id.clone(),
                                 tokio::spawn(async move {
-                                    settings::run_command(&state, &selection, Some(&bridge)).await
+                                    settings::run_command(
+                                        &state,
+                                        &selection,
+                                        Some(&bridge),
+                                        asker.as_deref(),
+                                    )
+                                    .await
                                 }),
                             ));
                         } else {

@@ -607,6 +607,9 @@ enum Request {
         drives: BTreeMap<String, String>,
     },
     Projects(ProjectsWatch),
+    /// The folders of the games installed here, by game id, that a new mod
+    /// of one can be copied from.
+    ProjectBases(BTreeMap<String, PathBuf>),
     Flush(oneshot::Sender<()>),
 }
 
@@ -618,6 +621,7 @@ struct ProjectsWatch {
     cache: PathBuf,
     tx: mpsc::UnboundedSender<Vec<ShelfProject>>,
     last: Option<Vec<ShelfProject>>,
+    bases: BTreeMap<String, PathBuf>,
 }
 
 /// A project of someone seated here, written out and ready to run.
@@ -627,6 +631,8 @@ pub struct ShelfProject {
     pub id: String,
     pub title: String,
     pub dir: PathBuf,
+    /// For a mod: the game it was made from.
+    pub base: Option<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -703,6 +709,14 @@ impl Worker {
                 self.save_projects().await;
                 self.refresh_projects().await?;
             }
+            Request::ProjectBases(bases) => {
+                if let Some(watch) = &mut self.projects {
+                    if watch.bases != bases {
+                        watch.bases = bases;
+                        self.refresh_projects().await?;
+                    }
+                }
+            }
             Request::Flush(done) => {
                 let _ = done.send(());
             }
@@ -712,9 +726,13 @@ impl Worker {
 
     /// Sync one account drive, and pass on what changed.
     async fn sync(&mut self, owner: &str, drive: &str) -> Result<()> {
-        let Some((url, _)) = &self.hub else {
+        if self.hub.is_none() {
             return Ok(());
-        };
+        }
+        // What was changed in a running project goes up before what came in
+        // elsewhere is written over it.
+        self.save_shelf().await;
+        let (url, _) = self.hub.as_ref().unwrap();
         let (report, changed) = self.store.sync_hub(url, drive).await?;
         info!(
             owner,
@@ -770,6 +788,27 @@ impl Worker {
         }
     }
 
+    /// Keep what changed in the written-out projects (a mod Claude edits while
+    /// it runs) in their owners' drives.
+    async fn save_shelf(&mut self) {
+        let Some(shelf) = self.projects.as_ref().and_then(|w| w.last.clone()) else {
+            return;
+        };
+        for project in shelf {
+            if self.store.linked_drive(&project.owner).is_none() || !project.dir.is_dir() {
+                continue;
+            }
+            match self.store.save_project(&project.owner, &project.dir).await {
+                Ok((_, changed)) if changed > 0 => {
+                    info!(project = project.id, changed, "changes to a running project saved");
+                    self.dirty.insert(project.owner);
+                }
+                Ok(_) => {}
+                Err(error) => warn!(%error, project = project.id, "could not save the project"),
+            }
+        }
+    }
+
     /// Write out the projects of everyone seated here, and tell the daemon
     /// when the list changed. A running project picks up the rewritten files
     /// with Warp's hot reload.
@@ -792,6 +831,22 @@ impl Worker {
                 .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
                 .collect();
             for project in self.store.projects(&owner).await? {
+                if let Some(base) = &project.base {
+                    // A new mod: a copy of its game, if that is installed here.
+                    if let Some(from) = watch.bases.get(base) {
+                        match self.store.fill_mod(&owner, &project.id, from).await {
+                            Ok(0) => {}
+                            Ok(files) => {
+                                info!(project = project.id, base, files, "new mod made from its game");
+                                self.dirty.insert(owner.clone());
+                            }
+                            Err(error) => warn!(%error, project = project.id, "could not make the mod"),
+                        }
+                    }
+                    if !self.store.has_files(&project.subject).await? {
+                        continue;
+                    }
+                }
                 let dir = watch.cache.join(&folder).join(&project.id);
                 let changed = self.store.write_project(&owner, &project.id, &dir).await?;
                 if changed > 0 {
@@ -802,6 +857,7 @@ impl Worker {
                     id: project.id,
                     title: project.title,
                     dir,
+                    base: project.base,
                 });
             }
         }
@@ -901,6 +957,7 @@ impl StoreHandle {
                     }
                     _ = project_tick.tick(), if worker.projects.is_some() => {
                         worker.save_projects().await;
+                        worker.save_shelf().await;
                     }
                     _ = tokio::time::sleep_until(soon) => {
                         if tokio::time::Instant::now() >= next_round {
@@ -959,8 +1016,15 @@ impl StoreHandle {
             cache,
             tx,
             last: None,
+            bases: BTreeMap::new(),
         }));
         rx
+    }
+
+    /// The folders of the Warp games installed here (game id -> folder), for
+    /// new mods to be copied from.
+    pub fn project_bases(&self, bases: BTreeMap<String, PathBuf>) {
+        let _ = self.tx.send(Request::ProjectBases(bases));
     }
 
     /// Wait until every write sent so far is done.
