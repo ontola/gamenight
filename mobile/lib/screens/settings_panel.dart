@@ -8,6 +8,7 @@ import '../api.dart';
 import '../room_controls.dart';
 import '../storage/phone_store.dart';
 import '../theme.dart';
+import '../widgets/choice_setting.dart';
 import '../widgets/number_setting.dart';
 
 /// The match settings of the game being played or warmed up: toggles,
@@ -323,25 +324,13 @@ class _SettingsSectionState extends State<SettingsSection> {
           onChanged: (v) => _apply({s.key: v}),
         );
       case SettingKind.choice:
-        return Padding(
+        return ChoiceSetting(
           key: ValueKey('setting-${s.key}'),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            _label(s),
-            if (subtitle != null) subtitle,
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final option in s.options)
-                ChoiceChip(
-                  label: Text(option),
-                  selected: option == _value(s),
-                  onSelected: (_) {
-                    if (option != _value(s)) _apply({s.key: option});
-                  },
-                ),
-            ]),
-          ]),
+          title: _label(s),
+          subtitle: subtitle,
+          options: s.options,
+          value: _value(s) as String,
+          onChanged: (option) => _apply({s.key: option}),
         );
     }
   }
@@ -553,25 +542,13 @@ class _MySettingsSectionState extends State<MySettingsSection> {
           onChanged: (v) => _set(s, v),
         );
       case SettingKind.choice:
-        return Padding(
+        return ChoiceSetting(
           key: ValueKey('my-setting-${s.key}'),
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child:
-              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            title,
-            if (subtitle != null) subtitle,
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
-              for (final option in s.options)
-                ChoiceChip(
-                  label: Text(option),
-                  selected: option == _value(s),
-                  onSelected: (_) {
-                    if (option != _value(s)) _set(s, option);
-                  },
-                ),
-            ]),
-          ]),
+          title: title,
+          subtitle: subtitle,
+          options: s.options,
+          value: _value(s) as String,
+          onChanged: (option) => _set(s, option),
         );
     }
   }

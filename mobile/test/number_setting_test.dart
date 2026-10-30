@@ -199,14 +199,30 @@ void main() {
     expect(controls.writes.last, {'gravity': 140});
   });
 
-  testWidgets('one tap picks the next round', (tester) async {
+  testWidgets('the next round is a dropdown', (tester) async {
     final controls = await show(tester);
-    await tester.tap(find.text('Blackout'));
+    expect(find.byType(ChoiceChip), findsNothing);
+    await tester.tap(find.text('Random'));
+    await tester.pumpAndSettle();
+    await capture(tester, 'gg-dropdown');
+    await tester.tap(find.text('Blackout').last);
     await tester.pumpAndSettle();
     expect(controls.writes, [
       {'next_modifier': 'Blackout'}
     ]);
     await capture(tester, 'gg-blackout');
+    // The game resets it after the round: the dropdown follows.
+    final reset = growingGuns();
+    controls.current = GameSettings(
+        game: reset.game,
+        instance: reset.instance,
+        revision: 9,
+        canUndo: true,
+        settings: reset.settings);
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+    expect(find.text('Random'), findsOneWidget);
+    expect(find.text('Blackout'), findsNothing);
   });
 
   test('wide ranges step in fives', () {
