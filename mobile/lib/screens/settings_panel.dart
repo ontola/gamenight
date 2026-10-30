@@ -8,6 +8,7 @@ import '../api.dart';
 import '../room_controls.dart';
 import '../storage/phone_store.dart';
 import '../theme.dart';
+import '../widgets/number_setting.dart';
 
 /// The match settings of the game being played or warmed up: toggles,
 /// numbers and choices the game declared. Hidden when it has none.
@@ -122,15 +123,6 @@ class _SettingsSectionState extends State<SettingsSection> {
   }
 
   Object _value(Setting s) => _pending[s.key] ?? _sending[s.key] ?? s.value;
-
-  void _adjust(Setting s, int delta) {
-    final value = (_value(s) as int) + delta;
-    if ((s.min != null && value < s.min!) ||
-        (s.max != null && value > s.max!)) {
-      return;
-    }
-    _apply({s.key: value});
-  }
 
   Future<void> _apply(Map<String, Object> values,
       {SettingsAction action = SettingsAction.set}) async {
@@ -320,33 +312,15 @@ class _SettingsSectionState extends State<SettingsSection> {
           onChanged: (v) => _apply({s.key: v}),
         );
       case SettingKind.number:
-        final value = _value(s) as int;
-        final lower = s.min == null || value > s.min!;
-        final higher = s.max == null || value < s.max!;
-        return ListTile(
+        return NumberSetting(
           key: ValueKey('setting-${s.key}'),
-          contentPadding: EdgeInsets.zero,
           title: _label(s),
+          label: s.label,
           subtitle: subtitle,
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            IconButton(
-              tooltip: 'Less ${s.label}',
-              onPressed: !lower ? null : () => _adjust(s, -1),
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-            SizedBox(
-              width: 32,
-              child: Text('$value',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-            IconButton(
-              tooltip: 'More ${s.label}',
-              onPressed: !higher ? null : () => _adjust(s, 1),
-              icon: const Icon(Icons.add_circle_outline),
-            ),
-          ]),
+          value: _value(s) as int,
+          min: s.min,
+          max: s.max,
+          onChanged: (v) => _apply({s.key: v}),
         );
       case SettingKind.choice:
         return Padding(
@@ -568,42 +542,15 @@ class _MySettingsSectionState extends State<MySettingsSection> {
           onChanged: (v) => _set(s, v),
         );
       case SettingKind.number:
-        final value = _value(s) as int;
-        // Wide ranges (a sensitivity in percent) move in fives.
-        final step = (s.max ?? 0) - (s.min ?? 0) > 50 ? 5 : 1;
-        int? next(int delta) {
-          final v = value + delta;
-          if (s.min != null && v < s.min!) return value > s.min! ? s.min : null;
-          if (s.max != null && v > s.max!) return value < s.max! ? s.max : null;
-          return v;
-        }
-
-        final lower = next(-step);
-        final higher = next(step);
-        return ListTile(
+        return NumberSetting(
           key: ValueKey('my-setting-${s.key}'),
-          contentPadding: EdgeInsets.zero,
           title: title,
+          label: s.label,
           subtitle: subtitle,
-          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-            IconButton(
-              tooltip: 'Less ${s.label}',
-              onPressed: lower == null ? null : () => _set(s, lower),
-              icon: const Icon(Icons.remove_circle_outline),
-            ),
-            SizedBox(
-              width: 40,
-              child: Text('$value',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-            IconButton(
-              tooltip: 'More ${s.label}',
-              onPressed: higher == null ? null : () => _set(s, higher),
-              icon: const Icon(Icons.add_circle_outline),
-            ),
-          ]),
+          value: _value(s) as int,
+          min: s.min,
+          max: s.max,
+          onChanged: (v) => _set(s, v),
         );
       case SettingKind.choice:
         return Padding(
