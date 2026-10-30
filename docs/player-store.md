@@ -94,3 +94,30 @@ answer to `save-schema.lock.json` (the ontology and property ids; commit it).
   value back through the lens.
 - Hexstead is the pilot (`played`, `wins`, `bestPoints`).
 
+
+## Players' own projects (vibecoded Warp games)
+
+A Warp (Luau) game folder can live in a player's drive, so they make it at
+home and play it at a friend's (`gamenight-store/src/projects.rs`).
+
+- A project is a `GameProject` resource (owner, `id` and `title` from its
+  `game.toml`) with a `ProjectFile` child per file: path and text. Only the
+  text a Warp game is made of is kept (`.luau`, `.lua`, `.wgsl`, `.toml`,
+  `.json`, `.md`, `.txt`; 512 KB per file, 4 MB and 400 files per project).
+  Files gone from the folder are marked removed (an edit syncs; a destroy
+  would not).
+- Saving: list folders in `gamenight/projects.json` in the user data
+  directory, `[{"dir": "C:/dev/my-game", "profile": "account:<id>"}]`. While
+  that profile is seated here (its account drive linked), the host checks the
+  folder every two seconds and saves what changed; it syncs two seconds later.
+- Playing: for everyone seated here, the host writes their projects out under
+  `gamenight/project-cache/<profile>/<id>` and puts them on the shelf
+  ("A player's own Warp project"), started as `warp <folder>`. Edits that sync
+  in are written out again, so a running project hot reloads. When the
+  player leaves, their projects leave the shelf (after the round, if one is
+  running).
+- The Warp runtime comes from `GAMENIGHT_WARP`, else the `warp` executable of a
+  Warp game registered in `local-games.json`. Without one, projects stay off
+  the shelf (logged).
+- Luau runs in Warp's sandbox (no os, io or network); a host only sees the
+  drives of people seated there.

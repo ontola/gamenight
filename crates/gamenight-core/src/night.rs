@@ -544,6 +544,43 @@ impl GameNight {
         fx
     }
 
+    /// Take a game off the shelf mid-night: a player's own project once they
+    /// are no longer seated here. A game that is running stays until the
+    /// round is over; the caller tries again later. Returns whether it went.
+    pub fn remove_from_library(&mut self, game: &GameId) -> (bool, Vec<Effect>) {
+        if self.active_session().is_some_and(|(g, _, _)| g == game) {
+            return (false, Vec::new());
+        }
+        let before = self.library.len();
+        self.library.retain(|m| &m.id != game);
+        if self.library.len() == before {
+            return (true, Vec::new());
+        }
+        let mut fx = vec![Effect::StateChanged];
+        if self.warm.as_ref().is_some_and(|w| &w.game == game) {
+            self.dispose_warm(&mut fx);
+            self.next_up = None;
+        }
+        // Out of what is still to come; what was played stays in the list.
+        let start = self.playlist.upcoming_start();
+        let queue_end = start + self.playlist.queued();
+        let mut queued = self.playlist.queued();
+        let mut entries = Vec::new();
+        for (index, entry) in self.playlist.entries().iter().enumerate() {
+            if index >= start && &entry.game == game {
+                if index < queue_end {
+                    queued -= 1;
+                }
+                continue;
+            }
+            entries.push((Some(index), entry.clone()));
+        }
+        self.apply_entries(entries, queued);
+        self.refresh_autoplay(&mut fx);
+        self.rewarm_if_misfit(&mut fx);
+        (true, fx)
+    }
+
     /// Start warming whatever currently fits, if nothing is warm yet.
     ///
     /// `set_library` populates the playlist but cannot emit effects, so at

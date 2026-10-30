@@ -3492,6 +3492,27 @@ mod player_count_fit_tests {
         assert!(night.snapshot().warm_session.is_none());
     }
 
+    /// A player's project leaves the shelf with them, and the warm session
+    /// it had goes too.
+    #[test]
+    fn a_game_taken_off_the_shelf_is_no_longer_warmed() {
+        let mut night = GameNight::default();
+        night.set_library(vec![game("solo", 1, 4, None)]);
+        night.handle(join("Ada"));
+        let fx = night.handle(Command::GameConnected {
+            game: GameId::new("solo"),
+        });
+        let (_, warm) = prepared_session(&fx).unwrap();
+        let (removed, fx) = night.remove_from_library(&GameId::new("solo"));
+        assert!(removed);
+        assert_eq!(disposed_sessions(&fx), vec![warm]);
+        assert!(night.snapshot().warm_session.is_none());
+        assert_eq!(
+            night.remove_from_library(&GameId::new("solo")),
+            (true, vec![])
+        );
+    }
+
     /// A game that never said how many players it needs gets the seats as
     /// they are — filling them would be inventing a requirement.
     #[test]

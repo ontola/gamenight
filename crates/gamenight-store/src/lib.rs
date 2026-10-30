@@ -10,6 +10,7 @@
 //! Games never see any of this: the daemon reads and writes it, and games
 //! only get `player_settings` / `player_data` for the players in the room.
 
+pub mod projects;
 pub mod schema;
 pub mod sync;
 
@@ -605,8 +606,37 @@ enum Request {
         url: String,
         drives: BTreeMap<String, String>,
     },
+    Projects(ProjectsWatch),
     Flush(oneshot::Sender<()>),
 }
+
+/// Players' projects on this host: the folders to keep in their drives,
+/// and where to write out the projects of everyone seated here to run them.
+struct ProjectsWatch {
+    /// `projects.json`: `[{"dir": "...", "profile": "account:<id>"}]`.
+    file: PathBuf,
+    cache: PathBuf,
+    tx: mpsc::UnboundedSender<Vec<ShelfProject>>,
+    last: Option<Vec<ShelfProject>>,
+}
+
+/// A project of someone seated here, written out and ready to run.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ShelfProject {
+    pub owner: String,
+    pub id: String,
+    pub title: String,
+    pub dir: PathBuf,
+}
+
+#[derive(serde::Deserialize)]
+struct WatchedFolder {
+    dir: PathBuf,
+    profile: String,
+}
+
+/// How often watched project folders are checked for edits.
+const PROJECTS_EVERY: Duration = Duration::from_secs(2);
 
 /// A sync soon after a save, so a few saves in a row go out together.
 const SYNC_AFTER_SAVE: Duration = Duration::from_secs(2);
@@ -633,6 +663,7 @@ struct Worker {
     dirty: BTreeSet<String>,
     /// Saved records that changed through a sync, for the night to take in.
     updates: Option<mpsc::UnboundedSender<Saved>>,
+    projects: Option<ProjectsWatch>,
 }
 
 impl Worker {
@@ -665,6 +696,12 @@ impl Worker {
                     self.emit([owner.clone()].into()).await?;
                     self.dirty.insert(owner);
                 }
+                self.refresh_projects().await?;
+            }
+            Request::Projects(watch) => {
+                self.projects = Some(watch);
+                self.save_projects().await;
+                self.refresh_projects().await?;
             }
             Request::Flush(done) => {
                 let _ = done.send(());
@@ -686,7 +723,94 @@ impl Worker {
             "player store synced"
         );
         self.emit(changed.into_iter().map(|(o, _)| o).collect())
-            .await
+            .await?;
+        if report.received > 0 {
+            self.refresh_projects().await?;
+        }
+        Ok(())
+    }
+
+    /// Keep each watched folder whose profile is seated here (its account
+    /// drive linked) as that profile's project.
+    async fn save_projects(&mut self) {
+        let Some(watch) = &self.projects else {
+            return;
+        };
+        let folders: Vec<WatchedFolder> = match std::fs::read(&watch.file) {
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(folders) => folders,
+                Err(error) => {
+                    warn!(%error, file = %watch.file.display(), "unreadable projects file");
+                    return;
+                }
+            },
+            Err(_) => return,
+        };
+        for folder in folders {
+            let seated = self
+                .hub
+                .as_ref()
+                .is_some_and(|(_, drives)| drives.contains_key(&folder.profile));
+            if !seated || self.store.linked_drive(&folder.profile).is_none() {
+                continue;
+            }
+            match self.store.save_project(&folder.profile, &folder.dir).await {
+                Ok((project, changed)) if changed > 0 => {
+                    info!(
+                        project = project.id,
+                        changed, "project saved to the player's drive"
+                    );
+                    self.dirty.insert(folder.profile);
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    warn!(%error, dir = %folder.dir.display(), "could not save the project")
+                }
+            }
+        }
+    }
+
+    /// Write out the projects of everyone seated here, and tell the daemon
+    /// when the list changed. A running project picks up the rewritten files
+    /// with Warp's hot reload.
+    async fn refresh_projects(&mut self) -> Result<()> {
+        let Some(watch) = &self.projects else {
+            return Ok(());
+        };
+        let owners: Vec<String> = match &self.hub {
+            Some((_, drives)) => drives
+                .keys()
+                .filter(|o| self.store.linked_drive(o).is_some())
+                .cloned()
+                .collect(),
+            None => Vec::new(),
+        };
+        let mut shelf = Vec::new();
+        for owner in owners {
+            let folder: String = owner
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect();
+            for project in self.store.projects(&owner).await? {
+                let dir = watch.cache.join(&folder).join(&project.id);
+                let changed = self.store.write_project(&owner, &project.id, &dir).await?;
+                if changed > 0 {
+                    info!(project = project.id, changed, "project files written out");
+                }
+                shelf.push(ShelfProject {
+                    owner: owner.clone(),
+                    id: project.id,
+                    title: project.title,
+                    dir,
+                });
+            }
+        }
+        let watch = self.projects.as_mut().unwrap();
+        if watch.last.as_ref() != Some(&shelf) {
+            let _ = watch.tx.send(shelf.clone());
+            watch.last = Some(shelf);
+        }
+        Ok(())
     }
 
     /// Hand the night what is saved now for `owners`.
@@ -753,21 +877,30 @@ impl StoreHandle {
             hub: None,
             dirty: BTreeSet::new(),
             updates,
+            projects: None,
         };
         tokio::spawn(async move {
             let mut next_round = tokio::time::Instant::now() + SYNC_EVERY;
+            let mut project_tick = tokio::time::interval(PROJECTS_EVERY);
+            // When the first save since the last sync goes out; fixed, so
+            // other wake-ups (the project tick) do not keep moving it.
+            let mut due: Option<tokio::time::Instant> = None;
             loop {
-                let soon = if worker.dirty.is_empty() || worker.hub.is_none() {
-                    next_round
-                } else {
-                    next_round.min(tokio::time::Instant::now() + SYNC_AFTER_SAVE)
-                };
+                if worker.dirty.is_empty() || worker.hub.is_none() {
+                    due = None;
+                } else if due.is_none() {
+                    due = Some(tokio::time::Instant::now() + SYNC_AFTER_SAVE);
+                }
+                let soon = due.map_or(next_round, |due| next_round.min(due));
                 tokio::select! {
                     request = rx.recv() => {
                         let Some(request) = request else { break };
                         if let Err(error) = worker.handle(request).await {
                             warn!(%error, "could not save to the player store");
                         }
+                    }
+                    _ = project_tick.tick(), if worker.projects.is_some() => {
+                        worker.save_projects().await;
                     }
                     _ = tokio::time::sleep_until(soon) => {
                         if tokio::time::Instant::now() >= next_round {
@@ -778,6 +911,7 @@ impl StoreHandle {
                             let owners = std::mem::take(&mut worker.dirty);
                             worker.sync_owners(Some(owners)).await;
                         }
+                        due = None;
                     }
                 }
             }
@@ -808,6 +942,25 @@ impl StoreHandle {
             url: url.into(),
             drives,
         });
+    }
+
+    /// Keep the folders listed in `file` (`[{"dir", "profile"}]`) in their
+    /// profiles' drives while those profiles are seated here, and write the
+    /// projects of everyone seated here out under `cache`. The receiver gets
+    /// the list of written-out projects whenever it changes.
+    pub fn follow_projects(
+        &self,
+        file: PathBuf,
+        cache: PathBuf,
+    ) -> mpsc::UnboundedReceiver<Vec<ShelfProject>> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let _ = self.tx.send(Request::Projects(ProjectsWatch {
+            file,
+            cache,
+            tx,
+            last: None,
+        }));
+        rx
     }
 
     /// Wait until every write sent so far is done.

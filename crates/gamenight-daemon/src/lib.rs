@@ -1846,9 +1846,9 @@ fn start_playtest(
         return;
     }
     if registered_locally(s, &game) {
-        if !s.playtests.contains_key(&game) {
-            info!(%game, "playtest build ignored: this machine registers the game itself");
-            s.playtests.insert(game, (String::new(), None));
+        if let std::collections::hash_map::Entry::Vacant(entry) = s.playtests.entry(game) {
+            info!(game = %entry.key(), "playtest build ignored: this machine registers the game itself");
+            entry.insert((String::new(), None));
         }
         return;
     }
@@ -2169,6 +2169,102 @@ async fn open_store() -> Option<(
     Some((handle, agent, saved, synced))
 }
 
+/// Where the Warp runtime is: `GAMENIGHT_WARP`, else the `warp` executable
+/// of a Warp game registered on this machine.
+fn warp_runtime(s: &Shared) -> Option<String> {
+    if let Ok(path) = std::env::var("GAMENIGHT_WARP") {
+        return Some(path);
+    }
+    s.launch_specs
+        .values()
+        .map(|spec| &spec.command)
+        .find(|command| {
+            std::path::Path::new(command)
+                .file_stem()
+                .is_some_and(|stem| stem.eq_ignore_ascii_case("warp"))
+        })
+        .cloned()
+}
+
+/// The shelf entry for a seated player's own Warp project.
+fn project_meta(project: &gamenight_store::ShelfProject, warp: &str) -> GameMeta {
+    let owner: String = project
+        .owner
+        .bytes()
+        .fold(0u32, |h, b| h.wrapping_mul(31).wrapping_add(b.into()))
+        .to_string();
+    let dir = project.dir.display().to_string();
+    GameMeta {
+        id: GameId::new(format!("project-{}-{}", project.id, owner)),
+        title: project.title.clone(),
+        tagline: Some("A player's own Warp project".into()),
+        cover: None,
+        icon: None,
+        screenshot: None,
+        color: None,
+        emoji: Some("🛠️".into()),
+        players: None,
+        min_players: Some(1),
+        max_players: None,
+        best_players: None,
+        play_with: Default::default(),
+        min_phones: None,
+        launch: Some(LaunchSpec {
+            command: warp.to_string(),
+            args: vec![dir.clone()],
+            cwd: Some(dir),
+            env: Default::default(),
+        }),
+    }
+}
+
+/// Seated players' own projects on the shelf, for as long as they are here.
+/// Needs the Warp runtime on this machine; without it they stay off.
+fn spawn_project_shelf(
+    shared: Arc<Mutex<Shared>>,
+    mut projects: mpsc::UnboundedReceiver<Vec<gamenight_store::ShelfProject>>,
+) {
+    tokio::spawn(async move {
+        let mut shown: std::collections::HashSet<GameId> = Default::default();
+        while let Some(list) = projects.recv().await {
+            let mut s = shared.lock().await;
+            let Some(warp) = warp_runtime(&s) else {
+                if !list.is_empty() {
+                    warn!(
+                        projects = list.len(),
+                        "players' projects need the Warp runtime (GAMENIGHT_WARP)"
+                    );
+                }
+                continue;
+            };
+            let mut now = std::collections::HashSet::new();
+            for project in &list {
+                let meta = project_meta(project, &warp);
+                now.insert(meta.id.clone());
+                if let Some(launch) = &meta.launch {
+                    s.launch_specs.insert(meta.id.clone(), launch.clone());
+                }
+                if !shown.contains(&meta.id) {
+                    info!(game = %meta.id, title = meta.title, "a player's project joined the shelf");
+                    let fx = s.night.add_to_library(meta);
+                    s.apply_effects(fx, None);
+                }
+            }
+            for gone in shown.difference(&now).cloned().collect::<Vec<_>>() {
+                let (removed, fx) = s.night.remove_from_library(&gone);
+                s.apply_effects(fx, None);
+                if removed {
+                    s.launch_specs.remove(&gone);
+                    info!(game = %gone, "a player's project left the shelf");
+                } else {
+                    now.insert(gone);
+                }
+            }
+            shown = now;
+        }
+    });
+}
+
 /// What only the packaged desktop app has: quitting with its lobby, and
 /// updating itself without losing the party.
 struct Desktop {
@@ -2200,6 +2296,11 @@ async fn run_inner(
             s.stored_settings = saved.settings.clone();
             s.night.load_player_settings(saved.settings);
             s.night.load_player_data(saved.data);
+            let projects = store.follow_projects(
+                gamenight_store::data_root().join("gamenight/projects.json"),
+                gamenight_store::data_root().join("gamenight/project-cache"),
+            );
+            spawn_project_shelf(shared.clone(), projects);
             s.store = Some(store);
             s.store_agent = agent;
             let shared = shared.clone();
