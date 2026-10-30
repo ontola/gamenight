@@ -2487,16 +2487,30 @@ async fn run_inner(
                 s.watch_focus();
                 let Some(lobby) = watched_lobby.as_ref() else { continue };
                 if !s.exit_with_lobby && !s.runtime_input { continue; }
+                let pending = s.pending_launches.contains_key(lobby);
                 let child = if let Some(pending) = s.pending_launches.get_mut(lobby) {
                     Some(&mut pending.child)
                 } else {
                     s.running_children.get_mut(lobby)
                 };
-                let alive = match child {
-                    Some(child) => child.try_wait()?.is_none(),
-                    None => false,
+                let (alive, closed) = match child {
+                    Some(child) => match child.try_wait()? {
+                        None => (true, false),
+                        // Only a lobby that got as far as saying hello was
+                        // closed by someone; before that it failed to start.
+                        Some(status) => (false, status.success() && !pending),
+                    },
+                    None => (false, false),
                 };
                 if !alive {
+                    // A clean exit is someone closing the lobby on purpose
+                    // (taskbar, window close, its own Quit): GameNight quits
+                    // with it instead of bringing the lobby back.
+                    if closed {
+                        info!(%lobby, "lobby closed; quitting GameNight");
+                        s.kill_all_children();
+                        return Ok(());
+                    }
                     if s.runtime_input {
                         // A plugin crash must not kill the game or erase seats.
                         // Bound restarts so a broken package cannot spin forever.
