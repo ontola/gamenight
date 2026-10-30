@@ -187,6 +187,24 @@ class PhoneStore {
     unawaited(syncNow());
   }
 
+  /// An Assistant request for the running `game` finished: when that game
+  /// is one of this player's mods, keep it in the mod's history.
+  Future<void> noteRequest(String game,
+      {required String asked,
+      required String answer,
+      required bool ok}) async {
+    if (!signedIn) return;
+    try {
+      for (final mod in await mods()) {
+        if (mod.game != game) continue;
+        await noteModChange(mod.id,
+            ModChange(at: DateTime.now(), asked: asked, answer: answer, ok: ok));
+      }
+    } catch (error) {
+      debugPrint('Could not keep the mod change: $error');
+    }
+  }
+
   /// Remember what was asked of a mod and what came of it.
   Future<void> noteModChange(String id, ModChange change) async {
     await _store.noteModChange(

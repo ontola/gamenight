@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'account.dart';
 import 'api.dart';
+import 'storage/phone_store.dart';
 
 String assistantId() {
   final b = List.generate(16, (_) => Random.secure().nextInt(256));
@@ -121,6 +122,16 @@ class Assistant extends ChangeNotifier {
                   ? 'Done.'
                   : 'The change was not completed.');
           pending = null;
+          // A change to the player's own mod goes in its history.
+          final game = status?['commands'] is Map
+              ? (status!['commands'] as Map)['game']?.toString()
+              : null;
+          if (game != null) {
+            unawaited(PhoneStore.instance?.noteRequest(game,
+                asked: r['prompt']?.toString() ?? '',
+                answer: notice,
+                ok: r['state'] == 'complete'));
+          }
         }
       }
       // A successful refresh clears connection errors, not action errors.

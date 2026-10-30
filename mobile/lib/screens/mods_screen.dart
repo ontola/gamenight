@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../api.dart';
 import '../app_state.dart';
 import '../assistant.dart';
 import '../layout.dart';
 import '../room_controls.dart';
 import '../storage/phone_store.dart';
 import '../theme.dart';
+import 'assistant_screen.dart';
 
 /// The games a mod can be made of: Warp games in Luau, which a host copies
 /// into the player's drive and Claude changes while they play.
@@ -128,7 +128,7 @@ class _ModsScreenState extends State<ModsScreen> {
       children.add(const Padding(
         padding: EdgeInsets.only(bottom: 12),
         child: Hint(
-            'A mod is your own copy of a game. Play it and tell Claude what should change: '
+            'A mod is your own copy of a game. Play it and tell the Assistant what should change: '
             'it changes the code while you play, and the mod stays in your account.'),
       ));
       if (_error != null) {
@@ -250,20 +250,8 @@ class ModScreen extends StatefulWidget {
 class _ModScreenState extends State<ModScreen> {
   late GameMod _mod = widget.mod;
   _Room? _roomNow;
-  final _ask = TextEditingController();
   Timer? _timer;
   bool _starting = false;
-
-  /// The change being made: its request id and when it was asked.
-  String? _working;
-  String? _error;
-
-  static const _errors = {
-    400: 'That request could not be sent. Make it shorter and try again.',
-    403: 'Sit in a room (pick up a player) to change your mod.',
-    409: 'Your mod is not running right now, or another request is still going.',
-    503: 'The assistant is not available right now.',
-  };
 
   @override
   void initState() {
@@ -275,7 +263,6 @@ class _ModScreenState extends State<ModScreen> {
   @override
   void dispose() {
     _timer?.cancel();
-    _ask.dispose();
     super.dispose();
   }
 
@@ -290,7 +277,6 @@ class _ModScreenState extends State<ModScreen> {
       if (mod != null) _mod = mod;
       _roomNow = room;
     });
-    if (_working != null) await _check();
   }
 
   bool get _playing => _roomNow?.playing == _mod.game;
@@ -308,58 +294,12 @@ class _ModScreenState extends State<ModScreen> {
     }
   }
 
-  Future<void> _send() async {
-    final text = _ask.text.trim();
-    if (text.isEmpty || _working != null) return;
-    final id = assistantId();
-    setState(() {
-      _working = id;
-      _error = null;
-    });
-    try {
-      await widget.state.cloud.request('POST', '/v1/rooms/agent/game',
-          body: {'request_id': id, 'game': _mod.game, 'text': text},
-          errors: _errors);
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _working = null;
-          _error = error is ApiError ? error.message : '$error';
-        });
-      }
-    }
-  }
-
-  /// Whether the change being made is done; when it is, keep it in the mod's
-  /// history.
-  Future<void> _check() async {
-    final id = _working;
-    if (id == null) return;
-    Map? request;
-    try {
-      final status =
-          await widget.state.cloud.request('GET', '/v1/rooms/agent') as Map;
-      request = (status['requests'] as List?)
-          ?.whereType<Map>()
-          .where((r) => r['id'] == id)
-          .firstOrNull;
-    } catch (_) {
-      return;
-    }
-    if (request == null || ['thinking', 'queued'].contains(request['state'])) {
-      return;
-    }
-    final change = ModChange(
-        at: DateTime.now(),
-        asked: request['prompt']?.toString() ?? _ask.text.trim(),
-        answer: request['result']?.toString() ?? '',
-        ok: request['state'] == 'complete');
-    _working = null;
-    await PhoneStore.instance?.noteModChange(_mod.id, change);
-    if (!mounted) return;
-    if (change.ok) _ask.clear();
-    setState(() => _error = change.ok ? null : change.answer);
-    unawaited(_refresh());
+  /// Changing a mod is what the Assistant does: ask it while the mod runs.
+  Future<void> _assistant() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'assistant'),
+        builder: (_) => AssistantScreen(state: widget.state)));
+    await _refresh();
   }
 
   Future<void> _rename() async {
@@ -420,7 +360,6 @@ class _ModScreenState extends State<ModScreen> {
   Widget build(BuildContext context) {
     final room = _roomNow;
     final onShelf = room?.shelf.contains(_mod.game) ?? false;
-    final working = _working != null;
     return Scaffold(
       appBar: AppBar(title: Text(_mod.title), actions: [
         IconButton(
@@ -444,43 +383,17 @@ class _ModScreenState extends State<ModScreen> {
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('Play now')),
           const SizedBox(height: 20),
-          const Text('What should change?',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          const SizedBox(height: 8),
-          TextField(
-            key: const ValueKey('mod-ask'),
-            controller: _ask,
-            enabled: !working,
-            minLines: 2,
-            maxLines: 6,
-            maxLength: 2000,
-            decoration: const InputDecoration(
-                hintText: 'Bosses split in two when they die'),
-            onChanged: (_) => setState(() {}),
-          ),
-          if (!_playing)
-            const Hint('Play your mod first: Claude changes it while it runs.'),
-          if (working) ...[
-            const SizedBox(height: 8),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
-            const Hint(
-                'Claude is changing your mod. Each saved file reloads in the game at once, so keep playing.'),
-          ],
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(_error!, style: const TextStyle(color: GnColors.warn)),
-            ),
+          Hint(_playing
+              ? 'Tell the Assistant what should change: it changes the code while you play, and keeps it in your mod.'
+              : 'Play your mod, then tell the Assistant what should change.'),
           const SizedBox(height: 8),
           Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-                key: const ValueKey('send-mod-change'),
-                onPressed: _playing && !working && _ask.text.trim().isNotEmpty
-                    ? _send
-                    : null,
-                child: const Text('Change it')),
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+                key: const ValueKey('mod-assistant'),
+                onPressed: _assistant,
+                icon: const Icon(Icons.auto_awesome_outlined),
+                label: const Text('Assistant')),
           ),
           if (_mod.changes.isNotEmpty) ...[
             const SizedBox(height: 24),

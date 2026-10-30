@@ -137,15 +137,16 @@ and deletes them.
   mod's own id and title in `game.toml`.
 - On the shelf the mod is `project-<id>-<tag>` (`gamenight-protocol`
   `project::game_id`), with the game's player counts.
-- A change asked on the mod page goes to `POST /v1/rooms/agent/game` (no
-  routing model). The host runs it with the game's live tools; for the
-  asking player's own mod the saving tools stay on (`write_file`,
-  `edit_file`, persisting `set_knob`), with 30 steps. The edited files are
+- Changes are asked of the Assistant, like any request (Joep: "modden doe je
+  met de assistent"); the mod page opens it. While the mod runs, the host
+  runs the request with the game's live tools; for the asking player's own
+  mod the saving tools stay on (`write_file`, `edit_file`, persisting
+  `set_knob`), with 30 steps and ten minutes. The edited files are
   in the project's folder under `project-cache`, which the host saves back
   to the drive every two seconds and before every sync, so what Claude
   changed is in the account and comes along to the next host.
 - Renaming rewrites the `title` in the mod's `game.toml` (where a host reads
-  the name); deleting marks the project removed. Each asked change and its
-  answer is kept on the project (`projectChanges`, the last 50).
+  the name); deleting marks the project removed. Each change the Assistant made
+  to it, with its answer, is kept on the project (`projectChanges`, the last 50).
 - The app checks the hub when the page opens; a host syncs about once a
   minute, so a new mod or name can take that long to reach the shelf.
