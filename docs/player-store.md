@@ -61,3 +61,36 @@ vectors, Loro merges, so edits made offline on two devices both survive).
 
 Local profiles (`local:<id>`) and offline hosts never sync; they keep their
 records in the host's own drive.
+
+## Save schemas: typed progress per game
+
+A game can describe what it saves with `save_player_data` in
+`save-schema.json` next to `gamenight.json`: a JSON Schema (draft 2020-12)
+with one object type in `$defs` whose `properties` are the top-level keys of
+the saved data. `gamenight-publish.py schema` (and `store`, when the file is
+there) sends it to `PUT /v1/developer/games/<id>/save-schema` and writes the
+answer to `save-schema.lock.json` (the ontology and property ids; commit it).
+
+- The hub turns the schema into an Atomic ontology for the game
+  (`atomic_lib::schema::json_schema`): one content-addressed Property per
+  field, in the hub's schema drive, with a `GameSchema` record listing the
+  current fields. Every account drive points to that drive
+  (`ns/schemas`), so the store syncs it next to the account, at most every
+  ten minutes (`Store::sync_hub`).
+- With the schema here, the store keeps each known field as its own typed
+  property, which Atomic merges per field; keys the schema does not know,
+  values that do not fit the type and whole data that is not an object stay
+  in the JSON blob (`ns/data`). Games without a schema keep the blob only.
+  Games see no difference: they save and load the same JSON.
+- A property's identity is its ontology, shortname and datatype, so a
+  renamed or retyped field is a new property. A new version must say what
+  became of every field the last one had, or the hub refuses it (HTTP 409):
+  `"x-gamenight-lenses": [{"from": "wins", "to": "victories", "op": "rename"}]`
+  (any Atomic lens op: `rename`, `wrap`, `head`, `map`, `convert`), or
+  `"x-gamenight-dropped": ["wins"]`. A field never comes back under an old
+  name with another type. Lenses apply when a record is read: data saved
+  under the old field shows under the new one, and a save under the new one
+  drops the old value, so a host still on the older build reads the new
+  value back through the lens.
+- Hexstead is the pilot (`played`, `wins`, `bestPoints`).
+

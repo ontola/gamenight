@@ -1100,6 +1100,7 @@ dependencies = [
  "futures-util",
  "gamenight-core",
  "gamenight-protocol",
+ "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",

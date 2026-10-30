@@ -224,6 +224,11 @@ Send the usual CSRF header for cookie authentication. Pasting an external video
 URL or setting `duration: 5` yourself does not verify it, and a clip uploaded for
 another game cannot satisfy this game's requirement.
 
+
+### Saved progress
+
+If your game saves progress with `save_player_data`, describe it in `save-schema.json` next to `gamenight.json`: a JSON Schema with one object type in `$defs`, one property per top-level key. `store` sends it along (or run `gamenight-publish.py schema`) and writes `save-schema.lock.json`; commit both. Players' progress is then kept field by field and merges cleanly between their devices. When a later version renames or retypes a field, say so in the schema with `"x-gamenight-lenses": [{"from": "wins", "to": "victories", "op": "rename"}]` or `"x-gamenight-dropped": ["wins"]`, otherwise the upload is refused. Give a field with a new type a new name. Your game always gets back the same JSON it saved.
+
 ## Optional artwork
 
 Use a portrait cover for the next-game display, a square icon for game spines and a gameplay screenshot for the TV. These are separate assets. If artwork is absent, the title remains readable; a random icon is not a substitute for a cover.

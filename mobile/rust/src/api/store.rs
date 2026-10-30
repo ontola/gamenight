@@ -72,13 +72,9 @@ impl PhoneStore {
         drive: String,
     ) -> Result<(), String> {
         let mut store = self.store.lock().await;
-        let origin = gamenight_store::sync::origin_of(&url);
         if store.linked_drive(&owner) != Some(drive.as_str()) {
-            let mut hub = gamenight_store::sync::WsTransport::connect(&url)
-                .await
-                .map_err(|e| e.to_string())?;
             store
-                .sync(&mut hub, &origin, &drive)
+                .sync_hub(&url, &drive)
                 .await
                 .map_err(|e| e.to_string())?;
             store
@@ -87,11 +83,8 @@ impl PhoneStore {
                 .map_err(|e| e.to_string())?;
         }
         *self.owner.lock().await = owner;
-        let mut hub = gamenight_store::sync::WsTransport::connect(&url)
-            .await
-            .map_err(|e| e.to_string())?;
         store
-            .sync(&mut hub, &origin, &drive)
+            .sync_hub(&url, &drive)
             .await
             .map_err(|e| e.to_string())?;
         Ok(())
@@ -105,12 +98,8 @@ impl PhoneStore {
         let Some(drive) = store.linked_drive(&owner).map(str::to_string) else {
             return Ok(false);
         };
-        let mut hub = gamenight_store::sync::WsTransport::connect(&url)
-            .await
-            .map_err(|e| e.to_string())?;
-        let origin = gamenight_store::sync::origin_of(&url);
         let (report, _) = store
-            .sync(&mut hub, &origin, &drive)
+            .sync_hub(&url, &drive)
             .await
             .map_err(|e| e.to_string())?;
         Ok(report.received > 0)

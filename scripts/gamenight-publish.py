@@ -21,6 +21,11 @@ def origin(value):
         raise ValueError('Use an HTTPS server origin (HTTP is allowed only for loopback tests)')
     return value.rstrip('/')
 
+class HTTPError(ValueError):
+    def __init__(self, status, message):
+        super().__init__(message)
+        self.status = status
+
 class Client:
     def __init__(self, base, token):
         self.base = origin(base)
@@ -50,7 +55,7 @@ class Client:
             except ValueError:
                 result = {}
             if not 200 <= response.status < 300:
-                raise ValueError(result.get('error', f'GameNight returned HTTP {response.status}'))
+                raise HTTPError(response.status, result.get('error', f'GameNight returned HTTP {response.status}'))
             return result
         finally:
             connection.close()
@@ -223,9 +228,35 @@ def store(client, args):
     if not body:
         raise ValueError('Nothing to send: no gamenight.json fields and no media found')
     result = client.request('PUT', path + '/store', body)
+    saved = args.manifest.with_name('save-schema.json')
+    if saved.is_file():
+        try:
+            save_schema(client, game, saved)
+        except HTTPError as e:
+            if e.status != 404:
+                raise
+            print('This GameNight server does not take save schemas yet; skipped save-schema.json.', file=sys.stderr)
     print(json.dumps({'game': game, 'sent': sorted(body), **result}, indent=2))
     if not result.get('preview_ready'):
         print('The store still needs a five-second gameplay clip (preview.mp4) before it can go live.', file=sys.stderr)
+
+def save_schema(client, game, file):
+    """Publish save-schema.json and write save-schema.lock.json next to it."""
+    path = f'/v1/developer/games/{urllib.parse.quote(game, safe="")}/save-schema'
+    result = client.request('PUT', path, json.loads(file.read_text()))
+    lock = file.with_name(file.name.removesuffix('.json') + '.lock.json')
+    lock.write_text(json.dumps(result['lockfile'], indent=2, sort_keys=True) + '\n')
+    print(f'Save schema published: {", ".join(sorted(result["fields"]))}. Commit {lock.name}.', file=sys.stderr)
+    return result
+
+def schema(client, args):
+    manifest = json.loads(args.manifest.read_text()) if args.manifest.is_file() else {}
+    game = args.game or manifest.get('id')
+    if not game:
+        raise ValueError('Pass --game or run next to a gamenight.json with an "id"')
+    if not args.schema.is_file():
+        raise ValueError(f'No {args.schema}: describe the data your game saves with save_player_data there')
+    print(json.dumps(save_schema(client, game, args.schema)['fields'], indent=2))
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -253,9 +284,13 @@ def main():
     for field in MEDIA:
         p.add_argument('--' + field, type=Path)
     p.add_argument('--image', type=Path, action='append', help='Gallery image; repeat for more')
+    p = commands.add_parser('schema', help='Publish save-schema.json, the shape of what the game saves per player')
+    p.add_argument('--game', help='Defaults to the id in gamenight.json')
+    p.add_argument('--manifest', type=Path, default=Path('gamenight.json'))
+    p.add_argument('--schema', type=Path, default=Path('save-schema.json'))
     args = parser.parse_args()
     client = Client(args.server, os.environ.get('GAMENIGHT_API_TOKEN', ''))
-    {'push': push, 'preview': preview, 'store': store}[args.command](client, args)
+    {'push': push, 'preview': preview, 'store': store, 'schema': schema}[args.command](client, args)
 
 if __name__ == '__main__':
     try:

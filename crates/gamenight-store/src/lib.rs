@@ -10,6 +10,7 @@
 //! Games never see any of this: the daemon reads and writes it, and games
 //! only get `player_settings` / `player_data` for the players in the room.
 
+pub mod schema;
 pub mod sync;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -56,11 +57,22 @@ pub struct Store {
     linked: BTreeMap<String, String>,
     /// (owner, game) -> subject of its resource.
     records: HashMap<(String, String), String>,
+    /// The hub's schema drive, once an account drive pointed to it.
+    schema_drive: Option<String>,
+    /// Games with a published save schema: game -> fields.
+    schemas: HashMap<String, schema::Fields>,
+    /// When the schema drive was last synced.
+    schemas_synced: Option<std::time::Instant>,
 }
 
 /// Where the owner -> drive links are kept, in the database's own key-value
 /// tree.
 const LINKS_KEY: &[u8] = b"gamenight:linked-drives";
+/// And the hub's schema drive.
+const SCHEMA_DRIVE_KEY: &[u8] = b"gamenight:schema-drive";
+/// How often the schema drive is synced at most: schemas change with a
+/// game's release, not during play.
+const SCHEMAS_EVERY: Duration = Duration::from_secs(600);
 
 impl Store {
     /// Open the store in `dir`, creating the database, agent and drive the
@@ -108,11 +120,24 @@ impl Store {
             .flatten()
             .and_then(|bytes| serde_json::from_slice(&bytes).ok())
             .unwrap_or_default();
+        let schema_drive = db
+            .kv
+            .get(Tree::PluginMeta, SCHEMA_DRIVE_KEY)
+            .ok()
+            .flatten()
+            .and_then(|bytes| String::from_utf8(bytes.to_vec()).ok());
+        let schemas = match &schema_drive {
+            Some(drive) => schema::load(&db, drive).await?,
+            None => HashMap::new(),
+        };
         let mut store = Self {
             db,
             drive,
             linked,
             records: HashMap::new(),
+            schema_drive,
+            schemas,
+            schemas_synced: None,
         };
         store.scan(&store.drive.clone()).await?;
         for drive in store.linked.values().cloned().collect::<BTreeSet<_>>() {
@@ -224,9 +249,9 @@ impl Store {
                 None => None,
             };
             if theirs.as_ref().map(revision).unwrap_or(-1) < revision(&old) {
-                for property in [DATA, DATA_REVISION] {
-                    if let Ok(value) = old.get(property) {
-                        props.push((property, value.clone()));
+                for (property, value) in old.get_propvals() {
+                    if property == DATA || property == DATA_REVISION || schema::is_field(property) {
+                        props.push((property.to_string(), Some(value.clone())));
                     }
                 }
             }
@@ -238,7 +263,10 @@ impl Store {
                         serde_json::from_str(&account.to_string()).unwrap_or_default();
                     merged.extend(account);
                 }
-                props.push((SETTINGS, Value::String(serde_json::to_string(&merged)?)));
+                props.push((
+                    SETTINGS.into(),
+                    Some(Value::String(serde_json::to_string(&merged)?)),
+                ));
             }
             if !props.is_empty() {
                 self.put(owner, &game, props).await?;
@@ -289,7 +317,78 @@ impl Store {
         } else {
             Vec::new()
         };
+        if self.schema_drive.is_none() {
+            if let Some(schemas) = schema::schema_drive_of(&self.db, drive).await {
+                self.db
+                    .kv
+                    .insert(Tree::PluginMeta, SCHEMA_DRIVE_KEY, schemas.as_bytes())
+                    .map_err(atomic)?;
+                self.db.flush().map_err(atomic)?;
+                self.schema_drive = Some(schemas);
+            }
+        }
         Ok((report, changed))
+    }
+
+    /// The schema drive to sync now, if one is known and it is due.
+    pub fn schemas_due(&self) -> Option<&str> {
+        let due = self
+            .schemas_synced
+            .is_none_or(|at| at.elapsed() >= SCHEMAS_EVERY);
+        self.schema_drive.as_deref().filter(|_| due)
+    }
+
+    /// Sync the hub's schema drive (read only), and return every record
+    /// when a schema changed, since that changes how their data reads.
+    pub async fn sync_schemas<T: atomic_lib::sync::transport::AtomicTransport>(
+        &mut self,
+        transport: &mut T,
+        origin: &str,
+    ) -> Result<(sync::SyncReport, Vec<(String, String)>)> {
+        let Some(drive) = self.schema_drive.clone() else {
+            return Ok((sync::SyncReport::default(), Vec::new()));
+        };
+        let agent = self.signer()?;
+        let report = sync::sync_drive(&self.db, &agent, transport, origin, &drive).await?;
+        self.schemas_synced = Some(std::time::Instant::now());
+        let mut changed = Vec::new();
+        if report.received > 0 {
+            let schemas = schema::load(&self.db, &drive).await?;
+            if schemas != self.schemas {
+                self.schemas = schemas;
+                changed = self.records.keys().cloned().collect();
+            }
+        }
+        Ok((report, changed))
+    }
+
+    /// Sync `drive` with the hub at `url` (`wss://host/atomic/ws`), and the
+    /// hub's schema drive when it is due. Returns what was sent and
+    /// received, and the records that changed.
+    pub async fn sync_hub(
+        &mut self,
+        url: &str,
+        drive: &str,
+    ) -> Result<(sync::SyncReport, Vec<(String, String)>)> {
+        let origin = sync::origin_of(url);
+        let mut transport = sync::WsTransport::connect(url).await?;
+        let (mut report, mut changed) = self.sync(&mut transport, &origin, drive).await?;
+        if self.schemas_due().is_some() {
+            let mut transport = sync::WsTransport::connect(url).await?;
+            match self.sync_schemas(&mut transport, &origin).await {
+                Ok((schemas, more)) => {
+                    report.received += schemas.received;
+                    changed.extend(more);
+                }
+                Err(error) => warn!(%error, "could not sync the save schemas"),
+            }
+        }
+        Ok((report, changed))
+    }
+
+    /// The fields of `game`'s published save schema, if it has one here.
+    pub fn schema(&self, game: &str) -> Option<&schema::Fields> {
+        self.schemas.get(game)
     }
 
     /// Everything saved for every profile.
@@ -315,21 +414,30 @@ impl Store {
                     Err(error) => warn!(%error, owner, game, "unreadable saved settings"),
                 }
             }
-            if let Ok(data) = resource.get(DATA) {
+            let blob = match resource.get(DATA) {
+                Ok(data) => match serde_json::from_str(&data.to_string()) {
+                    Ok(data) => Some(data),
+                    Err(error) => {
+                        warn!(%error, owner, game, "unreadable saved progress");
+                        None
+                    }
+                },
+                Err(_) => None,
+            };
+            let data = match self.schemas.get(game) {
+                Some(fields) => schema::join(&resource, blob, fields),
+                None => blob,
+            };
+            if let Some(data) = data {
                 let revision = match resource.get(DATA_REVISION) {
                     Ok(Value::Integer(n)) => (*n).max(0) as u64,
                     _ => 0,
                 };
-                match serde_json::from_str(&data.to_string()) {
-                    Ok(data) => {
-                        saved
-                            .data
-                            .entry(owner.clone())
-                            .or_default()
-                            .insert(game.clone(), SavedPlayerData { data, revision });
-                    }
-                    Err(error) => warn!(%error, owner, game, "unreadable saved progress"),
-                }
+                saved
+                    .data
+                    .entry(owner.clone())
+                    .or_default()
+                    .insert(game.clone(), SavedPlayerData { data, revision });
             }
         }
         Ok(saved)
@@ -343,8 +451,12 @@ impl Store {
         values: &BTreeMap<String, SettingValue>,
     ) -> Result<()> {
         let json = serde_json::to_string(values)?;
-        self.put(owner, game, vec![(SETTINGS, Value::String(json))])
-            .await
+        self.put(
+            owner,
+            game,
+            vec![(SETTINGS.into(), Some(Value::String(json)))],
+        )
+        .await
     }
 
     /// Replace `owner`'s progress for `game`.
@@ -354,19 +466,44 @@ impl Store {
         game: &str,
         saved: &SavedPlayerData,
     ) -> Result<()> {
-        let json = serde_json::to_string(&saved.data)?;
-        self.put(
-            owner,
-            game,
-            vec![
-                (DATA, Value::String(json)),
-                (DATA_REVISION, Value::Integer(saved.revision as i64)),
-            ],
-        )
-        .await
+        let mut props: Vec<(String, Option<Value>)> = Vec::new();
+        let blob = match self.schemas.get(game) {
+            Some(fields) => {
+                let (typed, rest) = schema::split(&saved.data, fields);
+                // A field the game left out this time is gone, as it would
+                // be from the blob; so is the old end of a renamed field.
+                for field in fields.values() {
+                    if !typed.iter().any(|(p, _)| *p == field.property) {
+                        props.push((field.property.clone(), None));
+                    }
+                }
+                for stale in schema::superseded(&self.db, &typed) {
+                    props.push((stale, None));
+                }
+                props.extend(typed.into_iter().map(|(p, v)| (p, Some(v))));
+                rest
+            }
+            None => saved.data.clone(),
+        };
+        props.push((
+            DATA.into(),
+            Some(Value::String(serde_json::to_string(&blob)?)),
+        ));
+        props.push((
+            DATA_REVISION.into(),
+            Some(Value::Integer(saved.revision as i64)),
+        ));
+        self.put(owner, game, props).await
     }
 
-    async fn put(&mut self, owner: &str, game: &str, props: Vec<(&str, Value)>) -> Result<()> {
+    /// Set (or, for `None`, remove) these properties of `owner`'s record
+    /// for `game`, creating it the first time.
+    async fn put(
+        &mut self,
+        owner: &str,
+        game: &str,
+        props: Vec<(String, Option<Value>)>,
+    ) -> Result<()> {
         let key = (owner.to_string(), game.to_string());
         match self.records.get(&key) {
             Some(subject) => {
@@ -376,9 +513,16 @@ impl Store {
                     .await
                     .map_err(atomic)?;
                 for (property, value) in props {
-                    resource
-                        .set_unsafe(property.into(), value)
-                        .map_err(atomic)?;
+                    match value {
+                        Some(value) => {
+                            resource.set_unsafe(property, value).map_err(atomic)?;
+                        }
+                        None => {
+                            if resource.get(&property).is_ok() {
+                                resource.remove_propval(&property).map_err(atomic)?;
+                            }
+                        }
+                    }
                 }
                 resource.save_locally(&self.db).await.map_err(atomic)?;
             }
@@ -387,7 +531,11 @@ impl Store {
                     (OWNER, Value::String(owner.into())),
                     (GAME, Value::String(game.into())),
                 ];
-                all.extend(props);
+                all.extend(
+                    props
+                        .iter()
+                        .filter_map(|(p, v)| v.clone().map(|v| (p.as_str(), v))),
+                );
                 let subject = self
                     .db
                     .create_resource(
@@ -530,9 +678,7 @@ impl Worker {
         let Some((url, _)) = &self.hub else {
             return Ok(());
         };
-        let origin = sync::origin_of(url);
-        let mut transport = sync::WsTransport::connect(url).await?;
-        let (report, changed) = self.store.sync(&mut transport, &origin, drive).await?;
+        let (report, changed) = self.store.sync_hub(url, drive).await?;
         info!(
             owner,
             sent = report.sent,
