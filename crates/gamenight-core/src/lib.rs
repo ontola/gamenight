@@ -13,7 +13,7 @@ mod vote;
 
 pub use night::{
     Command, Effect, GameCommand, GameNight, PartyCarry, PlayerDataStore, PlayerSettingsStore,
-    SavedPlayerData,
+    SavedPlayerData, ROOM_CLOSES_AFTER,
 };
 pub use playlist::Playlist;
 pub use session::{IllegalTransition, Session};
@@ -763,6 +763,47 @@ mod night_tests {
                 .active_ms,
             3000
         );
+    }
+
+    #[test]
+    fn a_room_nobody_touches_for_hours_closes_by_itself() {
+        let (mut night, session) = night_in_progress();
+        let tick = |night: &mut GameNight, minutes: u64| {
+            night.handle(Command::PresenceTick {
+                elapsed: std::time::Duration::from_secs(minutes * 60),
+            })
+        };
+        tick(&mut night, 170);
+        // A press anywhere keeps the room open for another three hours.
+        night.handle(Command::ControllerInput {
+            game: None,
+            session: None,
+            controller: "ordinal:0".into(),
+        });
+        tick(&mut night, 170);
+        assert!(!night.snapshot().players.is_empty());
+        // A game finishing rounds on its own is not someone playing.
+        night.handle(Command::SessionFinished { session });
+        let fx = tick(&mut night, 11);
+        assert!(fx.iter().any(|e| matches!(e, Effect::RoomClosed)));
+        assert!(fx.iter().any(|e| matches!(
+            e,
+            Effect::ToGame { session: s, command: GameCommand::Dispose, .. } if *s == session
+        )));
+        let after = night.snapshot();
+        assert!(after.players.is_empty());
+        assert!(after.seats.iter().all(|s| s.occupant.is_empty()));
+        assert!(after.active_session.is_none());
+        // An empty room stays quietly empty.
+        let fx = tick(&mut night, 200);
+        assert!(!fx.iter().any(|e| matches!(e, Effect::RoomClosed)));
+        // An update restart keeps counting.
+        night.handle(join_cmd("B", None, None));
+        tick(&mut night, 120);
+        let mut restarted = GameNight::default();
+        restarted.restore(night.carry());
+        let fx = tick(&mut restarted, 61);
+        assert!(fx.iter().any(|e| matches!(e, Effect::RoomClosed)));
     }
 
     #[test]

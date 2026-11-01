@@ -940,6 +940,12 @@ impl Shared {
                     self.kill_all_children();
                     broadcast = true;
                 }
+                Effect::RoomClosed => {
+                    info!("nobody played for a long while: the room closed");
+                    let party = self.night.snapshot();
+                    self.room_log.start_over(party);
+                    broadcast = true;
+                }
                 Effect::SettingsAccepted {
                     game,
                     session,
@@ -2257,7 +2263,10 @@ fn project_meta(
 ) -> GameMeta {
     let dir = project.dir.display().to_string();
     GameMeta {
-        id: GameId::new(gamenight_protocol::project::game_id(&project.owner, &project.id)),
+        id: GameId::new(gamenight_protocol::project::game_id(
+            &project.owner,
+            &project.id,
+        )),
         title: project.title.clone(),
         tagline: Some(match base {
             Some(base) => format!("A player's mod of {}", base.title),
@@ -2321,7 +2330,10 @@ fn spawn_project_shelf(
                     s.apply_effects(fx, None);
                 }
             }
-            let gone: Vec<_> = shown.into_iter().filter(|(g, _)| !now.contains_key(g)).collect();
+            let gone: Vec<_> = shown
+                .into_iter()
+                .filter(|(g, _)| !now.contains_key(g))
+                .collect();
             for (gone, title) in gone {
                 let (removed, fx) = s.night.remove_from_library(&gone);
                 s.apply_effects(fx, None);
@@ -4647,6 +4659,31 @@ mod update_restart_tests {
     }
 
     #[test]
+    fn a_closed_room_starts_the_next_evening_with_an_empty_log() {
+        let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
+        join(&mut s, "Ada", "xinput:0");
+        join(&mut s, "Bo", "xinput:1");
+        assert!(!s.snapshot().activity.is_empty());
+        s.dispatch(
+            Command::PresenceTick {
+                elapsed: gamenight_core::ROOM_CLOSES_AFTER,
+            },
+            None,
+        );
+        let party = s.snapshot();
+        assert!(party.players.is_empty());
+        assert!(party.activity.is_empty(), "no line per person leaving");
+        join(&mut s, "Cy", "xinput:0");
+        let texts: Vec<_> = s
+            .snapshot()
+            .activity
+            .iter()
+            .map(|e| e.text.clone())
+            .collect();
+        assert_eq!(texts, ["Cy joined"]);
+    }
+
+    #[test]
     fn update_restart_brings_the_same_party_back() {
         let update = host_update();
         let mut s = Shared::new(vec![], "127.0.0.1:0".into(), None);
@@ -4732,7 +4769,10 @@ mod project_base_tests {
         // `warp run <folder>`, the packaged game/ beside warp.exe, and a cwd.
         let by_arg = spec("warp", vec!["run".into(), game.display().to_string()], None);
         assert_eq!(warp_game_dir(&by_arg), Some(game.clone()));
-        assert_eq!(warp_game_dir(&spec(&warp, vec![], None)), Some(game.clone()));
+        assert_eq!(
+            warp_game_dir(&spec(&warp, vec![], None)),
+            Some(game.clone())
+        );
         let by_cwd = spec("warp", vec![".".into()], Some(game.display().to_string()));
         assert_eq!(
             warp_game_dir(&by_cwd).map(|d| d.canonicalize().unwrap()),

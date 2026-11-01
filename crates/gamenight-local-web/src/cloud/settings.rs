@@ -349,7 +349,8 @@ pub(crate) async fn run_command(
                     bridge,
                     &selection.id,
                     &path,
-                    asker.is_some_and(|a| gamenight_protocol::project::owned_by(&selection.game, a)),
+                    asker
+                        .is_some_and(|a| gamenight_protocol::project::owned_by(&selection.game, a)),
                 ),
             )
             .await
@@ -475,7 +476,9 @@ mod tests {
             text: "nonsense".into(),
         });
         assert_eq!(
-            run_command(&state, &selection, None, None).await.unwrap_err(),
+            run_command(&state, &selection, None, None)
+                .await
+                .unwrap_err(),
             "heard nonsense"
         );
         selection.seat.index = 3;

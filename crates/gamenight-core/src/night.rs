@@ -18,6 +18,10 @@ use crate::playlist::Playlist;
 use crate::session::Session;
 use crate::vote::VoteBoard;
 
+/// How long a room may sit without anyone touching a controller, a phone or
+/// the overlay before it closes by itself.
+pub const ROOM_CLOSES_AFTER: std::time::Duration = std::time::Duration::from_secs(3 * 60 * 60);
+
 /// Everything that can happen to the night, from any source.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Command {
@@ -231,6 +235,46 @@ pub enum Command {
     },
 }
 
+impl Command {
+    /// Something a person did, as opposed to a game or the host reporting
+    /// in. Keeps the room open (see [`ROOM_CLOSES_AFTER`]).
+    fn is_from_a_person(&self) -> bool {
+        matches!(
+            self,
+            Command::ControllerInput { .. }
+                | Command::JoinParty { .. }
+                | Command::LeaveParty { .. }
+                | Command::JoinPhonePlayer { .. }
+                | Command::RenamePlayer { .. }
+                | Command::SetPlayerSkinColor { .. }
+                | Command::SetPlayerColor { .. }
+                | Command::SetPlayerAvatar { .. }
+                | Command::SetPlayerProfile { .. }
+                | Command::SetCouchPosition { .. }
+                | Command::AssignSeat { .. }
+                | Command::SwapSeats { .. }
+                | Command::BindController { .. }
+                | Command::SetPlaylist { .. }
+                | Command::MovePlaylistEntry { .. }
+                | Command::RemovePlaylistEntry { .. }
+                | Command::Next
+                | Command::PlayNext { .. }
+                | Command::QueueNext { .. }
+                | Command::QueueGame { .. }
+                | Command::Pause
+                | Command::Resume
+                | Command::OverlayOpened
+                | Command::OverlayClosed
+                | Command::RequestStart { .. }
+                | Command::Vote { .. }
+                | Command::MediaControl { .. }
+                | Command::SetPlayerSetting { .. }
+                | Command::SetSetting { .. }
+                | Command::ControlSettings { .. }
+        )
+    }
+}
+
 /// A lifecycle command the daemon must deliver to a game process.
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameCommand {
@@ -289,6 +333,9 @@ pub enum Effect {
     MediaControl { action: MediaAction },
     /// The party voted to quit. The night is over.
     PartyOver,
+    /// Nobody touched anything for [`ROOM_CLOSES_AFTER`]: everyone left and
+    /// any game stopped. The next person to join starts a new evening.
+    RoomClosed,
     /// Tell the lobby game whether it currently has the couch's attention.
     /// See `ServerMessage::LobbyFocus`.
     LobbyFocus { game: GameId, active: bool },
@@ -345,6 +392,14 @@ pub struct PartyCarry {
     /// leaves it empty for the daemon to fill.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub activity: Vec<gamenight_protocol::ActivityEntry>,
+    /// Seconds since a person last did anything, so updating the host does
+    /// not keep a forgotten room open.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub quiet_secs: u64,
+}
+
+fn is_zero(n: &u64) -> bool {
+    *n == 0
 }
 
 /// Players' own setting values: owner -> game -> key -> value. The owner is a
@@ -389,6 +444,9 @@ pub struct GameNight {
     /// Each owner's saved progress per game, keyed like `player_settings`.
     player_data: PlayerDataStore,
     presence: HashMap<PlayerId, (std::time::Duration, gamenight_protocol::PresenceState)>,
+    /// How long since a person last did anything: pressed a controller,
+    /// joined, or changed something from a phone or the overlay.
+    quiet: std::time::Duration,
     /// Players with a linked phone, as the host's web server last reported.
     phones: Vec<PlayerId>,
     participation: HashMap<SessionId, bool>,
@@ -461,6 +519,7 @@ impl GameNight {
             player_settings: PlayerSettingsStore::new(),
             player_data: PlayerDataStore::new(),
             presence: HashMap::new(),
+            quiet: std::time::Duration::ZERO,
             phones: Vec::new(),
             participation: HashMap::new(),
             seats: (0..seat_count)
@@ -602,6 +661,9 @@ impl GameNight {
     /// Feed one command in, get the effects out. The only entry point.
     pub fn handle(&mut self, command: Command) -> Vec<Effect> {
         let mut fx = Vec::new();
+        if command.is_from_a_person() {
+            self.quiet = std::time::Duration::ZERO;
+        }
         match command {
             Command::Participation {
                 game,
@@ -643,7 +705,14 @@ impl GameNight {
                         _ => {}
                     }
                 }
-                self.tick_presence(elapsed, &mut fx)
+                self.tick_presence(elapsed, &mut fx);
+                // Unbounded, unlike the clocks above: a host that slept for
+                // two days was not played on either.
+                self.quiet = self.quiet.saturating_add(elapsed);
+                if self.quiet >= ROOM_CLOSES_AFTER {
+                    self.quiet = std::time::Duration::ZERO;
+                    self.close_room(&mut fx);
+                }
             }
             Command::GameConnected { game } => {
                 let is_lobby = self.lobby_game.as_ref() == Some(&game);
@@ -1334,6 +1403,7 @@ impl GameNight {
             history: self.history.clone(),
             settings: self.settings.clone(),
             activity: Vec::new(),
+            quiet_secs: self.quiet.as_secs(),
         }
     }
 
@@ -1356,6 +1426,7 @@ impl GameNight {
             self.seats = seats;
         }
         self.players = carry.players;
+        self.quiet = std::time::Duration::from_secs(carry.quiet_secs);
         self.arrange_couch(None);
         self.preferred_colors = carry.preferred_colors;
         self.profiles = carry.profiles;
@@ -1658,6 +1729,24 @@ impl GameNight {
             self.try_transition(fx);
             fx.push(Effect::StateChanged);
         }
+    }
+
+    /// The evening is over without anyone saying so: stop any game and let
+    /// everyone leave, so a room left on for days does not look occupied.
+    fn close_room(&mut self, fx: &mut Vec<Effect>) {
+        if self.players.is_empty() && self.active.is_none() {
+            return;
+        }
+        self.dispose_warm(fx);
+        self.dispose_active(fx);
+        self.pending_transition = false;
+        self.overlay_open = false;
+        for player in self.players.iter().map(|p| p.id).collect::<Vec<_>>() {
+            self.on_leave(player, fx);
+            self.presence.remove(&player);
+        }
+        fx.push(Effect::RoomClosed);
+        fx.push(Effect::StateChanged);
     }
 
     fn on_leave(&mut self, player_id: PlayerId, fx: &mut Vec<Effect>) {

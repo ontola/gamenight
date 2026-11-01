@@ -800,7 +800,10 @@ impl Worker {
             }
             match self.store.save_project(&project.owner, &project.dir).await {
                 Ok((_, changed)) if changed > 0 => {
-                    info!(project = project.id, changed, "changes to a running project saved");
+                    info!(
+                        project = project.id,
+                        changed, "changes to a running project saved"
+                    );
                     self.dirty.insert(project.owner);
                 }
                 Ok(_) => {}
@@ -837,10 +840,15 @@ impl Worker {
                         match self.store.fill_mod(&owner, &project.id, from).await {
                             Ok(0) => {}
                             Ok(files) => {
-                                info!(project = project.id, base, files, "new mod made from its game");
+                                info!(
+                                    project = project.id,
+                                    base, files, "new mod made from its game"
+                                );
                                 self.dirty.insert(owner.clone());
                             }
-                            Err(error) => warn!(%error, project = project.id, "could not make the mod"),
+                            Err(error) => {
+                                warn!(%error, project = project.id, "could not make the mod")
+                            }
                         }
                     }
                     if !self.store.has_files(&project.subject).await? {

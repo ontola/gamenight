@@ -268,7 +268,11 @@ impl Store {
             .await
             .map_err(atomic)?;
         self.db.flush().map_err(atomic)?;
-        let resource = self.db.get_resource(&subject.as_str().into()).await.map_err(atomic)?;
+        let resource = self
+            .db
+            .get_resource(&subject.as_str().into())
+            .await
+            .map_err(atomic)?;
         Ok(project_of(owner, &resource))
     }
 
@@ -305,8 +309,11 @@ impl Store {
         let subject = resource.get_subject().to_string();
         if let Some(mut toml) = self.files_of(&subject).await?.remove("game.toml") {
             let text = text_of(&toml, FILE_TEXT).unwrap_or_default();
-            toml.set_unsafe(FILE_TEXT.into(), Value::String(set_toml(&text, "title", title)))
-                .map_err(atomic)?;
+            toml.set_unsafe(
+                FILE_TEXT.into(),
+                Value::String(set_toml(&text, "title", title)),
+            )
+            .map_err(atomic)?;
             toml.save_locally(&self.db).await.map_err(atomic)?;
         }
         self.db.flush().map_err(atomic)?;
@@ -413,14 +420,22 @@ impl Store {
         };
         let changed = self.save_files(&subject, &files).await?;
         self.db.flush().map_err(atomic)?;
-        let resource = self.db.get_resource(&subject.as_str().into()).await.map_err(atomic)?;
+        let resource = self
+            .db
+            .get_resource(&subject.as_str().into())
+            .await
+            .map_err(atomic)?;
         Ok((project_of(owner, &resource), changed))
     }
 
     /// Make the project `subject`'s files these: new and changed files are
     /// saved, files not among them are marked removed. Returns how many
     /// changed.
-    async fn save_files(&mut self, subject: &str, files: &BTreeMap<String, String>) -> Result<usize> {
+    async fn save_files(
+        &mut self,
+        subject: &str,
+        files: &BTreeMap<String, String>,
+    ) -> Result<usize> {
         let mut stored = self.files_of(subject).await?;
         let mut changed = 0;
         for (path, text) in files {
@@ -706,13 +721,20 @@ mod handle_tests {
         let owner = "account:joep";
         phone.sync_hub(&url, &drive).await.unwrap();
         phone.link(owner, &drive).await.unwrap();
-        let made = phone.new_mod(owner, "neon-siege-warp", "Splitting bosses").await.unwrap();
+        let made = phone
+            .new_mod(owner, "neon-siege-warp", "Splitting bosses")
+            .await
+            .unwrap();
         assert!(made.id.starts_with("neon-siege-warp-mod-"));
         assert_eq!(made.base.as_deref(), Some("neon-siege-warp"));
         phone.sync_hub(&url, &drive).await.unwrap();
 
         std::fs::create_dir_all(game.join("sounds")).unwrap();
-        std::fs::write(game.join("game.toml"), "title = \"Neon Siege\"\nid = \"neon-siege-warp\"\nplayers = 1\n").unwrap();
+        std::fs::write(
+            game.join("game.toml"),
+            "title = \"Neon Siege\"\nid = \"neon-siege-warp\"\nplayers = 1\n",
+        )
+        .unwrap();
         std::fs::write(game.join("main.luau"), "local BOSS_SPLITS = false\n").unwrap();
         std::fs::write(game.join("sounds/boss.luau"), "return {}\n").unwrap();
         std::fs::create_dir_all(&data).unwrap();
@@ -734,8 +756,16 @@ mod handle_tests {
         assert_eq!(listed[0].title, "Splitting bosses");
         assert_eq!(listed[0].base.as_deref(), Some("neon-siege-warp"));
         let toml = std::fs::read_to_string(dir.join("game.toml")).unwrap();
-        assert!(toml.contains(&format!("id = \"{}\"", made.id)) && toml.contains("title = \"Splitting bosses\"") && toml.contains("players = 1"), "{toml}");
-        assert_eq!(std::fs::read_to_string(dir.join("sounds/boss.luau")).unwrap(), "return {}\n");
+        assert!(
+            toml.contains(&format!("id = \"{}\"", made.id))
+                && toml.contains("title = \"Splitting bosses\"")
+                && toml.contains("players = 1"),
+            "{toml}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("sounds/boss.luau")).unwrap(),
+            "return {}\n"
+        );
 
         // Claude edits the running mod; it reaches the phone.
         std::fs::write(dir.join("main.luau"), "local BOSS_SPLITS = true\n").unwrap();
@@ -744,7 +774,8 @@ mod handle_tests {
                 tokio::time::sleep(Duration::from_millis(500)).await;
                 phone.sync_hub(&url, &drive).await.unwrap();
                 phone.write_project(owner, &made.id, &back).await.unwrap();
-                if std::fs::read_to_string(back.join("main.luau")).is_ok_and(|t| t.contains("true")) {
+                if std::fs::read_to_string(back.join("main.luau")).is_ok_and(|t| t.contains("true"))
+                {
                     break;
                 }
             }
@@ -753,13 +784,28 @@ mod handle_tests {
         assert!(edited.is_ok(), "the edit never reached the phone");
 
         // A new name and a change note from the phone; the running copy follows.
-        phone.rename_project(owner, &made.id, "Bosses split").await.unwrap();
         phone
-            .note_change(owner, &made.id, Change { at: 1, asked: "bosses split".into(), answer: "Done".into(), ok: true })
+            .rename_project(owner, &made.id, "Bosses split")
+            .await
+            .unwrap();
+        phone
+            .note_change(
+                owner,
+                &made.id,
+                Change {
+                    at: 1,
+                    asked: "bosses split".into(),
+                    answer: "Done".into(),
+                    ok: true,
+                },
+            )
             .await
             .unwrap();
         let mods = phone.projects(owner).await.unwrap();
-        assert_eq!((mods[0].title.as_str(), mods[0].changes.len()), ("Bosses split", 1));
+        assert_eq!(
+            (mods[0].title.as_str(), mods[0].changes.len()),
+            ("Bosses split", 1)
+        );
         phone.sync_hub(&url, &drive).await.unwrap();
         host.sync_with(&url, [(owner.to_string(), drive.clone())].into());
         let renamed = tokio::time::timeout(Duration::from_secs(90), async {
@@ -772,8 +818,15 @@ mod handle_tests {
         })
         .await;
         assert!(renamed.is_ok(), "the new name never reached the host");
-        assert!(std::fs::read_to_string(dir.join("game.toml")).unwrap().contains("title = \"Bosses split\""));
-        assert!(std::fs::read_to_string(dir.join("main.luau")).unwrap().contains("true"), "the edit stays");
+        assert!(std::fs::read_to_string(dir.join("game.toml"))
+            .unwrap()
+            .contains("title = \"Bosses split\""));
+        assert!(
+            std::fs::read_to_string(dir.join("main.luau"))
+                .unwrap()
+                .contains("true"),
+            "the edit stays"
+        );
 
         // Removed on the phone: gone from the shelf.
         phone.remove_project(owner, &made.id).await.unwrap();

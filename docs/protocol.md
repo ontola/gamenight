@@ -434,6 +434,11 @@ same words. The local web server serves the log at `GET /api/activity?profile=â€
 to a player in the room, and the cloud relays the newest 100 lines of an online
 room at `GET /v1/rooms/activity`.
 
+A room nobody touches for three hours (no controller press, no change from a
+phone or the overlay) closes by itself: any game stops, everyone leaves and the
+log starts empty for the next evening. Games finishing rounds on their own do
+not keep it open.
+
 A game may add a line of its own about its running session, such as a new run
 or a winner. Keep it to moments worth remembering: the host keeps one line per
 two seconds per game and cuts text after 120 characters.

@@ -179,8 +179,17 @@ fn cut(text: &str, max: usize) -> String {
 /// Carries out `text` for the request `id` with the game's tools, and returns
 /// what the model says it did. `own`: the game is the asking player's own
 /// mod, so the change may be saved in its files.
-pub(crate) async fn run(bridge: &Bridge, id: &str, path: &str, own: bool) -> Result<String, String> {
-    let (max_steps, max_text) = if own { (MOD_STEPS, MOD_TEXT) } else { (MAX_STEPS, MAX_TEXT) };
+pub(crate) async fn run(
+    bridge: &Bridge,
+    id: &str,
+    path: &str,
+    own: bool,
+) -> Result<String, String> {
+    let (max_steps, max_text) = if own {
+        (MOD_STEPS, MOD_TEXT)
+    } else {
+        (MAX_STEPS, MAX_TEXT)
+    };
     let mut game = Game::open(path)?;
     let hello = game
         .rpc(
@@ -376,9 +385,10 @@ pub(crate) mod tests {
             tool_(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{}}))})).is_none(),
             "a set_knob that always writes main.luau"
         );
-        let knob =
-            tool_(&json!({"name":"set_knob","inputSchema":schema(json!({"name":{},"persist":{}}))}))
-                .unwrap();
+        let knob = tool_(
+            &json!({"name":"set_knob","inputSchema":schema(json!({"name":{},"persist":{}}))}),
+        )
+        .unwrap();
         assert!(knob["input_schema"]["properties"].get("persist").is_none());
         assert_eq!(
             temporary_(

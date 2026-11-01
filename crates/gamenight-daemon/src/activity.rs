@@ -39,6 +39,16 @@ impl RoomLog {
         self.trim();
     }
 
+    /// A new evening: forget the old one, and do not log everyone leaving.
+    /// Ids keep counting so readers see that something changed.
+    pub(crate) fn start_over(&mut self, party: PartySnapshot) {
+        self.entries.clear();
+        self.joined.clear();
+        self.last_note.clear();
+        self.rounds = None;
+        self.settle(party);
+    }
+
     /// Take this party as it is, without logging how it got here.
     pub(crate) fn settle(&mut self, mut party: PartySnapshot) {
         // Titles come from the newer side; the shelf's art need not be kept.
