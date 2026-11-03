@@ -3103,10 +3103,14 @@ async fn serve(
                         // The socket went first: the process may be dying, or
                         // it lost its connection and is still running.
                         Ok(None) => alive = true,
-                        Err(error) => warn!(game = %game_id, %error, "could not inspect game process"),
+                        Err(error) => {
+                            warn!(game = %game_id, %error, "could not inspect game process")
+                        }
                     }
                     if s.exit_with_lobby {
-                        if alive { warn!(game = %game_id, "game connection closed before its process exited; stopping the process"); }
+                        if alive {
+                            warn!(game = %game_id, "game connection closed before its process exited; stopping the process");
+                        }
                         let _ = child.start_kill();
                     }
                     tokio::spawn(async move {
