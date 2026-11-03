@@ -57,7 +57,7 @@
     if M.players then M.bind(M.players,nextPads) end
 end
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight-games/blob/ebb42fd6bab71450f02382d10fce2fc053c0698b/love-party/shared/input.lua#L19">Source: games/love-party/shared/input.lua</a></p>
+<p><a href="https://github.com/ontola/gamenight-games/blob/e4747c3117ac458f25a9333a60366f5de548ce85/love-party/shared/input.lua#L19">Source: games/love-party/shared/input.lua</a></p>
 <p>AI seats receive bots. Empty seats receive no controllable pawn. Keep standalone device enumeration separate from managed input.</p>
 <h2 id="joining-and-changing-profiles">Joining and changing profiles</h2>
 <p>After Prepare, send <code>participation</code> before Ready (<code>GameNight.notify_participation</code> in Godot). Set <code>instant_join</code> only if the match can accept new players immediately. Handle <code>party_updated</code> without resetting the running match. Update names, clothing, skin and face artwork independently.</p>
@@ -92,7 +92,7 @@ progress.</p>
 <h2 id="check-real-devices">Check real devices</h2>
 <p>Test two different profiles, reversed connection order, unplugging one pad and reconnecting it. Then switch between games. Synthetic frames can check token matching, but they do not prove that a physical controller belongs to the right player on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="71266a72e35882a85be4eed5888a65196be60bc200058f1f50eb3abd410880d0">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/controllers.md">Edit this page</a><span data-source-fingerprint="73283194b411e535a4fc492e24f79fd1de651631067c286b6758a486cfa2ffa3">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/other-engines"><small>Previous</small>Unity, Unreal &amp; others</a><a href="/docs/faces"><small>Next</small>Faces &amp; colours</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#match-tokens-not-array-positions">Match tokens, not array positions</a><a href="#release-stale-input">Release stale input</a><a href="#joining-and-changing-profiles">Joining and changing profiles</a><a href="#start-opens-your-menu-back-leaves">Start opens your menu, Back leaves</a><a href="#back-must-toggle-once">Back must toggle once</a><a href="#check-real-devices">Check real devices</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>
