@@ -2416,6 +2416,49 @@ mod night_tests {
         assert_eq!(started_session(&fx), Some(warm));
     }
 
+    /// A game that drops out mid-run (crash, quit, lost socket) sends the
+    /// couch back to the lobby; the next game waits for someone to pick it.
+    #[test]
+    fn a_game_dropping_out_over_a_lobby_never_starts_the_next_one() {
+        let mut night = GameNight::default();
+        night.set_lobby_game(Some(GameId::new("lobby")));
+        night.set_library(vec![meta("lobby"), meta("spellstorm"), meta("neon-trails")]);
+        night.handle(Command::GameConnected {
+            game: GameId::new("lobby"),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("spellstorm"),
+        });
+        night.handle(Command::GameConnected {
+            game: GameId::new("neon-trails"),
+        });
+        let fx = night.handle(Command::SetPlaylist {
+            entries: vec![entry("spellstorm"), entry("neon-trails")],
+        });
+        let (_, first) = prepared_session(&fx).expect("spellstorm warms");
+        night.handle(Command::SessionReady { session: first });
+        let fx = night.handle(Command::Next);
+        assert_eq!(started_session(&fx), Some(first));
+        let warm = night.snapshot().warm_session;
+        if let Some(w) = warm {
+            night.handle(Command::SessionReady { session: w.id });
+        }
+
+        let fx = night.handle(Command::GameDisconnected {
+            game: GameId::new("spellstorm"),
+        });
+        assert_eq!(started_session(&fx), None, "nobody chose the next game");
+        assert!(night.snapshot().active_session.is_none());
+        assert_eq!(
+            lobby_focus(&fx),
+            Some(true),
+            "the lobby takes the screen back"
+        );
+        // Picking it in the lobby still works.
+        let fx = night.handle(Command::Next);
+        assert!(started_session(&fx).is_some());
+    }
+
     fn lobby_focus(fx: &[Effect]) -> Option<bool> {
         fx.iter().find_map(|e| match e {
             Effect::LobbyFocus { active, .. } => Some(*active),

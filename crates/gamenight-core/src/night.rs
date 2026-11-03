@@ -2997,9 +2997,15 @@ impl GameNight {
             self.history.push(a.game);
             self.vote.close();
             self.overlay_paused = false;
-            // The active game crashed or quit — keep the night going.
-            self.pending_transition = true;
-            self.try_transition(fx);
+            // The active game crashed or quit. With a lobby, the couch goes
+            // back to it and picks what's next: a game that drops out mid-run
+            // must never start the next one on its own (Joep lost a level 4
+            // Spellstorm run to Neon Trails that way). Without a lobby there
+            // is nothing to go back to, so the night keeps going.
+            if self.lobby_game.is_none() {
+                self.pending_transition = true;
+                self.try_transition(fx);
+            }
         }
         // The lobby is meant to stay resident all night, so it disconnecting
         // means a fresh process is about to take its place (crash, quit, or
