@@ -2554,7 +2554,8 @@ async fn run_inner(
         let shared = shared.clone();
         tokio::spawn(async move {
             if let Err(e) = handle_connection(stream, shared).await {
-                debug!(%peer, error = %e, "connection ended");
+                // A game's socket failing mid-run ends its session: worth seeing.
+                warn!(%peer, error = %e, "connection ended with an error");
             }
         });
     }
@@ -3089,15 +3090,23 @@ async fn serve(
                 s.actions.remove(game_id);
                 let mut kind = gamenight_protocol::GameIssueKind::Disconnected;
                 if let Some(mut child) = s.running_children.remove(game_id) {
-                    if let Ok(Some(status)) = child.try_wait() {
-                        kind = if status.success() {
-                            gamenight_protocol::GameIssueKind::Closed
-                        } else {
-                            gamenight_protocol::GameIssueKind::ExitedUnexpectedly
-                        };
-                        info!(game = %game_id, %status, "game process exited");
+                    let mut alive = false;
+                    match child.try_wait() {
+                        Ok(Some(status)) => {
+                            kind = if status.success() {
+                                gamenight_protocol::GameIssueKind::Closed
+                            } else {
+                                gamenight_protocol::GameIssueKind::ExitedUnexpectedly
+                            };
+                            info!(game = %game_id, %status, "game process exited");
+                        }
+                        // The socket went first: the process may be dying, or
+                        // it lost its connection and is still running.
+                        Ok(None) => alive = true,
+                        Err(error) => warn!(game = %game_id, %error, "could not inspect game process"),
                     }
                     if s.exit_with_lobby {
+                        if alive { warn!(game = %game_id, "game connection closed before its process exited; stopping the process"); }
                         let _ = child.start_kill();
                     }
                     tokio::spawn(async move {
