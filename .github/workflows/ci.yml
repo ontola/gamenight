@@ -15,7 +15,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # macOS runners stopped starting on 3 Nov (cancelled after 15 min
+        # without a runner); Joep chose Windows-only releases until that is
+        # fixed. Put macos-latest back here and in release.yml then.
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

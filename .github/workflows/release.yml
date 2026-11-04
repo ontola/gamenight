@@ -43,7 +43,11 @@ jobs:
       ref: ${{ needs.select.outputs.revision }}
       version: ${{ needs.select.outputs.version }}
       automatic: true
+  # Off while GitHub's macOS runners do not start (see ci.yml); Joep chose
+  # Windows-only releases until then. Re-enable with `needs: [select,
+  # windows, macos]` on publish and the macOS copy below.
   macos:
+    if: false
     needs: [select, windows]
     uses: ./.github/workflows/macos-preview.yml
     secrets: inherit
@@ -52,7 +56,7 @@ jobs:
       version: ${{ needs.select.outputs.version }}
       automatic: true
   publish:
-    needs: [select, windows, macos]
+    needs: [select, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -89,7 +93,7 @@ jobs:
           mkdir release
           cp games/*.love release/
           cp installers/gamenight-windows-installer/* release/
-          cp installers/gamenight-macos-installer/* release/
+          if [ -d installers/gamenight-macos-installer ]; then cp installers/gamenight-macos-installer/* release/; fi
           tar -czf release/game-contract-windows.tar.gz -C evidence .
           tar -czf release/catalog.tar.gz catalog/games
           python scripts/release-manifest.py release --version "$VERSION" --revision "$REVISION" --run "$GITHUB_RUN_ID"
