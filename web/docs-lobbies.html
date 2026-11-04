@@ -321,6 +321,11 @@ path and an absolute existing <code>cwd</code> when supplied:</p>
   &quot;env&quot;:{&quot;GAMENIGHT_LOBBY_API&quot;:&quot;1&quot;}
 }}]
 </code></pre></div>
+<p>On Windows the installed app passes <code>GAMENIGHT_APP_ID</code> to the lobby (and only
+the lobby). Call <code>SetCurrentProcessExplicitAppUserModelID</code> with it before you
+create a window, so the lobby shows up on a pinned GameNight taskbar button
+instead of as a separate app. Send <code>lobby_ready</code> once your first frame is on
+screen: that closes GameNight's welcome window.</p>
 <p>In the installed app, <code>party_state.lobbies</code> lists the lobbies the host can run
 (bundled, then registered ones), the running one marked <code>current</code>; with only
 one lobby the list is empty. Game Room has <strong>Switch lobby</strong> in its Start menu,
@@ -379,7 +384,7 @@ nonzero exit is “Game exited unexpectedly”. These states describe evidence, 
 user intent. Reconnecting games clear their issue and must prepare again before
 being shown as ready.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="f7b12fc767ee1fec2dadc762ad391222d2dff61b616f94e8f4bc2c35a2057050">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="3e90dd58b769dfc3200d97e4a69ab6f082ac872f13e69e6d8a1a62b6e902a81d">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

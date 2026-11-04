@@ -333,6 +333,12 @@ path and an absolute existing `cwd` when supplied:
 }}]
 ```
 
+On Windows the installed app passes `GAMENIGHT_APP_ID` to the lobby (and only
+the lobby). Call `SetCurrentProcessExplicitAppUserModelID` with it before you
+create a window, so the lobby shows up on a pinned GameNight taskbar button
+instead of as a separate app. Send `lobby_ready` once your first frame is on
+screen: that closes GameNight's welcome window.
+
 In the installed app, `party_state.lobbies` lists the lobbies the host can run
 (bundled, then registered ones), the running one marked `current`; with only
 one lobby the list is empty. Game Room has **Switch lobby** in its Start menu,
