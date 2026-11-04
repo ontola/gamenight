@@ -1906,11 +1906,15 @@ impl GameNight {
     /// Vec order is join order, independent of controller seat or relay arrival.
     /// Reserve preferences first so an automatic fallback cannot steal one.
     fn assign_player_colors(&mut self) {
-        let mut used = HashSet::new();
+        // Colours that look alike count as one: a chosen #ff5555 and the
+        // palette's #e36c76 are both "red", and only the first may have it.
+        let mut used: Vec<String> = Vec::new();
+        let taken = |used: &Vec<String>, color: &str| used.iter().any(|u| similar_colors(u, color));
         let mut assigned = HashMap::new();
         for player in &self.players {
             if let Some(color) = self.preferred_colors.get(&player.id) {
-                if used.insert(color.clone()) {
+                if !taken(&used, color) {
+                    used.push(color.clone());
                     assigned.insert(player.id, color.clone());
                 }
             }
@@ -1922,25 +1926,26 @@ impl GameNight {
             }
             let current = player.color.as_ref().map(|c| c.to_ascii_lowercase());
             let color = current
-                .filter(|c| !used.contains(c))
+                .filter(|c| !taken(&used, c))
                 .or_else(|| {
                     gamenight_protocol::guest_face::COLORS
                         .iter()
-                        .find(|c| !used.contains(**c))
+                        .find(|c| !taken(&used, c))
                         .map(|c| (*c).to_owned())
                 })
                 .unwrap_or_else(|| {
                     // More players than the standard palette: remain deterministic.
                     let mut n = index as u32;
-                    loop {
+                    for _ in 0..4096 {
                         let color = format!("#{:06x}", n.wrapping_mul(0x9e3779) & 0xffffff);
-                        if !used.contains(&color) {
-                            break color;
+                        if !taken(&used, &color) {
+                            return color;
                         }
                         n = n.wrapping_add(1);
                     }
+                    format!("#{:06x}", (index as u32).wrapping_mul(0x9e3779) & 0xffffff)
                 });
-            used.insert(color.clone());
+            used.push(color.clone());
             player.color = Some(color);
         }
     }
@@ -3320,4 +3325,46 @@ impl GameNight {
 /// The same people, whatever they are called or look like now.
 fn same_people(a: &[Player], b: &[Player]) -> bool {
     a.len() == b.len() && a.iter().zip(b).all(|(a, b)| a.id == b.id)
+}
+
+/// Two player colours a couch would call the same: the same hue family at a
+/// similar brightness, or two greys of a similar brightness.
+pub fn similar_colors(a: &str, b: &str) -> bool {
+    let (Some(a), Some(b)) = (hsl(a), hsl(b)) else {
+        return a.eq_ignore_ascii_case(b);
+    };
+    if (a.2 - b.2).abs() >= 0.12 {
+        return false;
+    }
+    let grey = |c: (f32, f32, f32)| c.1 < 0.2 || c.2 < 0.12 || c.2 > 0.92;
+    match (grey(a), grey(b)) {
+        (true, true) => true,
+        (false, false) => {
+            let d = (a.0 - b.0).abs() % 360.0;
+            d.min(360.0 - d) < 16.0
+        }
+        _ => false,
+    }
+}
+
+/// `#rrggbb` as (hue degrees, saturation, lightness).
+fn hsl(color: &str) -> Option<(f32, f32, f32)> {
+    let hex = color.strip_prefix('#').filter(|h| h.len() == 6)?;
+    let v = u32::from_str_radix(hex, 16).ok()?;
+    let [r, g, b] = [(v >> 16) & 255, (v >> 8) & 255, v & 255].map(|c| c as f32 / 255.0);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    let l = (max + min) / 2.0;
+    let d = max - min;
+    if d == 0.0 {
+        return Some((0.0, 0.0, l));
+    }
+    let s = d / (1.0 - (2.0 * l - 1.0).abs());
+    let h = if max == r {
+        60.0 * (((g - b) / d).rem_euclid(6.0))
+    } else if max == g {
+        60.0 * ((b - r) / d + 2.0)
+    } else {
+        60.0 * ((r - g) / d + 4.0)
+    };
+    Some((h, s, l))
 }

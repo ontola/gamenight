@@ -37,6 +37,31 @@ mod night_tests {
     }
 
     #[test]
+    fn two_reds_never_share_a_room_and_the_first_keeps_it() {
+        let mut night = GameNight::default();
+        night.handle(join_cmd("Ann", None, Some("#ff5555")));
+        night.handle(join_cmd("Bob", None, Some("#e53935")));
+        let players = night.snapshot().players;
+        assert_eq!(players[0].color.as_deref(), Some("#ff5555"));
+        let bob = players[1].color.clone().unwrap();
+        assert!(!crate::night::similar_colors(&bob, "#ff5555"), "{bob}");
+        // The palettes stay usable: none of their colours look alike.
+        let clothing = [
+            "#ff5555", "#ff8f3f", "#ffc94a", "#7ddf64", "#3fd0c9", "#55a0ff", "#8b7bff", "#c792ea",
+            "#ff7ab8", "#b0764a", "#9aa5b1", "#4a5568",
+        ];
+        for list in [&clothing[..], &gamenight_protocol::guest_face::COLORS[..]] {
+            for (i, a) in list.iter().enumerate() {
+                for b in &list[i + 1..] {
+                    assert!(!crate::night::similar_colors(a, b), "{a} ~ {b}");
+                }
+            }
+        }
+        assert!(crate::night::similar_colors("#ff5555", "#e36c76"));
+        assert!(!crate::night::similar_colors("#ff8f3f", "#b0764a"));
+    }
+
+    #[test]
     fn guests_receive_stable_shared_artwork_and_distinct_colors() {
         let mut night = GameNight::new(4);
         for name in ["A", "B", "C", "D"] {
