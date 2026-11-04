@@ -168,6 +168,26 @@ impl HostUpdate {
     }
 }
 
+/// The desktop launcher's welcome window: it shows "progress\ntext" from
+/// this file while GameNight starts, and closes when the file goes.
+mod welcome {
+    fn path() -> Option<std::path::PathBuf> {
+        std::env::var_os("GAMENIGHT_WELCOME_FILE").map(std::path::PathBuf::from)
+    }
+    /// A step, only while the window is still up (never brings it back).
+    pub fn step(progress: f32, text: &str) {
+        if let Some(path) = path().filter(|p| p.exists()) {
+            let _ = std::fs::write(path, format!("{progress:.2}\n{text}"));
+        }
+    }
+    /// The lobby is on screen (or GameNight stops): the window goes.
+    pub fn done() {
+        if let Some(path) = path() {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
 /// The process that owns the window in front, and its executable.
 #[cfg(windows)]
 fn foreground_process() -> Option<(u32, std::path::PathBuf)> {
@@ -1456,6 +1476,20 @@ impl Shared {
             }
             cmd.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
         }
+        // The lobby joins the launcher's taskbar entry (a pinned GameNight);
+        // games keep their own.
+        let lobby = self.lobby_game.as_ref() == Some(game);
+        if lobby {
+            welcome::step(0.5, "Opening the lobby\u{2026}");
+        }
+        match std::env::var("GAMENIGHT_HOST_APP_ID") {
+            Ok(id) if lobby => {
+                cmd.env("GAMENIGHT_APP_ID", id);
+            }
+            _ => {
+                cmd.env_remove("GAMENIGHT_APP_ID");
+            }
+        }
         cmd.args(&spec.args)
             .envs(&spec.env)
             .env(ENV_GAMENIGHT, "1")
@@ -2411,6 +2445,7 @@ async fn run_inner(
     }
     let exit_with_lobby = desktop.is_some();
     if let Some(desktop) = desktop {
+        welcome::step(0.3, "Starting the host\u{2026}");
         let mut s = shared.lock().await;
         s.exit_with_lobby = true;
         s.update = desktop.update;
@@ -2768,6 +2803,7 @@ async fn serve(
                 },
             );
             if role == Role::Lobby {
+                welcome::step(0.8, "Setting up the room\u{2026}");
                 s.lobby_connections.insert(game_id.clone());
                 s.night.preserve_party_on_lobby_disconnect();
                 if !s.runtime_input {
@@ -2917,7 +2953,8 @@ async fn serve(
                     } else {
                         if matches!(parsed, ClientMessage::LobbyReady) {
                             // The new lobby is on screen; the launcher's
-                            // update cover may go.
+                            // welcome window and update cover may go.
+                            welcome::done();
                             if let Some(update) = &s.update {
                                 let _ = std::fs::remove_file(&update.splash);
                             }

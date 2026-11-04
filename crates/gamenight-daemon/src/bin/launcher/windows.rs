@@ -477,3 +477,208 @@ pub fn show_error(message: &str) {
         );
     }
 }
+
+static WELCOME: std::sync::OnceLock<(PathBuf, std::time::Instant)> = std::sync::OnceLock::new();
+static WELCOME_SHOWN: std::sync::Mutex<(f32, f32, String)> =
+    std::sync::Mutex::new((0.0, 0.0, String::new()));
+
+/// GameNight's first window, up the moment the launcher starts: the name, what
+/// the host is doing and a progress bar. It is an ordinary window (taskbar
+/// entry, minimise button) under the launcher's own taskbar identity, so it
+/// can be sent to the background. The daemon writes "progress\ntext" to
+/// `flag` and removes it once the lobby is on screen; then this window goes.
+pub fn show_welcome(flag: PathBuf) {
+    use windows_sys::Win32::{
+        Graphics::Gdi::{CreateSolidBrush, UpdateWindow},
+        System::LibraryLoader::GetModuleHandleW,
+        UI::WindowsAndMessaging::{
+            AllowSetForegroundWindow, CreateWindowExW, DispatchMessageW, GetMessageW,
+            GetSystemMetrics, LoadIconW, RegisterClassW, SetTimer, ShowWindow, TranslateMessage,
+            ASFW_ANY, MSG, SM_CXSCREEN, SM_CYSCREEN, SW_SHOWNORMAL, WNDCLASSW, WS_CAPTION,
+            WS_MINIMIZEBOX, WS_OVERLAPPED, WS_SYSMENU,
+        },
+    };
+    let _ = WELCOME.set((flag, std::time::Instant::now()));
+    let class: Vec<u16> = "GameNightWelcome\0".encode_utf16().collect();
+    let title: Vec<u16> = "GameNight\0".encode_utf16().collect();
+    unsafe {
+        let instance = GetModuleHandleW(std::ptr::null());
+        let mut window_class: WNDCLASSW = std::mem::zeroed();
+        window_class.lpfnWndProc = Some(welcome_proc);
+        window_class.hInstance = instance;
+        // winres embeds branding/gamenight.ico as resource 1.
+        window_class.hIcon = LoadIconW(instance, std::ptr::without_provenance(1));
+        window_class.hbrBackground = CreateSolidBrush(COVER_BACKGROUND);
+        window_class.lpszClassName = class.as_ptr();
+        RegisterClassW(&window_class);
+        let (w, h) = (560, 300);
+        let window = CreateWindowExW(
+            0,
+            class.as_ptr(),
+            title.as_ptr(),
+            WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+            (GetSystemMetrics(SM_CXSCREEN) - w) / 2,
+            (GetSystemMetrics(SM_CYSCREEN) - h) / 2,
+            w,
+            h,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            instance,
+            std::ptr::null(),
+        );
+        if window.is_null() {
+            return;
+        }
+        ShowWindow(window, SW_SHOWNORMAL);
+        UpdateWindow(window);
+        // The lobby must be able to take the screen from this window.
+        AllowSetForegroundWindow(ASFW_ANY);
+        SetTimer(window, 1, 50, None);
+        let mut message: MSG = std::mem::zeroed();
+        while GetMessageW(&mut message, std::ptr::null_mut(), 0, 0) > 0 {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+}
+
+unsafe extern "system" fn welcome_proc(
+    window: windows_sys::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+) -> windows_sys::Win32::Foundation::LRESULT {
+    use windows_sys::Win32::{
+        Foundation::RECT,
+        Graphics::Gdi::{
+            BeginPaint, CreateFontW, CreateSolidBrush, DeleteObject, DrawTextW, EndPaint, FillRect,
+            InvalidateRect, SelectObject, SetBkMode, SetTextColor, DT_CENTER, DT_SINGLELINE,
+            DT_VCENTER, PAINTSTRUCT, TRANSPARENT,
+        },
+        UI::WindowsAndMessaging::{
+            DefWindowProcW, DestroyWindow, GetClientRect, PostQuitMessage, WM_DESTROY,
+            WM_ERASEBKGND, WM_PAINT, WM_TIMER,
+        },
+    };
+    match message {
+        WM_TIMER => {
+            let Some((flag, started)) = WELCOME.get() else {
+                DestroyWindow(window);
+                return 0;
+            };
+            let content = std::fs::read_to_string(flag);
+            if content.is_err() || started.elapsed() > std::time::Duration::from_secs(180) {
+                DestroyWindow(window);
+                return 0;
+            }
+            let content = content.unwrap_or_default();
+            let mut lines = content.lines();
+            let target = lines
+                .next()
+                .and_then(|p| p.trim().parse::<f32>().ok())
+                .unwrap_or(0.1)
+                .clamp(0.0, 1.0);
+            let text = lines
+                .next()
+                .unwrap_or("Starting GameNight\u{2026}")
+                .to_owned();
+            let mut shown = WELCOME_SHOWN.lock().unwrap();
+            // Ease toward the step, then creep on while it takes long, so the
+            // bar never looks stuck (but never passes the next step).
+            if shown.1 < target {
+                shown.1 = target;
+            }
+            let (ceiling, speed) = if shown.0 < shown.1 {
+                (shown.1, 0.12)
+            } else {
+                ((shown.1 + 0.12).min(0.97), 0.004)
+            };
+            shown.0 += (ceiling - shown.0).max(0.0) * speed;
+            shown.2 = text;
+            InvalidateRect(window, std::ptr::null(), 0);
+            0
+        }
+        WM_ERASEBKGND => 1,
+        WM_PAINT => {
+            let mut paint: PAINTSTRUCT = std::mem::zeroed();
+            let dc = BeginPaint(window, &mut paint);
+            let mut client: RECT = std::mem::zeroed();
+            GetClientRect(window, &mut client);
+            let background = CreateSolidBrush(COVER_BACKGROUND);
+            FillRect(dc, &client, background);
+            DeleteObject(background);
+            let (progress, text) = {
+                let shown = WELCOME_SHOWN.lock().unwrap();
+                (shown.0, shown.2.clone())
+            };
+            let face: Vec<u16> = "Segoe UI\0".encode_utf16().collect();
+            let font = |size: i32, weight: i32| {
+                CreateFontW(size, 0, 0, 0, weight, 0, 0, 0, 0, 0, 0, 5, 0, face.as_ptr())
+            };
+            SetBkMode(dc, TRANSPARENT as i32);
+            let width = client.right - client.left;
+            let draw = |text: &str, top: i32, height: i32, size: i32, weight: i32, color: u32| {
+                let f = font(size, weight);
+                let previous = SelectObject(dc, f);
+                SetTextColor(dc, color);
+                let mut wide: Vec<u16> = text.encode_utf16().collect();
+                let mut rect = RECT {
+                    left: 0,
+                    top,
+                    right: width,
+                    bottom: top + height,
+                };
+                DrawTextW(
+                    dc,
+                    wide.as_mut_ptr(),
+                    wide.len() as i32,
+                    &mut rect,
+                    DT_CENTER | DT_VCENTER | DT_SINGLELINE,
+                );
+                SelectObject(dc, previous);
+                DeleteObject(f);
+            };
+            draw("GameNight", 54, 64, 54, 700, 0x00f8_f1f2);
+            let text = if text.is_empty() {
+                "Starting GameNight\u{2026}".to_owned()
+            } else {
+                text
+            };
+            draw(&text, 128, 36, 22, 400, 0x00c8_b8b8);
+            // The bar: a dim track and the lobby's violet (#7c5cff).
+            let (left, right, top) = (72, width - 72, 190);
+            let track = CreateSolidBrush(0x002e_2222);
+            FillRect(
+                dc,
+                &RECT {
+                    left,
+                    top,
+                    right,
+                    bottom: top + 8,
+                },
+                track,
+            );
+            DeleteObject(track);
+            let fill = CreateSolidBrush(0x00ff_5c7c);
+            let end = left + ((right - left) as f32 * progress.clamp(0.0, 1.0)) as i32;
+            FillRect(
+                dc,
+                &RECT {
+                    left,
+                    top,
+                    right: end.max(left + 8),
+                    bottom: top + 8,
+                },
+                fill,
+            );
+            DeleteObject(fill);
+            EndPaint(window, &paint);
+            0
+        }
+        WM_DESTROY => {
+            PostQuitMessage(0);
+            0
+        }
+        _ => DefWindowProcW(window, message, wparam, lparam),
+    }
+}

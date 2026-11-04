@@ -176,6 +176,17 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
             local.join(format!("{name}.prev.log")),
         );
     }
+    // GameNight's first window, up right away; the daemon reports its steps
+    // and removes the file once the lobby is on screen. A restart has its
+    // own full-screen cover instead.
+    #[cfg(windows)]
+    let welcome = (!restart).then(|| {
+        let flag = Welcome(local.join("welcome.flag"));
+        let _ = fs::write(&flag.0, "0.1\nStarting GameNight\u{2026}");
+        let path = flag.0.clone();
+        std::thread::spawn(move || windows::show_welcome(path));
+        flag
+    });
     let mut command = Command::new(daemon);
     command
         .current_dir(&root)
@@ -205,6 +216,8 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
         .env_remove("GAMENIGHT_UPDATE_READY_FILE")
         .env_remove("GAMENIGHT_RESUME_FILE")
         .env_remove("GAMENIGHT_UPDATE_SPLASH_FILE")
+        .env_remove("GAMENIGHT_WELCOME_FILE")
+        .env_remove("GAMENIGHT_HOST_APP_ID")
         .stdin(Stdio::piped())
         .env("RUST_LOG", "info")
         .stdout(fs::File::create(local.join("daemon.log"))?)
@@ -226,6 +239,16 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
             .env("GAMENIGHT_UPDATE_READY_FILE", &files.ready)
             .env("GAMENIGHT_RESUME_FILE", &files.resume)
             .env("GAMENIGHT_UPDATE_SPLASH_FILE", &files.splash);
+        if let Some(welcome) = &welcome {
+            command.env("GAMENIGHT_WELCOME_FILE", &welcome.0);
+        }
+        // The lobby joins this taskbar entry, so a pinned GameNight is where
+        // the running lobby shows up (with GameNight's icon).
+        if let Ok(locator) = velopack::locator::auto_locate_app_manifest(
+            velopack::locator::LocationContext::FromCurrentExe,
+        ) {
+            command.env("GAMENIGHT_HOST_APP_ID", locator.get_app_user_model_id());
+        }
     }
     let mut child = command.spawn()?;
     #[cfg(windows)]
@@ -256,6 +279,8 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
         });
     }
     let status = child.wait();
+    #[cfg(windows)]
+    drop(welcome);
     drop(browser);
     #[cfg(windows)]
     job.close()?; // No hidden game or descendant may survive into an update.
@@ -298,6 +323,17 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     #[cfg(windows)]
     updates.apply_on_exit();
     Ok(Next::Quit)
+}
+
+/// The welcome window's file; gone with this value, so the window never
+/// outlives a host that failed to start.
+#[cfg(windows)]
+struct Welcome(std::path::PathBuf);
+#[cfg(windows)]
+impl Drop for Welcome {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
 }
 
 /// The host's port must be free. Right after a restart the previous host
