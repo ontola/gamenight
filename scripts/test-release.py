@@ -44,6 +44,10 @@ class ReleaseTests(unittest.TestCase):
             result = module.manifest(root, '0.2.1', 'a'*40, '123')
             self.assertEqual(len(result['sha256']), 4)
             self.assertEqual(result['run_id'], 123)
+            (root/'GameNight.dmg').unlink()
+            with self.assertRaises(ValueError):
+                module.manifest(root, '0.2.1', 'a'*40, '123')
+            self.assertNotIn('mac', module.manifest(root, '0.2.1', 'a'*40, '123', windows_only=True)['installers'])
             (root/'Another-Setup.exe').touch()
             with self.assertRaises(ValueError):
                 module.manifest(root, '0.2.1', 'a'*40, '123')

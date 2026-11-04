@@ -93,10 +93,11 @@ jobs:
           mkdir release
           cp games/*.love release/
           cp installers/gamenight-windows-installer/* release/
-          if [ -d installers/gamenight-macos-installer ]; then cp installers/gamenight-macos-installer/* release/; fi
+          only=--windows-only
+          if [ -d installers/gamenight-macos-installer ]; then cp installers/gamenight-macos-installer/* release/; only=; fi
           tar -czf release/game-contract-windows.tar.gz -C evidence .
           tar -czf release/catalog.tar.gz catalog/games
-          python scripts/release-manifest.py release --version "$VERSION" --revision "$REVISION" --run "$GITHUB_RUN_ID"
+          python scripts/release-manifest.py release --version "$VERSION" --revision "$REVISION" --run "$GITHUB_RUN_ID" $only
       # A build takes about 45 minutes and main often moves meanwhile. Waiting
       # for a commit that stays current would publish nothing on a busy day,
       # so publish unless a newer preview is already out. Versions follow the
