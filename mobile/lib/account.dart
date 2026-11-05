@@ -267,11 +267,12 @@ class CloudApi {
           ? null
           : jsonDecode(response.body);
     }
-    if (errors.containsKey(status)) throw ApiError(errors[status]!);
+    if (errors.containsKey(status)) throw ApiError(errors[status]!, status);
     if (status == 429) {
-      throw const ApiError('Too many attempts. Wait a minute and try again.');
+      throw const ApiError(
+          'Too many attempts. Wait a minute and try again.', 429);
     }
-    throw ApiError('GameNight online answered $status. Try again.');
+    throw ApiError('GameNight online answered $status. Try again.', status);
   }
 
   static String? cookie(http.Response response, String name) {

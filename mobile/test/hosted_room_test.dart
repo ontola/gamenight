@@ -90,6 +90,66 @@ void main() {
     expect(state.companionError, isNull);
   });
 
+  test('a dropped room check after resuming shows no error until it lasts',
+      () async {
+    SharedPreferences.setMockInitialValues(
+        {'cloud_token': 'test-only', 'hosted_room': true});
+    var down = false;
+    var refuse = false;
+    final client = MockClient((request) async {
+      if (down) throw http.ClientException('socket closed');
+      if (refuse) return http.Response('', 404);
+      if (request.url.path == '/v1/rooms/status') {
+        return http.Response(jsonEncode(roomFixture()), 200);
+      }
+      return http.Response(
+          jsonEncode({
+            'game': 'pocket-aces',
+            'title': 'Pocket Aces',
+            'url': '/v1/companion/test-cap/index.html'
+          }),
+          200);
+    });
+    final state = AppState(await SharedPreferences.getInstance(),
+        cloud: CloudApi(client: client));
+    addTearDown(state.dispose);
+    var now = DateTime(2026, 11, 5, 12);
+    state.clock = () => now;
+    await state.refreshHostedRoom();
+    expect(state.companion?.title, 'Pocket Aces');
+    // Back from the background: the OS cut the sockets.
+    state.resumed();
+    down = true;
+    for (var i = 0; i < 4; i++) {
+      now = now.add(const Duration(seconds: 4));
+      await state.refreshHostedRoom();
+    }
+    expect(state.sessionError, isNull, reason: 'still within the grace');
+    expect(state.companion?.title, 'Pocket Aces');
+    down = false;
+    await state.refreshHostedRoom();
+    expect(state.sessionError, isNull);
+    // A real outage still shows after a while.
+    down = true;
+    for (var i = 0; i < 2; i++) {
+      now = now.add(const Duration(seconds: 4));
+      await state.refreshHostedRoom();
+    }
+    expect(state.sessionError, isNull, reason: 'two misses are not an outage');
+    for (var i = 0; i < 2; i++) {
+      now = now.add(const Duration(seconds: 4));
+      await state.refreshHostedRoom();
+    }
+    expect(state.sessionError, contains('Could not reach'));
+    down = false;
+    await state.refreshHostedRoom();
+    expect(state.sessionError, isNull);
+    // A clear refusal is not a hiccup.
+    refuse = true;
+    await state.refreshHostedRoom();
+    expect(state.sessionError, isNotNull);
+  });
+
   test('a player picked up at its door brings the phone into that room',
       () async {
     SharedPreferences.setMockInitialValues({'cloud_token': 'test-only'});

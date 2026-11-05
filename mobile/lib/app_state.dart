@@ -90,6 +90,60 @@ class AppState extends ChangeNotifier {
   SessionInfo? session;
   String? sessionError;
 
+  /// Background checks (the 4 s poll) only show a connection problem once
+  /// it lasts: one dropped request, or the first seconds after the app comes
+  /// back from the background (the OS cut its sockets), say nothing. A clear
+  /// answer from the server (a 4xx) still shows at once.
+  int _checkFailures = 0;
+  DateTime? _failingSince;
+  DateTime? _resumedAt;
+  static const checkFailuresBeforeError = 3;
+  static const checkErrorAfter = Duration(seconds: 12);
+  static const resumeGrace = Duration(seconds: 20);
+  @visibleForTesting
+  DateTime Function() clock = DateTime.now;
+
+  static bool _transient(ApiError e) {
+    final status = e.status;
+    return status == null || status == 408 || status == 429 || status >= 500;
+  }
+
+  void _checkSucceeded() {
+    _checkFailures = 0;
+    _failingSince = null;
+    sessionError = null;
+  }
+
+  /// A background check failed. Shows [e] only when it is a real refusal, or
+  /// when checks kept failing for a while and not just after resuming.
+  void _checkFailed(ApiError e) {
+    if (!_transient(e)) {
+      sessionError = e.message;
+      return;
+    }
+    final now = clock();
+    _checkFailures++;
+    _failingSince ??= now;
+    final resumed = _resumedAt;
+    final settled = resumed == null || now.difference(resumed) >= resumeGrace;
+    if (settled &&
+        _checkFailures >= checkFailuresBeforeError &&
+        now.difference(_failingSince!) >= checkErrorAfter) {
+      sessionError = e.message;
+    }
+  }
+
+  /// The app came back to the foreground: forget failures from requests the
+  /// OS cut while it slept, and check again right away.
+  void resumed() {
+    _resumedAt = clock();
+    _checkFailures = 0;
+    _failingSince = null;
+    if (_poll != null && (_api != null || inHostedRoom)) {
+      unawaited(_refreshAll());
+    }
+  }
+
   /// The current game's phone screen, while there is one.
   Companion? companion;
   String? _fullscreenCompanion;
@@ -578,7 +632,8 @@ class AppState extends ChangeNotifier {
           linked: next.linked,
           mainPlayer: next.mainPlayer,
           game: next.currentGame);
-      sessionError = null;
+      // In a hosted room that room's status decides what shows.
+      if (!inHostedRoom) _checkSucceeded();
       if (next.linked && next.playerId != null) {
         _bind(next.playerId);
         claim = next.playerId;
@@ -590,7 +645,9 @@ class AppState extends ChangeNotifier {
       }
       companion = next.linked ? await api.companion(profileId) : null;
     } on ApiError catch (e) {
-      sessionError = e.message;
+      // A remembered GameNight PC off this Wi-Fi says nothing about a
+      // hosted room that works over the internet.
+      if (!inHostedRoom) _checkFailed(e);
     }
     if (_disposed) return;
     notifyListeners();
@@ -1099,7 +1156,7 @@ class AppState extends ChangeNotifier {
           linked: room.connected,
           mainPlayer: room.mainPlayer,
           game: room.current);
-      sessionError = null;
+      _checkSucceeded();
       companionError = null;
       if (!room.connected || room.current == null) {
         companion = null;
@@ -1114,7 +1171,7 @@ class AppState extends ChangeNotifier {
             final url = cloud.base.resolve(path);
             if (url.origin != cloud.base.origin ||
                 !url.path.startsWith('/v1/companion/')) {
-              throw const ApiError('Invalid phone screen address.');
+              throw const ApiError('Invalid phone screen address.', 422);
             }
           }
           companion = next;
@@ -1123,9 +1180,12 @@ class AppState extends ChangeNotifier {
           sessionError = e.message;
         } on SignedOut {
           rethrow;
-        } on ApiError {
-          companion = null;
-          companionError = 'Phone controls could not connect. Retrying…';
+        } on ApiError catch (e) {
+          // One dropped request keeps the phone screen that already works.
+          if (!_transient(e) || companion == null) {
+            companion = null;
+            companionError = 'Phone controls could not connect. Retrying…';
+          }
         }
       }
     } on GuestRoomExpired catch (e) {
@@ -1134,7 +1194,7 @@ class AppState extends ChangeNotifier {
     } on SignedOut {
       await _forgetAccount(clearPlayer: true);
     } on ApiError catch (e) {
-      sessionError = e.message;
+      _checkFailed(e);
     }
     notifyListeners();
   }

@@ -433,18 +433,22 @@ class RoomScreenState extends State<RoomScreen> {
 
   List<Widget> _connectCards() => [
         if (state.sessionError != null)
-          Section(title: 'Could not join this room', children: [
-            Text(state.sessionError!,
-                style: const TextStyle(color: GnColors.warn)),
-            if (state.pendingRoomDestination != null) ...[
-              const SizedBox(height: 12),
-              FilledButton(
-                  onPressed: _busy
-                      ? null
-                      : () => _joinAction(state.resumeRoomInvitation),
-                  child: const Text('Try again')),
-            ],
-          ]),
+          Section(
+              title: state.pendingRoomDestination != null
+                  ? 'Could not join this room'
+                  : 'Could not reach GameNight',
+              children: [
+                Text(state.sessionError!,
+                    style: const TextStyle(color: GnColors.warn)),
+                if (state.pendingRoomDestination != null) ...[
+                  const SizedBox(height: 12),
+                  FilledButton(
+                      onPressed: _busy
+                          ? null
+                          : () => _joinAction(state.resumeRoomInvitation),
+                      child: const Text('Try again')),
+                ],
+              ]),
         // Bare, narrow block: the code field is 360 wide, so the rest is too.
         Center(
           child: ConstrainedBox(
