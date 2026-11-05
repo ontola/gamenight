@@ -154,18 +154,20 @@ pub fn changes(before: &PartySnapshot, after: &PartySnapshot) -> Vec<Change> {
             let was = effective(spec, old.values.get(&spec.key));
             let now = effective(spec, settings.values.get(&spec.key));
             if was != now {
-                out.push(
-                    Change::new(
-                        ActivityKind::Setting,
-                        format!(
-                            "{}: {} set to {}",
-                            title(after, &settings.game),
-                            spec.label,
-                            shown(&now)
-                        ),
-                    )
-                    .in_game(&settings.game),
-                );
+                let game = title(after, &settings.game);
+                let who = settings
+                    .changed_by
+                    .and_then(|id| after.players.iter().find(|p| p.id == id));
+                let text = match who {
+                    Some(player) => format!(
+                        "{} set {} to {} ({game})",
+                        player.name,
+                        spec.label,
+                        shown(&now)
+                    ),
+                    None => format!("{game}: {} set to {}", spec.label, shown(&now)),
+                };
+                out.push(Change::new(ActivityKind::Setting, text).in_game(&settings.game));
             }
         }
     }
@@ -279,6 +281,7 @@ mod tests {
             }],
             values: Default::default(),
             players: Default::default(),
+            changed_by: None,
         });
         assert!(changes(&before, &after).is_empty());
         let mut changed = after.clone();
@@ -286,6 +289,27 @@ mod tests {
             .values
             .insert("wind".into(), SettingValue::Toggle(true));
         assert_eq!(texts(&after, &changed), ["Ballkickers: Wind set to on"]);
+        // Changed from someone's phone: it says who.
+        let mut night = GameNight::new(4);
+        night.handle(Command::JoinParty {
+            name: "Joep".into(),
+            seat: None,
+            color: None,
+            avatar: None,
+            library: Vec::new(),
+        });
+        let joep = night.snapshot().players[0].clone();
+        let mut by_phone = changed.clone();
+        by_phone.players.push(joep.clone());
+        let mut after_phone = by_phone.clone();
+        after_phone.settings[0].changed_by = Some(joep.id);
+        after_phone.settings[0]
+            .values
+            .insert("wind".into(), SettingValue::Toggle(false));
+        assert_eq!(
+            texts(&by_phone, &after_phone),
+            ["Joep set Wind to off (Ballkickers)"]
+        );
     }
 
     #[test]

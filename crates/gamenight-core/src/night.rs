@@ -2536,6 +2536,7 @@ impl GameNight {
             specs,
             values,
             players: Default::default(),
+            changed_by: None,
         });
         self.push_player_settings(Some(&game), None, fx);
         fx.push(Effect::StateChanged);
@@ -2877,6 +2878,7 @@ impl GameNight {
             self.settings_previous.insert(game.clone(), previous);
             entry.revision += 1;
             entry.can_undo = true;
+            entry.changed_by = None;
             fx.push(Effect::SettingChanged { game, key, value });
         }
         fx.push(Effect::StateChanged);
@@ -2973,6 +2975,7 @@ impl GameNight {
             self.settings_previous.remove(&game);
             entry.can_undo = false;
         }
+        entry.changed_by = Some(player_id);
         for (key, value) in next {
             if entry.values.insert(key.clone(), value.clone()) != Some(value.clone()) {
                 fx.push(Effect::SettingChanged {

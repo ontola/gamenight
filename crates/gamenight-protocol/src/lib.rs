@@ -895,6 +895,10 @@ pub struct GameSettings {
     #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
     pub players:
         std::collections::BTreeMap<PlayerId, std::collections::BTreeMap<String, SettingValue>>,
+    /// The player whose phone made the last change, for the room log. Absent
+    /// when the game itself or the TV menu changed it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changed_by: Option<PlayerId>,
 }
 
 /// A stopped game process. Exit codes cannot reliably distinguish a forced

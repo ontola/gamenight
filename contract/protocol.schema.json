@@ -1741,6 +1741,17 @@
           "default": false,
           "type": "boolean"
         },
+        "changed_by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlayerId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The player whose phone made the last change, for the room log. Absent\nwhen the game itself or the TV menu changed it."
+        },
         "game": {
           "$ref": "#/$defs/GameId"
         },

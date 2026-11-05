@@ -434,6 +434,11 @@ same words. The local web server serves the log at `GET /api/activity?profile=â€
 to a player in the room, and the cloud relays the newest 100 lines of an online
 room at `GET /v1/rooms/activity`.
 
+A setting changed from a phone names who did it ("Joep set Items to off
+(Ballkickers)"), and so does a phone button ("Joep: New round (Ballkickers)").
+The party snapshot's `settings[].changed_by` holds the player behind the last
+change; it is absent when the game itself or the TV menu changed it.
+
 A room nobody touches for three hours (no controller press, no change from a
 phone or the overlay) closes by itself: any game stops, everyone leaves and the
 log starts empty for the next evening. Games finishing rounds on their own do
