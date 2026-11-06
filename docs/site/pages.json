@@ -31,7 +31,8 @@
       "crates/gamenight-sdk/src/lib.rs",
       "games/love-party/shared/lifecycle.lua",
       "sdk/unity/Runtime/Core/GameNightClient.cs",
-      "sdk/unreal/GameNight/Source/GameNight/Public/GameNightSubsystem.h"
+      "sdk/unreal/GameNight/Source/GameNight/Public/GameNightSubsystem.h",
+      "sdk/bevy/src/lib.rs"
     ]
   },
   {
@@ -56,8 +57,19 @@
     ]
   },
   {
+    "slug": "bevy",
+    "title": "Bevy",
+    "group": "Your engine",
+    "source": "docs/site/bevy.md",
+    "watch": [
+      "sdk/bevy/src/lib.rs",
+      "sdk/bevy/demo/src/main.rs",
+      "sdk/bevy/demo/assets/phone/index.html"
+    ]
+  },
+  {
     "slug": "rust",
-    "title": "Rust / Bevy",
+    "title": "Rust",
     "group": "Your engine",
     "source": "docs/site/rust.md",
     "watch": [

@@ -9,7 +9,8 @@ Starting a new game? The [Game playbook](/docs/playbook) gets you from an idea t
 | Engine | Starting point | What is included |
 | --- | --- | --- |
 | [LÖVE / Lua](/docs/love) | Shared party runner | Lifecycle, controller mapping, window handling and faces |
-| [Rust / Bevy](/docs/rust) | Rust SDK | Typed protocol events; your engine handles input consumption and rendering |
+| [Bevy](/docs/bevy) | Bevy plugin and demo game | Lifecycle, controllers per seat, window and audio handling, settings, faces and phone screens |
+| [Rust](/docs/rust) | Rust SDK | Typed protocol events; your engine handles input consumption and rendering |
 | [Godot 4](/docs/godot) | Godot addon | Lifecycle, controllers per seat, window handling, settings, faces and phone screens |
 | [C / C++](/docs/c) | Single-header adapter | TCP transport and lifecycle; no controller stream or face decoder yet |
 | [Unity](/docs/unity) | Unity package and the Orb Rush demo | Lifecycle, controllers per seat, window handling, settings, faces, phone screens and saves; new, not yet tested on hardware |
@@ -32,6 +33,6 @@ Read [Game lifecycle](/docs/lifecycle), then [Controllers & players](/docs/contr
 
 ## How these docs stay current
 
-These pages are built from Markdown in the public repository. Code excerpts are read from source, not pasted copies. CI checks generated pages, internal links and watched implementation files. The Rust example compiles against the SDK; the C example compiles against the header. The Unity demo's rules play against a fake host without Unity, and its Unity code compiles against Unity's reference assemblies. The Unreal plugin's protocol core passes its unit tests and the conformance harness in CI; its Unreal code is not compiled there yet.
+These pages are built from Markdown in the public repository. Code excerpts are read from source, not pasted copies. CI checks generated pages, internal links and watched implementation files. The Rust example compiles against the SDK; the C example compiles against the header. The Bevy demo is built with Bevy and passes the conformance harness in CI. The Unity demo's rules play against a fake host without Unity, and its Unity code compiles against Unity's reference assemblies. The Unreal plugin's protocol core passes its unit tests and the conformance harness in CI; its Unreal code is not compiled there yet.
 
 An implementation change makes the docs check fail until someone reviews and regenerates the affected pages. This catches drift; it cannot prove every explanation is correct. Godot snippets are source-checked, not runtime-certified. Physical controller and window tests still matter.

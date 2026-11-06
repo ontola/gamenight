@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
-# The phone app's Rust library builds with the app (cargokit), on its own.
-exclude = ["mobile/rust"]
+# The phone app's Rust library builds with the app (cargokit), and the
+# Bevy plugin with its demo in its own workspace (Bevy is big), each on its own.
+exclude = ["mobile/rust", "sdk/bevy"]
 members = [
     "crates/gamenight-protocol",
     "crates/gamenight-core",

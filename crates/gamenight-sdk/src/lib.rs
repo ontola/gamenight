@@ -129,6 +129,14 @@ pub enum GameEvent {
         data: serde_json::Value,
         revision: u64,
     },
+    /// The whole party changed (host music, playlist, overlay...). Only sent
+    /// after [`GameNight::emit_party_state`]. The SDK always keeps
+    /// [`GameNight::party`] current; engine adapters use this
+    /// to refresh their own copy, for example to follow
+    /// [`PartySnapshot::now_playing`].
+    PartyState {
+        party: Box<PartySnapshot>,
+    },
     /// Only ever sent to the process registered as the persistent lobby
     /// (`GAMENIGHT_GAME_ID` matching what the daemon was told via
     /// `set_lobby_game`) — `active: false` the moment some other game
@@ -168,6 +176,7 @@ pub enum GameEvent {
 pub struct GameNight {
     ws: WebSocketStream<MaybeTlsStream<TcpStream>>,
     party: PartySnapshot,
+    party_events: bool,
 }
 
 impl GameNight {
@@ -231,7 +240,17 @@ impl GameNight {
                 None => return Err(SdkError::Protocol("connection closed during hello".into())),
             }
         };
-        Ok(Self { ws, party })
+        Ok(Self {
+            ws,
+            party,
+            party_events: false,
+        })
+    }
+
+    /// Also return [`GameEvent::PartyState`] from [`Self::next_event`] whenever
+    /// the whole party snapshot changes. Off by default.
+    pub fn emit_party_state(&mut self, on: bool) {
+        self.party_events = on;
     }
 
     /// The party as of the last message from the daemon.
@@ -304,8 +323,14 @@ impl GameNight {
                         },
                         ServerMessage::LobbyFocus { active } => GameEvent::LobbyFocus { active },
                         ServerMessage::PartyState { party } => {
-                            self.party = party;
-                            continue;
+                            if !self.party_events {
+                                self.party = party;
+                                continue;
+                            }
+                            self.party = party.clone();
+                            GameEvent::PartyState {
+                                party: Box::new(party),
+                            }
                         }
                         ServerMessage::Welcome { party, .. } => {
                             self.party = party;
@@ -594,6 +619,35 @@ impl GameNight {
             data,
         })
         .await
+    }
+
+    /// Vibrate the controller on one of this session's seats. `weak` is the
+    /// light motor, `strong` the heavy one, both 0 to 65535; `ms` is at most
+    /// 5000. Each call replaces the last for that pad; send zeros to stop.
+    /// Ignored unless the session is running in front.
+    pub async fn rumble(
+        &mut self,
+        session: SessionId,
+        seat: u8,
+        weak: u16,
+        strong: u16,
+        ms: u32,
+    ) -> Result<(), SdkError> {
+        self.send(&ClientMessage::Rumble {
+            session,
+            seat,
+            weak,
+            strong,
+            ms: ms.min(5000),
+        })
+        .await
+    }
+
+    /// Send any game message the helpers above do not cover. Engine adapters
+    /// (such as `gamenight-bevy`) use this to forward a queue of messages
+    /// from their own thread.
+    pub async fn send_message(&mut self, msg: &ClientMessage) -> Result<(), SdkError> {
+        self.send(msg).await
     }
 
     async fn send(&mut self, msg: &ClientMessage) -> Result<(), SdkError> {

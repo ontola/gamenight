@@ -12,6 +12,12 @@ The Clubhouse lobby (`crates/lobby`, derived from Fish Folk: Jumpy, with the
 vendored Bones framework and `bevy_gilrs`) was retired in October 2026; its
 notices and media credits remain in the repository history.
 
+## Bevy demo
+
+`sdk/bevy/demo/assets/fonts/Outfit-700.ttf` (Outfit, SIL Open Font License 1.1,
+`OFL-Outfit.txt` next to it) is embedded unchanged in the Star Catch demo. Its
+sounds are synthesised in code.
+
 ## Fonts for catalog artwork
 
 `scripts/fonts/FairfaxSM.ttf` (Kreative Software, SIL Open Font License 1.1,

@@ -10,7 +10,7 @@ echo 'path-include=/usr/share/man/man6/love*' > /etc/dpkg/dpkg.cfg.d/zz-love-man
 apt-get update -qq
 apt-get install -y -qq --no-install-recommends unzip xz-utils xvfb mesa-vulkan-drivers \
   libgl1-mesa-dri libvulkan1 vulkan-tools pkg-config libudev-dev libasound2-dev \
-  libx11-dev libxkbcommon-dev libwayland-dev libxcursor-dev libxi-dev libxrandr-dev \
+  libx11-dev libxkbcommon-dev libxkbcommon-x11-0 libwayland-dev libxcursor-dev libxi-dev libxrandr-dev \
   love ffmpeg imagemagick >/dev/null
 
 # Godot: `godot` = 4.5.2 (most games), plus godot-4.6 and godot-4.7.

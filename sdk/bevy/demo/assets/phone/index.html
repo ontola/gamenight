@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Star Catch</title>
+<style>
+  :root { --you: #facc15; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #0f1221; color: #fff; font: 600 18px/1.3 system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  }
+  header { display: flex; align-items: center; gap: 10px; width: 100%; }
+  .dot { width: 22px; height: 22px; border-radius: 50%; background: var(--you); }
+  .time { margin-left: auto; opacity: .7; font-variant-numeric: tabular-nums; }
+  .score { font-size: 96px; font-weight: 800; color: var(--you); font-variant-numeric: tabular-nums; }
+  .label { opacity: .6; margin-top: -10px; }
+  button {
+    width: min(80vw, 340px); aspect-ratio: 1; border-radius: 50%; border: 0;
+    background: var(--you); color: #0f1221; font: 800 40px system-ui, sans-serif;
+    box-shadow: 0 10px 0 rgba(0,0,0,.35); cursor: pointer;
+  }
+  button:active { transform: translateY(6px); box-shadow: 0 4px 0 rgba(0,0,0,.35); }
+  .status { opacity: .6; min-height: 1.3em; }
+</style>
+</head>
+<body>
+  <header><span class="dot"></span><span id="name">Star Catch</span><span class="time" id="time"></span></header>
+  <div style="text-align:center"><div class="score" id="score">0</div><div class="label">stars</div></div>
+  <button id="dash">Dash</button>
+  <div class="status" id="status"></div>
+<script src="/assets/companion.js"></script>
+<script>
+  // The game sends {name, color, score, seconds, results} once a second.
+  const $ = (id) => document.getElementById(id);
+  const game = GameNight.connect((view) => {
+    if (view.color) document.documentElement.style.setProperty("--you", view.color);
+    if (view.name) $("name").textContent = view.name;
+    $("score").textContent = view.score ?? 0;
+    const s = view.seconds ?? 0;
+    $("time").textContent = view.results ? "Round over" : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }, (status) => { $("status").textContent = status === "connected" ? "" : status; });
+  $("dash").addEventListener("pointerdown", () => {
+    game.send({ action: "dash" });
+    navigator.vibrate?.(20);
+  });
+</script>
+</body>
+</html>

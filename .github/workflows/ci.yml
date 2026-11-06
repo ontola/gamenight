@@ -122,6 +122,26 @@ jobs:
             .local/lobby-flow.log
             .local/game-room-flow.log
 
+  bevy:
+    # The Bevy plugin and its demo are their own workspace (Bevy is big).
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: sdk/bevy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sdk/bevy
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev libasound2-dev libxkbcommon-x11-0 libwayland-dev xvfb mesa-vulkan-drivers
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Plugin tests and the conformance harness with the demo
+        run: xvfb-run -a cargo test --workspace --locked
   shared-web:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,8 @@
-# Rust / Bevy
+# Rust
 
-Use `gamenight-sdk` for the WebSocket connection and typed events. The SDK is engine-independent. It does not create windows, pause Bevy systems, draw faces or apply controller state for you.
+Use `gamenight-sdk` for the WebSocket connection and typed events. The SDK is engine-independent. It does not create windows, pause systems, draw faces or apply controller state for you.
+
+Making a Bevy game? Use the [Bevy plugin](/docs/bevy) instead: it is built on this SDK and also handles the window, audio, per-seat controllers, settings, phone screens and faces.
 
 ## Add the SDK
 
@@ -26,7 +28,7 @@ Run it from the public repository with `cargo run -p gamenight-sdk --example doc
 
 Run the network task separately and pass events into your engine through a channel. Apply Prepare and PartyUpdated to the roster. Store ControllerFrame data with a receipt time, then have your input system look up each seat’s exact controller token.
 
-In Bevy, gate simulation systems on your session state. Do not pause the network task or the systems that receive Resume. Drain messages every frame, including while loading, paused or displaying results. Send Ready after assets and a rendered frame are ready, not immediately after receiving Prepare.
+In an engine loop, gate simulation systems on your session state (the [Bevy plugin](/docs/bevy) does this with `gameplay_runs`). Do not pause the network task or the systems that receive Resume. Drain messages every frame, including while loading, paused or displaying results. Send Ready after assets and a rendered frame are ready, not immediately after receiving Prepare.
 
 ## Controllers and faces
 

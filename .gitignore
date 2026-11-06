@@ -1,4 +1,5 @@
 /target/
+/sdk/bevy/target/
 .local/
 .env
 .env.*

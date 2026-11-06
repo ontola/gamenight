@@ -1,0 +1,27 @@
+[package]
+name = "gamenight-bevy"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/ontola/gamenight"
+description = "Bevy plugin for GameNight: lifecycle, per-seat controllers, window and audio ownership, settings, phone screens and faces."
+
+[workspace]
+members = [".", "demo"]
+
+[dependencies]
+bevy = { version = "0.20", default-features = false, features = ["std", "bevy_window", "bevy_winit", "x11", "bevy_image", "bevy_asset", "bevy_color", "bevy_log", "bevy_audio", "bevy_render", "gamepad", "sysinfo_plugin"] }
+gamenight-sdk = { path = "../../crates/gamenight-sdk" }
+gamenight-protocol = { path = "../../crates/gamenight-protocol" }
+tokio = { version = "1", features = ["rt", "macros", "sync", "time"] }
+serde_json = "1"
+uuid = "1"
+
+# Bevy wants optimised dependencies even in debug builds; full debug info
+# for all of them would take gigabytes.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2
+debug = false
