@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "GameNight",
+	"Description": "Couch multiplayer on GameNight: lifecycle, per-seat controllers, settings, player saves, faces and phone screens.",
+	"Category": "Networking",
+	"CreatedBy": "Ontola",
+	"CreatedByURL": "https://github.com/ontola/gamenight",
+	"DocsURL": "https://github.com/ontola/gamenight/blob/main/docs/site/unreal.md",
+	"SupportURL": "https://github.com/ontola/gamenight/issues",
+	"EnabledByDefault": true,
+	"CanContainContent": false,
+	"IsBetaVersion": true,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "GameNight",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"PlatformAllowList": [ "Win64", "Mac", "Linux" ]
+		}
+	]
+}

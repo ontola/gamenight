@@ -1,0 +1,18 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.5",
+	"Category": "",
+	"Description": "Orb Rush: the GameNight demo game for Unreal Engine.",
+	"Modules": [
+		{
+			"Name": "OrbRush",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [ "Engine" ]
+		}
+	],
+	"Plugins": [
+		{ "Name": "GameNight", "Enabled": true }
+	],
+	"AdditionalPluginDirectories": [ "../../sdk/unreal" ]
+}

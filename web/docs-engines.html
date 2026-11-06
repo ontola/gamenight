@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-engines">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-engines" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines" aria-current="page">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/unity">Unity</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-engines" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines" aria-current="page">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/unity">Unity</a></li><li><a href="/docs/unreal">Unreal Engine</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Other engines</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="engine-support">Engine support</h1>
 <p>Which engines GameNight supports, how far, and where to start. Pick the row for
 your engine, then follow its guide. If your engine is not listed as
@@ -65,10 +65,10 @@ windows or faces into your engine yourself.</li>
 <td>Orb Rush (demo)</td>
 </tr>
 <tr>
-<td><a href="/docs/other-engines">Unreal</a></td>
-<td>Protocol only</td>
-<td>Wire protocol</td>
-<td>None</td>
+<td><a href="/docs/unreal">Unreal Engine 5</a></td>
+<td>New</td>
+<td><code>sdk/unreal</code> plugin and the Orb Rush demo</td>
+<td>Orb Rush (demo)</td>
 </tr>
 <tr>
 <td>Other engines</td>
@@ -101,7 +101,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>SDK</td>
 <td>SDK</td>
 <td>SDK</td>
-<td>You</td>
+<td>SDK</td>
 </tr>
 <tr>
 <td>Prepare, Ready, Start, Pause, Resume, Dispose</td>
@@ -110,7 +110,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>SDK</td>
 <td>SDK</td>
 <td>SDK</td>
-<td>You</td>
+<td>SDK (also pauses the world)</td>
 </tr>
 <tr>
 <td>Controller input per seat</td>
@@ -119,7 +119,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>You (typed frames)</td>
 <td>No</td>
 <td>SDK (<code>FrameForSeat</code>, <code>JustPressed</code>, deadzones)</td>
-<td>You</td>
+<td>SDK (<code>GetPad</code>, <code>JustPressed</code>, deadzones)</td>
 </tr>
 <tr>
 <td>Hidden preparation and taking the screen</td>
@@ -128,7 +128,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>You</td>
 <td>You</td>
 <td>SDK (<code>GameNightScreen</code>; no hiding on Linux)</td>
-<td>You</td>
+<td>SDK (<code>bAutomaticScreen</code>)</td>
 </tr>
 <tr>
 <td>Match settings from the lobby and phone</td>
@@ -137,7 +137,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>SDK</td>
 <td>SDK</td>
 <td>SDK</td>
-<td>You</td>
+<td>SDK</td>
 </tr>
 <tr>
 <td>Player names, colours and faces</td>
@@ -146,7 +146,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>You (avatar decoding included)</td>
 <td>No</td>
 <td>SDK (<code>GameNightFaces</code>)</td>
-<td>You</td>
+<td>SDK (<code>DrawFace</code>, <code>GetFaceTexture</code>)</td>
 </tr>
 <tr>
 <td><a href="/docs/phone-screens">Phone screens</a> for each player</td>
@@ -155,7 +155,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>SDK</td>
 <td>No</td>
 <td>SDK (<code>DeclarePhoneScreen</code>)</td>
-<td>You</td>
+<td>SDK (<code>DeclareCompanionFolder</code>)</td>
 </tr>
 <tr>
 <td>Performance diagnostics</td>
@@ -164,7 +164,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>You (manual samples)</td>
 <td>No</td>
 <td>SDK</td>
-<td>You</td>
+<td>SDK</td>
 </tr>
 <tr>
 <td>Headless contract test in CI</td>
@@ -173,7 +173,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>Yes</td>
 <td>Compile only</td>
 <td>Yes, without Unity (dotnet)</td>
-<td>No</td>
+<td>Protocol core only, without Unreal</td>
 </tr>
 <tr>
 <td>Keep the SDK copy current</td>
@@ -182,7 +182,7 @@ your game code must handle it. &quot;No&quot; means the SDK cannot do it yet.</p
 <td>Cargo revision</td>
 <td>Copy the header</td>
 <td>Package Manager git URL</td>
-<td>n/a</td>
+<td>Copy the plugin folder</td>
 </tr>
 </tbody>
 </table>
@@ -195,8 +195,11 @@ and compiles the Unity layer against reference assemblies, but no Unity
 build has been tested on hardware yet: window handling, faces on screen and
 pads. Linux has no window hiding. The Input System code path is not compiled
 in CI.</li>
-<li><strong>Unreal</strong>: no plugin yet. Needed: a C++ plugin on the game thread with the
-same scope as the Unity package, plus packaging notes for Windows and macOS.</li>
+<li><strong>Unreal</strong>: the plugin and the Orb Rush demo are new. CI unit tests the
+plugin's C++ protocol core and runs <code>gamenight-certify</code> against it headless,
+but has no Unreal build: the module and the demo are not compiled there, and
+window handling, audio, the world pause, faces on screen and pads are not
+tested on hardware yet.</li>
 <li><strong>C / C++</strong>: the header has no controller tokens, controller frames, colours
 or faces, and no phone screens. Games still have to parse those messages
 themselves.</li>
@@ -212,7 +215,7 @@ against the <a href="/docs/protocol">protocol reference</a> and the
 <a href="/docs/controllers">controller rules</a>. Before calling an integration done, run
 the <a href="/docs/testing">integration checks</a>.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/engines.md">Edit this page</a><span data-source-fingerprint="4fa2752fdd2ff387b65144b2876fc24c9aa6db710a094b2d7ac46c7963d11054">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/engines.md">Edit this page</a><span data-source-fingerprint="9d253b9b66bfcae058a552746e02ec0d82850fb1a1e9c02e0ea5dc9a1d23c784">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/playbook"><small>Previous</small>Game playbook</a><a href="/docs/lifecycle"><small>Next</small>Game lifecycle</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#support-levels">Support levels</a><a href="#features-per-engine">Features per engine</a><a href="#open-work">Open work</a><a href="#for-agents-and-code-generators">For agents and code generators</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

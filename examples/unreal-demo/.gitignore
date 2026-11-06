@@ -1,0 +1,11 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+.vscode/
+.idea/
+*.sln
+*.xcworkspace
+Plugins/GameNight/Binaries/
+Plugins/GameNight/Intermediate/

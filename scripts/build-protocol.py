@@ -3,8 +3,8 @@
 
 The schema is generated from crates/gamenight-protocol (a Rust test fails when
 it is stale). This script turns it into message type tags, enum values and
-protocol constants for every SDK language (GDScript, JS, Python, Dart, C and
-C#), so a hand-typed "party_state" can no longer drift from the daemon:
+protocol constants for every SDK language (GDScript, JS, Python, Dart, C, C#
+and C++), so a hand-typed "party_state" can no longer drift from the daemon:
 
     python3 scripts/build-protocol.py           # rewrite the bindings
     python3 scripts/build-protocol.py --check   # fail when any is stale
@@ -253,6 +253,44 @@ def csharp(p: Protocol) -> str:
     return "\n".join(lines) + "\n"
 
 
+def cpp_literal(value) -> str:
+    if isinstance(value, list):
+        return "{ " + ", ".join(cpp_literal(v) for v in value) + " }"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return json.dumps(value)
+
+
+def cpp_type(value) -> str:
+    if isinstance(value, list):
+        return "const char* const"
+    return {str: "const char*", int: "int", float: "double", bool: "bool"}[type(value)]
+
+
+def cpp_header(p: Protocol) -> str:
+    """Plain C++17 constants, shared by the Unreal plugin and any C++ engine."""
+    lines = [
+        f"// {BEGIN}.",
+        "// GameNight wire protocol: message tags, enum values, limits. Plain C++17,",
+        "// no engine headers, so the Unreal plugin's core and its tests share it.",
+        "#pragma once",
+        "",
+        "namespace gamenight {",
+        "namespace protocol {",
+        "",
+    ]
+    for name, value in p.constants.items():
+        suffix = "[]" if isinstance(value, list) else ""
+        lines.append(f"inline constexpr {cpp_type(value)} {name}{suffix} = {cpp_literal(value)};")
+    lines += ["", "// Message \"type\" tags, both directions."]
+    lines += [f'inline constexpr const char* MSG_{t.upper()} = "{t}";' for t in p.tags]
+    for name, values in p.enums.items():
+        lines += ["", f"// {name}"]
+        lines += [f'inline constexpr const char* {snake_upper(name)}_{v.upper()} = "{v}";' for v in values]
+    lines += ["", "}  // namespace protocol", "}  // namespace gamenight"]
+    return "\n".join(lines) + "\n"
+
+
 def py_tags(p: Protocol) -> list[str]:
     return [f'MSG_{t.upper()} = "{t}"' for t in p.tags]
 
@@ -306,6 +344,7 @@ FILES = {
     "mobile/lib/protocol.g.dart": dart,
     "sdk/python/gamenight_protocol.py": python,
     "sdk/unity/Runtime/Core/Protocol.cs": csharp,
+    "sdk/unreal/GameNight/Source/GameNight/Public/GameNightProtocol.h": cpp_header,
 }
 
 # Marked blocks inside hand-written files: path -> (comment prefix, suffix, emitter).
@@ -328,6 +367,9 @@ SCANNED = [
     "sdk/godot/addons/gamenight/lobby.gd",
     "sdk/godot/addons/gamenight/screen.gd",
     "sdk/unity/Runtime/Core/GameNightClient.cs",
+    "sdk/unreal/GameNight/Source/GameNight/Private/GameNightCore.cpp",
+    "sdk/unreal/GameNight/Source/GameNight/Private/GameNightSubsystem.cpp",
+    "examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp",
 ]
 TAG_LITERAL = re.compile(r"""\\?["']type\\?["']\s*:\s*\\?["']([a-z_]+)\\?["']""")
 

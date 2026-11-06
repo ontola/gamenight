@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orb Rush</title>
+<style>
+  :root { --you: #ffe58a; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: #14121c; color: #fff; font: 600 18px/1.3 system-ui, sans-serif;
+    display: flex; flex-direction: column; padding: 20px 16px env(safe-area-inset-bottom);
+    -webkit-user-select: none; user-select: none; touch-action: manipulation;
+  }
+  header { display: flex; align-items: center; gap: 12px; }
+  .dot { width: 28px; height: 28px; border-radius: 50%; background: var(--you); flex: none; }
+  #name { font-size: 22px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #clock { font-variant-numeric: tabular-nums; opacity: .7; }
+  main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+  #score { font-size: 96px; line-height: 1; color: var(--you); font-variant-numeric: tabular-nums; }
+  #label { opacity: .6; margin-top: -16px; }
+  button {
+    width: min(80vw, 320px); aspect-ratio: 1; border-radius: 50%; border: 6px solid var(--you);
+    background: #1f1c2b; color: #fff; font: 800 32px system-ui, sans-serif;
+  }
+  button:disabled { opacity: .35; }
+  button:not(:disabled):active { transform: scale(.96); background: #2b2740; }
+  #status { text-align: center; opacity: .5; min-height: 1.3em; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot"></span>
+  <span id="name">Orb Rush</span>
+  <span id="clock"></span>
+</header>
+<main>
+  <div id="score">0</div>
+  <div id="label">orbs this round</div>
+  <button id="boost" disabled>Boost</button>
+</main>
+<div id="status">Connecting</div>
+<script src="/assets/companion.js"></script>
+<script>
+  // The game decides, the phone draws: every message is this player's whole view.
+  const $ = (id) => document.getElementById(id);
+  const game = GameNight.connect(render, (status) => {
+    $("status").textContent = status === "connected" ? "" : "Reconnecting";
+  });
+  function render(view) {
+    if (typeof view !== "object" || view === null) return;
+    if (typeof view.color === "string") document.documentElement.style.setProperty("--you", view.color);
+    $("name").textContent = view.name || "Orb Rush";
+    $("score").textContent = String(view.score ?? 0);
+    $("clock").textContent = view.results ? "Results" : (view.clock != null ? view.clock + " s" : "");
+    $("boost").disabled = !view.boost || view.results;
+  }
+  $("boost").addEventListener("click", () => {
+    $("boost").disabled = true;
+    game.send({ tap: "boost" });
+  });
+</script>
+</body>
+</html>

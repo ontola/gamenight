@@ -9,6 +9,7 @@ pub fn page(slug: &str) -> Option<&'static str> {
         "rust" => Some(include_str!("docs-rust.html")),
         "godot" => Some(include_str!("docs-godot.html")),
         "unity" => Some(include_str!("docs-unity.html")),
+        "unreal" => Some(include_str!("docs-unreal.html")),
         "lobbies" => Some(include_str!("docs-lobbies.html")),
         "c" => Some(include_str!("docs-c.html")),
         "other-engines" => Some(include_str!("docs-other-engines.html")),

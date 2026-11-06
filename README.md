@@ -64,7 +64,8 @@ prepare, start, pause, resume and release a session. The game owns its rules,
 score screen and subsequent rounds. Players choose when to switch games.
 
 Use the [Rust SDK](crates/gamenight-sdk), [Godot SDK](sdk/godot),
-[C/C++ SDK](sdk/c), or implement the [JSON protocol](docs/protocol.md) directly.
+[Unreal plugin](sdk/unreal), [C/C++ SDK](sdk/c), or implement the
+[JSON protocol](docs/protocol.md) directly.
 The [JavaScript example](examples/tiny-game.mjs) is a small reference.
 
 Start with the [integration guide](docs/integrating-your-game.md).

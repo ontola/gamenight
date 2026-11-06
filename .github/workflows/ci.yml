@@ -60,6 +60,8 @@ jobs:
           python3 scripts/test-c-transport.py
           cc -std=c99 -Wall -Wextra -Werror -I sdk/c -o /tmp/c-game examples/c-game.c
           cargo run -p gamenight-certify -- c-game -- /tmp/c-game
+          python3 scripts/test-unreal-sdk.py --headless /tmp/unreal-core
+          cargo run -p gamenight-certify -- unreal-core -- /tmp/unreal-core
       - if: runner.os == 'Windows'
         uses: actions/setup-dotnet@v4
         with:

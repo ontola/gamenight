@@ -22,7 +22,7 @@ your engine, then follow its guide. If your engine is not listed as
 | [Rust / Bevy](/docs/rust) | Partial | `gamenight-sdk` crate | Demo game |
 | [C / C++](/docs/c) | Partial | `sdk/c/gamenight.h` | None yet (transport example only) |
 | [Unity](/docs/unity) | New | `sdk/unity` package and the Orb Rush demo | Orb Rush (demo) |
-| [Unreal](/docs/other-engines) | Protocol only | Wire protocol | None |
+| [Unreal Engine 5](/docs/unreal) | New | `sdk/unreal` plugin and the Orb Rush demo | Orb Rush (demo) |
 | Other engines | Protocol only | [Wire protocol](/docs/other-engines) | Mineclonia (Luanti, game-specific adapter) |
 
 ## Features per engine
@@ -32,16 +32,16 @@ your game code must handle it. "No" means the SDK cannot do it yet.
 
 | Feature | Godot 4 | LÖVE | Rust | C / C++ | Unity | Unreal |
 | --- | --- | --- | --- | --- | --- | --- |
-| Connect, hello and launch token | SDK | SDK | SDK | SDK | SDK | You |
-| Prepare, Ready, Start, Pause, Resume, Dispose | SDK | SDK | SDK | SDK | SDK | You |
-| Controller input per seat | SDK (`frame_for_seat`, `just_pressed`, deadzones) | SDK | You (typed frames) | No | SDK (`FrameForSeat`, `JustPressed`, deadzones) | You |
-| Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | SDK (`GameNightScreen`; no hiding on Linux) | You |
-| Match settings from the lobby and phone | SDK | SDK | SDK | SDK | SDK | You |
-| Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | SDK (`GameNightFaces`) | You |
-| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | SDK (`mode.phone`) | SDK | No | SDK (`DeclarePhoneScreen`) | You |
-| Performance diagnostics | SDK | SDK | You (manual samples) | No | SDK | You |
-| Headless contract test in CI | Yes | Yes | Yes | Compile only | Yes, without Unity (dotnet) | No |
-| Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | Package Manager git URL | n/a |
+| Connect, hello and launch token | SDK | SDK | SDK | SDK | SDK | SDK |
+| Prepare, Ready, Start, Pause, Resume, Dispose | SDK | SDK | SDK | SDK | SDK | SDK (also pauses the world) |
+| Controller input per seat | SDK (`frame_for_seat`, `just_pressed`, deadzones) | SDK | You (typed frames) | No | SDK (`FrameForSeat`, `JustPressed`, deadzones) | SDK (`GetPad`, `JustPressed`, deadzones) |
+| Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | SDK (`GameNightScreen`; no hiding on Linux) | SDK (`bAutomaticScreen`) |
+| Match settings from the lobby and phone | SDK | SDK | SDK | SDK | SDK | SDK |
+| Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | SDK (`GameNightFaces`) | SDK (`DrawFace`, `GetFaceTexture`) |
+| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | SDK (`mode.phone`) | SDK | No | SDK (`DeclarePhoneScreen`) | SDK (`DeclareCompanionFolder`) |
+| Performance diagnostics | SDK | SDK | You (manual samples) | No | SDK | SDK |
+| Headless contract test in CI | Yes | Yes | Yes | Compile only | Yes, without Unity (dotnet) | Protocol core only, without Unreal |
+| Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | Package Manager git URL | Copy the plugin folder |
 
 ## Open work
 
@@ -53,8 +53,11 @@ This list doubles as the roadmap for engine support.
   build has been tested on hardware yet: window handling, faces on screen and
   pads. Linux has no window hiding. The Input System code path is not compiled
   in CI.
-- **Unreal**: no plugin yet. Needed: a C++ plugin on the game thread with the
-  same scope as the Unity package, plus packaging notes for Windows and macOS.
+- **Unreal**: the plugin and the Orb Rush demo are new. CI unit tests the
+  plugin's C++ protocol core and runs `gamenight-certify` against it headless,
+  but has no Unreal build: the module and the demo are not compiled there, and
+  window handling, audio, the world pause, faces on screen and pads are not
+  tested on hardware yet.
 - **C / C++**: the header has no controller tokens, controller frames, colours
   or faces, and no phone screens. Games still have to parse those messages
   themselves.
