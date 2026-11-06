@@ -1,9 +1,9 @@
-// Orb Rush: the GameNight demo game for Unreal Engine.
+// Dash Derby: the GameNight demo game for Unreal Engine.
 //
 // Everyone races for orbs; A dashes and knocks others aside; a round lasts 60
 // seconds, then the results show and the next round starts by itself. The
 // whole level is built in code from engine shapes, so this file and
-// OrbRushGameMode.cpp are the entire game.
+// DashDerbyGameMode.cpp are the entire game.
 //
 // What it shows, one GameNight feature at a time:
 //   - prepare hidden, NotifyReady, start instantly, pause and resume
@@ -21,7 +21,7 @@
 #include "GameFramework/GameModeBase.h"
 #include "GameNightTypes.h"
 
-#include "OrbRushGameMode.generated.h"
+#include "DashDerbyGameMode.generated.h"
 
 class ACameraActor;
 class AStaticMeshActor;
@@ -52,12 +52,12 @@ struct FOrbRunner
 };
 
 UCLASS()
-class AOrbRushGameMode : public AGameModeBase
+class ADashDerbyGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
 
 public:
-	AOrbRushGameMode();
+	ADashDerbyGameMode();
 
 	virtual void BeginPlay() override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;

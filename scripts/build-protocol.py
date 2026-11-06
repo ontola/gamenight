@@ -369,7 +369,7 @@ SCANNED = [
     "sdk/unity/Runtime/Core/GameNightClient.cs",
     "sdk/unreal/GameNight/Source/GameNight/Private/GameNightCore.cpp",
     "sdk/unreal/GameNight/Source/GameNight/Private/GameNightSubsystem.cpp",
-    "examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp",
+    "examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp",
 ]
 TAG_LITERAL = re.compile(r"""\\?["']type\\?["']\s*:\s*\\?["']([a-z_]+)\\?["']""")
 

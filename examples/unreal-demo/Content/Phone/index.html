@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Orb Rush</title>
+<title>Dash Derby</title>
 <style>
   :root { --you: #ffe58a; }
   * { box-sizing: border-box; }
@@ -32,7 +32,7 @@
 <body>
 <header>
   <span class="dot"></span>
-  <span id="name">Orb Rush</span>
+  <span id="name">Dash Derby</span>
   <span id="clock"></span>
 </header>
 <main>
@@ -51,7 +51,7 @@
   function render(view) {
     if (typeof view !== "object" || view === null) return;
     if (typeof view.color === "string") document.documentElement.style.setProperty("--you", view.color);
-    $("name").textContent = view.name || "Orb Rush";
+    $("name").textContent = view.name || "Dash Derby";
     $("score").textContent = String(view.score ?? 0);
     $("clock").textContent = view.results ? "Results" : (view.clock != null ? view.clock + " s" : "");
     $("boost").disabled = !view.boost || view.results;

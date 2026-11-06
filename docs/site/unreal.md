@@ -3,7 +3,7 @@
 The GameNight plugin for Unreal Engine 5 lives in `sdk/unreal/GameNight`. It
 covers the whole game contract: the connection and lifecycle, input per seat,
 the window and audio, the world pause, match and per-player settings, saved
-progress, faces and phone screens. **Orb Rush** in `examples/unreal-demo` is a
+progress, faces and phone screens. **Dash Derby** in `examples/unreal-demo` is a
 complete demo game built on it, and every snippet on this page comes from
 that game or the plugin.
 
@@ -16,7 +16,7 @@ Unreal side has no Unreal build in CI yet. See [What is tested](#what-is-tested)
 Copy `sdk/unreal/GameNight` into your project's `Plugins/` folder, or point
 your `.uproject` at the folder that holds it, as the demo does:
 
-::: source json examples/unreal-demo/OrbRush.uproject
+::: source json examples/unreal-demo/DashDerby.uproject
 
 Add `"GameNight"` to your module's dependencies in its `.Build.cs`, then set
 your game id under **Project Settings > Plugins > GameNight**. It must match
@@ -56,18 +56,18 @@ When the host goes away, a launched game quits.
 
 ## Bind the lifecycle
 
-Orb Rush connects its handlers in `BeginPlay` and declares its settings, its
+Dash Derby connects its handlers in `BeginPlay` and declares its settings, its
 phone button and its phone screen once. The plugin declares them again after
 every reconnect.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "\tUGameNightSubsystem* GN = GameNight();\n\tif (GN && GN->IsLaunchedByGameNight())" "\t// Standalone: the keyboard"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "\tUGameNightSubsystem* GN = GameNight();\n\tif (GN && GN->IsLaunchedByGameNight())" "\t// Standalone: the keyboard"
 
 On prepare, it seats everyone in couch order (left to right as they sit),
 opts into live joins and reports ready:
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "void AOrbRushGameMode::HandlePrepared" "void AOrbRushGameMode::HandleStarted"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "void ADashDerbyGameMode::HandlePrepared" "void ADashDerbyGameMode::HandleStarted"
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "void AOrbRushGameMode::SeatFromSession" "\tTArray<FString> Seated;"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "void ADashDerbyGameMode::SeatFromSession" "\tTArray<FString> Seated;"
 
 Seats with an AI occupant get a bot. Empty seats are skipped. The number of
 people is `LocalSeatCount()`, never the number of pads you can see.
@@ -80,7 +80,7 @@ negative Y as on the wire) and buttons, and `JustPressed(Seat, Button)` is
 true on the frame a button went down. A button still held from the lobby
 must be released first, so one press never does two things.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "\tif (Runner.Seat >= 0)\n\t{" "\telse if (Runner.bKeyboard)"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "\tif (Runner.Seat >= 0)\n\t{" "\telse if (Runner.bKeyboard)"
 
 `ReportActivity` tells GameNight someone is really playing, so the party does
 not mark them asleep. `Rumble(Seat, Weak, Strong, Seconds)` vibrates that
@@ -93,16 +93,16 @@ and the drawn face. Use the colour for the player's body and draw the head
 with `DrawFace` on a HUD canvas. It draws the skin circle and the face, or the
 default face when the player has none, and mirrors it with `Facing = -1`.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushHUD.cpp "\t// Each player's own face rides above their body." "\t// The only text while playing"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp "\t// Each player's own face rides above their body." "\t// The only text while playing"
 
 `GetFaceTexture(Player)` gives the face alone as a nearest-filtered texture,
 for a material or a widget. Profile changes arrive in `OnPlayersUpdated`
 while the match runs: update in place and never restart.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "void AOrbRushGameMode::HandlePlayersUpdated" "// ---- settings, actions, phones"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "void ADashDerbyGameMode::HandlePlayersUpdated" "// ---- settings, actions, phones"
 
 With `NotifyParticipation(true)`, players who join or leave mid-round arrive
-in `OnRosterChanged`. Orb Rush keeps everyone still seated, with their score,
+in `OnRosterChanged`. Dash Derby keeps everyone still seated, with their score,
 and adds the newcomers at once.
 
 ## Settings and the Start menu
@@ -112,13 +112,13 @@ change the same values; every change arrives in `OnSettingChanged`, also the
 ones you make yourself. A setting with `"scope": "player"` is every player's
 own choice, here the shape of their body.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "// Declared to GameNight: the phones" "}  // namespace"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "// Declared to GameNight: the phones" "}  // namespace"
 
 Every GameNight Start menu has the same layout: the game's name, **Resume**,
-**New round**, then the settings, with no button hints. Orb Rush's menu sends
+**New round**, then the settings, with no button hints. Dash Derby's menu sends
 each change back with `SetSettingJson`, so the phones show the same value:
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "\t\tApplySetting(Key, Value);\n\t\t// Tell GameNight" "\treturn true;\n}"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "\t\tApplySetting(Key, Value);\n\t\t// Tell GameNight" "\treturn true;\n}"
 
 ## Rounds, results and saves
 
@@ -127,7 +127,7 @@ one short line to the room log in the app. Each player's own progress is saved
 with their profile between nights, and `UnlockForPresent` gives an unlock to
 everyone who was there; `PartyUnion` reads what the people here tonight have.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "void AOrbRushGameMode::EndRound" "// ---- the frame"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "void ADashDerbyGameMode::EndRound" "// ---- the frame"
 
 The C++ API takes `gamenight::Json` values (`GN->Core()` is the protocol
 client underneath). Blueprints use the `...Json` functions, which take and
@@ -142,11 +142,11 @@ from a real folder, so stage it as loose files:
 
 ::: source ini examples/unreal-demo/Config/DefaultGame.ini "[/Script/UnrealEd.ProjectPackagingSettings]" "bUseIoStore"
 
-The game decides and the phone draws: Orb Rush sends each player their whole
+The game decides and the phone draws: Dash Derby sends each player their whole
 view, again whenever their phone connects, and checks every tap against the
 rules.
 
-::: source cpp examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp "void AOrbRushGameMode::HandlePhone(" "void AOrbRushGameMode::SendPhoneViews"
+::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "void ADashDerbyGameMode::HandlePhone(" "void ADashDerbyGameMode::SendPhoneViews"
 
 The page itself is plain HTML with the host's `/assets/companion.js`; see
 [Phone screens](/docs/phone-screens) for the limits of hosted rooms.
@@ -155,14 +155,14 @@ The page itself is plain HTML with the host's `/assets/companion.js`; see
 
 ## Build and package
 
-Open `examples/unreal-demo/OrbRush.uproject` with Unreal Engine 5.3 or later
+Open `examples/unreal-demo/DashDerby.uproject` with Unreal Engine 5.3 or later
 and let it build the modules, or build from the command line:
 
 ```sh
 # Windows
-Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project=<path>\OrbRush.uproject -platform=Win64 -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=<out>
+Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project=<path>\DashDerby.uproject -platform=Win64 -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=<out>
 # macOS
-Engine/Build/BatchFiles/RunUAT.sh BuildCookRun -project=<path>/OrbRush.uproject -platform=Mac -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=<out>
+Engine/Build/BatchFiles/RunUAT.sh BuildCookRun -project=<path>/DashDerby.uproject -platform=Mac -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=<out>
 ```
 
 The demo has no `.umap` and no assets of its own: it builds the arena from

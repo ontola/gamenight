@@ -63,14 +63,14 @@ static void Line(Client& client, const std::string& json) {
 
 static Client Launched() {
 	Config config;
-	config.game_id = "orb-rush";
+	config.game_id = "dash-derby";
 	config.token = "launch-token";
 	config.launched = true;
 	return Client(config);
 }
 
 static const char* kPrepare =
-	R"({"type":"prepare","game":"orb-rush","session":"s1",)"
+	R"({"type":"prepare","game":"dash-derby","session":"s1",)"
 	R"("seats":[{"index":0,"controller":"pad0","occupant":{"kind":"local","player_id":"ann"}},)"
 	R"({"index":1,"controller":"pad1","occupant":{"kind":"local","player_id":"bo"}},)"
 	R"({"index":2,"occupant":{"kind":"ai"}}],)"
@@ -110,7 +110,7 @@ static void TestHelloAndWelcome() {
 	EXPECT(hello.size() == 1);
 	EXPECT(hello[0]["type"].str() == "hello");
 	EXPECT(hello[0]["role"].str() == "game");
-	EXPECT(hello[0]["game"].str() == "orb-rush");
+	EXPECT(hello[0]["game"].str() == "dash-derby");
 	EXPECT(hello[0]["token"].str() == "launch-token");
 
 	Json settings = Json::MakeArray();
@@ -294,7 +294,7 @@ static void TestInput() {
 
 static void TestSettingsSavesPhones() {
 	Client client = Running();
-	Line(client, R"({"type":"setting_changed","game":"orb-rush","key":"orbs","value":9})");
+	Line(client, R"({"type":"setting_changed","game":"dash-derby","key":"orbs","value":9})");
 	std::vector<Event> events = Events(client);
 	EXPECT(events.size() == 1 && events[0].kind == Event::Kind::SettingChanged && events[0].key == "orbs" &&
 	       events[0].value.integer() == 9);
@@ -303,13 +303,13 @@ static void TestSettingsSavesPhones() {
 	std::vector<Json> sent = Sent(client);
 	EXPECT(sent.size() == 1 && sent[0]["type"].str() == "set_setting" && sent[0]["value"].integer() == 10);
 
-	Line(client, R"({"type":"player_settings","game":"orb-rush","player_id":"ann","values":{"hat":"crown"}})");
+	Line(client, R"({"type":"player_settings","game":"dash-derby","player_id":"ann","values":{"hat":"crown"}})");
 	events = Events(client);
 	EXPECT(events.size() == 1 && events[0].player_id == "ann");
 	EXPECT(client.player_setting("ann", "hat").str() == "crown");
 	EXPECT(client.player_setting("bo", "hat").is_null());
 
-	Line(client, R"({"type":"player_data","game":"orb-rush","player_id":"ann","data":{"best":4,"unlocks":["gold"]},"revision":3})");
+	Line(client, R"({"type":"player_data","game":"dash-derby","player_id":"ann","data":{"best":4,"unlocks":["gold"]},"revision":3})");
 	EXPECT(Events(client).size() == 1);
 	EXPECT(client.player_data("ann")["best"].integer() == 4);
 	client.SavePlayerData("ann", Json::MakeObject().set("best", 7));
@@ -319,7 +319,7 @@ static void TestSettingsSavesPhones() {
 	sent = Sent(client);
 	EXPECT(sent.size() == 1 && sent[0]["expected_revision"].integer() == 0);
 
-	Line(client, R"({"type":"player_data","game":"orb-rush","player_id":"ann","data":{"unlocks":["gold"]},"revision":4})");
+	Line(client, R"({"type":"player_data","game":"dash-derby","player_id":"ann","data":{"unlocks":["gold"]},"revision":4})");
 	Events(client);
 	EXPECT(client.PartyUnion().size() == 1);
 	client.UnlockForPresent("silver");
@@ -415,7 +415,7 @@ static void TestFaces() {
 
 static void TestStandalone() {
 	Config config;
-	config.game_id = "orb-rush";
+	config.game_id = "dash-derby";
 	Client client(config);
 	// Nothing goes out before the socket says hello.
 	client.DeclareSettings(Json::MakeArray());

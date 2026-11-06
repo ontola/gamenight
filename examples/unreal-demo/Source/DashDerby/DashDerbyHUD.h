@@ -6,10 +6,10 @@
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
 
-#include "OrbRushHUD.generated.h"
+#include "DashDerbyHUD.generated.h"
 
 UCLASS()
-class AOrbRushHUD : public AHUD
+class ADashDerbyHUD : public AHUD
 {
 	GENERATED_BODY()
 

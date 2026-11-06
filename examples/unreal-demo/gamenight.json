@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json",
   "id": "unreal-demo",
-  "title": "Orb Rush",
+  "title": "Dash Derby",
   "tagline": "Race your friends for orbs and dash them out of the way. The GameNight demo for Unreal Engine.",
   "developer": "Ontola",
   "players": {

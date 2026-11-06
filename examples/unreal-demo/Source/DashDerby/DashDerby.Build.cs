@@ -1,8 +1,8 @@
 using UnrealBuildTool;
 
-public class OrbRush : ModuleRules
+public class DashDerby : ModuleRules
 {
-	public OrbRush(ReadOnlyTargetRules Target) : base(Target)
+	public DashDerby(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "GameNight" });

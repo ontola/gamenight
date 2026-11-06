@@ -1,12 +1,12 @@
 using UnrealBuildTool;
 
-public class OrbRushEditorTarget : TargetRules
+public class DashDerbyEditorTarget : TargetRules
 {
-	public OrbRushEditorTarget(TargetInfo Target) : base(Target)
+	public DashDerbyEditorTarget(TargetInfo Target) : base(Target)
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.Latest;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-		ExtraModuleNames.Add("OrbRush");
+		ExtraModuleNames.Add("DashDerby");
 	}
 }

@@ -23,7 +23,7 @@ your engine, then follow its guide. If your engine is not listed as
 | [Rust](/docs/rust) | Partial | `gamenight-sdk` crate | Terminal demo game |
 | [C / C++](/docs/c) | Partial | `sdk/c/gamenight.h` | None yet (transport example only) |
 | [Unity](/docs/unity) | New | `sdk/unity` package and the Orb Rush demo | Orb Rush (demo) |
-| [Unreal Engine 5](/docs/unreal) | New | `sdk/unreal` plugin and the Orb Rush demo | Orb Rush (demo) |
+| [Unreal Engine 5](/docs/unreal) | New | `sdk/unreal` plugin and the Dash Derby demo | Dash Derby (demo) |
 | Other engines | Protocol only | [Wire protocol](/docs/other-engines) | Mineclonia (Luanti, game-specific adapter) |
 
 ## Features per engine
@@ -54,7 +54,7 @@ This list doubles as the roadmap for engine support.
   build has been tested on hardware yet: window handling, faces on screen and
   pads. Linux has no window hiding. The Input System code path is not compiled
   in CI.
-- **Unreal**: the plugin and the Orb Rush demo are new. CI unit tests the
+- **Unreal**: the plugin and the Dash Derby demo are new. CI unit tests the
   plugin's C++ protocol core and runs `gamenight-certify` against it headless,
   but has no Unreal build: the module and the demo are not compiled there, and
   window handling, audio, the world pause, faces on screen and pads are not

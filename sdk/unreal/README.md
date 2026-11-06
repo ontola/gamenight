@@ -2,7 +2,7 @@
 
 Start with the [Unreal integration guide](../../docs/site/unreal.md), published
 in [GameNight Docs](https://gamenight.ontola.io/docs/unreal). The demo game
-[Orb Rush](../../examples/unreal-demo) uses every part of the plugin.
+[Dash Derby](../../examples/unreal-demo) uses every part of the plugin.
 
 - `GameNight/` is the plugin. Copy it into your project's `Plugins/` folder,
   or list this folder in your `.uproject` under `AdditionalPluginDirectories`.

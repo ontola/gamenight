@@ -1,6 +1,6 @@
-#include "OrbRushGameMode.h"
+#include "DashDerbyGameMode.h"
 
-#include "OrbRushHUD.h"
+#include "DashDerbyHUD.h"
 
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
@@ -22,7 +22,7 @@
 
 using gamenight::Json;
 
-const FBox2D AOrbRushGameMode::Arena(FVector2D(-1200.0, -650.0), FVector2D(1200.0, 650.0));
+const FBox2D ADashDerbyGameMode::Arena(FVector2D(-1200.0, -650.0), FVector2D(1200.0, 650.0));
 
 namespace
 {
@@ -80,31 +80,31 @@ Json ActionsSpec()
 }
 }  // namespace
 
-AOrbRushGameMode::AOrbRushGameMode()
+ADashDerbyGameMode::ADashDerbyGameMode()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	// Paused by GameNight means paused: no simulation, no timers.
 	PrimaryActorTick.bTickEvenWhenPaused = false;
 	DefaultPawnClass = nullptr;
-	HUDClass = AOrbRushHUD::StaticClass();
+	HUDClass = ADashDerbyHUD::StaticClass();
 }
 
-UGameNightSubsystem* AOrbRushGameMode::GameNight() const { return UGameNightSubsystem::Get(this); }
+UGameNightSubsystem* ADashDerbyGameMode::GameNight() const { return UGameNightSubsystem::Get(this); }
 
-void AOrbRushGameMode::Trace(const FString& Line) const
+void ADashDerbyGameMode::Trace(const FString& Line) const
 {
 	// GAME_TRACE=1 prints what happens, for tests and agents reading the log.
 	if (bTrace) UE_LOG(LogTemp, Display, TEXT("trace: %s"), *Line);
 }
 
-const TArray<FString>& AOrbRushGameMode::MenuRows()
+const TArray<FString>& ADashDerbyGameMode::MenuRows()
 {
 	static const TArray<FString> Rows = {TEXT("Resume"), TEXT("New round"), TEXT("Round length"), TEXT("Orbs"),
 	                                     TEXT("Dash bumps")};
 	return Rows;
 }
 
-FString AOrbRushGameMode::MenuValue(int32 Row) const
+FString ADashDerbyGameMode::MenuValue(int32 Row) const
 {
 	switch (Row)
 	{
@@ -117,7 +117,7 @@ FString AOrbRushGameMode::MenuValue(int32 Row) const
 
 // ---- setup -----------------------------------------------------------------
 
-void AOrbRushGameMode::BeginPlay()
+void ADashDerbyGameMode::BeginPlay()
 {
 	Super::BeginPlay();
 	bTrace = FPlatformMisc::GetEnvironmentVariable(TEXT("GAME_TRACE")) == TEXT("1");
@@ -132,19 +132,19 @@ void AOrbRushGameMode::BeginPlay()
 	UGameNightSubsystem* GN = GameNight();
 	if (GN && GN->IsLaunchedByGameNight())
 	{
-		GN->OnConnected.AddDynamic(this, &AOrbRushGameMode::HandleConnected);
-		GN->OnPrepared.AddDynamic(this, &AOrbRushGameMode::HandlePrepared);
-		GN->OnStarted.AddDynamic(this, &AOrbRushGameMode::HandleStarted);
-		GN->OnPaused.AddDynamic(this, &AOrbRushGameMode::HandlePaused);
-		GN->OnResumed.AddDynamic(this, &AOrbRushGameMode::HandleResumed);
-		GN->OnDisposed.AddDynamic(this, &AOrbRushGameMode::HandleDisposed);
-		GN->OnRosterChanged.AddDynamic(this, &AOrbRushGameMode::HandleRosterChanged);
-		GN->OnPlayersUpdated.AddDynamic(this, &AOrbRushGameMode::HandlePlayersUpdated);
-		GN->OnSettingChanged.AddDynamic(this, &AOrbRushGameMode::HandleSettingChanged);
-		GN->OnPlayerSettingsChanged.AddDynamic(this, &AOrbRushGameMode::HandlePlayerSettings);
-		GN->OnActionTriggered.AddDynamic(this, &AOrbRushGameMode::HandleAction);
-		GN->OnCompanionMessage.AddDynamic(this, &AOrbRushGameMode::HandlePhone);
-		GN->OnCompanionPresence.AddDynamic(this, &AOrbRushGameMode::HandlePhonePresence);
+		GN->OnConnected.AddDynamic(this, &ADashDerbyGameMode::HandleConnected);
+		GN->OnPrepared.AddDynamic(this, &ADashDerbyGameMode::HandlePrepared);
+		GN->OnStarted.AddDynamic(this, &ADashDerbyGameMode::HandleStarted);
+		GN->OnPaused.AddDynamic(this, &ADashDerbyGameMode::HandlePaused);
+		GN->OnResumed.AddDynamic(this, &ADashDerbyGameMode::HandleResumed);
+		GN->OnDisposed.AddDynamic(this, &ADashDerbyGameMode::HandleDisposed);
+		GN->OnRosterChanged.AddDynamic(this, &ADashDerbyGameMode::HandleRosterChanged);
+		GN->OnPlayersUpdated.AddDynamic(this, &ADashDerbyGameMode::HandlePlayersUpdated);
+		GN->OnSettingChanged.AddDynamic(this, &ADashDerbyGameMode::HandleSettingChanged);
+		GN->OnPlayerSettingsChanged.AddDynamic(this, &ADashDerbyGameMode::HandlePlayerSettings);
+		GN->OnActionTriggered.AddDynamic(this, &ADashDerbyGameMode::HandleAction);
+		GN->OnCompanionMessage.AddDynamic(this, &ADashDerbyGameMode::HandlePhone);
+		GN->OnCompanionPresence.AddDynamic(this, &ADashDerbyGameMode::HandlePhonePresence);
 		// Declared once; the plugin declares them again after a reconnect.
 		GN->DeclareSettings(SettingsSpec());
 		GN->DeclareActions(ActionsSpec());
@@ -169,7 +169,7 @@ void AOrbRushGameMode::BeginPlay()
 	NewRound();
 }
 
-void AOrbRushGameMode::BuildLevel()
+void ADashDerbyGameMode::BuildLevel()
 {
 	if (bLevelBuilt) return;
 	bLevelBuilt = true;
@@ -229,13 +229,13 @@ void AOrbRushGameMode::BuildLevel()
 	}
 }
 
-void AOrbRushGameMode::PostLogin(APlayerController* NewPlayer)
+void ADashDerbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
 	UseFixedCamera(NewPlayer);
 }
 
-void AOrbRushGameMode::UseFixedCamera(APlayerController* Controller)
+void ADashDerbyGameMode::UseFixedCamera(APlayerController* Controller)
 {
 	// One fixed camera over the whole field; there is no pawn to follow.
 	if (!Controller || !FixedCamera) return;
@@ -245,14 +245,14 @@ void AOrbRushGameMode::UseFixedCamera(APlayerController* Controller)
 
 // ---- GameNight lifecycle ---------------------------------------------------
 
-void AOrbRushGameMode::HandleConnected()
+void ADashDerbyGameMode::HandleConnected()
 {
 	// Nothing to do: settings, actions and the phone screen are declared
 	// again by the plugin on every (re)connect.
 	Trace(TEXT("connected"));
 }
 
-void AOrbRushGameMode::HandlePrepared(const FString& SessionId)
+void ADashDerbyGameMode::HandlePrepared(const FString& SessionId)
 {
 	UGameNightSubsystem* GN = GameNight();
 	GN->NotifyProgress(20, TEXT("seating players"));
@@ -266,14 +266,14 @@ void AOrbRushGameMode::HandlePrepared(const FString& SessionId)
 	GN->NotifyReady();
 }
 
-void AOrbRushGameMode::HandleStarted(const FString& SessionId)
+void ADashDerbyGameMode::HandleStarted(const FString& SessionId)
 {
 	bHostPaused = false;
 	Trace(TEXT("running"));
 	SendPhoneViews();
 }
 
-void AOrbRushGameMode::HandlePaused(const FString& SessionId)
+void ADashDerbyGameMode::HandlePaused(const FString& SessionId)
 {
 	bHostPaused = true;
 	// Nothing else to do: the plugin pauses the world, mutes the game and
@@ -281,13 +281,13 @@ void AOrbRushGameMode::HandlePaused(const FString& SessionId)
 	Trace(TEXT("paused"));
 }
 
-void AOrbRushGameMode::HandleResumed(const FString& SessionId)
+void ADashDerbyGameMode::HandleResumed(const FString& SessionId)
 {
 	bHostPaused = false;
 	Trace(TEXT("running"));
 }
 
-void AOrbRushGameMode::HandleDisposed(const FString& SessionId)
+void ADashDerbyGameMode::HandleDisposed(const FString& SessionId)
 {
 	bHostPaused = true;
 	MenuOwner = -1;
@@ -295,7 +295,7 @@ void AOrbRushGameMode::HandleDisposed(const FString& SessionId)
 	Trace(TEXT("disposed"));
 }
 
-void AOrbRushGameMode::SeatFromSession()
+void ADashDerbyGameMode::SeatFromSession()
 {
 	UGameNightSubsystem* GN = GameNight();
 	ClearRunners();
@@ -329,7 +329,7 @@ void AOrbRushGameMode::SeatFromSession()
 	Trace(TEXT("seated ") + FString::Join(Seated, TEXT(", ")));
 }
 
-void AOrbRushGameMode::HandleRosterChanged()
+void ADashDerbyGameMode::HandleRosterChanged()
 {
 	// Someone joined or left mid-round. Keep everyone who is still seated
 	// (with their score), add the newcomers, drop who left.
@@ -368,7 +368,7 @@ void AOrbRushGameMode::HandleRosterChanged()
 	MenuOwner = -1;
 }
 
-void AOrbRushGameMode::HandlePlayersUpdated()
+void ADashDerbyGameMode::HandlePlayersUpdated()
 {
 	// A name, colour or face changed. Update in place; never restart.
 	UGameNightSubsystem* GN = GameNight();
@@ -384,7 +384,7 @@ void AOrbRushGameMode::HandlePlayersUpdated()
 
 // ---- settings, actions, phones ---------------------------------------------
 
-void AOrbRushGameMode::ApplySetting(const FString& Key, const FString& ValueJson)
+void ADashDerbyGameMode::ApplySetting(const FString& Key, const FString& ValueJson)
 {
 	const Json Value = Json::parse(UGameNightSubsystem::ToUtf8(ValueJson));
 	if (Key == TEXT("round_seconds")) RoundSeconds = FMath::Clamp(static_cast<int32>(Value.integer(RoundSeconds)), 20, 180);
@@ -394,20 +394,20 @@ void AOrbRushGameMode::ApplySetting(const FString& Key, const FString& ValueJson
 	Trace(FString::Printf(TEXT("setting %s = %s"), *Key, *ValueJson));
 }
 
-void AOrbRushGameMode::HandleSettingChanged(const FString& Key, const FString& ValueJson)
+void ADashDerbyGameMode::HandleSettingChanged(const FString& Key, const FString& ValueJson)
 {
 	// Values from the party apply from the next round (orbs fill up at once).
 	ApplySetting(Key, ValueJson);
 	while (Orbs.Num() < OrbCount && Runners.Num() > 0) Orbs.Add(FreeSpot());
 }
 
-void AOrbRushGameMode::HandlePlayerSettings(const FString& PlayerId)
+void ADashDerbyGameMode::HandlePlayerSettings(const FString& PlayerId)
 {
 	for (FOrbRunner& Runner : Runners)
 		if (Runner.Player.Id == PlayerId) ApplyShape(Runner);
 }
 
-void AOrbRushGameMode::HandleAction(const FString& Key, const FString& PlayerId)
+void ADashDerbyGameMode::HandleAction(const FString& Key, const FString& PlayerId)
 {
 	// The room log already says who pressed it.
 	if (Key == TEXT("new_round"))
@@ -417,7 +417,7 @@ void AOrbRushGameMode::HandleAction(const FString& Key, const FString& PlayerId)
 	}
 }
 
-void AOrbRushGameMode::HandlePhone(const FString& PlayerId, const FString& DataJson)
+void ADashDerbyGameMode::HandlePhone(const FString& PlayerId, const FString& DataJson)
 {
 	// Phone messages are untrusted input: check them against the rules.
 	const Json Data = Json::parse(UGameNightSubsystem::ToUtf8(DataJson));
@@ -432,7 +432,7 @@ void AOrbRushGameMode::HandlePhone(const FString& PlayerId, const FString& DataJ
 	}
 }
 
-void AOrbRushGameMode::HandlePhonePresence(const FString& PlayerId, bool bConnected)
+void ADashDerbyGameMode::HandlePhonePresence(const FString& PlayerId, bool bConnected)
 {
 	// Phones reload and sleep: send the whole view again on connect.
 	for (FOrbRunner& Runner : Runners)
@@ -443,7 +443,7 @@ void AOrbRushGameMode::HandlePhonePresence(const FString& PlayerId, bool bConnec
 	}
 }
 
-void AOrbRushGameMode::SendPhoneView(const FOrbRunner& Runner)
+void ADashDerbyGameMode::SendPhoneView(const FOrbRunner& Runner)
 {
 	UGameNightSubsystem* GN = GameNight();
 	if (!GN || Runner.Player.Id.IsEmpty()) return;
@@ -459,7 +459,7 @@ void AOrbRushGameMode::SendPhoneView(const FOrbRunner& Runner)
 	GN->SendCompanionMessage(View, Runner.Player.Id);
 }
 
-void AOrbRushGameMode::SendPhoneViews()
+void ADashDerbyGameMode::SendPhoneViews()
 {
 	for (const FOrbRunner& Runner : Runners)
 		if (Runner.bPhone || !Runner.Player.Id.IsEmpty()) SendPhoneView(Runner);
@@ -467,7 +467,7 @@ void AOrbRushGameMode::SendPhoneViews()
 
 // ---- runners -----------------------------------------------------------------
 
-void AOrbRushGameMode::AddRunner(FOrbRunner Runner)
+void ADashDerbyGameMode::AddRunner(FOrbRunner Runner)
 {
 	const int32 Index = Runners.Num();
 	if (Runner.Player.Id.IsEmpty() && Runner.Player.Name.IsEmpty())
@@ -500,7 +500,7 @@ void AOrbRushGameMode::AddRunner(FOrbRunner Runner)
 	Runners.Add(MoveTemp(Runner));
 }
 
-void AOrbRushGameMode::ApplyShape(FOrbRunner& Runner)
+void ADashDerbyGameMode::ApplyShape(FOrbRunner& Runner)
 {
 	if (UGameNightSubsystem* GN = GameNight(); GN && !Runner.Player.Id.IsEmpty())
 	{
@@ -517,7 +517,7 @@ void AOrbRushGameMode::ApplyShape(FOrbRunner& Runner)
 	}
 }
 
-void AOrbRushGameMode::ClearRunners()
+void ADashDerbyGameMode::ClearRunners()
 {
 	for (FOrbRunner& Runner : Runners)
 	{
@@ -527,25 +527,25 @@ void AOrbRushGameMode::ClearRunners()
 	Runners.Reset();
 }
 
-FVector2D AOrbRushGameMode::FreeSpot()
+FVector2D ADashDerbyGameMode::FreeSpot()
 {
 	return FVector2D(Random.FRandRange(static_cast<float>(Arena.Min.X) + 60.0f, static_cast<float>(Arena.Max.X) - 60.0f),
 	                 Random.FRandRange(static_cast<float>(Arena.Min.Y) + 60.0f, static_cast<float>(Arena.Max.Y) - 60.0f));
 }
 
-FVector AOrbRushGameMode::BodyLocation(const FOrbRunner& Runner) const
+FVector ADashDerbyGameMode::BodyLocation(const FOrbRunner& Runner) const
 {
 	return FVector(-Runner.Position.Y, Runner.Position.X, RunnerRadius);
 }
 
-int32 AOrbRushGameMode::BestScore(const FOrbRunner& Runner) const
+int32 ADashDerbyGameMode::BestScore(const FOrbRunner& Runner) const
 {
 	const UGameNightSubsystem* GN = GameNight();
 	if (!GN || Runner.Player.Id.IsEmpty()) return 0;
 	return static_cast<int32>(GN->Core().player_data(UGameNightSubsystem::ToUtf8(Runner.Player.Id))["best"].integer());
 }
 
-bool AOrbRushGameMode::HasCrown(const FOrbRunner& Runner) const
+bool ADashDerbyGameMode::HasCrown(const FOrbRunner& Runner) const
 {
 	// Tonight's crown: unlocked by anyone present, worn by the leader.
 	const UGameNightSubsystem* GN = GameNight();
@@ -557,7 +557,7 @@ bool AOrbRushGameMode::HasCrown(const FOrbRunner& Runner) const
 
 // ---- rounds ------------------------------------------------------------------
 
-void AOrbRushGameMode::NewRound()
+void ADashDerbyGameMode::NewRound()
 {
 	++Round;
 	Clock = static_cast<float>(RoundSeconds);
@@ -578,7 +578,7 @@ void AOrbRushGameMode::NewRound()
 	Trace(FString::Printf(TEXT("round %d"), Round));
 }
 
-void AOrbRushGameMode::EndRound()
+void ADashDerbyGameMode::EndRound()
 {
 	Results = ResultsSeconds;
 	TArray<const FOrbRunner*> Ranking;
@@ -600,7 +600,7 @@ void AOrbRushGameMode::EndRound()
 	SendPhoneViews();
 }
 
-void AOrbRushGameMode::SaveProgress()
+void ADashDerbyGameMode::SaveProgress()
 {
 	// Each player's own progress, kept with their profile between nights.
 	UGameNightSubsystem* GN = GameNight();
@@ -619,7 +619,7 @@ void AOrbRushGameMode::SaveProgress()
 
 // ---- the frame -----------------------------------------------------------------
 
-FVector2D AOrbRushGameMode::ReadMove(FOrbRunner& Runner, uint32& OutPressed)
+FVector2D ADashDerbyGameMode::ReadMove(FOrbRunner& Runner, uint32& OutPressed)
 {
 	OutPressed = 0;
 	FVector2D Move = FVector2D::ZeroVector;
@@ -680,7 +680,7 @@ FVector2D AOrbRushGameMode::ReadMove(FOrbRunner& Runner, uint32& OutPressed)
 	return Move.GetClampedToMaxSize(1.0);
 }
 
-bool AOrbRushGameMode::StepMenu(const TArray<uint32>& Pressed)
+bool ADashDerbyGameMode::StepMenu(const TArray<uint32>& Pressed)
 {
 	const uint32 Start = Bit(EGameNightButton::Start);
 	if (MenuOwner < 0)
@@ -743,7 +743,7 @@ bool AOrbRushGameMode::StepMenu(const TArray<uint32>& Pressed)
 	return true;
 }
 
-void AOrbRushGameMode::Tick(float DeltaSeconds)
+void ADashDerbyGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	if (bHostPaused || Runners.Num() == 0) return;
@@ -768,7 +768,7 @@ void AOrbRushGameMode::Tick(float DeltaSeconds)
 	}
 }
 
-void AOrbRushGameMode::Simulate(float DeltaSeconds, const TArray<FVector2D>& Moves, const TArray<uint32>& Pressed)
+void ADashDerbyGameMode::Simulate(float DeltaSeconds, const TArray<FVector2D>& Moves, const TArray<uint32>& Pressed)
 {
 	// Players keep moving while the results show; nothing scores.
 	const bool bScoring = Results <= 0.0f;
@@ -825,7 +825,7 @@ void AOrbRushGameMode::Simulate(float DeltaSeconds, const TArray<FVector2D>& Mov
 	if (Clock <= 0.0f) EndRound();
 }
 
-void AOrbRushGameMode::Collide()
+void ADashDerbyGameMode::Collide()
 {
 	UGameNightSubsystem* GN = GameNight();
 	for (int32 I = 0; I < Runners.Num(); ++I)
@@ -852,7 +852,7 @@ void AOrbRushGameMode::Collide()
 	}
 }
 
-void AOrbRushGameMode::SyncActors()
+void ADashDerbyGameMode::SyncActors()
 {
 	for (FOrbRunner& Runner : Runners)
 	{

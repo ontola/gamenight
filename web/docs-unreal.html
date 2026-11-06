@@ -13,7 +13,7 @@
 <p>The GameNight plugin for Unreal Engine 5 lives in <code>sdk/unreal/GameNight</code>. It
 covers the whole game contract: the connection and lifecycle, input per seat,
 the window and audio, the world pause, match and per-player settings, saved
-progress, faces and phone screens. <strong>Orb Rush</strong> in <code>examples/unreal-demo</code> is a
+progress, faces and phone screens. <strong>Dash Derby</strong> in <code>examples/unreal-demo</code> is a
 complete demo game built on it, and every snippet on this page comes from
 that game or the plugin.</p>
 <p>The plugin is written for Unreal Engine 5.3 and later on Windows, macOS and
@@ -26,10 +26,10 @@ your <code>.uproject</code> at the folder that holds it, as the demo does:</p>
 	&quot;FileVersion&quot;: 3,
 	&quot;EngineAssociation&quot;: &quot;5.5&quot;,
 	&quot;Category&quot;: &quot;&quot;,
-	&quot;Description&quot;: &quot;Orb Rush: the GameNight demo game for Unreal Engine.&quot;,
+	&quot;Description&quot;: &quot;Dash Derby: the GameNight demo game for Unreal Engine.&quot;,
 	&quot;Modules&quot;: [
 		{
-			&quot;Name&quot;: &quot;OrbRush&quot;,
+			&quot;Name&quot;: &quot;DashDerby&quot;,
 			&quot;Type&quot;: &quot;Runtime&quot;,
 			&quot;LoadingPhase&quot;: &quot;Default&quot;,
 			&quot;AdditionalDependencies&quot;: [ &quot;Engine&quot; ]
@@ -41,7 +41,7 @@ your <code>.uproject</code> at the folder that holds it, as the demo does:</p>
 	&quot;AdditionalPluginDirectories&quot;: [ &quot;../../sdk/unreal&quot; ]
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/OrbRush.uproject#L1">Source: examples/unreal-demo/OrbRush.uproject</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/DashDerby.uproject#L1">Source: examples/unreal-demo/DashDerby.uproject</a></p>
 <p>Add <code>&quot;GameNight&quot;</code> to your module's dependencies in its <code>.Build.cs</code>, then set
 your game id under <strong>Project Settings &gt; Plugins &gt; GameNight</strong>. It must match
 your catalog entry; GameNight also passes it in <code>GAMENIGHT_GAME_ID</code>.</p>
@@ -79,25 +79,25 @@ without code from you. Both are settings. F1 returns to the party; the
 controller's Back button is GameNight's own and reaches the host directly.
 When the host goes away, a launched game quits.</p>
 <h2 id="bind-the-lifecycle">Bind the lifecycle</h2>
-<p>Orb Rush connects its handlers in <code>BeginPlay</code> and declares its settings, its
+<p>Dash Derby connects its handlers in <code>BeginPlay</code> and declares its settings, its
 phone button and its phone screen once. The plugin declares them again after
 every reconnect.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">UGameNightSubsystem* GN = GameNight();
 if (GN &amp;&amp; GN-&gt;IsLaunchedByGameNight())
 {
-	GN-&gt;OnConnected.AddDynamic(this, &amp;AOrbRushGameMode::HandleConnected);
-	GN-&gt;OnPrepared.AddDynamic(this, &amp;AOrbRushGameMode::HandlePrepared);
-	GN-&gt;OnStarted.AddDynamic(this, &amp;AOrbRushGameMode::HandleStarted);
-	GN-&gt;OnPaused.AddDynamic(this, &amp;AOrbRushGameMode::HandlePaused);
-	GN-&gt;OnResumed.AddDynamic(this, &amp;AOrbRushGameMode::HandleResumed);
-	GN-&gt;OnDisposed.AddDynamic(this, &amp;AOrbRushGameMode::HandleDisposed);
-	GN-&gt;OnRosterChanged.AddDynamic(this, &amp;AOrbRushGameMode::HandleRosterChanged);
-	GN-&gt;OnPlayersUpdated.AddDynamic(this, &amp;AOrbRushGameMode::HandlePlayersUpdated);
-	GN-&gt;OnSettingChanged.AddDynamic(this, &amp;AOrbRushGameMode::HandleSettingChanged);
-	GN-&gt;OnPlayerSettingsChanged.AddDynamic(this, &amp;AOrbRushGameMode::HandlePlayerSettings);
-	GN-&gt;OnActionTriggered.AddDynamic(this, &amp;AOrbRushGameMode::HandleAction);
-	GN-&gt;OnCompanionMessage.AddDynamic(this, &amp;AOrbRushGameMode::HandlePhone);
-	GN-&gt;OnCompanionPresence.AddDynamic(this, &amp;AOrbRushGameMode::HandlePhonePresence);
+	GN-&gt;OnConnected.AddDynamic(this, &amp;ADashDerbyGameMode::HandleConnected);
+	GN-&gt;OnPrepared.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePrepared);
+	GN-&gt;OnStarted.AddDynamic(this, &amp;ADashDerbyGameMode::HandleStarted);
+	GN-&gt;OnPaused.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePaused);
+	GN-&gt;OnResumed.AddDynamic(this, &amp;ADashDerbyGameMode::HandleResumed);
+	GN-&gt;OnDisposed.AddDynamic(this, &amp;ADashDerbyGameMode::HandleDisposed);
+	GN-&gt;OnRosterChanged.AddDynamic(this, &amp;ADashDerbyGameMode::HandleRosterChanged);
+	GN-&gt;OnPlayersUpdated.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePlayersUpdated);
+	GN-&gt;OnSettingChanged.AddDynamic(this, &amp;ADashDerbyGameMode::HandleSettingChanged);
+	GN-&gt;OnPlayerSettingsChanged.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePlayerSettings);
+	GN-&gt;OnActionTriggered.AddDynamic(this, &amp;ADashDerbyGameMode::HandleAction);
+	GN-&gt;OnCompanionMessage.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePhone);
+	GN-&gt;OnCompanionPresence.AddDynamic(this, &amp;ADashDerbyGameMode::HandlePhonePresence);
 	// Declared once; the plugin declares them again after a reconnect.
 	GN-&gt;DeclareSettings(SettingsSpec());
 	GN-&gt;DeclareActions(ActionsSpec());
@@ -110,10 +110,10 @@ if (GN &amp;&amp; GN-&gt;IsLaunchedByGameNight())
 	return;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L132">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L132">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>On prepare, it seats everyone in couch order (left to right as they sit),
 opts into live joins and reports ready:</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void AOrbRushGameMode::HandlePrepared(const FString&amp; SessionId)
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::HandlePrepared(const FString&amp; SessionId)
 {
 	UGameNightSubsystem* GN = GameNight();
 	GN-&gt;NotifyProgress(20, TEXT(&quot;seating players&quot;));
@@ -127,8 +127,8 @@ opts into live joins and reports ready:</p>
 	GN-&gt;NotifyReady();
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L255">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void AOrbRushGameMode::SeatFromSession()
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L255">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::SeatFromSession()
 {
 	UGameNightSubsystem* GN = GameNight();
 	ClearRunners();
@@ -157,7 +157,7 @@ opts into live joins and reports ready:</p>
 		AddRunner(MoveTemp(Bot));
 	}
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L298">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L298">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>Seats with an AI occupant get a bot. Empty seats are skipped. The number of
 people is <code>LocalSeatCount()</code>, never the number of pads you can see.</p>
 <h2 id="read-input-per-seat">Read input per seat</h2>
@@ -181,7 +181,7 @@ must be released first, so one press never does two things.</p>
 	if (Pad.Buttons != 0 || !Move.IsNearlyZero(0.3)) GN-&gt;ReportActivity(Runner.Seat);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L644">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L644">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p><code>ReportActivity</code> tells GameNight someone is really playing, so the party does
 not mark them asleep. <code>Rumble(Seat, Weak, Strong, Seconds)</code> vibrates that
 seat's controller. Back is never bound: it returns to the party.</p>
@@ -199,11 +199,11 @@ for (const FOrbRunner&amp; Runner : Mode-&gt;Runners)
 	GN-&gt;DrawFace(Canvas, Runner.Player, FVector2D(Screen.X, Screen.Y), 30.0f * Unit, Facing);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushHUD.cpp#L47">Source: examples/unreal-demo/Source/OrbRush/OrbRushHUD.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp#L47">Source: examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp</a></p>
 <p><code>GetFaceTexture(Player)</code> gives the face alone as a nearest-filtered texture,
 for a material or a widget. Profile changes arrive in <code>OnPlayersUpdated</code>
 while the match runs: update in place and never restart.</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void AOrbRushGameMode::HandlePlayersUpdated()
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::HandlePlayersUpdated()
 {
 	// A name, colour or face changed. Update in place; never restart.
 	UGameNightSubsystem* GN = GameNight();
@@ -217,9 +217,9 @@ while the match runs: update in place and never restart.</p>
 	Trace(TEXT(&quot;players updated&quot;));
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L371">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L371">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>With <code>NotifyParticipation(true)</code>, players who join or leave mid-round arrive
-in <code>OnRosterChanged</code>. Orb Rush keeps everyone still seated, with their score,
+in <code>OnRosterChanged</code>. Dash Derby keeps everyone still seated, with their score,
 and adds the newcomers at once.</p>
 <h2 id="settings-and-the-start-menu">Settings and the Start menu</h2>
 <p>Declare the settings the party may change. Phones, an LLM and your own menu
@@ -252,9 +252,9 @@ Json ActionsSpec()
 	                                  .set(&quot;confirm&quot;, true));
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L56">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L56">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>Every GameNight Start menu has the same layout: the game's name, <strong>Resume</strong>,
-<strong>New round</strong>, then the settings, with no button hints. Orb Rush's menu sends
+<strong>New round</strong>, then the settings, with no button hints. Dash Derby's menu sends
 each change back with <code>SetSettingJson</code>, so the phones show the same value:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">ApplySetting(Key, Value);
 	// Tell GameNight, so the phones and an LLM show the same value.
@@ -262,13 +262,13 @@ each change back with <code>SetSettingJson</code>, so the phones show the same v
 	if (GN &amp;&amp; GN-&gt;IsLaunchedByGameNight()) GN-&gt;SetSettingJson(Key, Value);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L738">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L738">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <h2 id="rounds-results-and-saves">Rounds, results and saves</h2>
 <p>A round ends with <code>NotifyFinished()</code>; the session goes on. <code>AddRoomLog</code> writes
 one short line to the room log in the app. Each player's own progress is saved
 with their profile between nights, and <code>UnlockForPresent</code> gives an unlock to
 everyone who was there; <code>PartyUnion</code> reads what the people here tonight have.</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void AOrbRushGameMode::EndRound()
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::EndRound()
 {
 	Results = ResultsSeconds;
 	TArray&lt;const FOrbRunner*&gt; Ranking;
@@ -290,7 +290,7 @@ everyone who was there; <code>PartyUnion</code> reads what the people here tonig
 	SendPhoneViews();
 }
 
-void AOrbRushGameMode::SaveProgress()
+void ADashDerbyGameMode::SaveProgress()
 {
 	// Each player's own progress, kept with their profile between nights.
 	UGameNightSubsystem* GN = GameNight();
@@ -307,7 +307,7 @@ void AOrbRushGameMode::SaveProgress()
 	}
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L581">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L581">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>The C++ API takes <code>gamenight::Json</code> values (<code>GN-&gt;Core()</code> is the protocol
 client underneath). Blueprints use the <code>...Json</code> functions, which take and
 return JSON text.</p>
@@ -324,10 +324,10 @@ from a real folder, so stage it as loose files:</p>
 +MapsToCook=(FilePath=&quot;/Engine/Maps/Entry&quot;)
 </code></pre></div>
 <p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Config/DefaultGame.ini#L13">Source: examples/unreal-demo/Config/DefaultGame.ini</a></p>
-<p>The game decides and the phone draws: Orb Rush sends each player their whole
+<p>The game decides and the phone draws: Dash Derby sends each player their whole
 view, again whenever their phone connects, and checks every tap against the
 rules.</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void AOrbRushGameMode::HandlePhone(const FString&amp; PlayerId, const FString&amp; DataJson)
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::HandlePhone(const FString&amp; PlayerId, const FString&amp; DataJson)
 {
 	// Phone messages are untrusted input: check them against the rules.
 	const Json Data = Json::parse(UGameNightSubsystem::ToUtf8(DataJson));
@@ -342,7 +342,7 @@ rules.</p>
 	}
 }
 
-void AOrbRushGameMode::HandlePhonePresence(const FString&amp; PlayerId, bool bConnected)
+void ADashDerbyGameMode::HandlePhonePresence(const FString&amp; PlayerId, bool bConnected)
 {
 	// Phones reload and sleep: send the whole view again on connect.
 	for (FOrbRunner&amp; Runner : Runners)
@@ -353,7 +353,7 @@ void AOrbRushGameMode::HandlePhonePresence(const FString&amp; PlayerId, bool bCo
 	}
 }
 
-void AOrbRushGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
+void ADashDerbyGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
 {
 	UGameNightSubsystem* GN = GameNight();
 	if (!GN || Runner.Player.Id.IsEmpty()) return;
@@ -369,7 +369,7 @@ void AOrbRushGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
 	GN-&gt;SendCompanionMessage(View, Runner.Player.Id);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp#L420">Source: examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L420">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>The page itself is plain HTML with the host's <code>/assets/companion.js</code>; see
 <a href="/docs/phone-screens">Phone screens</a> for the limits of hosted rooms.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-html">&lt;script src=&quot;/assets/companion.js&quot;&gt;&lt;/script&gt;
@@ -382,7 +382,7 @@ void AOrbRushGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
   function render(view) {
     if (typeof view !== &quot;object&quot; || view === null) return;
     if (typeof view.color === &quot;string&quot;) document.documentElement.style.setProperty(&quot;--you&quot;, view.color);
-    $(&quot;name&quot;).textContent = view.name || &quot;Orb Rush&quot;;
+    $(&quot;name&quot;).textContent = view.name || &quot;Dash Derby&quot;;
     $(&quot;score&quot;).textContent = String(view.score ?? 0);
     $(&quot;clock&quot;).textContent = view.results ? &quot;Results&quot; : (view.clock != null ? view.clock + &quot; s&quot; : &quot;&quot;);
     $(&quot;boost&quot;).disabled = !view.boost || view.results;
@@ -395,12 +395,12 @@ void AOrbRushGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
 </code></pre></div>
 <p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Content/Phone/index.html#L44">Source: examples/unreal-demo/Content/Phone/index.html</a></p>
 <h2 id="build-and-package">Build and package</h2>
-<p>Open <code>examples/unreal-demo/OrbRush.uproject</code> with Unreal Engine 5.3 or later
+<p>Open <code>examples/unreal-demo/DashDerby.uproject</code> with Unreal Engine 5.3 or later
 and let it build the modules, or build from the command line:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh"># Windows
-Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project=&lt;path&gt;\OrbRush.uproject -platform=Win64 -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=&lt;out&gt;
+Engine\Build\BatchFiles\RunUAT.bat BuildCookRun -project=&lt;path&gt;\DashDerby.uproject -platform=Win64 -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=&lt;out&gt;
 # macOS
-Engine/Build/BatchFiles/RunUAT.sh BuildCookRun -project=&lt;path&gt;/OrbRush.uproject -platform=Mac -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=&lt;out&gt;
+Engine/Build/BatchFiles/RunUAT.sh BuildCookRun -project=&lt;path&gt;/DashDerby.uproject -platform=Mac -clientconfig=Shipping -build -cook -stage -pak -archive -archivedirectory=&lt;out&gt;
 </code></pre></div>
 <p>The demo has no <code>.umap</code> and no assets of its own: it builds the arena from
 engine shapes in code, so it cooks <code>/Engine/BasicShapes</code> and the empty
@@ -427,7 +427,7 @@ GameNight, then follow the <a href="/docs/testing">test guide</a>, before relyin
 them for a release.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/unreal.md">Edit this page</a><span data-source-fingerprint="689ceda9ace63028dd3a1f00120fa668feb84bfe798d2e5112e7205b25531632">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/unreal.md">Edit this page</a><span data-source-fingerprint="094c3e602745ad098f11e45e5aa2f92ef2a3ea00009dfb90b5955d7d97ed469a">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/unity"><small>Previous</small>Unity</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-plugin">Add the plugin</a><a href="#how-it-fits-together">How it fits together</a><a href="#bind-the-lifecycle">Bind the lifecycle</a><a href="#read-input-per-seat">Read input per seat</a><a href="#players-colours-and-faces">Players, colours and faces</a><a href="#settings-and-the-start-menu">Settings and the Start menu</a><a href="#rounds-results-and-saves">Rounds, results and saves</a><a href="#phone-screens-and-phone-buttons">Phone screens and phone buttons</a><a href="#build-and-package">Build and package</a><a href="#what-is-tested">What is tested</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

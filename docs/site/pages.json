@@ -110,8 +110,8 @@
       "sdk/unreal/GameNight/Source/GameNight/Private/GameNightSubsystem.cpp",
       "sdk/unreal/GameNight/Source/GameNight/Private/GameNightCore.cpp",
       "sdk/unreal/GameNight/Source/GameNight/Public/GameNightTypes.h",
-      "examples/unreal-demo/Source/OrbRush/OrbRushGameMode.cpp",
-      "examples/unreal-demo/Source/OrbRush/OrbRushHUD.cpp",
+      "examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp",
+      "examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp",
       "scripts/test-unreal-sdk.py"
     ]
   },

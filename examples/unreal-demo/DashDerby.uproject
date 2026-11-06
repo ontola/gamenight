@@ -2,10 +2,10 @@
 	"FileVersion": 3,
 	"EngineAssociation": "5.5",
 	"Category": "",
-	"Description": "Orb Rush: the GameNight demo game for Unreal Engine.",
+	"Description": "Dash Derby: the GameNight demo game for Unreal Engine.",
 	"Modules": [
 		{
-			"Name": "OrbRush",
+			"Name": "DashDerby",
 			"Type": "Runtime",
 			"LoadingPhase": "Default",
 			"AdditionalDependencies": [ "Engine" ]

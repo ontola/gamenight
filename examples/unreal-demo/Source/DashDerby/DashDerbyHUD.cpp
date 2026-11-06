@@ -1,4 +1,4 @@
-#include "OrbRushHUD.h"
+#include "DashDerbyHUD.h"
 
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
@@ -6,9 +6,9 @@
 #include "Engine/Font.h"
 #include "Engine/World.h"
 #include "GameNightSubsystem.h"
-#include "OrbRushGameMode.h"
+#include "DashDerbyGameMode.h"
 
-void AOrbRushHUD::Text(const FString& Line, float X, float Y, float Scale, const FLinearColor& Color, int32 Align)
+void ADashDerbyHUD::Text(const FString& Line, float X, float Y, float Scale, const FLinearColor& Color, int32 Align)
 {
 	UFont* Font = GEngine->GetLargeFont();
 	float Width = 0.0f;
@@ -22,7 +22,7 @@ void AOrbRushHUD::Text(const FString& Line, float X, float Y, float Scale, const
 	Canvas->DrawItem(Item);
 }
 
-void AOrbRushHUD::Panel(float X, float Y, float W, float H, const FLinearColor& Border)
+void ADashDerbyHUD::Panel(float X, float Y, float W, float H, const FLinearColor& Border)
 {
 	FCanvasTileItem Fill(FVector2D(X, Y) * Unit, FVector2D(W, H) * Unit, FLinearColor(0.02f, 0.015f, 0.04f, 0.9f));
 	Fill.BlendMode = SE_BLEND_Translucent;
@@ -33,10 +33,10 @@ void AOrbRushHUD::Panel(float X, float Y, float W, float H, const FLinearColor& 
 	Canvas->DrawItem(Box);
 }
 
-void AOrbRushHUD::DrawHUD()
+void ADashDerbyHUD::DrawHUD()
 {
 	Super::DrawHUD();
-	AOrbRushGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AOrbRushGameMode>() : nullptr;
+	ADashDerbyGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<ADashDerbyGameMode>() : nullptr;
 	UGameNightSubsystem* GN = UGameNightSubsystem::Get(this);
 	if (!Mode || !GN || !Canvas || Mode->Runners.Num() == 0) return;
 	// Lay out on a 1920 x 1080 grid, scaled to the real screen.
@@ -88,9 +88,9 @@ void AOrbRushHUD::DrawHUD()
 	{
 		// Every GameNight Start menu: the game's name, Resume, New round, then
 		// the settings. No button hints.
-		const TArray<FString>& Rows = AOrbRushGameMode::MenuRows();
+		const TArray<FString>& Rows = ADashDerbyGameMode::MenuRows();
 		Panel(Middle - 300.0f, 260.0f, 600.0f, 150.0f + Rows.Num() * 64.0f, Mode->Runners[Mode->MenuOwner].Player.Color);
-		Text(TEXT("Orb Rush"), Middle * Unit, 320.0f * Unit, 2.0f, White);
+		Text(TEXT("Dash Derby"), Middle * Unit, 320.0f * Unit, 2.0f, White);
 		for (int32 I = 0; I < Rows.Num(); ++I)
 		{
 			const float Y = 420.0f + I * 64.0f;
