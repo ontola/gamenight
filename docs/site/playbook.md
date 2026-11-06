@@ -28,8 +28,9 @@ behind; run `python3 gamenight/sdk/godot/sync.py my-game` to update it.
 Keep one repository per game.
 
 Replace the orb game with yours one step at a time, and keep the tests green
-after every step. Other engines work too (see [Engine support](/docs/engines)),
-but only the Godot template exists so far.
+after every step. Other engines work too (see [Engine support](/docs/engines)).
+For Unity, copy the Orb Rush project in `examples/unity-demo` instead; the
+[Unity guide](/docs/unity) walks through it and its headless test.
 
 ## The loop
 

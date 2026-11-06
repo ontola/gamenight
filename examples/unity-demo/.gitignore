@@ -1,0 +1,10 @@
+# Unity creates these when you open the project.
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/Builds/
+/Packages/packages-lock.json
+*.csproj
+*.sln

@@ -3,8 +3,8 @@
 
 The schema is generated from crates/gamenight-protocol (a Rust test fails when
 it is stale). This script turns it into message type tags, enum values and
-protocol constants for every SDK language, so a hand-typed "party_state" can
-no longer drift from the daemon:
+protocol constants for every SDK language (GDScript, JS, Python, Dart, C and
+C#), so a hand-typed "party_state" can no longer drift from the daemon:
 
     python3 scripts/build-protocol.py           # rewrite the bindings
     python3 scripts/build-protocol.py --check   # fail when any is stale
@@ -208,6 +208,51 @@ def dart(p: Protocol) -> str:
     return "\n".join(lines) + "\n"
 
 
+def pascal(name: str) -> str:
+    return "".join(part.capitalize() for part in re.split(r"[_\W]+", name) if part)
+
+
+def cs_literal(value) -> str:
+    if isinstance(value, list):
+        return "{ " + ", ".join(cs_literal(v) for v in value) + " }"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return json.dumps(value)
+
+
+def cs_type(value) -> str:
+    if isinstance(value, list):
+        return "string[]"
+    return {str: "string", int: "int", float: "double", bool: "bool"}[type(value)]
+
+
+def csharp(p: Protocol) -> str:
+    lines = [
+        f"// {BEGIN}.",
+        "// GameNight wire protocol: message tags, enum values, limits. Plain C#, no",
+        "// UnityEngine, so the same file builds in Unity and in a dotnet test.",
+        "namespace GameNightSdk",
+        "{",
+        "    public static class Protocol",
+        "    {",
+    ]
+    for name, value in p.constants.items():
+        if isinstance(value, list):
+            lines.append(f"        public static readonly string[] {name} = {cs_literal(value)};")
+        else:
+            lines.append(f"        public const {cs_type(value)} {name} = {cs_literal(value)};")
+    lines += ["", "        /// <summary>Message \"type\" tags, both directions.</summary>",
+              "        public static class Msg", "        {"]
+    lines += [f'            public const string {pascal(t)} = "{t}";' for t in p.tags]
+    lines.append("        }")
+    for name, values in p.enums.items():
+        lines += ["", f"        public static class {name}", "        {"]
+        lines += [f'            public const string {pascal(v)} = "{v}";' for v in values]
+        lines.append("        }")
+    lines += ["    }", "}"]
+    return "\n".join(lines) + "\n"
+
+
 def py_tags(p: Protocol) -> list[str]:
     return [f'MSG_{t.upper()} = "{t}"' for t in p.tags]
 
@@ -260,6 +305,7 @@ FILES = {
     "sdk/js/protocol.mjs": js_module,
     "mobile/lib/protocol.g.dart": dart,
     "sdk/python/gamenight_protocol.py": python,
+    "sdk/unity/Runtime/Core/Protocol.cs": csharp,
 }
 
 # Marked blocks inside hand-written files: path -> (comment prefix, suffix, emitter).
@@ -281,6 +327,7 @@ SCANNED = [
     "sdk/godot/addons/gamenight/gamenight.gd",
     "sdk/godot/addons/gamenight/lobby.gd",
     "sdk/godot/addons/gamenight/screen.gd",
+    "sdk/unity/Runtime/Core/GameNightClient.cs",
 ]
 TAG_LITERAL = re.compile(r"""\\?["']type\\?["']\s*:\s*\\?["']([a-z_]+)\\?["']""")
 

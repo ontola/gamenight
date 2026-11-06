@@ -8,7 +8,7 @@
 <a class="docs-skip" href="#docs-article">Skip to article</a>
 <a class="docs-portal docs-portal-mobile" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a>
 <button class="docs-menu-toggle" type="button" aria-expanded="false" aria-controls="docs-nav-phone-screens">Documentation <span aria-hidden="true">☰</span></button>
-<nav class="docs-sidebar" id="docs-nav-phone-screens" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unity, Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens" aria-current="page">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
+<nav class="docs-sidebar" id="docs-nav-phone-screens" aria-label="Documentation"><a class="docs-portal" href="https://gamenight.ontola.io/developers"><strong>Developer portal</strong><span>Add your game</span></a><h2>Start here</h2><ul><li><a href="/docs">Get started</a></li><li><a href="/docs/playbook">Game playbook</a></li><li><a href="/docs/engines">Engine support</a></li><li><a href="/docs/lifecycle">Game lifecycle</a></li></ul><h2>Your engine</h2><ul><li><a href="/docs/love">LÖVE / Lua</a></li><li><a href="/docs/rust">Rust / Bevy</a></li><li><a href="/docs/godot">Godot 4</a></li><li><a href="/docs/unity">Unity</a></li><li><a href="/docs/lobbies">Build a lobby</a></li><li><a href="/docs/c">C / C++</a></li><li><a href="/docs/other-engines">Unreal &amp; others</a></li></ul><h2>Integration</h2><ul><li><a href="/docs/controllers">Controllers &amp; players</a></li><li><a href="/docs/faces">Faces &amp; colours</a></li><li><a href="/docs/phone-screens" aria-current="page">Phone screens</a></li></ul><h2>Ship your game</h2><ul><li><a href="/docs/performance">Performance</a></li><li><a href="/docs/testing">Test your integration</a></li><li><a href="/docs/publishing">Publish a game</a></li><li><a href="/docs/store-clip">Store clip</a></li></ul><h2>Reference</h2><ul><li><a href="/docs/settings">Game settings</a></li><li><a href="/docs/protocol">Protocol reference</a></li></ul></nav>
 <article class="docs-article" id="docs-article"><p class="docs-eyebrow">GAMENIGHT / DOCUMENTATION</p><h1 id="phone-screens">Phone screens</h1>
 <p>A game can give every seated player a screen of their own on their phone: a
 hand of cards, a private vote, a god's view of the map. This is how GameNight
@@ -72,6 +72,15 @@ up there.</p>
 phone when <code>player_id</code> is empty. Other engines send the same
 <code>declare_companion</code> and <code>companion_message</code> messages; see the
 <a href="/docs/protocol#phone-screens">protocol reference</a>.</p>
+<h2 id="in-unity">In Unity</h2>
+<p>Keep the page under <code>Assets/StreamingAssets</code>, which stays a real folder in a
+desktop build, and declare it when the connection opens:</p>
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-csharp">GameNight.Client.Connected += () =&gt; GameNight.DeclarePhoneScreen(&quot;phone&quot;);
+GameNight.Client.CompanionPresence += (playerId, connected) =&gt; { if (connected) SendView(playerId); };
+GameNight.Client.CompanionMessage += (playerId, data) =&gt; OnTap(playerId, data);
+</code></pre></div>
+<p><code>GameNight.Client.SendCompanionMessage(data, playerId)</code> answers one phone.
+The <a href="/docs/unity#phone-screens">Unity guide</a> has the Orb Rush example.</p>
 <h2 id="in-love">In LÖVE</h2>
 <p>The shared runner declares the page and routes messages when a mode sets
 <code>phone</code>. A <code>.love</code> file is a zip, so the runner copies the folder to the save
@@ -156,7 +165,7 @@ speak the same protocol. iOS apps are only possible through the App Store.</p>
 only, so bind <code>0.0.0.0</code>; and a game with mouse capture needs a way to the
 &quot;join as phone&quot; option from a controller.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="5b76be8841e6ce0b3deacf7c5c11a4adf9e80ce75e8331221e415900b6114eca">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/phone-screens.md">Edit this page</a><span data-source-fingerprint="e333d771f8bf43a6971a17dbb193699ce9b9f155c6e45fa1cb99ea36c0436e91">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/faces"><small>Previous</small>Faces &amp; colours</a><a href="/docs/performance"><small>Next</small>Performance</a></nav></article>
-<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#phones-count-as-players">Phones count as players</a><a href="#in-godot">In Godot</a><a href="#in-love">In LÖVE</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
+<aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#how-it-fits-together">How it fits together</a><a href="#phones-count-as-players">Phones count as players</a><a href="#in-godot">In Godot</a><a href="#in-unity">In Unity</a><a href="#in-love">In LÖVE</a><a href="#keep-the-game-in-charge">Keep the game in charge</a><a href="#fit-a-hosted-room">Fit a hosted room</a><a href="#native-phone-apps">Native phone apps</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

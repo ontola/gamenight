@@ -1,6 +1,6 @@
-# Unity, Unreal and other engines
+# Unreal and other engines
 
-There is no maintained Unity or Unreal plugin in this repository. Use the open protocol to write an adapter, or [ask for integration help](/developers#help/new). Do not assume a game is supported because its engine can open a socket. [Engine support](/docs/engines) lists what a Unity or Unreal adapter must cover.
+There is no maintained Unreal plugin in this repository; Unity has a [package](/docs/unity). Use the open protocol to write an adapter, or [ask for integration help](/developers#help/new). Do not assume a game is supported because its engine can open a socket. [Engine support](/docs/engines) lists what an Unreal adapter must cover. The [Unity package](/docs/unity) is plain C# at its core and shows a complete adapter, feature by feature.
 
 ## Open the connection
 
@@ -14,7 +14,7 @@ Use the actual game ID and launch token, then wait for Welcome and check the pro
 
 ## Keep the adapter alive
 
-Receive messages independently of your simulation. On Unity, keep the connection pump running even when `Time.timeScale` is zero. On Unreal, ensure your connection handler still runs while gameplay is paused. Dispatch engine operations to the appropriate game thread.
+Receive messages independently of your simulation. On Unreal, ensure your connection handler still runs while gameplay is paused. Dispatch engine operations to the appropriate game thread.
 
 Handle Prepare, Start, Pause, Resume and Dispose explicitly. Send Ready after preparing the first frame. Window focus is not a Start or Resume command. Use borderless fullscreen to avoid display-mode switches.
 

@@ -9,6 +9,8 @@ your engine, then follow its guide. If your engine is not listed as
 - **Full**: an SDK in this repository handles the connection, lifecycle,
   per-seat controllers and the game window. Released games use it and CI runs
   its contract tests.
+- **New**: an SDK covers everything Full does, but no released game uses it
+  yet and CI checks it without the engine itself.
 - **Partial**: an SDK handles the connection and lifecycle. You wire controllers,
   windows or faces into your engine yourself.
 - **Protocol only**: no SDK. Write an adapter against the [protocol](/docs/protocol).
@@ -19,7 +21,7 @@ your engine, then follow its guide. If your engine is not listed as
 | [LÖVE / Lua](/docs/love) | Full | Shared party runner | Blast Party, Neon Trails, Neon Siege, Volley Trouble, Stack Together, Bubble Buddies |
 | [Rust / Bevy](/docs/rust) | Partial | `gamenight-sdk` crate | Demo game |
 | [C / C++](/docs/c) | Partial | `sdk/c/gamenight.h` | None yet (transport example only) |
-| [Unity](/docs/other-engines) | Protocol only | Wire protocol | None |
+| [Unity](/docs/unity) | New | `sdk/unity` package and the Orb Rush demo | Orb Rush (demo) |
 | [Unreal](/docs/other-engines) | Protocol only | Wire protocol | None |
 | Other engines | Protocol only | [Wire protocol](/docs/other-engines) | Mineclonia (Luanti, game-specific adapter) |
 
@@ -28,28 +30,31 @@ your engine, then follow its guide. If your engine is not listed as
 "SDK" means the SDK does it for you. "You" means the protocol carries it but
 your game code must handle it. "No" means the SDK cannot do it yet.
 
-| Feature | Godot 4 | LÖVE | Rust | C / C++ | Unity / Unreal |
-| --- | --- | --- | --- | --- | --- |
-| Connect, hello and launch token | SDK | SDK | SDK | SDK | You |
-| Prepare, Ready, Start, Pause, Resume, Dispose | SDK | SDK | SDK | SDK | You |
-| Controller input per seat | SDK (`frame_for_seat`, `just_pressed`, deadzones) | SDK | You (typed frames) | No | You |
-| Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | You |
-| Match settings from the lobby and phone | SDK | SDK | SDK | SDK | You |
-| Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | You |
-| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | SDK (`mode.phone`) | SDK | No | You |
-| Performance diagnostics | SDK | SDK | You (manual samples) | No | You |
-| Headless contract test in CI | Yes | Yes | Yes | Compile only | No |
-| Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | n/a |
+| Feature | Godot 4 | LÖVE | Rust | C / C++ | Unity | Unreal |
+| --- | --- | --- | --- | --- | --- | --- |
+| Connect, hello and launch token | SDK | SDK | SDK | SDK | SDK | You |
+| Prepare, Ready, Start, Pause, Resume, Dispose | SDK | SDK | SDK | SDK | SDK | You |
+| Controller input per seat | SDK (`frame_for_seat`, `just_pressed`, deadzones) | SDK | You (typed frames) | No | SDK (`FrameForSeat`, `JustPressed`, deadzones) | You |
+| Hidden preparation and taking the screen | SDK (`GameNightScreen`) | SDK | You | You | SDK (`GameNightScreen`; no hiding on Linux) | You |
+| Match settings from the lobby and phone | SDK | SDK | SDK | SDK | SDK | You |
+| Player names, colours and faces | SDK (`face.gd`) | SDK (`shared.face`) | You (avatar decoding included) | No | SDK (`GameNightFaces`) | You |
+| [Phone screens](/docs/phone-screens) for each player | SDK (`declare_companion_folder`) | SDK (`mode.phone`) | SDK | No | SDK (`DeclarePhoneScreen`) | You |
+| Performance diagnostics | SDK | SDK | You (manual samples) | No | SDK | You |
+| Headless contract test in CI | Yes | Yes | Yes | Compile only | Yes, without Unity (dotnet) | No |
+| Keep the SDK copy current | `sync.py` and CI check | Pinned game sources | Cargo revision | Copy the header | Package Manager git URL | n/a |
 
 ## Open work
 
 This list doubles as the roadmap for engine support.
 
-- **Unity**: no package yet. Needed: a C# client for the connection and
-  lifecycle that keeps running while `Time.timeScale` is zero, controller frames
-  mapped to seats, a window helper and a sample scene.
+- **Unity**: the package and the Orb Rush demo are new. CI runs the SDK core
+  and the demo rules against a fake host and `gamenight-certify` with dotnet,
+  and compiles the Unity layer against reference assemblies, but no Unity
+  build has been tested on hardware yet: window handling, faces on screen and
+  pads. Linux has no window hiding. The Input System code path is not compiled
+  in CI.
 - **Unreal**: no plugin yet. Needed: a C++ plugin on the game thread with the
-  same scope as Unity, plus packaging notes for Windows and macOS.
+  same scope as the Unity package, plus packaging notes for Windows and macOS.
 - **C / C++**: the header has no controller tokens, controller frames, colours
   or faces, and no phone screens. Games still have to parse those messages
   themselves.

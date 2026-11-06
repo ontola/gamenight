@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Builds the Unity SDK core and the Orb Rush demo rules as a console game,
+    without Unity, so CI can play them against a fake host and gamenight-certify.
+    C# 9 is what Unity 2021.3 and later compile; newer syntax would break there.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>orb-rush-headless</AssemblyName>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Runtime/Core/*.cs" />
+    <Compile Include="../../../../examples/unity-demo/Assets/OrbRush/OrbRushGame.cs" />
+    <Compile Include="Program.cs" />
+  </ItemGroup>
+</Project>

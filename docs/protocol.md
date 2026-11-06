@@ -16,8 +16,8 @@ field, enum value and protocol constant, are in
 bindings are generated from it by `scripts/build-protocol.py`: `GN_MSG_*` in
 `sdk/c/gamenight.h`, `protocol.gd` in the Godot addon,
 [`sdk/js/protocol.mjs`](../sdk/js/protocol.mjs),
-[`sdk/python/gamenight_protocol.py`](../sdk/python/gamenight_protocol.py) and
-`mobile/lib/protocol.g.dart`. Use one of them, or the schema, rather than
+[`sdk/python/gamenight_protocol.py`](../sdk/python/gamenight_protocol.py),
+`mobile/lib/protocol.g.dart` and `Protocol.cs` in the Unity package. Use one of them, or the schema, rather than
 retyping tag strings.
 
 ## Transport

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Type-checks the Unity layer of the SDK and the Orb Rush view against
+    Unity's reference assemblies from NuGet, without a Unity install. It does
+    not run anything. Pass -p:UnityPlatform=UNITY_STANDALONE_WIN (or _OSX) to
+    check that platform's window code; the default checks the Linux path.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <UnityPlatform Condition="'$(UnityPlatform)' == ''">UNITY_STANDALONE_LINUX</UnityPlatform>
+    <DefineConstants>$(DefineConstants);ENABLE_LEGACY_INPUT_MANAGER;UNITY_STANDALONE;$(UnityPlatform)</DefineConstants>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- FindObjectOfType is deprecated in newer Unity, still the 2021.3 way. -->
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../Runtime/**/*.cs" />
+    <Compile Include="../../../../examples/unity-demo/Assets/OrbRush/*.cs" />
+  </ItemGroup>
+</Project>

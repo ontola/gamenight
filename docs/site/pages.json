@@ -29,7 +29,8 @@
       "sdk/godot/addons/gamenight/gamenight.gd",
       "sdk/c/gamenight.h",
       "crates/gamenight-sdk/src/lib.rs",
-      "games/love-party/shared/lifecycle.lua"
+      "games/love-party/shared/lifecycle.lua",
+      "sdk/unity/Runtime/Core/GameNightClient.cs"
     ]
   },
   {
@@ -73,6 +74,20 @@
     ]
   },
   {
+    "slug": "unity",
+    "title": "Unity",
+    "group": "Your engine",
+    "source": "docs/site/unity.md",
+    "watch": [
+      "sdk/unity/Runtime/Core/GameNightClient.cs",
+      "sdk/unity/Runtime/Core/Party.cs",
+      "sdk/unity/Runtime/Unity/GameNight.cs",
+      "sdk/unity/Runtime/Unity/GameNightScreen.cs",
+      "sdk/unity/Runtime/Unity/GameNightFaces.cs",
+      "scripts/test-unity-sdk.py"
+    ]
+  },
+  {
     "slug": "lobbies",
     "title": "Build a lobby",
     "group": "Your engine",
@@ -98,7 +113,7 @@
   },
   {
     "slug": "other-engines",
-    "title": "Unity, Unreal & others",
+    "title": "Unreal & others",
     "group": "Your engine",
     "source": "docs/site/other-engines.md",
     "watch": [
@@ -132,7 +147,8 @@
     "source": "docs/site/phone-screens.md",
     "watch": [
       "sdk/godot/addons/gamenight/gamenight.gd",
-      "crates/gamenight-local-web/src/companion.rs"
+      "crates/gamenight-local-web/src/companion.rs",
+      "sdk/unity/Runtime/Unity/GameNight.cs"
     ]
   },
   {

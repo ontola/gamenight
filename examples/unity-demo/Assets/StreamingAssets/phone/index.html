@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orb Rush</title>
+<style>
+  :root { --you: #9aa3ad; }
+  html, body { margin: 0; height: 100%; background: #14121c; color: #fff; font: 600 18px/1.3 system-ui, sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; padding: 24px; box-sizing: border-box; text-align: center; }
+  .dot { width: 72px; height: 72px; border-radius: 50%; background: var(--you); }
+  .score { font-size: 72px; line-height: 1; }
+  button { width: 100%; max-width: 320px; padding: 22px; border: 0; border-radius: 18px; background: var(--you); color: #14121c; font: inherit; font-size: 26px; }
+  button:disabled { opacity: 0.4; }
+  .status { opacity: 0.6; font-size: 15px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="dot"></div>
+  <div id="name">Orb Rush</div>
+  <div class="score" id="score">0</div>
+  <div id="round"></div>
+  <button id="boost">Boost</button>
+  <div class="status" id="status"></div>
+</main>
+<script src="/assets/companion.js"></script>
+<script>
+  // Your own screen for Orb Rush: your score, and a boost only you can trigger.
+  // The game sends {name, color, score, round, boosting}; we send {action: "boost"}.
+  const $ = (id) => document.getElementById(id);
+  const game = GameNight.connect((data) => {
+    if (data.color) document.documentElement.style.setProperty("--you", data.color);
+    $("name").textContent = data.name || "Orb Rush";
+    $("score").textContent = data.score ?? 0;
+    $("round").textContent = data.round ? "Round " + data.round : "";
+    $("boost").disabled = !!data.boosting;
+  }, (status) => { $("status").textContent = status === "connected" ? "" : status; });
+  $("boost").addEventListener("click", () => game.send({ action: "boost" }));
+</script>
+</body>
+</html>

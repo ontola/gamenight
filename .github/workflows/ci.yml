@@ -173,6 +173,30 @@ jobs:
       - if: failure()
         run: cat "$RUNNER_TEMP/local-web.log"
 
+  unity-sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y pkg-config libudev-dev
+      - name: Every package file has its .meta file
+        run: python3 scripts/unity-package-meta.py --check
+      - name: SDK core and Orb Rush against the fake host; Unity layer compiles
+        run: python3 scripts/test-unity-sdk.py
+      - name: Windows and macOS window code compiles
+        run: |
+          dotnet build "sdk/unity/Tests~/UnityCompile" -p:UnityPlatform=UNITY_STANDALONE_WIN --nologo -v q
+          dotnet build "sdk/unity/Tests~/UnityCompile" -p:UnityPlatform=UNITY_STANDALONE_OSX --nologo -v q
+      - name: Certify headless Orb Rush against a real daemon
+        run: |
+          dotnet build "sdk/unity/Tests~/Harness" -c Release -o "$RUNNER_TEMP/orb-rush" --nologo -v q
+          cargo run --locked -p gamenight-certify -- unity-demo --timeout 120 -- "$RUNNER_TEMP/orb-rush/orb-rush-headless"
+
   documentation:
     runs-on: ubuntu-latest
     steps:

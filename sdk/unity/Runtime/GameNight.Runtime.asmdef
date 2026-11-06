@@ -1,0 +1,19 @@
+{
+  "name": "GameNight.Runtime",
+  "rootNamespace": "GameNightSdk",
+  "references": ["Unity.InputSystem"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [
+    {
+      "name": "com.unity.inputsystem",
+      "expression": "1.0.0",
+      "define": "GAMENIGHT_INPUT_SYSTEM"
+    }
+  ],
+  "noEngineReferences": false
+}

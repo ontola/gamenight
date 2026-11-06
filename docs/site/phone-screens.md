@@ -78,6 +78,20 @@ phone when `player_id` is empty. Other engines send the same
 `declare_companion` and `companion_message` messages; see the
 [protocol reference](/docs/protocol#phone-screens).
 
+## In Unity
+
+Keep the page under `Assets/StreamingAssets`, which stays a real folder in a
+desktop build, and declare it when the connection opens:
+
+```csharp
+GameNight.Client.Connected += () => GameNight.DeclarePhoneScreen("phone");
+GameNight.Client.CompanionPresence += (playerId, connected) => { if (connected) SendView(playerId); };
+GameNight.Client.CompanionMessage += (playerId, data) => OnTap(playerId, data);
+```
+
+`GameNight.Client.SendCompanionMessage(data, playerId)` answers one phone.
+The [Unity guide](/docs/unity#phone-screens) has the Orb Rush example.
+
 ## In LÖVE
 
 The shared runner declares the page and routes messages when a mode sets

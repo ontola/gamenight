@@ -1,0 +1,15 @@
+{
+  "name": "com.ontola.gamenight",
+  "version": "0.1.0",
+  "displayName": "GameNight",
+  "description": "Make your Unity game a GameNight game: the party lifecycle, every player's pad by seat, names, colours and faces, match settings on the phones, phone screens, saves and screen handling.",
+  "unity": "2021.3",
+  "author": {
+    "name": "GameNight contributors",
+    "url": "https://github.com/ontola/gamenight"
+  },
+  "license": "MIT",
+  "documentationUrl": "https://github.com/ontola/gamenight/blob/main/docs/site/unity.md",
+  "keywords": ["gamenight", "couch", "local multiplayer", "party"],
+  "samples": []
+}
