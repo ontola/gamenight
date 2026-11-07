@@ -34,4 +34,19 @@ void main() {
     expect(isRoomCode('ABC234'), isTrue);
     expect(isRoomCode('ABCIO1'), isFalse);
   });
+
+  test('sign-in links work on the old and the new address', () {
+    for (final origin in [
+      'https://gamenight.ontola.io',
+      'https://gamepad.party'
+    ]) {
+      expect(
+          SignInLink.parse(Uri.parse('$origin/auth/app#code=12345678'))?.code,
+          '12345678');
+    }
+    expect(
+        SignInLink.parse(
+            Uri.parse('https://example.com/auth/app#code=12345678')),
+        isNull);
+  });
 }

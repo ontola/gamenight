@@ -11,6 +11,10 @@
 const int defaultWebPort = 7913;
 const String hostedOrigin = 'https://gamenight.ontola.io';
 
+/// Origins of the hosted site. gamepad.party is the new name; links on the
+/// old address keep working during the move.
+const Set<String> hostedOrigins = {hostedOrigin, 'https://gamepad.party'};
+
 final RegExp _roomCode = RegExp(r'^[A-HJ-NP-Z2-9]{6}$');
 
 bool isRoomCode(String code) => _roomCode.hasMatch(code);
@@ -29,7 +33,7 @@ class HostLink {
   const HostLink(this.base,
       {this.roomCode, this.claim, this.seat, this.linkRevision = 0, this.pair});
 
-  bool get hosted => base.origin == hostedOrigin;
+  bool get hosted => hostedOrigins.contains(base.origin);
 
   /// Only the room/seat invitation survives sign-in, never arbitrary URLs.
   String? get appDestination {
@@ -110,7 +114,8 @@ class SignInLink {
 
   /// Null for any other URL.
   static SignInLink? parse(Uri uri) {
-    if (uri.scheme != 'https' || uri.origin != hostedOrigin) return null;
+    if (uri.scheme != 'https') return null;
+    if (!hostedOrigins.contains(uri.origin)) return null;
     if (uri.path != '/auth/app') return null;
     final Map<String, String> fragment;
     try {

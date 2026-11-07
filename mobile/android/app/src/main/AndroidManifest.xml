@@ -43,6 +43,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="gamenight.ontola.io" android:path="/auth/app"/>
+                <data android:host="gamepad.party"/>
                 <data android:path="/join"/>
                 <data android:path="/studio"/>
                 <data android:path="/"/>
