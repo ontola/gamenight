@@ -47,7 +47,7 @@
     const code=window.jsQR(pixels.data,pixels.width,pixels.height);
     if(!code)return false;
     if(accept(code.data))return true;
-    status.textContent="This is not a GameNight sign-in QR. Try the code in the lobby.";
+    status.textContent="This is not a Gamepad Party sign-in QR. Try the code in the lobby.";
     return false;
   }
   async function decode(source,width,height,current,photo=false) {
@@ -136,7 +136,7 @@
     try {
       const image = new Image(); image.src = url; await image.decode();
       if (current !== generation || !dialog.open) return;
-      if (!await decode(image, image.naturalWidth, image.naturalHeight,current,true) && current===generation) status.textContent = 'No GameNight QR found. Try a closer, sharper photo.';
+      if (!await decode(image, image.naturalWidth, image.naturalHeight,current,true) && current===generation) status.textContent = 'No Gamepad Party QR found. Try a closer, sharper photo.';
     } catch (_) { status.textContent = 'Could not read this photo. Try another image.'; }
     finally { URL.revokeObjectURL(url); event.target.value = ''; }
   };

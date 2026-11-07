@@ -221,7 +221,7 @@ class GameNightApi {
     } catch (_) {
       Diagnostics.failure('Local host $method connection failed');
       throw const ApiError(
-          'GameNight is unreachable. Join the same Wi-Fi as the GameNight PC.');
+          'Gamepad Party is unreachable. Join the same Wi-Fi as the Gamepad Party PC.');
     }
     if (response.statusCode >= 500) {
       Diagnostics.failure(
@@ -233,7 +233,7 @@ class GameNightApi {
     }
     if (response.statusCode >= 300) {
       throw ApiError(
-          failure ?? 'GameNight refused the request.', response.statusCode);
+          failure ?? 'Gamepad Party refused the request.', response.statusCode);
     }
     if (response.statusCode == 204 || response.body.isEmpty) return null;
     return jsonDecode(utf8.decode(response.bodyBytes));
@@ -247,7 +247,7 @@ class GameNightApi {
 
   /// Cheap reachability check used by the connect screen.
   Future<void> ping() => _send('GET', '/api/player-links',
-      failure: 'This address answered, but it is not a GameNight.');
+      failure: 'This address answered, but it is not a Gamepad Party.');
 
   Future<Profile?> loadProfile(String id) async {
     try {
@@ -290,7 +290,7 @@ class GameNightApi {
                     'seat': seat,
                     'link_revision': linkRevision
                   },
-                  failure: 'Saved on your phone. Is GameNight still running?')
+                  failure: 'Saved on your phone. Is Gamepad Party still running?')
               as Map<String, dynamic>);
 
   /// Asks to be picked up in the lobby: walk your character to your door.
@@ -314,7 +314,7 @@ class GameNightApi {
   Future<void> phoneSeat(String profile) =>
       _send('POST', '/api/local-room/phone-seat',
           body: {'profile': profile},
-          failure: 'Could not take a seat. Is GameNight still running?');
+          failure: 'Could not take a seat. Is Gamepad Party still running?');
 
   Future<void> cancelPickup(String profile) =>
       _send('POST', '/api/local-room/cancel/${Uri.encodeComponent(profile)}',

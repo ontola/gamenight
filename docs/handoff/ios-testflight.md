@@ -1,14 +1,14 @@
-# Handoff: TestFlight-setup voor de GameNight iOS-app
+# Handoff: TestFlight-setup voor de Gamepad Party iOS-app
 
 ## Doel
 
-De GameNight player-app (Flutter, `ontola/gamenight`, map `mobile/`) moet bij elke push naar `main` automatisch als iOS-build in TestFlight verschijnen. De CI-kant is al klaar; wat ontbreekt is de eenmalige setup in het Apple-account en drie GitHub-secrets.
+De Gamepad Party player-app (Flutter, `ontola/gamenight`, map `mobile/`) moet bij elke push naar `main` automatisch als iOS-build in TestFlight verschijnen. De CI-kant is al klaar; wat ontbreekt is de eenmalige setup in het Apple-account en drie GitHub-secrets.
 
 ## Wat er al is (niet aanpassen tenzij het faalt)
 
 - `.github/workflows/mobile.yml`, job `ios` (runner `macos-latest`, alleen op `main` en `workflow_dispatch`).
   - Zonder secrets: `flutter build ios --release --no-codesign` (alleen compilecheck).
-  - Met secrets: `mobile/ios/testflight.py prepare` maakt via de App Store Connect API per run een nieuw Apple Distribution-certificaat en een `IOS_APP_STORE`-profiel ("GameNight CI <run id>"), registreert de bundle ID als die nog niet bestaat, schrijft `ios/Flutter/Signing.xcconfig` en `ExportOptions.plist`, dan `flutter build ipa`, upload met `xcrun altool --upload-app`, en `testflight.py cleanup` trekt certificaat en profiel weer in.
+  - Met secrets: `mobile/ios/testflight.py prepare` maakt via de App Store Connect API per run een nieuw Apple Distribution-certificaat en een `IOS_APP_STORE`-profiel ("Gamepad Party CI <run id>"), registreert de bundle ID als die nog niet bestaat, schrijft `ios/Flutter/Signing.xcconfig` en `ExportOptions.plist`, dan `flutter build ipa`, upload met `xcrun altool --upload-app`, en `testflight.py cleanup` trekt certificaat en profiel weer in.
 - Bundle ID: `io.ontola.gamenight`. Buildnummer = `github.run_number` (zelfde als de Android-APK). Versie komt uit `mobile/pubspec.yaml` (`0.1.0`).
 - `Info.plist` heeft `ITSAppUsesNonExemptEncryption = false`, dus geen exportcompliance-vraag per build.
 - Uitleg staat ook in `mobile/README.md`, sectie "iOS and TestFlight".

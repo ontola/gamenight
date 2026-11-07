@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory=$true)][string]$Executable,
-    [string]$ProductName = 'GameNight'
+    [string]$ProductName = 'Gamepad Party'
 )
 $ErrorActionPreference = 'Stop'
 if (!('GameNightBranding.Native' -as [type])) {

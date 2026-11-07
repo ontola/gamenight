@@ -71,7 +71,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
             ),
             child: Text(
               _hint ??
-                  'Point your camera at the QR code in the GameNight lobby.',
+                  'Point your camera at the QR code in the Gamepad Party lobby.',
               textAlign: TextAlign.center,
             ),
           ),

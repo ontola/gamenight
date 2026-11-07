@@ -107,7 +107,7 @@ func _run() -> void:
 	check(main.room._prompts.queue.state.items == [["Y", "Play next", true], ["X", "Skip next"]], "Queue shows separate Play next and Skip next actions")
 	check(main.room._prompts.shelf.state.items == [["Y", "Play now"], ["X", "Queue"]], "Selector offers Play now or Queue")
 	await capture(main, "queue-hierarchy")
-	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved."
+	party.onboarding_error = "Hexstead is not available on this computer. Add or update the game, then restart Gamepad Party. Your choice is saved."
 	party.warm_session = {"game": "ballkickers", "phase": "preparing", "progress_label": "World ready. Loading 2 player views"}
 	main.set_party(party)
 	main._update_prompts()

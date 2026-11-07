@@ -167,7 +167,7 @@ impl Updates {
                         append_log(
                             &log,
                             &format!(
-                                "Update downloaded ({version}); waiting for GameNight to close."
+                                "Update downloaded ({version}); waiting for Gamepad Party to close."
                             ),
                         );
                         return;
@@ -212,7 +212,7 @@ impl Updates {
             append_log(&self.log, "Restart requested but no update is pending.");
             return false;
         };
-        if let Err(error) = spawn_splash(&self.files.splash, "Updating GameNight\u{2026}") {
+        if let Err(error) = spawn_splash(&self.files.splash, "Updating Gamepad Party\u{2026}") {
             append_log(&self.log, &format!("Update cover unavailable: {error}"));
         }
         // Silent: the cover is the progress, and nobody is at a keyboard.
@@ -409,7 +409,7 @@ unsafe extern "system" fn cover_proc(
             SetTextColor(dc, 0x00f8_f1f2);
             let mut text: Vec<u16> = COVER_TEXT
                 .get()
-                .map_or("Updating GameNight\u{2026}", String::as_str)
+                .map_or("Updating Gamepad Party\u{2026}", String::as_str)
                 .encode_utf16()
                 .collect();
             DrawTextW(
@@ -463,11 +463,11 @@ fn utc_now() -> String {
 }
 pub fn show_error(message: &str) {
     use windows_sys::Win32::UI::WindowsAndMessaging::{MessageBoxW, MB_ICONERROR, MB_OK};
-    let text: Vec<u16> = format!("GameNight could not start or close.\n\n{message}")
+    let text: Vec<u16> = format!("Gamepad Party could not start or close.\n\n{message}")
         .encode_utf16()
         .chain(Some(0))
         .collect();
-    let title: Vec<u16> = "GameNight".encode_utf16().chain(Some(0)).collect();
+    let title: Vec<u16> = "Gamepad Party".encode_utf16().chain(Some(0)).collect();
     unsafe {
         MessageBoxW(
             std::ptr::null_mut(),
@@ -580,7 +580,7 @@ unsafe extern "system" fn welcome_proc(
                 .clamp(0.0, 1.0);
             let text = lines
                 .next()
-                .unwrap_or("Starting GameNight\u{2026}")
+                .unwrap_or("Starting Gamepad Party\u{2026}")
                 .to_owned();
             let mut shown = WELCOME_SHOWN.lock().unwrap();
             // Ease toward the step, then creep on while it takes long, so the
@@ -638,9 +638,9 @@ unsafe extern "system" fn welcome_proc(
                 SelectObject(dc, previous);
                 DeleteObject(f);
             };
-            draw("GameNight", 54, 64, 54, 700, 0x00f8_f1f2);
+            draw("Gamepad Party", 54, 64, 54, 700, 0x00f8_f1f2);
             let text = if text.is_empty() {
-                "Starting GameNight\u{2026}".to_owned()
+                "Starting Gamepad Party\u{2026}".to_owned()
             } else {
                 text
             };

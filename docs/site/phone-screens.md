@@ -1,7 +1,7 @@
 # Phone screens
 
 A game can give every seated player a screen of their own on their phone: a
-hand of cards, a private vote, a god's view of the map. This is how GameNight
+hand of cards, a private vote, a god's view of the map. This is how Gamepad Party
 does asymmetric play. The TV stays the shared screen; the phone shows what only
 that player may see. The wire format is in the
 [protocol reference](/docs/protocol#phone-screens); this page is how to build one.
@@ -9,9 +9,9 @@ that player may see. The wire format is in the
 ## How it fits together
 
 1. The game declares a folder with a web page in it.
-2. GameNight serves that page to each signed-in phone at the table, on the
+2. Gamepad Party serves that page to each signed-in phone at the table, on the
    LAN or through a hosted room.
-3. The page and the game exchange small JSON messages. GameNight tags every
+3. The page and the game exchange small JSON messages. Gamepad Party tags every
    message from a phone with the player who sent it; a phone cannot pretend
    to be someone else.
 
@@ -24,7 +24,7 @@ game.send({ action: "roll" });
 
 ## Phones count as players
 
-If your game is played on phones, say so in `gamenight.json`, so GameNight
+If your game is played on phones, say so in `gamenight.json`, so Gamepad Party
 counts phones and not just controllers:
 
 ```json
@@ -35,7 +35,7 @@ Use `"controller_and_phone"` when every player needs both, and
 `"controller_or_phone"` with `"min_phones": 1` when only some players are on a
 phone, like one god among controller players. Two controllers and four phones
 then fit a four-player phone game: people without a controller tap **Play on
-this phone** in the GameNight app and get a seat of their own. Such a player
+this phone** in the Gamepad Party app and get a seat of their own. Such a player
 leaves the party about 10 seconds after their phone leaves the room. See
 [controllers and phones](/docs/protocol#controllers-and-phones).
 
@@ -160,7 +160,7 @@ GameNight.declare_companion(apk_folder, "", {
 })
 ```
 
-The GameNight app installs the APK from the PC and opens it. The app then
+The Gamepad Party app installs the APK from the PC and opens it. The app then
 connects to the game by its own means, for example LAN discovery. Hosted rooms
 do not relay that connection, so a native app needs the phone on the same
 network as the PC. Ship the APK inside the game's package next to the

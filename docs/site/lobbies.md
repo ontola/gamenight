@@ -322,7 +322,7 @@ failed artwork leaves the game title visible instead of blocking navigation.
 
 ## Choose a lobby in the installed app
 
-Register an installed executable in `local-games.json` in the GameNight data
+Register an installed executable in `local-games.json` in the Gamepad Party data
 directory, alongside the launcher's `shelf.json`. Use an absolute executable
 path and an absolute existing `cwd` when supplied:
 
@@ -335,9 +335,9 @@ path and an absolute existing `cwd` when supplied:
 
 On Windows the installed app passes `GAMENIGHT_APP_ID` to the lobby (and only
 the lobby). Call `SetCurrentProcessExplicitAppUserModelID` with it before you
-create a window, so the lobby shows up on a pinned GameNight taskbar button
+create a window, so the lobby shows up on a pinned Gamepad Party taskbar button
 instead of as a separate app. Send `lobby_ready` once your first frame is on
-screen: that closes GameNight's welcome window.
+screen: that closes Gamepad Party's welcome window.
 
 In the installed app, `party_state.lobbies` lists the lobbies the host can run
 (bundled, then registered ones), the running one marked `current`; with only

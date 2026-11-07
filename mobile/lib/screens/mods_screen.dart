@@ -120,7 +120,7 @@ class _ModsScreenState extends State<ModsScreen> {
     final children = <Widget>[];
     if (store == null) {
       children.add(const Hint(
-          'Mods are kept in the GameNight app on your phone or computer, not in the browser.'));
+          'Mods are kept in the Gamepad Party app on your phone or computer, not in the browser.'));
     } else if (!store.signedIn) {
       children.add(const Hint(
           'Sign in to make mods. They are kept in your account, so you can play them wherever you sit.'));

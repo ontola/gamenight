@@ -1,7 +1,7 @@
-# GameNight for Unreal Engine
+# Gamepad Party for Unreal Engine
 
 Start with the [Unreal integration guide](../../docs/site/unreal.md), published
-in [GameNight Docs](https://gamenight.ontola.io/docs/unreal). The demo game
+in [Gamepad Party Docs](https://gamenight.ontola.io/docs/unreal). The demo game
 [Dash Derby](../../examples/unreal-demo) uses every part of the plugin.
 
 - `GameNight/` is the plugin. Copy it into your project's `Plugins/` folder,
@@ -22,4 +22,4 @@ cargo run -p gamenight-certify -- unreal-core -- /tmp/unreal-core
 ```
 
 CI has no Unreal build: the module and the demo are not compiled there. Build
-the demo with a real engine and playtest it under GameNight before a release.
+the demo with a real engine and playtest it under Gamepad Party before a release.

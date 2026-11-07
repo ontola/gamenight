@@ -31,7 +31,7 @@ def main() -> int:
         with FakeHost(godot, game_id, path=game) as host:
             host.welcome(godot_sdk=99)
             host.expect("declare_settings")
-            host.saw("is older than GameNight")
+            host.saw("is older than Gamepad Party")
             print("ok: hello, settings, and the warning for an older addon")
             host.setting("round_seconds", 30)
             host.saw("setting round_seconds = 30")

@@ -176,7 +176,7 @@ job.
 The contract checks cover the protocol. Your game also needs tests of its own
 that a person would otherwise do by hand. What worked in our games:
 
-- **A fake host.** A small script plays GameNight: it starts the game with
+- **A fake host.** A small script plays Gamepad Party: it starts the game with
   `GAMENIGHT=1`, `GAMENIGHT_ADDR`, `GAMENIGHT_GAME_ID` and `GAMENIGHT_TOKEN`,
   answers `hello`, sends Prepare, waits for Ready, sends Start, controller
   frames, Pause, Resume and Dispose, and checks what the game did. The
@@ -199,8 +199,8 @@ that a person would otherwise do by hand. What worked in our games:
 
   Pass `pack=` to run the exported game, or `command=` to start it another
   way (a packaged `.exe`, a launcher, a window). `host.disconnect()` plays a
-  GameNight that goes away; `host.exit_code()` then checks the game quit
-  cleanly. `HostClient` connects to a real GameNight as the overlay does.
+  Gamepad Party that goes away; `host.exit_code()` then checks the game quit
+  cleanly. `HostClient` connects to a real Gamepad Party as the overlay does.
 - **Install Godot the same way everywhere.** In GitHub Actions use
   `ontola/gamenight/.github/actions/setup-godot@main` with your project's
   `version`; it verifies the download's sha256, works on Linux and Windows,
@@ -208,7 +208,7 @@ that a person would otherwise do by hand. What worked in our games:
 - **Keep sending frames.** Input older than 250 ms counts as released, so a
   test that holds a button must repeat the frame, about every 50 ms.
 - **Listen on a free port.** Bind port 0 and pass the port in
-  `GAMENIGHT_ADDR`, so a test never meets a real GameNight on the same machine
+  `GAMENIGHT_ADDR`, so a test never meets a real Gamepad Party on the same machine
   and tests can run side by side.
 - **Write the game's output to a file on Windows.** Godot on Windows writes
   stdout synchronously; an unread pipe blocks the game before it connects.

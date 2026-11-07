@@ -1,6 +1,6 @@
 # Windows distribution
 
-GameNight uses [Velopack](https://docs.velopack.io/getting-started/rust) 1.2.0 for
+Gamepad Party uses [Velopack](https://docs.velopack.io/getting-started/rust) 1.2.0 for
 per-user installation and updates. The player needs neither a development
 toolchain nor .NET. Packaging machines need Rust/MSVC, Python 3 and .NET 8.
 
@@ -14,14 +14,14 @@ dotnet tool install --global vpk --version 1.2.0
 ```
 
 The default profile is `release`; `-BuildProfile ci` is a faster build for packaging
-checks. Choose a new output directory. The script packages GameNight and its starter catalogue, and produces `Setup.exe`, a
+checks. Choose a new output directory. The script packages Gamepad Party and its starter catalogue, and produces `Setup.exe`, a
 portable ZIP, a full update package, a channel feed and SHA-256 checksums in
 `releases/`. This first implementation ships full updates. Delta packaging can
 be added later by supplying the preceding release to Velopack.
 
 Visual C++ runtime DLLs are copied from the installed toolchain's redistributable
 directory alongside the launcher and native binaries, avoiding a separate
-machine-wide prerequisite installer. Keep the build toolchain patched: GameNight
+machine-wide prerequisite installer. Keep the build toolchain patched: Gamepad Party
 releases are responsible for updating these app-local runtime copies. The
 package includes their version and redistribution notice.
 
@@ -30,7 +30,7 @@ the channels are `win-preview` and `win-stable`. The installation directories
 are separate from `%LOCALAPPDATA%\GameNight` user data. Application updates
 replace the complete application folder, while games and shared runtimes download independently
 into hash-specific directories under the user data folder. Old content versions are retained.
-Both channels share GameNight user data and cannot run simultaneously against
+Both channels share Gamepad Party user data and cannot run simultaneously against
 that directory. LÖVE games manage their saves independently.
 
 ## CI and releases
@@ -132,8 +132,8 @@ before applying a pending update. Killing the launcher also closes its job.
 The standalone/headless daemon retains its existing resident behavior.
 
 The launcher checks for an update at startup and again every 30 minutes until
-one is downloaded, so a PC that keeps GameNight open all evening still picks up
-new releases. The update is applied when GameNight closes. An unfinished
+one is downloaded, so a PC that keeps Gamepad Party open all evening still picks up
+new releases. The update is applied when Gamepad Party closes. An unfinished
 download does not delay exit and is retried during a later session. Update failures are recorded in `updater.log`. There is no in-game
 restart prompt and no update replacement while a session is running. Controller
 input, focus, silent prewarm and fullscreen still require a real hardware check
@@ -144,7 +144,7 @@ before promoting a preview to stable.
 The Windows package ships the catalog entries with Windows downloads, not game or LÖVE bytes.
 The desktop daemon uses the same installer queue as the standalone host and
 forwards download progress to the lobby. A finished install joins the playable
-shelf immediately without restarting. GameNight can open offline; playing a
+shelf immediately without restarting. Gamepad Party can open offline; playing a
 starter game the first time requires its download to finish.
 
 A catalogue download can declare a shared `runtime` with an ID, HTTPS URL,
@@ -185,8 +185,8 @@ must not hide failures in automated rendering jobs.
 `web/icon.svg` is the editable logo. `scripts/generate-branding.cjs` produces the
 shared multi-size Windows icon used by the lobby, launcher and Velopack installer.
 Run it with Sharp available after changing the logo, then run its `--check` mode.
-The launcher embeds Windows product/description metadata as GameNight. Preview
-installers and their shortcuts use GameNight Preview; stable uses GameNight.
+The launcher embeds Windows product/description metadata as Gamepad Party. Preview
+installers and their shortcuts use Gamepad Party Preview; stable uses Gamepad Party.
 Package IDs remain distinct to keep their update channels separate.
 
 The installer build checks executable and Setup icon resources and display names

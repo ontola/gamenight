@@ -80,7 +80,7 @@ void main() {
         await tester.tap(find.text('Open'));
         await tester.pump();
         expect(calls, ['installed', 'installed', 'open']);
-        expect(find.text('Update from the GameNight computer'), findsNothing);
+        expect(find.text('Update from the Gamepad Party computer'), findsNothing);
       },
       variant: TargetPlatformVariant({TargetPlatform.android}),
     );

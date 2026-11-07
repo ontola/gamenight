@@ -1,4 +1,4 @@
-"""Build deterministic LÖVE games and an optional local GameNight shelf."""
+"""Build deterministic LÖVE games and an optional local Gamepad Party shelf."""
 from game_sources import game_sources
 import argparse
 import hashlib
@@ -53,7 +53,7 @@ def main():
             meta["launch"] = {"command": str(args.love.resolve()), "args": [str(artifact)], "cwd": str(output)}
             shelf.append(meta)
         if args.base_url:
-            entry = {"id": game, "title": title, "developer": "GameNight contributors", "players": {"min": 2, "max": meta["max_players"]},
+            entry = {"id": game, "title": title, "developer": "Gamepad Party contributors", "players": {"min": 2, "max": meta["max_players"]},
                      "price": "free", "integration": {"level": "integrated", "protocol": 1},
                      "downloads": {"windows": {"url": f"{args.base_url.rstrip('/')}/{artifact.name}", "sha256": digest,
                                                "entrypoint": artifact.name, "runtime": RUNTIME}}}

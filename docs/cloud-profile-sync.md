@@ -2,7 +2,7 @@
 
 The local editor remains independent. The host registers with
 `https://gamenight.ontola.io` by default so the website can find the room.
-Set `GAMENIGHT_CLOUD_URL` to use another HTTPS GameNight service origin, or
+Set `GAMENIGHT_CLOUD_URL` to use another HTTPS Gamepad Party service origin, or
 `GAMENIGHT_OFFLINE=1` to disable cloud registration and polling explicitly.
 No inbound Internet port is required. Local play remains available when the
 service cannot be reached.

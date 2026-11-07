@@ -8,12 +8,12 @@ Download the [Mac preview](https://gamenight.ontola.io/download/GameNight.dmg) a
 
 Run the **macOS installer** workflow on `main`, with a numeric bundle version such as `0.1.4`. It builds both Apple Silicon and Intel binaries from the same commit and combines them into one universal app.
 
-The packaging job installs the pinned universal Godot 4.5.2 (`.github/actions/setup-godot`), exports the Game Room lobby (`lobbies/game-room`, preset `macOS`) as a `.pck`, and adds the Mac catalog entries, attribution files and the GameNight icon. `Contents/Resources/build.json` records the source commit and the SHA-256 digest of the lobby pack. Packaging checks both executable architectures, bundle names and the pack hash. The native smoke check launches the packaged host from an unrelated working directory and waits until the Game Room connects to it with its launch token.
+The packaging job installs the pinned universal Godot 4.5.2 (`.github/actions/setup-godot`), exports the Game Room lobby (`lobbies/game-room`, preset `macOS`) as a `.pck`, and adds the Mac catalog entries, attribution files and the Gamepad Party icon. `Contents/Resources/build.json` records the source commit and the SHA-256 digest of the lobby pack. Packaging checks both executable architectures, bundle names and the pack hash. The native smoke check launches the packaged host from an unrelated working directory and waits until the Game Room connects to it with its launch token.
 
 The app contains:
 
 - `Contents/MacOS/GameNight`: launcher, without a separate Dock icon.
-- `Contents/Helpers/GameNight.app`: the visible lobby, whose process and app name are both GameNight. Its executable is Godot's universal editor binary; the launcher starts it with `--main-pack` on `Contents/Resources/GameNight.pck` (the exported Game Room), so no export templates are needed, as on Windows.
+- `Contents/Helpers/GameNight.app`: the visible lobby, whose process and app name are both Gamepad Party. Its executable is Godot's universal editor binary; the launcher starts it with `--main-pack` on `Contents/Resources/GameNight.pck` (the exported Game Room), so no export templates are needed, as on Windows.
 - `Contents/Resources/bin/gamenight-daemon`: session host.
 - `Contents/Resources/notices/game-room`: Godot's and the lobby fonts' licenses.
 - `Contents/Resources/catalog`: downloadable Mac games. Shared LÖVE games use the same game archives as Windows and a separately pinned Mac runtime.

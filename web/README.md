@@ -1,4 +1,4 @@
-# Shared GameNight web UI
+# Shared Gamepad Party web UI
 
 Public build output and page assets for the local and hosted Studio. The Svelte + TypeScript application shell lives in `web-app/`. Run `pnpm install --frozen-lockfile`, `pnpm check`, and `pnpm build` there after shell changes. The build updates `web/shell.js`, which is committed so Rust builds and pinned cloud imports need no Node runtime. The local Rust server embeds these files. The private deployment vendors a pinned snapshot using its import script; do not edit that generated snapshot.
 

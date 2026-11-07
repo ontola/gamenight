@@ -159,7 +159,7 @@ func _open() -> void:
 	_said_hello = false
 	var err := _socket.connect_to_url(daemon_url)
 	if err != OK:
-		push_warning("GameNight: cannot reach daemon at %s (%s)" % [daemon_url, err])
+		push_warning("Gamepad Party: cannot reach daemon at %s (%s)" % [daemon_url, err])
 		_schedule_reconnect()
 
 func _process(_delta: float) -> void:
@@ -391,7 +391,7 @@ func declare_companion_folder(folder: String = "res://phone", entry: String = "i
 	var target := "user://gamenight-phone"
 	var files := _companion_files(folder, "")
 	if files.is_empty():
-		push_warning("GameNight: no phone screen files found in %s" % folder)
+		push_warning("Gamepad Party: no phone screen files found in %s" % folder)
 		return ""
 	DirAccess.make_dir_recursive_absolute(target)
 	var total := 0
@@ -400,16 +400,16 @@ func declare_companion_folder(folder: String = "res://phone", entry: String = "i
 		var encoded := int(ceil(data.size() / 3.0)) * 4
 		total += encoded
 		if encoded > 512 * 1024:
-			push_warning("GameNight: phone file %s is %d KiB in a hosted room; the limit is 512 KiB" % [path, encoded >> 10])
+			push_warning("Gamepad Party: phone file %s is %d KiB in a hosted room; the limit is 512 KiB" % [path, encoded >> 10])
 		if not path.get_extension().to_lower() in COMPANION_TYPES:
-			push_warning("GameNight: hosted rooms do not serve phone file %s (use HTML, JS, CSS, JSON, SVG, PNG, JPEG, WebP or WOFF2)" % path)
+			push_warning("Gamepad Party: hosted rooms do not serve phone file %s (use HTML, JS, CSS, JSON, SVG, PNG, JPEG, WebP or WOFF2)" % path)
 		DirAccess.make_dir_recursive_absolute(target.path_join(path.get_base_dir()))
 		var out := FileAccess.open(target.path_join(path), FileAccess.WRITE)
 		if out == null: continue
 		out.store_buffer(data)
 		out.close()
 	if files.size() > 128 or total > 2 * 1024 * 1024:
-		push_warning("GameNight: the phone screen is %d files, %d KiB in a hosted room; the limit is 128 files, 2048 KiB" % [files.size(), total >> 10])
+		push_warning("Gamepad Party: the phone screen is %d files, %d KiB in a hosted room; the limit is 128 files, 2048 KiB" % [files.size(), total >> 10])
 	var root := ProjectSettings.globalize_path(target)
 	declare_companion(root, entry, app)
 	return root
@@ -423,7 +423,7 @@ func _companion_files(folder: String, prefix: String) -> Array:
 	for name in dir.get_files():
 		if name.ends_with(".import"):
 			if not dir.file_exists(name.trim_suffix(".import")):
-				push_warning("GameNight: %s was imported, not exported raw; set its importer to Keep File" % prefix.path_join(name.trim_suffix(".import")))
+				push_warning("Gamepad Party: %s was imported, not exported raw; set its importer to Keep File" % prefix.path_join(name.trim_suffix(".import")))
 			continue
 		if name.ends_with(".uid") or name.ends_with(".remap"): continue
 		found.append(prefix.path_join(name))
@@ -520,7 +520,7 @@ static func couch_order(seats: Array, players: Array) -> Array:
 ## Standalone-only convenience. Managed games must use frame_for_seat instead.
 func devices_for_local_seats(count: int) -> Array:
 	if launched_by_daemon:
-		push_warning("Use frame_for_seat: local device indices do not identify GameNight players.")
+		push_warning("Use frame_for_seat: local device indices do not identify Gamepad Party players.")
 		return []
 	var devices: Array = Array(Input.get_connected_joypads()).slice(0,count)
 	if devices.size() < count: devices.append(-1)
@@ -652,7 +652,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _raise_overlay() -> void:
 	if overlay_url == "":
-		push_warning("GameNight: overlay_url not set (GAMENIGHT_OVERLAY_URL) — cannot raise the party overlay")
+		push_warning("Gamepad Party: overlay_url not set (GAMENIGHT_OVERLAY_URL) — cannot raise the party overlay")
 		return
 	OS.shell_open(overlay_url)
 
@@ -664,7 +664,7 @@ func _handle(msg: Variant) -> void:
 	match kind:
 		PROTOCOL.MSG_WELCOME:
 			if int(msg.get("godot_sdk", 0)) > SDK_VERSION:
-				push_warning("GameNight: this game's addons/gamenight (version %d) is older than GameNight's (%d). Update it with sdk/godot/sync.py." % [SDK_VERSION, int(msg.get("godot_sdk", 0))])
+				push_warning("Gamepad Party: this game's addons/gamenight (version %d) is older than Gamepad Party's (%d). Update it with sdk/godot/sync.py." % [SDK_VERSION, int(msg.get("godot_sdk", 0))])
 			party = msg.get("party", {})
 			daemon_connected.emit()
 			party_updated.emit(party)
@@ -764,4 +764,4 @@ func _handle(msg: Variant) -> void:
 		PROTOCOL.MSG_COMPANION_PRESENCE:
 			companion_presence.emit(str(msg.get("player_id", "")), bool(msg.get("connected", false)))
 		PROTOCOL.MSG_ERROR:
-			push_warning("GameNight daemon: %s" % msg.get("message", "unknown error"))
+			push_warning("Gamepad Party daemon: %s" % msg.get("message", "unknown error"))

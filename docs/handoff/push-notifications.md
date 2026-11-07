@@ -41,7 +41,7 @@ Firebase heeft de productie-APNs-sleutel `GameNight Push`, beperkt tot topic
 geen development-APNs-sleutel ingesteld voor lokale Debug-builds. De volledige
 mobiele workflow voor commit `aaa6c317` en build 86 is geslaagd, inclusief
 TestFlight-upload en Play. App Store Connect toont build 86 als verwerkt en
-gekoppeld aan de interne groep GameNight. Op het moment van configuratie waren er nog geen
+gekoppeld aan de interne groep Gamepad Party. Op het moment van configuratie waren er nog geen
 push-tokens geregistreerd. Open de nieuwe app en sta meldingen toe om een
 telefoon te registreren.
 

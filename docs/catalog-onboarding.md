@@ -6,7 +6,7 @@ account. A catalog query parameter alone cannot pass data into a native app.
 
 1. The catalog remembers a game ID in browser storage for seven days and offers
    the standard installer for a supported platform.
-2. A fresh desktop launch creates `onboarding.json` in the GameNight data directory.
+2. A fresh desktop launch creates `onboarding.json` in the Gamepad Party data directory.
    The local web server opens `/play` on the website in the default browser, with
    a random one-time capability, local port and OS in the URL fragment.
 3. The website reads the remembered choice. If it is missing or incompatible, it

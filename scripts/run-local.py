@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build and run a local GameNight, without any cloud account or private code."""
+"""Build and run a local Gamepad Party, without any cloud account or private code."""
 import argparse
 import json
 import os
@@ -42,7 +42,7 @@ def main():
             parser.error(f"Missing {binary}; run without --skip-build")
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1", args.port)) == 0:
-            parser.error(f"Port {args.port} is in use; close that GameNight or choose --port")
+            parser.error(f"Port {args.port} is in use; close that Gamepad Party or choose --port")
     shelf = json.loads(args.shelf.read_text()) if args.shelf else [{
         "id": "demo-game", "title": "SDK Demo", "players": "1–4",
         "min_players": 1, "max_players": 4, "emoji": "🦀", "color": "#7c5cff",
@@ -59,7 +59,7 @@ def main():
             parser.error("Godot 4.5 not found; supply --godot /path/to/godot (or --headless)")
         launch = {"command": str(Path(godot).resolve()), "args": ["--path", str(lobby_dir)], "cwd": str(lobby_dir), "env": {"GAMENIGHT_LOBBY_API": "1"}}
         shelf = [entry for entry in shelf if entry.get("id") != lobby_id]
-        shelf.append({"id": lobby_id, "title": {"godot": "GameNight Living Room", "game-room": "GameNight Game Room"}[args.lobby], "players": "1–4",
+        shelf.append({"id": lobby_id, "title": {"godot": "Gamepad Party Living Room", "game-room": "Gamepad Party Game Room"}[args.lobby], "players": "1–4",
                       "min_players": 1, "max_players": 4, "emoji": "🎮", "color": "#7c5cff",
                       "launch": launch})
     local = root / ".local"
@@ -78,7 +78,7 @@ def main():
     if args.studio or not args.headless:
         env["GAMENIGHT_WEB"] = "1"
     log_path = local / "gamenight.log"
-    print(f"Starting GameNight. Logs: {log_path}\nPress Ctrl+C to stop.", flush=True)
+    print(f"Starting Gamepad Party. Logs: {log_path}\nPress Ctrl+C to stop.", flush=True)
     options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen([str(daemon)], cwd=root, env=env, stdout=log, stderr=log, **options)

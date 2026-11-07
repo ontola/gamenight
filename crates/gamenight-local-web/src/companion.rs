@@ -369,7 +369,7 @@ pub async fn socket(
 ) -> Response {
     let (hub, player) = hub_and_player(&state, &query.profile);
     let Some(player) = player else {
-        return (StatusCode::FORBIDDEN, "sign in to this GameNight first").into_response();
+        return (StatusCode::FORBIDDEN, "sign in to this Gamepad Party first").into_response();
     };
     let Some(game) = query.game.map(GameId::new) else {
         return StatusCode::BAD_REQUEST.into_response();

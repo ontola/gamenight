@@ -3,7 +3,7 @@
   "id": "mineclonia",
   "title": "Mineclonia",
   "tagline": "Build, mine and explore with 1–4 local players in an experimental voxel sandbox.",
-  "developer": "Mineclonia contributors · GameNight integration by Ontola",
+  "developer": "Mineclonia contributors · Gamepad Party integration by Ontola",
   "players": {
     "min": 1,
     "max": 4,

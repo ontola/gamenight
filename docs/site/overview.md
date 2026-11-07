@@ -1,6 +1,6 @@
 # Bring your game to the couch
 
-GameNight puts local multiplayer games in one lobby. Players pick a game, keep their controller and profile, and return to the lobby with Back. Your game keeps its engine and runs in its own process.
+Gamepad Party puts local multiplayer games in one lobby. Players pick a game, keep their controller and profile, and return to the lobby with Back. Your game keeps its engine and runs in its own process.
 
 ## Pick your engine
 
@@ -23,7 +23,7 @@ These are implementation starting points, not certifications. [Engine support](/
 
 Prepare a playable frame while hidden and silent. Show it when the host says Start. Pause simulation and audio when players return to the lobby, then resume the same state. Keep processing host messages throughout.
 
-Controllers follow player seats. Faces, names and colours follow player IDs. Your game owns the rounds and score screens; finishing a round does not end the GameNight session.
+Controllers follow player seats. Faces, names and colours follow player IDs. Your game owns the rounds and score screens; finishing a round does not end the Gamepad Party session.
 
 Read [Game lifecycle](/docs/lifecycle), then [Controllers & players](/docs/controllers). Add [faces and colours](/docs/faces) once play is reliable.
 

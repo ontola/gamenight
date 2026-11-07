@@ -105,9 +105,9 @@ async fn resume_requested_game(state: &SharedState, ticket: &str, saved: &Value)
 fn requested_failure_message(game: &str, error: StatusCode) -> String {
     let game: String = game.chars().take(80).collect();
     if error == StatusCode::UNPROCESSABLE_ENTITY {
-        format!("{game} is not available on this computer. Add or update the game, then restart GameNight. Your choice is saved.")
+        format!("{game} is not available on this computer. Add or update the game, then restart Gamepad Party. Your choice is saved.")
     } else {
-        format!("Could not prepare {game}. Your choice is saved; try again from the lobby or restart GameNight.")
+        format!("Could not prepare {game}. Your choice is saved; try again from the lobby or restart Gamepad Party.")
     }
 }
 

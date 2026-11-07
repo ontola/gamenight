@@ -113,7 +113,7 @@ jobs:
           if gh release view "v$VERSION" --json isDraft --jq .isDraft > /tmp/draft; then
             if [ "$(cat /tmp/draft)" = false ]; then exit 0; fi
           else
-            gh release create "v$VERSION" --draft --prerelease --target "$REVISION" --title "GameNight $VERSION preview" --generate-notes
+            gh release create "v$VERSION" --draft --prerelease --target "$REVISION" --title "Gamepad Party $VERSION preview" --generate-notes
           fi
           gh release upload "v$VERSION" release/* --clobber
           gh release edit "v$VERSION" --draft=false --prerelease

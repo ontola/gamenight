@@ -43,9 +43,9 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     let choose_lobby = args.first().is_some_and(|arg| arg == "--choose-lobby");
     let requested = if args.first().is_some_and(|arg| arg == "--open-url") {
         Some(
-            links::game(args.get(1).ok_or("Missing GameNight link")?)
+            links::game(args.get(1).ok_or("Missing Gamepad Party link")?)
                 .filter(|_| args.len() == 2)
-                .ok_or("Invalid GameNight link")?,
+                .ok_or("Invalid Gamepad Party link")?,
         )
     } else {
         None
@@ -115,11 +115,11 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
             links::request(&local, game)?;
             return Ok(Next::Quit);
         }
-        return Err("GameNight is already running".into());
+        return Err("Gamepad Party is already running".into());
     }
     port_free(port, restart)?;
     if let Err(error) = links::register() {
-        eprintln!("GameNight links: {error}");
+        eprintln!("Gamepad Party links: {error}");
     }
     // Only a fresh installation asks the browser for a catalog choice. Keep
     // pending setup across interrupted launches; never reset an existing party.
@@ -182,7 +182,7 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     #[cfg(windows)]
     let welcome = (!restart).then(|| {
         let flag = Welcome(local.join("welcome.flag"));
-        let _ = fs::write(&flag.0, "0.1\nStarting GameNight\u{2026}");
+        let _ = fs::write(&flag.0, "0.1\nStarting Gamepad Party\u{2026}");
         let path = flag.0.clone();
         std::thread::spawn(move || windows::show_welcome(path));
         flag
@@ -286,7 +286,7 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
     job.close()?; // No hidden game or descendant may survive into an update.
     if !status?.success() {
         return Err(format!(
-            "The GameNight host stopped unexpectedly. See {}",
+            "The Gamepad Party host stopped unexpectedly. See {}",
             local.join("daemon-errors.log").display()
         )
         .into());
@@ -313,7 +313,7 @@ fn run(restart: bool) -> Result<Next, Box<dyn std::error::Error>> {
             // would race this one for the lock and port, and fail unseen.
             let text = match lobby {
                 Some(title) => format!("Opening {title}\u{2026}"),
-                None => "Restarting GameNight\u{2026}".into(),
+                None => "Restarting Gamepad Party\u{2026}".into(),
             };
             let _ = windows::spawn_splash(&splash, &text);
             return Ok(Next::Restart);
@@ -366,7 +366,7 @@ fn main() {
         if let Some(flag) = std::env::args_os().nth(2) {
             let text = std::env::args()
                 .nth(3)
-                .unwrap_or_else(|| "Updating GameNight\u{2026}".into());
+                .unwrap_or_else(|| "Updating Gamepad Party\u{2026}".into());
             windows::show_update_cover(flag.into(), text);
         }
         return;
@@ -401,7 +401,7 @@ fn main() {
         #[cfg(windows)]
         windows::show_error(&error.to_string());
         #[cfg(not(windows))]
-        eprintln!("GameNight could not start or close: {error}");
+        eprintln!("Gamepad Party could not start or close: {error}");
         std::process::exit(1);
     }
 }

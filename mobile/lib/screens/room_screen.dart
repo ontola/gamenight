@@ -191,7 +191,7 @@ class RoomScreenState extends State<RoomScreen> {
         ? 'Room $code'
         : hosted
             ? 'Your room'
-            : 'GameNight at ${state.host?.authority ?? ''}';
+            : 'Gamepad Party at ${state.host?.authority ?? ''}';
     final name = hosted ? state.name : state.session?.playerName ?? state.name;
     return ContentWidth(
       child: Container(
@@ -275,7 +275,7 @@ class RoomScreenState extends State<RoomScreen> {
         contentPadding: EdgeInsets.zero,
         value: _rememberJoin,
         onChanged: (v) => setState(() => _rememberJoin = v ?? false),
-        title: const Text('Remember me on this GameNight'),
+        title: const Text('Remember me on this Gamepad Party'),
         controlAffinity: ListTileControlAffinity.leading,
       );
 
@@ -353,7 +353,7 @@ class RoomScreenState extends State<RoomScreen> {
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child:
-                    Hint('The GameNight PC has not checked in for a moment.'),
+                    Hint('The Gamepad Party PC has not checked in for a moment.'),
               ),
             if (!state.isGuest && room != null && (connected || waiting)) ...[
               const SizedBox(height: 4),
@@ -365,11 +365,11 @@ class RoomScreenState extends State<RoomScreen> {
                     : (v) => _run(() async {
                           await state.setHostedMainPlayer(v);
                           return v
-                              ? 'You are the main player on this GameNight.'
+                              ? 'You are the main player on this Gamepad Party.'
                               : 'Your player will no longer appear automatically.';
                         }),
-                title: const Text('Main player on this GameNight'),
-                subtitle: const Text('Wait at the door when GameNight starts.'),
+                title: const Text('Main player on this Gamepad Party'),
+                subtitle: const Text('Wait at the door when Gamepad Party starts.'),
               ),
               if (!room.mainPlayer)
                 SwitchListTile(
@@ -383,7 +383,7 @@ class RoomScreenState extends State<RoomScreen> {
                                 ? 'Your player will be waiting here next time.'
                                 : 'Your player will no longer be remembered here.';
                           }),
-                  title: const Text('Remember me on this GameNight'),
+                  title: const Text('Remember me on this Gamepad Party'),
                 ),
             ],
           ]),
@@ -436,7 +436,7 @@ class RoomScreenState extends State<RoomScreen> {
           Section(
               title: state.pendingRoomDestination != null
                   ? 'Could not join this room'
-                  : 'Could not reach GameNight',
+                  : 'Could not reach Gamepad Party',
               children: [
                 Text(state.sessionError!,
                     style: const TextStyle(color: GnColors.warn)),
@@ -488,7 +488,7 @@ class RoomScreenState extends State<RoomScreen> {
                           keyboardType: TextInputType.url,
                           autocorrect: false,
                           decoration: const InputDecoration(
-                              labelText: 'GameNight address',
+                              labelText: 'Gamepad Party address',
                               hintText: '192.168.1.20:7913'),
                           onSubmitted: _busy ? null : openLink,
                         ),
@@ -552,7 +552,7 @@ class RoomScreenState extends State<RoomScreen> {
         ]),
         const SizedBox(height: 8),
         Hint(state.sessionError != null
-            ? 'Showing what this phone last knew. It updates when GameNight is reachable again.'
+            ? 'Showing what this phone last knew. It updates when Gamepad Party is reachable again.'
             : linked
                 ? '${s!.seat == null ? 'Your profile is linked to this party.' : 'Player ${s.seat! + 1}.'} '
                     'Your name and face follow you into every game.'
@@ -592,7 +592,7 @@ class RoomScreenState extends State<RoomScreen> {
           _codeField(),
           _rememberBox(),
           const Hint(
-              'The first player to join becomes this GameNight’s main player '
+              'The first player to join becomes this Gamepad Party’s main player '
               'and returns next time.'),
         ]),
       if (linked || waiting)
@@ -605,11 +605,11 @@ class RoomScreenState extends State<RoomScreen> {
                 : (v) => _run(() async {
                       await state.setMainPlayer(v);
                       return v
-                          ? 'You are the main player on this GameNight.'
+                          ? 'You are the main player on this Gamepad Party.'
                           : 'Your player will no longer appear automatically.';
                     }),
-            title: const Text('Main player on this GameNight'),
-            subtitle: const Text('Wait at the door when GameNight starts.'),
+            title: const Text('Main player on this Gamepad Party'),
+            subtitle: const Text('Wait at the door when Gamepad Party starts.'),
           ),
           if (!s.mainPlayer)
             SwitchListTile(
@@ -623,7 +623,7 @@ class RoomScreenState extends State<RoomScreen> {
                             ? 'Your player will be waiting here next time.'
                             : 'Your player will no longer be remembered here.';
                       }),
-              title: const Text('Remember me on this GameNight'),
+              title: const Text('Remember me on this Gamepad Party'),
               subtitle: const Text(
                   'Return as a guest without becoming the main player.'),
             ),
@@ -645,7 +645,7 @@ class RoomScreenState extends State<RoomScreen> {
         Row(children: [
           const Icon(Icons.wifi, color: GnColors.muted, size: 20),
           const SizedBox(width: 8),
-          Expanded(child: Hint('GameNight at ${state.host!.authority}')),
+          Expanded(child: Hint('Gamepad Party at ${state.host!.authority}')),
           TextButton(
             onPressed: _busy ? null : scan,
             child: const Text('Scan again'),

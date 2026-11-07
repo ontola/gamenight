@@ -111,7 +111,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)))
         ]),
         const SizedBox(height: 8),
-        const Hint('Keep GameNight a tap away on your phone.'),
+        const Hint('Keep Gamepad Party a tap away on your phone.'),
         const SizedBox(height: 12),
         FilledButton.icon(
             onPressed: () async {

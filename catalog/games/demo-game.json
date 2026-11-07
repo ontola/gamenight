@@ -3,7 +3,7 @@
   "id": "demo-game",
   "title": "Demo Game",
   "tagline": "The Rust SDK reference integration.",
-  "developer": "GameNight contributors",
+  "developer": "Gamepad Party contributors",
   "players": { "min": 1, "max": 4 },
   "match_minutes": 1,
   "price": "free",

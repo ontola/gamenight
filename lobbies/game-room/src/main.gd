@@ -273,7 +273,7 @@ func set_party(snapshot: Dictionary) -> void:
 	var active: Variant = party.get("active_session")
 	if not (active is Dictionary and str(active.get("game")) == str(_quitting.get("game", ""))): _quitting = {}
 	if was_ready.is_empty() and not update_ready().is_empty():
-		toast("New GameNight version ready. It installs when the room is quiet, or press Start.", GREEN)
+		toast("New Gamepad Party version ready. It installs when the room is quiet, or press Start.", GREEN)
 	profiles.clear()
 	for player in party.get("players", []): profiles[str(player.id)] = player
 	_apply_claims()
@@ -619,7 +619,7 @@ func queue_station() -> Dictionary:
 		"enabled": not entries.is_empty() and (client.connected or demo != null)}
 
 func _unavailable(game: Dictionary) -> String:
-	if not client.connected and demo == null: return "Waiting for GameNight"
+	if not client.connected and demo == null: return "Waiting for Gamepad Party"
 	return _shortfall(game)
 
 ## Y uses the station; at the shelf, queue (X) adds the box to the players'
@@ -713,11 +713,11 @@ func menu_items(id: String) -> Array:
 	# Hosts that predate couch positions don't send them.
 	if profiles.get(id, {}).get("couch") != null: items.insert(1, {"label": "Couch position", "action": "couch"})
 	# The host restarts into the new version and brings the party back.
-	if not update_ready().is_empty(): items.push_front({"label": "Update GameNight now", "action": "update"})
+	if not update_ready().is_empty(): items.push_front({"label": "Update Gamepad Party now", "action": "update"})
 	if links.get("linked", {}).has(id): items.insert(1, {"label": "Unlink my phone profile", "action": "unlink"})
 	if profiles.size() > 1: items.append({"label": "Remove a player", "action": "remove_page"})
 	if party.get("lobbies", []).size() > 1: items.append({"label": "Switch lobby", "action": "lobbies"})
-	items.append({"label": "Quit GameNight", "action": "quit"})
+	items.append({"label": "Quit Gamepad Party", "action": "quit"})
 	return items
 
 ## Where `id` sits on the couch, counted from the left, and how many places
@@ -803,7 +803,7 @@ func _menu_input(id: String, pressed: int, stick: Vector2) -> void:
 					client._command({"type": "switch_lobby", "lobby": item.lobby})
 			"update":
 				menus.erase(id)
-				toast("Updating GameNight… everyone stays in the party.", GREEN)
+				toast("Updating Gamepad Party… everyone stays in the party.", GREEN)
 				client._command({"type": "apply_update"})
 			"leave":
 				menus.erase(id)
@@ -1395,7 +1395,7 @@ func _draw_plaque(canvas: Control) -> void:
 		canvas.draw_texture_rect(qr, qr_rect, false)
 	else:
 		_text(canvas, "Phone joining", Vector2(qr_rect.position.x, qr_rect.get_center().y - 6), 16, DIM, qr_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-		_text(canvas, "starts with GameNight", Vector2(qr_rect.position.x, qr_rect.get_center().y + 18), 16, DIM, qr_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+		_text(canvas, "starts with Gamepad Party", Vector2(qr_rect.position.x, qr_rect.get_center().y + 18), 16, DIM, qr_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	var code := str(room_info.get("room_code", room_info.get("code", "")))
 	if code == "<null>": code = ""
 	if code.is_empty(): code = "· · · ·"
@@ -1456,7 +1456,7 @@ func _draw_hud(canvas: Control) -> void:
 		_text(canvas, msg, rect.position + Vector2(20, size + 4), size, TEXT)
 	if demo == null and not client.connected:
 		var size := int(24 * scale)
-		var msg := "Connecting to GameNight…"
+		var msg := "Connecting to Gamepad Party…"
 		var w := font.get_string_size(msg, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 48
 		canvas.draw_rect(Rect2(canvas.size.x / 2 - w / 2, 24, w, size + 28), Color(0.03, 0.03, 0.06, 0.9))
 		_text(canvas, msg, Vector2(canvas.size.x / 2 - w / 2 + 24, 24 + size + 6), size, AMBER)

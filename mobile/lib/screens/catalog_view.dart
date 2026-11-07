@@ -737,7 +737,7 @@ class GameCard extends StatelessWidget {
                                 label: const Text('Add to queue', maxLines: 1),
                               )
                             : const Center(
-                                child: Text('Not on this GameNight',
+                                child: Text('Not on this Gamepad Party',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

@@ -202,7 +202,7 @@ class FakeHost:
         self._log.close()
 
     def disconnect(self) -> None:
-        """Drop the connection the way a GameNight that goes away does."""
+        """Drop the connection the way a Gamepad Party that goes away does."""
         if self._peer is None:
             return
         try:
@@ -346,7 +346,7 @@ class HostClient:
         while b"\r\n\r\n" not in response:
             chunk = self.peer.recv(1)
             if not chunk:
-                raise AssertionError("GameNight closed the connection during the handshake")
+                raise AssertionError("Gamepad Party closed the connection during the handshake")
             response += chunk
         assert response.split(b"\r\n", 1)[0].split(b" ")[1:2] == [b"101"], response
         self.peer.settimeout(None)
@@ -369,7 +369,7 @@ class HostClient:
                 break
             if msg.get("type") == kind and check(msg):
                 return msg
-        raise AssertionError(f"GameNight never sent {kind}")
+        raise AssertionError(f"Gamepad Party never sent {kind}")
 
     def close(self) -> None:
         try:

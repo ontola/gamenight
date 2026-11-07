@@ -1,8 +1,8 @@
-# The GameNight Protocol (v1)
+# The Gamepad Party Protocol (v1)
 
 The protocol is the product. Engine plugins are convenience wrappers around
 what is written here. Anything that can open a WebSocket and speak JSON can be
-a GameNight game or overlay — Godot, Unity, Bevy, a shell script, a browser.
+a Gamepad Party game or overlay — Godot, Unity, Bevy, a shell script, a browser.
 
 This document is the formal wire reference. **If you're integrating a game,
 start with [Integrating your game](integrating-your-game.md)** — it walks the
@@ -36,7 +36,7 @@ there is nothing to configure on either side.
 
 Both are first-class and can share one party — a WebSocket overlay and a
 plain-socket game see exactly the same messages. The plain form exists
-because "anything that can open a socket can be a GameNight game" has to be
+because "anything that can open a socket can be a Gamepad Party game" has to be
 literally true: WebSocket's handshake and masked frame codec are several
 hundred lines of ceremony before the first byte of protocol, which is free
 in Godot and expensive in a C++ engine with no such dependency. Blank lines
@@ -237,7 +237,7 @@ every snapshot, so overlays can show a real bar instead of a spinner:
 optional. A game that loads instantly should never send this — "loading"
 with no number is a legitimate state, and screens must stay honest without
 it. This matters most for games with genuinely slow warm-ups: a kart racer
-loading a track for eight seconds is a fine GameNight citizen if it *says*
+loading a track for eight seconds is a fine Gamepad Party citizen if it *says*
 so, and a mystery if it doesn't.
 
 `request_overlay` takes no arguments. Games are not allowed to drive the
@@ -456,7 +456,7 @@ In Godot, call `GameNight.add_room_log("New run")`.
 
 ## Phone buttons
 
-Next to its settings, a game can offer buttons in the GameNight app for things
+Next to its settings, a game can offer buttons in the Gamepad Party app for things
 that happen once: "New round", "New run", "Skip level". Declare them any time
 after `hello`, and again after a reconnect; an empty list removes them.
 
@@ -508,7 +508,7 @@ How the daemon reads it, per platform:
 
 | platform | source | reached via |
 |---|---|---|
-| macOS | Spotify, Music | AppleScript, and only for apps already running (`pgrep`) — GameNight never launches a player to ask it what it's doing |
+| macOS | Spotify, Music | AppleScript, and only for apps already running (`pgrep`) — Gamepad Party never launches a player to ask it what it's doing |
 | Linux | any MPRIS player | `playerctl`, if installed |
 | other | — | no music card, ever |
 
@@ -527,7 +527,7 @@ and **the daemon owns the values**: it validates every write, broadcasts them
 in every snapshot, pushes changes to the game, and keeps them when the game's
 process reconnects. Anything speaking the overlay role can turn a knob: the
 party overlay, or an LLM through [`gamenight-mcp`](llm-control.md) ("hey
-GameNight, disable items").
+Gamepad Party, disable items").
 
 A game declares its settings once, right after `welcome` (and again after
 every reconnect — the daemon replays changed values in response):
@@ -635,7 +635,7 @@ The handshake context travels in **environment variables, not CLI arguments**
 
 | variable | meaning |
 |---|---|
-| `GAMENIGHT=1` | this process was launched by a GameNight daemon |
+| `GAMENIGHT=1` | this process was launched by a Gamepad Party daemon |
 | `GAMENIGHT_ADDR` | the daemon's WebSocket address |
 | `GAMENIGHT_GAME_ID` | the title this process was launched to serve |
 | `GAMENIGHT_TOKEN` | per-launch secret; echo it in the `hello` |
@@ -699,9 +699,9 @@ one); reprioritizing only reorders what hasn't started yet.
 
 A game can give every seated player a screen of their own on their phone: a
 hand of cards nobody else may see, a god's-eye map, a private vote. This is
-how GameNight does asymmetric play. The phone screen is a small web page that
+how Gamepad Party does asymmetric play. The phone screen is a small web page that
 ships with the game; the host's local web server (`GAMENIGHT_WEB=1`, port
-7913) serves it while that game is the active session, and the GameNight app
+7913) serves it while that game is the active session, and the Gamepad Party app
 and the phone studio open it automatically.
 
 Declare it once after `welcome`, and again after every reconnect:
@@ -714,7 +714,7 @@ Declare it once after `welcome`, and again after every reconnect:
 `/play/<game>/<entry>?profile=…&game=<game>`, so relative links in the page
 resolve inside `root`, and nothing outside it is served.
 
-With hosted GameNight rooms, the host forwards the current game's phone bundle
+With hosted Gamepad Party rooms, the host forwards the current game's phone bundle
 and messages through an outbound encrypted connection. Phones do not need access
 to the PC's LAN address. The signed-in app obtains its screen from
 `GET /v1/rooms/companion`; the returned URL is a short-lived capability for that
@@ -777,10 +777,10 @@ don't fit in a web page. Declare a native app instead of (or next to) a page:
 ```
 
 `download` is an `https://` URL or a file inside `root`; a file is served by
-the GameNight PC over the LAN, so the PC is the phone's installer. The
-GameNight app acts as the store: **Install** downloads the APK and hands
+the Gamepad Party PC over the LAN, so the PC is the phone's installer. The
+Gamepad Party app acts as the store: **Install** downloads the APK and hands
 it to Android's installer (Android asks once to allow installs from
-GameNight and confirms each first install; updates of apps GameNight
+Gamepad Party and confirms each first install; updates of apps Gamepad Party
 installed need no confirmation on Android 12+), and **Open** launches
 `android`. In Godot: `GameNight.declare_companion(root, "", app)`. The app connects to the
 game by its own means, for example LAN discovery; `companion_message` is for
@@ -790,7 +790,7 @@ the app must come from the App Store or TestFlight.
 ## Plain-text requests
 
 A game can accept requests in plain words, such as "geef me 10 End Crystal",
-from the GameNight app and the session assistant (which turns speech or loose
+from the Gamepad Party app and the session assistant (which turns speech or loose
 wording into a request the game understands). Declare it after `welcome`:
 
 ```json
@@ -830,13 +830,13 @@ Add the path of its token file, a JSON file with `url` (a loopback
 
 The local web server then sends no `game_command` for a request. It reads the
 token file, lists the game's tools and carries out the request with them, one
-model step at a time from the GameNight cloud, and the model's last words are
+model step at a time from the Gamepad Party cloud, and the model's last words are
 the answer. The token stays on the host. Such a change is temporary: the host
 hides tools that save into the game's files (`write_file`, `load_mod`), asks
 `set_knob` for `persist: false`, and offers `set_knob` only when the game
 supports that. A restart brings back the saved game; keeping a change is the
 game's own explicit tool, used only when the player asks to keep it. Warp games do this by themselves when
-GameNight launches them.
+Gamepad Party launches them.
 
 ## The night, end to end
 
@@ -889,7 +889,7 @@ are not implemented. Downloads and host controller routing are implemented.
 ### Ready crossing Dispose
 
 A host may replace a preparing session when seats change. A `ready` reply for
-a recently disposed session can already be in flight. GameNight ignores these
+a recently disposed session can already be in flight. Gamepad Party ignores these
 late replies for the 64 most recent disposals; it never applies them to the
 replacement session. Unknown session IDs still produce a protocol error.
 

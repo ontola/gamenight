@@ -1,6 +1,6 @@
 # Engine support
 
-Which engines GameNight supports, how far, and where to start. Pick the row for
+Which engines Gamepad Party supports, how far, and where to start. Pick the row for
 your engine, then follow its guide. If your engine is not listed as
 **Full**, read its open work before you start: you write that part yourself.
 

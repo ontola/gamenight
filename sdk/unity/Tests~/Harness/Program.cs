@@ -30,7 +30,7 @@ static class Program
         var game = new OrbRushGame(client, null, seed, trace);
         if (!client.LaunchedByHost)
         {
-            Console.Error.WriteLine("Not launched by GameNight; use --sim to play with bots.");
+            Console.Error.WriteLine("Not launched by Gamepad Party; use --sim to play with bots.");
             return 2;
         }
         Console.Out.Flush();

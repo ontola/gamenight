@@ -1,6 +1,6 @@
-# Dash Derby: the GameNight demo for Unreal Engine
+# Dash Derby: the Gamepad Party demo for Unreal Engine
 
-A small, complete couch game on the [GameNight Unreal plugin](../../sdk/unreal).
+A small, complete couch game on the [Gamepad Party Unreal plugin](../../sdk/unreal).
 Everyone races for orbs, A dashes and knocks others aside, a round lasts 60
 seconds, then the results show and the next round starts by itself.
 
@@ -10,7 +10,7 @@ no asset of its own: the arena is built in code from engine shapes, so every
 change reads as a diff. The [Unreal guide](../../docs/site/unreal.md) walks
 through it.
 
-| GameNight feature | Where |
+| Gamepad Party feature | Where |
 | --- | --- |
 | Prepare hidden, ready, start, pause, resume, dispose | `HandlePrepared` and friends |
 | Input per seat, bots in AI seats, activity, rumble | `ReadMove`, `Collide` |
@@ -29,9 +29,9 @@ layout. Standalone it plays with WASD or the first pad (Space or A to dash,
 Escape or Start for the menu) against bots. `-players=2` adds a local player,
 `-seed=7` makes a run repeatable, and `GAME_TRACE=1` logs what happens.
 
-To play it under GameNight, package it (see the guide) and add the build to
+To play it under Gamepad Party, package it (see the guide) and add the build to
 your local shelf, or set **Connect Standalone** in Project Settings > Plugins >
-GameNight while a GameNight host runs on the same machine.
+Gamepad Party while a Gamepad Party host runs on the same machine.
 
 Not verified yet: this demo has not been compiled or played in CI. The plugin's
 protocol core is tested and certified headless; see the guide for what that

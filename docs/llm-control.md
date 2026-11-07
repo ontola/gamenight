@@ -1,12 +1,12 @@
-# "Hey GameNight" — LLM control
+# "Hey Gamepad Party" — LLM control
 
-GameNight ships an [MCP](https://modelcontextprotocol.io) server,
+Gamepad Party ships an [MCP](https://modelcontextprotocol.io) server,
 `gamenight-mcp`, that turns the party into something you can *talk to*.
 Connect any MCP-capable assistant — Claude, a voice pipeline, a home
 automation — and it becomes a member of the party that can read the room and
 turn the knobs:
 
-> "Hey GameNight, let's disable items" → `set_setting {key: "items", value: false}`
+> "Hey Gamepad Party, let's disable items" → `set_setting {key: "items", value: false}`
 > "Make the matches shorter" → `set_setting {key: "match_seconds", value: 60}`
 > "Queue up TowerFall next" → `play_next {game: "towerfall"}`
 

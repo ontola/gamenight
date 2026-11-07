@@ -144,7 +144,7 @@ def main():
     for game in ids:
         path = GAMES / f'{game}.json'
         if not path.is_file():
-            print(f'{game}: no catalog entry. New games are published through the GameNight API, '
+            print(f'{game}: no catalog entry. New games are published through the Gamepad Party API, '
                   'not added to catalog/games; see docs/site/publishing.md.', file=sys.stderr)
             return 2
         existing = json.loads(path.read_text())

@@ -139,14 +139,14 @@ void main() {
     });
     await _open(tester, reports, voice, initialGame: 'pocket-aces');
     expect(find.text('Sent to the developer of Pocket Aces.'), findsOneWidget);
-    await _tap(tester, find.text('GameNight'));
+    await _tap(tester, find.text('Gamepad Party'));
     await tester.enterText(find.byKey(const ValueKey('feedback-draft')),
-        'Please keep this feedback for GameNight.');
+        'Please keep this feedback for Gamepad Party.');
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
     await tester.pumpAndSettle();
     await _open(tester, reports, voice, initialGame: 'pocket-aces');
-    expect(find.text('Sent to the GameNight team.'), findsOneWidget);
+    expect(find.text('Sent to the Gamepad Party team.'), findsOneWidget);
     tester.view.physicalSize = const Size(320, 640);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
@@ -219,7 +219,7 @@ void main() {
   });
 
   testWidgets(
-      'permission denied leaves keyboard available and offline feedback queued for GameNight',
+      'permission denied leaves keyboard available and offline feedback queued for Gamepad Party',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     Map<String, dynamic>? submitted;
@@ -237,7 +237,7 @@ void main() {
       tester.view.reset();
     });
     await _open(tester, reports, voice);
-    await _tap(tester, find.text('GameNight'));
+    await _tap(tester, find.text('Gamepad Party'));
     await _tap(tester, find.byKey(const ValueKey('feedback-record')));
     expect(find.textContaining('Allow access in your phone settings'),
         findsOneWidget);
@@ -247,7 +247,7 @@ void main() {
     await tester.pumpAndSettle();
     await _tap(tester, find.byKey(const ValueKey('feedback-send')));
     expect(submitted!.containsKey('game'), false,
-        reason: 'GameNight target never sends to developer');
+        reason: 'Gamepad Party target never sends to developer');
     expect(find.text('Saved. We’ll send it soon.'), findsOneWidget);
     await _capture(tester, 'feedback-queued');
     expect(reports.draft, isEmpty);
@@ -267,7 +267,7 @@ void main() {
       tester.view.reset();
     });
     await _open(tester, reports, voice);
-    await _tap(tester, find.text('GameNight'));
+    await _tap(tester, find.text('Gamepad Party'));
     await _tap(tester, find.byKey(const ValueKey('feedback-record')));
     speech.result!('Please remember my draft.');
     await tester.pumpAndSettle();
@@ -289,7 +289,7 @@ void main() {
             .controller!
             .text,
         'Please remember my draft.');
-    expect(find.text('Sent to the GameNight team.'), findsOneWidget);
+    expect(find.text('Sent to the Gamepad Party team.'), findsOneWidget);
     await _tap(tester, find.byKey(const ValueKey('feedback-record')));
     expect(speech.initializations, 1);
     speech.error!('error_busy');

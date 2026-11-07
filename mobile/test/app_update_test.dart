@@ -46,7 +46,7 @@ void main() {
     await tester.pumpWidget(
         MaterialApp(home: Scaffold(body: UpdateBanner(check: () async => 12))));
     await tester.pump();
-    expect(find.text('A new version of GameNight is ready.'), findsOneWidget);
+    expect(find.text('A new version of Gamepad Party is ready.'), findsOneWidget);
     await tester.tap(find.text('Update'));
     await tester.pump();
     expect(installs, [
@@ -67,7 +67,7 @@ void main() {
     await tester.pump();
     await tester.tap(find.text('Later'));
     await tester.pump();
-    expect(find.text('A new version of GameNight is ready.'), findsNothing);
+    expect(find.text('A new version of Gamepad Party is ready.'), findsNothing);
 
     await tester.pumpWidget(MaterialApp(
         home: Scaffold(
@@ -89,7 +89,7 @@ void main() {
     ))));
     await tester.pump();
     expect(
-        find.text('New version ready. It installs when you leave GameNight.'),
+        find.text('New version ready. It installs when you leave Gamepad Party.'),
         findsOneWidget);
     expect(find.text('Restart now'), findsOneWidget);
 
@@ -126,6 +126,6 @@ void main() {
     await tester.tap(find.text('Restart now'));
     await tester.pump();
     expect(installs, [(Uri.file('/cache/updates/gamenight-12.apk'), true)]);
-    expect(find.text('Updating GameNight…'), findsOneWidget);
+    expect(find.text('Updating Gamepad Party…'), findsOneWidget);
   });
 }

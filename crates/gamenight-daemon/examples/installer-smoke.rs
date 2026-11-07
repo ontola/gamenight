@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(flag) = std::env::args_os().nth(2) {
             let text = std::env::args()
                 .nth(3)
-                .unwrap_or_else(|| "Updating GameNight\u{2026}".into());
+                .unwrap_or_else(|| "Updating Gamepad Party\u{2026}".into());
             windows::show_update_cover(flag.into(), text);
         }
         return Ok(());

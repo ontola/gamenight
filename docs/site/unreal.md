@@ -1,6 +1,6 @@
 # Unreal Engine
 
-The GameNight plugin for Unreal Engine 5 lives in `sdk/unreal/GameNight`. It
+The Gamepad Party plugin for Unreal Engine 5 lives in `sdk/unreal/GameNight`. It
 covers the whole game contract: the connection and lifecycle, input per seat,
 the window and audio, the world pause, match and per-player settings, saved
 progress, faces and phone screens. **Dash Derby** in `examples/unreal-demo` is a
@@ -19,21 +19,21 @@ your `.uproject` at the folder that holds it, as the demo does:
 ::: source json examples/unreal-demo/DashDerby.uproject
 
 Add `"GameNight"` to your module's dependencies in its `.Build.cs`, then set
-your game id under **Project Settings > Plugins > GameNight**. It must match
-your catalog entry; GameNight also passes it in `GAMENIGHT_GAME_ID`.
+your game id under **Project Settings > Plugins > Gamepad Party**. It must match
+your catalog entry; Gamepad Party also passes it in `GAMENIGHT_GAME_ID`.
 
 ::: source ini examples/unreal-demo/Config/DefaultGame.ini "[/Script/GameNight.GameNightSettings]" "[/Script/UnrealEd.ProjectPackagingSettings]"
 
 A game started by hand stays offline, so a test run never joins the party on
 your machine. Turn on **Connect Standalone** (or set `GAMENIGHT_ADDR`) to
-connect a Play In Editor session to a running GameNight.
+connect a Play In Editor session to a running Gamepad Party.
 
 ## How it fits together
 
 Everything goes through `UGameNightSubsystem`, a game instance subsystem that
 lives from boot to quit and ticks also while the game is paused. Get it from
 any actor with `UGameNightSubsystem::Get(this)`, or in Blueprint with the
-**GameNight Subsystem** node. It talks to GameNight over the plain TCP
+**Gamepad Party Subsystem** node. It talks to Gamepad Party over the plain TCP
 transport (one JSON message per line) on the same port as the WebSocket one.
 
 The contract is the same as in every SDK:
@@ -51,7 +51,7 @@ screen while warming, a lower frame cap once ready, borderless fullscreen in
 front on Start and Resume, and away again on Pause. It also pauses the world
 whenever the session is not running, so physics, timers and game sounds stop
 without code from you. Both are settings. F1 returns to the party; the
-controller's Back button is GameNight's own and reaches the host directly.
+controller's Back button is Gamepad Party's own and reaches the host directly.
 When the host goes away, a launched game quits.
 
 ## Bind the lifecycle
@@ -74,7 +74,7 @@ people is `LocalSeatCount()`, never the number of pads you can see.
 
 ## Read input per seat
 
-GameNight routes every controller and phone to a seat. Read the seat, never
+Gamepad Party routes every controller and phone to a seat. Read the seat, never
 local device order: `GetPad(Seat)` gives the sticks (deadzone applied, up is
 negative Y as on the wire) and buttons, and `JustPressed(Seat, Button)` is
 true on the frame a button went down. A button still held from the lobby
@@ -82,7 +82,7 @@ must be released first, so one press never does two things.
 
 ::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "\tif (Runner.Seat >= 0)\n\t{" "\telse if (Runner.bKeyboard)"
 
-`ReportActivity` tells GameNight someone is really playing, so the party does
+`ReportActivity` tells Gamepad Party someone is really playing, so the party does
 not mark them asleep. `Rumble(Seat, Weak, Strong, Seconds)` vibrates that
 seat's controller. Back is never bound: it returns to the party.
 
@@ -114,7 +114,7 @@ own choice, here the shape of their body.
 
 ::: source cpp examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp "// Declared to GameNight: the phones" "}  // namespace"
 
-Every GameNight Start menu has the same layout: the game's name, **Resume**,
+Every Gamepad Party Start menu has the same layout: the game's name, **Resume**,
 **New round**, then the settings, with no button hints. Dash Derby's menu sends
 each change back with `SetSettingJson`, so the phones show the same value:
 
@@ -171,7 +171,7 @@ engine shapes in code, so it cooks `/Engine/BasicShapes` and the empty
 Space to dash, Escape for the menu) or the first pad against bots; pass
 `-players=2` for more local players and `-seed=7` for a repeatable game.
 
-On Windows, GameNight starts games hidden. The plugin keeps a warming game
+On Windows, Gamepad Party starts games hidden. The plugin keeps a warming game
 minimised and muted until Start, and parks the window off the screen when the
 window server refuses to minimise it.
 
@@ -182,11 +182,11 @@ window server refuses to minimise it.
   the lifecycle, input edges, stale input, settings, saves, phones, faces and
   performance samples (`scripts/test-unreal-sdk.py`).
 - The same core drives a headless game over a real socket, and CI runs the
-  GameNight conformance harness against it
+  Gamepad Party conformance harness against it
   (`gamenight-certify unreal-core`).
 - `GameNightProtocol.h` is generated from the protocol schema, so message tags
   cannot drift (`scripts/build-protocol.py --check`).
 - Not yet in CI: compiling the Unreal module and the demo, and the window,
   audio and pause behaviour on real hardware. Build the demo and run it under
-  GameNight, then follow the [test guide](/docs/testing), before relying on
+  Gamepad Party, then follow the [test guide](/docs/testing), before relying on
   them for a release.

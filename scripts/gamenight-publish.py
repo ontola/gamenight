@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Upload immutable GameNight builds and store pages using only Python's standard library."""
+"""Upload immutable Gamepad Party builds and store pages using only Python's standard library."""
 import argparse
 import hashlib
 import http.client
@@ -55,7 +55,7 @@ class Client:
             except ValueError:
                 result = {}
             if not 200 <= response.status < 300:
-                raise HTTPError(response.status, result.get('error', f'GameNight returned HTTP {response.status}'))
+                raise HTTPError(response.status, result.get('error', f'Gamepad Party returned HTTP {response.status}'))
             return result
         finally:
             connection.close()
@@ -120,7 +120,7 @@ def push(client, args):
                 output.write(f'{name}={value}\n')
     if os.environ.get('GITHUB_STEP_SUMMARY'):
         with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
-            summary.write(f"GameNight build `{build['id']}`: **{release['state']}**. [Open publishing portal]({result['portal_url']})\n")
+            summary.write(f"Gamepad Party build `{build['id']}`: **{release['state']}**. [Open publishing portal]({result['portal_url']})\n")
 
 def preview(client, args):
     feed = client.request('GET', f'/v1/developer/games/{urllib.parse.quote(args.game, safe="")}/preview-catalog')
@@ -235,7 +235,7 @@ def store(client, args):
         except HTTPError as e:
             if e.status != 404:
                 raise
-            print('This GameNight server does not take save schemas yet; skipped save-schema.json.', file=sys.stderr)
+            print('This Gamepad Party server does not take save schemas yet; skipped save-schema.json.', file=sys.stderr)
     print(json.dumps({'game': game, 'sent': sorted(body), **result}, indent=2))
     if not result.get('preview_ready'):
         print('The store still needs a five-second gameplay clip (preview.mp4) before it can go live.', file=sys.stderr)
@@ -296,5 +296,5 @@ if __name__ == '__main__':
     try:
         main()
     except (ValueError, OSError, http.client.HTTPException) as error:
-        print('GameNight publishing failed: ' + str(error), file=sys.stderr)
+        print('Gamepad Party publishing failed: ' + str(error), file=sys.stderr)
         sys.exit(1)

@@ -1,4 +1,4 @@
-# GameNight app
+# Gamepad Party app
 
 A Flutter app for players on the couch. It does what the phone studio in the
 browser does, as an installable app for Android and iOS:
@@ -11,7 +11,7 @@ browser does, as an installable app for Android and iOS:
 - **Games.** Browse the catalog and choose games for your room. Swipe left or right on a game page to move through the same list, A gallery with multiple images or videos keeps its own swipe controls.
 - **You.** Edit your name, skin colour and 48×48 face. Changes save automatically.
 
-GameNight branding and Feedback remain in the top bar across these tabs.
+Gamepad Party branding and Feedback remain in the top bar across these tabs.
 Phone games open under Room automatically. Hosted rooms discover their private
 phone screen through authenticated `GET /v1/rooms/companion`; the returned
 same-origin URL is scoped to the player's seat and session. Local connections
@@ -43,7 +43,7 @@ never talks directly to the daemon's control port.
 
 ## Run
 
-For hosted rooms, start the GameNight lobby with its cloud connection enabled.
+For hosted rooms, start the Gamepad Party lobby with its cloud connection enabled.
 The optional LAN fallback needs `python scripts/run-local.py --studio` or
 `GAMENIGHT_WEB=1`; it is not required for website/app guest play.
 
@@ -61,10 +61,10 @@ flutter build ipa      # iOS, needs a Mac and signing (CI uploads to TestFlight,
 The `play` job builds a signed Android App Bundle after the Android checks pass
 on main. Download the `gamenight-play` artifact for the first manual upload to
 Play Console (`io.ontola.gamenight`). Activate an internal testing release and
-select the GameNight tester list. This does not publish to production.
+select the Gamepad Party tester list. This does not publish to production.
 
 Enable the Google Play Android Developer API in a Google Cloud project. Grant a
-service account access to **GameNight only**, with app read access and permission
+service account access to **Gamepad Party only**, with app read access and permission
 to release to testing tracks. Store its JSON key as the repository secret
 `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`; never commit it. After the first manual
 release, subsequent mobile workflow runs upload to the `internal` track.
@@ -76,7 +76,7 @@ Play builds use `--dart-define=GAMENIGHT_PLAY_STORE=true`. This single flag also
 selects the Gradle manifest overlay and native guard: no package installation
 permission, no APK self-updates, and no installation of companion APKs from the
 PC. Already installed companion apps can still be opened. Google Play handles
-GameNight updates; the separately downloadable APK keeps its existing updater.
+Gamepad Party updates; the separately downloadable APK keeps its existing updater.
 Test the Play-specific behavior with:
 
 ```sh
@@ -104,7 +104,7 @@ afterwards, so no signing key is stored. The App Store Connect app record for
 is the workflow run number, the same as the APK's.
 
 Android allows plain HTTP for this app (`usesCleartextTraffic`), and iOS
-allows local networking (`NSAllowsLocalNetworking`), because the GameNight PC
+allows local networking (`NSAllowsLocalNetworking`), because the Gamepad Party PC
 serves plain HTTP on the LAN.
 
 The web app can also run in Safari and be added to the iPhone home screen.
@@ -114,7 +114,7 @@ Build it for the hosted `/app/` path:
 flutter build web --release --base-href /app/ --pwa-strategy none --no-web-resources-cdn
 ```
 
-Serve `build/web` at `/app/` on the same HTTPS origin as the GameNight cloud API.
+Serve `build/web` at `/app/` on the same HTTPS origin as the Gamepad Party cloud API.
 Browser sign-in uses the site's secure cookies and CSRF protection; native apps
 continue to use bearer tokens. A separate static origin cannot authenticate or
 open private phone controls. Enter the emailed code in the web app, or return
@@ -131,7 +131,7 @@ Catalog game pages support sideways swipes without an extra counter bar.
 
 ## Download
 
-CI signs every build from `main` with the GameNight key and publishes it as
+CI signs every build from `main` with the Gamepad Party key and publishes it as
 the `app-latest` release, so this link always has the newest app:
 
 <https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk>
@@ -169,14 +169,14 @@ requests verification. A browser chosen by the user can still override app links
 
 The Feedback button is available from every main tab, even before sign-in.
 Tap the microphone, speak, review or edit the transcript, then send. Choose
-GameNight or the current game. Explicit game feedback appears in that game's
-owner-only developer inbox. GameNight staff can review both feedback and app
+Gamepad Party or the current game. Explicit game feedback appears in that game's
+owner-only developer inbox. Gamepad Party staff can review both feedback and app
 errors in the central private inbox.
 
 Recording shows microphone activity and live text. Startup, silence and final-result timeouts prevent a stalled speech service from leaving the button stuck. Empty results, permissions, network and language failures show a message beside the recording controls; diagnostic codes go through the same error-reporting outbox without dictated text or audio.
 
 Speech uses the phone's speech recognition service, which may process audio
-online. GameNight stores the submitted text, not the recording. Microphone access
+online. Gamepad Party stores the submitted text, not the recording. Microphone access
 is requested only when recording starts. Keyboard input also works; interrupted
 recordings and drafts remain editable. The operating system can stop recognition
 on silence, so players can continue recording into the same draft.

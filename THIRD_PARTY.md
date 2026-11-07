@@ -2,7 +2,7 @@
 
 ## Game Room lobby
 
-`lobbies/game-room` is GameNight's own lobby. Desktop packages run it with the
+`lobbies/game-room` is Gamepad Party's own lobby. Desktop packages run it with the
 unmodified Godot 4.5.2 editor binary (MIT, `lobbies/game-room/GODOT-LICENSE.txt`).
 Its fonts keep their SIL Open Font License notices next to them in
 `lobbies/game-room/assets/fonts`. Packages carry these notices in
@@ -28,10 +28,10 @@ sounds are synthesised in code.
 
 Windows packages include the Microsoft Visual C++ Runtime DLLs from the build
 machine's licensed Visual Studio redistributable directory, under Microsoft's
-license terms. These files are not part of GameNight's MIT-licensed source.
+license terms. These files are not part of Gamepad Party's MIT-licensed source.
 `notices/msvc-runtime.txt` in each package identifies the runtime version.
 See Microsoft's [redistribution documentation](https://learn.microsoft.com/cpp/windows/redistributing-visual-cpp-files).
-The app-local copies must be refreshed through GameNight releases when Microsoft
+The app-local copies must be refreshed through Gamepad Party releases when Microsoft
 updates the runtime; they are not maintained by Windows Update.
 
 The separately downloaded, pinned LOVE distribution includes its own runtime libraries and license

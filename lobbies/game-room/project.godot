@@ -2,8 +2,8 @@
 config_version=5
 
 [application]
-config/name="GameNight Game Room"
-config/description="A 2.5D platformer lobby for GameNight: pixel-art players in a neon game room."
+config/name="Gamepad Party Game Room"
+config/description="A 2.5D platformer lobby for Gamepad Party: pixel-art players in a neon game room."
 run/main_scene="res://main.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 config/icon="res://assets/icon.svg"

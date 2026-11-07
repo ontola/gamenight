@@ -6,9 +6,9 @@ rendering.
 
 ## Install
 
-Copy `sdk/godot/addons/gamenight` into your project’s `addons` directory and enable GameNight in Project Settings → Plugins. The plugin registers `GameNight` and `GameNightScreen` autoloads.
+Copy `sdk/godot/addons/gamenight` into your project’s `addons` directory and enable Gamepad Party in Project Settings → Plugins. The plugin registers `GameNight` and `GameNightScreen` autoloads.
 
-Godot has no package manager, so every game keeps its own copy of the addon, and copies fall behind. Run `python sdk/godot/sync.py path/to/your/game` from a GameNight checkout to update it, and add the drift check to your game's CI. It fails as soon as your copy differs from the SDK on `main`:
+Godot has no package manager, so every game keeps its own copy of the addon, and copies fall behind. Run `python sdk/godot/sync.py path/to/your/game` from a Gamepad Party checkout to update it, and add the drift check to your game's CI. It fails as soon as your copy differs from the SDK on `main`:
 
 ```yaml
 jobs:
@@ -48,7 +48,7 @@ The addon provides this implementation:
 
 Call `GameNight.notify_ready(session_id)` only after your level and first frame are prepared. `notify_finished` reports a round; your game still owns the results screen and next round.
 
-`GameNight.add_room_log("New run")` adds a line to the room log players read back in the GameNight app (never on the TV). Use it for a new run, a level or a winner, not every frame.
+`GameNight.add_room_log("New run")` adds a line to the room log players read back in the Gamepad Party app (never on the TV). Use it for a new run, a level or a winner, not every frame.
 
 `GameNight.declare_actions([{"key": "new_round", "label": "New round", "confirm": true}])` puts buttons on the players' phones, next to your settings. A press arrives as `action_triggered(key, player_id)` while your session is being played, and the room log says who pressed it.
 
@@ -62,7 +62,7 @@ func _on_prepared(session_id: String, seats: Array, players: Array) -> void:
 ```
 
 Report real play with `GameNight.report_activity(seat)` on a press or a stick
-past its deadzone, so GameNight does not mark a player asleep. It sends at
+past its deadzone, so Gamepad Party does not mark a player asleep. It sends at
 most once a second per controller. See [Controllers & players](/docs/controllers#joining-and-changing-profiles).
 
 ## Controllers and live profiles
@@ -199,13 +199,13 @@ does not certify a game.
 
 For what to do about the numbers, see [Performance](/docs/performance).
 
-The GameNight autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
+The Gamepad Party autoload samples application frame intervals while running and reports them every ten active seconds, with CPU/GPU model, OS, physical RAM and window dimensions. Rebuild your game to ship this adapter update. See the [protocol reference](../protocol.md#session-diagnostics) for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.
 
 
 ## Yield your soundtrack to host music
 
 The welcome snapshot and subsequent `GameNight.party_updated` snapshots include
-`now_playing` when GameNight detects a host music player. Check `playing`, not
+`now_playing` when Gamepad Party detects a host music player. Check `playing`, not
 just whether a track exists: paused tracks still have metadata. When it is true,
 mute your music bus only. Keep effects audible and preserve the player's own
 music preference. Restore that preference when host music pauses or disappears.

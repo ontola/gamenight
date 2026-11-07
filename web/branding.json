@@ -1,11 +1,11 @@
 {
   "source": "web/icon.svg",
   "sha256": {
-    "web/icon.svg": "95089c6c885e9fae95378dcf0bdfd618ddb93ec5cad2356f574b6caba27ee39b",
+    "web/icon.svg": "8ecf72f80f0bb9deea348004a8913b4e8850aae71c2dc4013598f74e83806f7e",
     "web/favicon.ico": "c30db386f59e7c41a6098f977baf52fb91073a0396886758ac6b09a60ec365c7",
     "web/apple-touch-icon.png": "a66bf033fae4e5ab5d20e99a80bc7925b8cd44cd94fece57ad97616f746229df",
-    "site/icon.svg": "95089c6c885e9fae95378dcf0bdfd618ddb93ec5cad2356f574b6caba27ee39b",
-    "mobile/assets/icon.svg": "95089c6c885e9fae95378dcf0bdfd618ddb93ec5cad2356f574b6caba27ee39b",
+    "site/icon.svg": "8ecf72f80f0bb9deea348004a8913b4e8850aae71c2dc4013598f74e83806f7e",
+    "mobile/assets/icon.svg": "8ecf72f80f0bb9deea348004a8913b4e8850aae71c2dc4013598f74e83806f7e",
     "site/icon.png": "97c40495685f041b11e1344325e1a1976efe0e015e8bd2d6dd639dfc2d8f8a80",
     "site/favicon.ico": "c30db386f59e7c41a6098f977baf52fb91073a0396886758ac6b09a60ec365c7",
     "crates/gamenight-daemon/branding/gamenight.ico": "c30db386f59e7c41a6098f977baf52fb91073a0396886758ac6b09a60ec365c7",

@@ -5,14 +5,14 @@ join or controller QR claim selects that player automatically and remembers the
 full profile. Opening a QR link, an invalid code or a failed claim does not count.
 Later guests never replace the main player automatically.
 
-On the phone's You page, **Main player on this GameNight** lets a connected or
+On the phone's You page, **Main player on this Gamepad Party** lets a connected or
 waiting player select their own profile, or clear it. Clearing also stops that
 profile returning automatically, but does not unlink the current controller.
 The installation remembers that the setting was cleared; the next guest will
 not silently become the main player. Selecting a different main player leaves
 previously remembered guests available at the door.
 
-The Join dialog and You page also offer **Remember me on this GameNight** for
+The Join dialog and You page also offer **Remember me on this Gamepad Party** for
 guests. Remembering is per installation, separate from saved game preferences
 and account sign-in. In the controller QR confirmation, the first-player default
 is explained and can be declined by unchecking Remember me.

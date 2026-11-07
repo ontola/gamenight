@@ -405,7 +405,7 @@ func _logo() -> void:
 	var y := 8.0
 	var z := Layout.BACK + 0.12
 	var sign_texture := screen("logo", Vector2i(1280, 320), func(canvas: Control):
-		var words := [["Game", AMBER], ["Night", NIGHT_LILAC]]
+		var words := [["Gamepad ", AMBER], ["Party", NIGHT_LILAC]]
 		var size := 180
 		var widths := words.map(func(w): return wordmark.get_string_size(w[0], HORIZONTAL_ALIGNMENT_LEFT, -1, size).x)
 		var total: float = widths[0] + widths[1]

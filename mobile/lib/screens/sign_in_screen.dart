@@ -94,7 +94,7 @@ class _SignInScreenState extends State<SignInScreen> {
       appBar: AppBar(title: const Text('Sign in')),
       body: ContentWidth(
           child: ListView(padding: const EdgeInsets.all(16), children: [
-        Section(title: 'Your GameNight account', children: [
+        Section(title: 'Your Gamepad Party account', children: [
           Hint(widget.reason ??
               'Keep your name and faces on every device, and join rooms with their code.'),
           if (kIsWeb) ...[

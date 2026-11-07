@@ -230,7 +230,7 @@ def write_report(report, output):
         for game in report['games']:
             lines.append('| '+game['id']+' | '+' | '.join(game['checks'][f]['status'] for f in features)+' |')
         lines.append('')
-    lines += ['Essential checks are mandatory. Personalisation is mandatory for GameNight games.',
+    lines += ['Essential checks are mandatory. Personalisation is mandatory for Gamepad Party games.',
               'Optional features do not reduce playability; claimed features require passing evidence.',
               'Protocol success alone does not certify gameplay, graphics, audio or physical input.', '']
     (output/'matrix.md').write_text('\n'.join(lines), encoding='utf-8')

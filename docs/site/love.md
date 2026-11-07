@@ -1,6 +1,6 @@
 # LÖVE / Lua
 
-Use the [shared runner](https://github.com/ontola/gamenight-games/tree/main/love-party) in the separate `ontola/gamenight-games` repository. It handles the GameNight connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.
+Use the [shared runner](https://github.com/ontola/gamenight-games/tree/main/love-party) in the separate `ontola/gamenight-games` repository. It handles the Gamepad Party connection, hidden preparation, pause/resume, window switching and host controller input. The bundled games use this path.
 
 ## Run the reference game
 

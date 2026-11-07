@@ -87,7 +87,7 @@ def lifecycle(binary: Path) -> None:
         assert menu["key"] == "orbs" and menu["value"] == 7, menu
         host.hold(frame(BUTTON_START), 0.15)
         host.saw("menu closed")
-        print("ok: Start menu changes settings through GameNight")
+        print("ok: Start menu changes settings through Gamepad Party")
 
         host.setting("orbs", 9)
         host.saw("setting orbs = 9")
@@ -143,7 +143,7 @@ def lifecycle(binary: Path) -> None:
 
         host.disconnect()
         assert host.exit_code(10) == 0
-        print("ok: quits when GameNight goes away")
+        print("ok: quits when Gamepad Party goes away")
 
 
 def unity_compile() -> None:

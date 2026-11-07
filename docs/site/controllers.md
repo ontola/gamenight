@@ -46,9 +46,9 @@ What our games do with a changing roster:
 
 ## Start opens your menu, Back leaves
 
-Back/Select belongs to GameNight and always returns to the party, even from
+Back/Select belongs to Gamepad Party and always returns to the party, even from
 inside your pause menu. Start opens and closes your game's own menu with its
-settings and the controls. In managed play, leave out anything GameNight
+settings and the controls. In managed play, leave out anything Gamepad Party
 already chose (players, game mode picked in the lobby).
 
 Use press edges for every menu and action button, and require a release after

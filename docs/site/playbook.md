@@ -1,6 +1,6 @@
 # Game playbook
 
-How to go from an idea to a game in the GameNight store quickly. It is written
+How to go from an idea to a game in the Gamepad Party store quickly. It is written
 for AI coding agents as much as for people: every step can run headless, from
 the command line, without someone watching the screen.
 
@@ -16,14 +16,14 @@ You get a small, working Godot 4 couch game with:
 
 | Part | What it does |
 | --- | --- |
-| `main.gd` | the game: GameNight lifecycle, seats, faces, settings and a Start menu, bots, dev flags |
+| `main.gd` | the game: Gamepad Party lifecycle, seats, faces, settings and a Start menu, bots, dev flags |
 | `gamenight.json` | the game's metadata: title, tagline, developer, players, tags; the only place you edit them |
-| `tests/lifecycle.py` | a fake GameNight host drives prepare, start, controller input, pause, resume, dispose |
+| `tests/lifecycle.py` | a fake Gamepad Party host drives prepare, start, controller input, pause, resume, dispose |
 | `tools/capture_preview.sh`, `tools/encode_preview.py` | the five-second store clip, frame by frame |
 | `.github/workflows/ci.yml` | tests, Windows export, release, store page |
 | `AGENTS.md` | the commands and rules for whoever works on it next |
 
-The GameNight addon is installed from the SDK. CI fails when your copy falls
+The Gamepad Party addon is installed from the SDK. CI fails when your copy falls
 behind; run `python3 gamenight/sdk/godot/sync.py my-game` to update it.
 Keep one repository per game.
 
@@ -104,9 +104,9 @@ switch games often. The template does all of this; keep it as you build.
 
 - **Start playing at once.** No title screen, no setup screen before the
   first round. The lobby already picked the game and the players.
-- **Settings live in the Start menu, and in GameNight.** Declare every
+- **Settings live in the Start menu, and in Gamepad Party.** Declare every
   option with `GameNight.declare_settings` and apply `setting_changed`, so
-  players can change them from the GameNight app, the lobby, or by asking
+  players can change them from the Gamepad Party app, the lobby, or by asking
   an LLM. Show the same settings in a small menu on Start. Apply a change
   from the next round when changing it mid-round would be unfair. The menu
   sends its changes with `GameNight.set_setting`, so the app shows them too.
@@ -115,10 +115,10 @@ switch games often. The template does all of this; keep it as you build.
   playing. Then Resume, then New round (apply options), then the settings.
   No button hints in the menu (choose, change, select, resume): a highlighted
   row and ‹ › around its value speak for themselves.
-- **Leave Back alone.** Back (Select) returns to the party; GameNight handles
+- **Leave Back alone.** Back (Select) returns to the party; Gamepad Party handles
   it and pauses your game. Never bind it to anything in the game.
 - **Use the players' colours, names and faces.** Each player picks them once
-  in GameNight. Colour the player's character, draw their face on it with the
+  in Gamepad Party. Colour the player's character, draw their face on it with the
   SDK's `face.gd`, and name them where it matters, such as the results screen.
 - **Don't flood the screen.** No text over characters, no labels on every
   thing. A clock, a score per player and clear shapes and colours read from the
@@ -143,7 +143,7 @@ switch games often. The template does all of this; keep it as you build.
 - **Bots fill empty seats.** The host can seat AI players, so a game works with
   one person. The same bots run your sim and your store clip.
 - **Controllers follow seats.** Read `GameNight.frame_for_seat(seat)` when
-  GameNight launched the game, never joystick indices.
+  Gamepad Party launched the game, never joystick indices.
 - **Prepare quietly.** Load everything in Prepare while hidden, then call
   `notify_ready`. Start shows it; Pause freezes play, timers and audio.
 
@@ -173,7 +173,7 @@ Add `cover.png` (portrait 360x480), `icon.png` (128x128) and `gameplay.png`
 
 1. [Register the game](/developers) in the developer portal and create a
    publish key. Save it as the `GAMENIGHT_API_TOKEN` secret of the repository.
-   The first stable release needs GameNight's distribution approval.
+   The first stable release needs Gamepad Party's distribution approval.
 2. Run the CI workflow by hand with `release` set to `v0.1.0`. It tests,
    exports Windows, publishes the GitHub release and fills the store page.
 3. Or fill the store page from your machine:
@@ -185,11 +185,11 @@ GAMENIGHT_API_TOKEN=gn_pub_... python3 gamenight-publish.py store
 It reads `gamenight.json` and uploads what is in `assets/gamenight/`. See
 [Publish a game](/docs/publishing) for builds, channels and review.
 
-Everything players see lives in GameNight production, filled from your
+Everything players see lives in Gamepad Party production, filled from your
 repository by these commands. Do not add the game to `ontola/gamenight`'s
 `catalog/games` or to any store file in another repository: installed hosts
 get stable releases from the hosted catalog. Store visibility (listed or
-hidden) is a GameNight staff setting.
+hidden) is a Gamepad Party staff setting.
 
 ## Pitfalls we hit
 

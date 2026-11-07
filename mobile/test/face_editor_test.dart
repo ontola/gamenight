@@ -223,7 +223,7 @@ void main() {
     state.dispose();
   });
 
-  testWidgets('the body guide shows without joining a GameNight',
+  testWidgets('the body guide shows without joining a Gamepad Party',
       (tester) async {
     final state = await _state();
     // Tinting the bundled body happens off the fake clock.

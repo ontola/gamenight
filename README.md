@@ -1,8 +1,8 @@
-<p align="center"><img src="site/icon.png" width="96" alt="GameNight"></p>
+<p align="center"><img src="site/icon.png" width="96" alt="Gamepad Party"></p>
 <h1 align="center">Get to the next game.</h1>
 <p align="center">Open-source couch multiplayer. Less setup between games.</p>
 
-GameNight lets you play a whole evening of couch games from your controller.
+Gamepad Party lets you play a whole evening of couch games from your controller.
 Pick a game. Play a round. Try something else.
 
 The next game loads in the background while you play. Back/Select returns to
@@ -16,7 +16,7 @@ players across integrated games.
 
 ## Play
 
-Install GameNight for Windows or macOS and connect your controllers. Join the lobby,
+Install Gamepad Party for Windows or macOS and connect your controllers. Join the lobby,
 walk to a game and press Y to play. The lobby shows download and loading
 progress. Downloaded games are cached for later sessions.
 
@@ -24,7 +24,7 @@ Scan the lobby QR code to open the character editor on your phone. Draw a face
 and change the playlist. Games can use your profile too; the catalog lists
 which parts of the integration have been checked.
 
-Prefer an app? The [GameNight app](mobile) is a Flutter version of the same
+Prefer an app? The [Gamepad Party app](mobile) is a Flutter version of the same
 phone studio for Android and iOS: join the room, draw your face and manage the
 playlist.
 
@@ -59,7 +59,7 @@ older-build evidence is not treated as verification of the current download.
 The local runtime works without an account or cloud service. You can run it,
 change it and add your own games.
 
-GameNight runs each game as a separate process. The host tells it when to
+Gamepad Party runs each game as a separate process. The host tells it when to
 prepare, start, pause, resume and release a session. The game owns its rules,
 score screen and subsequent rounds. Players choose when to switch games.
 
@@ -82,10 +82,10 @@ Tools. See [development setup](docs/development.md) for Linux dependencies.
 python scripts/run-local.py --studio --shelf /path/to/games.json
 ```
 
-The shelf lists your games and their launch commands. GameNight adds the lobby.
+The shelf lists your games and their launch commands. Gamepad Party adds the lobby.
 Without a shelf, the script uses a terminal SDK demo for testing the protocol.
 
-Game sources live outside this repository. The GameNight lobbies stay here:
+Game sources live outside this repository. The Gamepad Party lobbies stay here:
 [the Game Room](lobbies/game-room), which every desktop package ships, and
 [the Godot SDK's sample lobby](sdk/godot/lobby).
 The SDKs, catalog and integration checks also belong here.
@@ -99,7 +99,7 @@ racer with three procedural worlds, flight, weapons and 1–4 player split-scree
 Its source, tests and release workflow live in `joepio/spaceracer`.
 The [catalog entry](catalog/games/spaceracer.json) pins a Windows ZIP and its SHA-256 checksum
 from [GitHub Releases](https://github.com/joepio/spaceracer/releases).
-The GameNight protocol ID is `spaceracer`, including for local debug builds.
+The Gamepad Party protocol ID is `spaceracer`, including for local debug builds.
 
 ```sh
 python scripts/fetch-game-sources.py
@@ -127,7 +127,7 @@ Add a game, improve an integration or report a bug we can reproduce.
 
 ## License
 
-GameNight's original code is MIT-licensed. See [LICENSE](LICENSE).
+Gamepad Party's original code is MIT-licensed. See [LICENSE](LICENSE).
 The lobby and vendored dependencies retain their upstream notices.
 [THIRD_PARTY.md](THIRD_PARTY.md) lists source revisions and asset credits.
 

@@ -128,7 +128,7 @@ async def run(godot: str, pack: str = "") -> None:
             await hold(frame(), 0.15)
             changed = await expect("set_setting")
             assert (changed["key"], changed["value"]) == ("round_seconds", 40), changed
-            print("ok: the menu writes the setting back to GameNight")
+            print("ok: the menu writes the setting back to Gamepad Party")
             await hold(frame(1 << B), 0.15)
             await hold(frame(), 0.2)
             await saw("menu closed")

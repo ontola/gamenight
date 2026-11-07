@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GameNight · Your player</title>
+  <title>Gamepad Party · Your player</title>
   <link rel="stylesheet" href="/web/studio.css"><link rel="stylesheet" href="/web/site.css">
 <link rel="icon" type="image/svg+xml" sizes="any" href="/web/icon.svg"><link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48" href="/favicon.ico"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><script src="/web/shell.js" defer></script></head>
 <body class="studio-page">
@@ -19,8 +19,8 @@
       <input id="room-code" name="room-code" aria-label="Room code, six characters. Joins automatically when complete." placeholder="······" maxlength="6" minlength="6" pattern="[A-Za-z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
         <div id="room-code-slots" aria-hidden="true"><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span><span>·</span></div>
       </div>
-      <label class="preference-toggle"><input id="remember-join" type="checkbox"> Remember me on this GameNight</label>
-      <p class="identity-hint">The first player to join becomes this GameNight’s main player and returns next time. You can change this in You.</p>
+      <label class="preference-toggle"><input id="remember-join" type="checkbox"> Remember me on this Gamepad Party</label>
+      <p class="identity-hint">The first player to join becomes this Gamepad Party’s main player and returns next time. You can change this in You.</p>
     </form>
     <button id="room-leave" class="nav-btn" type="button" hidden>Leave room</button>
   </header>
@@ -28,10 +28,10 @@
 
 <main>
     <section class="card" id="remember-player-card" hidden>
-      <label class="preference-toggle"><input id="main-player" type="checkbox"> Main player on this GameNight</label>
+      <label class="preference-toggle"><input id="main-player" type="checkbox"> Main player on this Gamepad Party</label>
       <p class="identity-hint" id="main-player-hint">Appear at the door on startup, ready for your controller.</p>
       <div id="remember-guest-options">
-      <label class="preference-toggle"><input id="remember-player" type="checkbox"> Remember me on this GameNight</label>
+      <label class="preference-toggle"><input id="remember-player" type="checkbox"> Remember me on this Gamepad Party</label>
       <p class="identity-hint">Return as a guest without becoming the main player.</p>
       </div>
     </section>

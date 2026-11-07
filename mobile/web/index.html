@@ -22,18 +22,18 @@
   <meta name="theme-color" content="#0D1020">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Join your GameNight room, play on your phone and choose what comes next.">
+  <meta name="description" content="Join your Gamepad Party room, play on your phone and choose what comes next.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="GameNight">
+  <meta name="apple-mobile-web-app-title" content="Gamepad Party">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>GameNight</title>
+  <title>Gamepad Party</title>
   <link rel="manifest" href="manifest.json">
   <style>
     @font-face{font-family:Bungee;src:url(assets/assets/fonts/Bungee-Regular.ttf) format('truetype');font-display:swap}
@@ -65,11 +65,11 @@
         clearTimeout(delayed); document.getElementById('app-loading')?.remove();
       }, {once: true});
       window.gameNightLoadFailed = () => {
-        clearTimeout(delayed); status.textContent = 'GameNight could not load. Please try again.'; retry.hidden = false;
+        clearTimeout(delayed); status.textContent = 'Gamepad Party could not load. Please try again.'; retry.hidden = false;
       };
     })();
   </script>
   <script src="flutter_bootstrap.js" async onerror="gameNightLoadFailed()"></script>
-  <noscript>Enable JavaScript to open GameNight.</noscript>
+  <noscript>Enable JavaScript to open Gamepad Party.</noscript>
 </body>
 </html>

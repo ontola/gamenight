@@ -20,9 +20,9 @@ $stage = Join-Path $OutputDir 'package/gamenight-windows-preview'
 & (Join-Path $PSScriptRoot 'test-windows-branding.ps1') -Executable (Join-Path $stage 'GameNight.exe')
 $releaseDir = Join-Path $OutputDir 'releases'
 $icon = Join-Path (Split-Path -Parent $PSScriptRoot) 'crates/gamenight-daemon/branding/gamenight.ico'
-if (!(Test-Path -LiteralPath $icon)) { throw 'GameNight installer icon is missing' }
+if (!(Test-Path -LiteralPath $icon)) { throw 'Gamepad Party installer icon is missing' }
 $packId = if ($Channel -eq 'stable') { 'Ontola.GameNight' } else { 'Ontola.GameNight.Preview' }
-$title = if ($Channel -eq 'stable') { 'GameNight' } else { 'GameNight Preview' }
+$title = if ($Channel -eq 'stable') { 'Gamepad Party' } else { 'Gamepad Party Preview' }
 $vpkArgs = @('pack', '--packId', $packId, '--packVersion', $Version, '--packDir', $stage,
     '--mainExe', 'GameNight.exe', '--packTitle', $title, '--packAuthors', 'Ontola', '--icon', $icon,
     '--channel', "win-$Channel", '--runtime', 'win-x64', '--outputDir', $releaseDir)

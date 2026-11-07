@@ -3,7 +3,7 @@
   "id": "unity-demo",
   "title": "Orb Rush",
   "tagline": "Race your friends for orbs and dash them out of the way: the Unity reference game.",
-  "developer": "GameNight contributors",
+  "developer": "Gamepad Party contributors",
   "players": {
     "min": 1,
     "max": 8,

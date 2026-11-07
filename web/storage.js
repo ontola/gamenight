@@ -24,9 +24,9 @@
     let reason='';try{reason=(await response.json()).error||'';}catch{}
     if(response.status===401&&cloud){location.replace('/auth/login');throw Error('Please sign in.');}
     if(response.status===403)throw Error(cloud&&path.includes('/control')?'In an online room, only the main player can change settings.':'Join the room first.');
-    if(response.status===409)throw Error(reason||(path.includes('settings')||path.includes('/control')?'The game changed meanwhile. Look again and retry.':'GameNight cannot play that game right now.'));
-    if(response.status===503)throw Error('The GameNight computer is not answering. Try again in a moment.');
-    throw Error('GameNight did not answer. Try again.');
+    if(response.status===409)throw Error(reason||(path.includes('settings')||path.includes('/control')?'The game changed meanwhile. Look again and retry.':'Gamepad Party cannot play that game right now.'));
+    if(response.status===503)throw Error('The Gamepad Party computer is not answering. Try again in a moment.');
+    throw Error('Gamepad Party did not answer. Try again.');
   }
   try {
     if(cloud){
@@ -121,7 +121,7 @@
         const dismiss=()=>{if(accepting)return;sessionStorage.removeItem('gamenight_pair');box.close();box.remove();document.getElementById('qr-open').focus();};
         close.onclick=dismiss;
         box.addEventListener('cancel',event=>{event.preventDefault();dismiss();});
-        const rememberPair=document.createElement('input');rememberPair.type='checkbox';const rememberLabel=document.createElement('label');rememberLabel.className='preference-toggle';rememberLabel.append(rememberPair,document.createTextNode(' Remember me on this GameNight'));
+        const rememberPair=document.createElement('input');rememberPair.type='checkbox';const rememberLabel=document.createElement('label');rememberLabel.className='preference-toggle';rememberLabel.append(rememberPair,document.createTextNode(' Remember me on this Gamepad Party'));
         panel.append(close,title,text,rememberLabel,button);box.append(panel);document.body.append(box);box.showModal();close.focus();
         try{
           const info=await request('/v1/pairing/'+encodeURIComponent(ticket));
@@ -176,7 +176,7 @@
         await request(cloud?'/v1/rooms/main-player':'/api/profiles/'+encodeURIComponent(local.getItem('gamenight_profile_id'))+'/main-player','POST',{enabled,...(cloud?{code:memoryRoom.room_code}:{})});
         memoryRoom.main_player=enabled;
         if(enabled || previous)memoryRoom.remembered=enabled;
-        window.showToast(enabled?'You are the main player on this GameNight.':'Your player will no longer appear automatically.');
+        window.showToast(enabled?'You are the main player on this Gamepad Party.':'Your player will no longer appear automatically.');
       } catch(error){mainPlayer.checked=previous;window.showToast(error.message);}
       finally {memoryBusy=false;mainPlayer.disabled=false;showMemory(memoryRoom);}
     };

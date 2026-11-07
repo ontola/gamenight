@@ -106,7 +106,7 @@ Backup decodeBackup(String text) {
     value = jsonDecode(text.trim());
   } on FormatException {
     throw const BackupError(
-        'This is not a GameNight backup. Nothing was imported.');
+        'This is not a Gamepad Party backup. Nothing was imported.');
   }
   const cells = gridSize * gridSize;
   if (value is! Map ||
@@ -124,12 +124,12 @@ Backup decodeBackup(String text) {
       (value['preferredColor'] != null &&
           (value['preferredColor'] is! String ||
               !_hex.hasMatch(value['preferredColor'] as String)))) {
-    throw const BackupError('Please import a current GameNight backup.');
+    throw const BackupError('Please import a current Gamepad Party backup.');
   }
   final palette = value['palette'] as List;
   if (palette.length > 200 * cells ||
       !palette.every((c) => c is String && _hex.hasMatch(c))) {
-    throw const BackupError('Please import a current GameNight backup.');
+    throw const BackupError('Please import a current Gamepad Party backup.');
   }
   final ids = <String>{};
   final artworks = <Artwork>[];

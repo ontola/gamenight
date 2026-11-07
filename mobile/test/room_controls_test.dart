@@ -233,7 +233,7 @@ void main() {
       expect(find.text('Growing Guns'), findsWidgets,
           reason: 'no cover: title on a coloured tile');
       expect(find.text('1–6 players'), findsOneWidget);
-      expect(find.text('GameNight Lobby'), findsNothing);
+      expect(find.text('Gamepad Party Lobby'), findsNothing);
       expect(find.text('Add to queue'), findsNothing);
       expect(find.text('Pick up my character'), findsNothing);
       expect(room.calls.where((c) => c.contains('/api/games')), isEmpty);
@@ -252,7 +252,7 @@ void main() {
       await close(tester);
     });
 
-    testWidgets('connected to a GameNight but not picked up yet, it says so',
+    testWidgets('connected to a Gamepad Party but not picked up yet, it says so',
         (tester) async {
       await show(tester);
       expect(find.text('Join a room'), findsNothing);
@@ -305,7 +305,7 @@ void main() {
           reason: 'the host has it, so it can be queued');
       expect(find.text('Stack Together'), findsNothing);
       expect(find.text('Add to queue'), findsOneWidget);
-      expect(find.text('Not on this GameNight'), findsOneWidget,
+      expect(find.text('Not on this Gamepad Party'), findsOneWidget,
           reason: 'only the listed Growing Guns');
       await close(tester);
     });
@@ -327,7 +327,7 @@ void main() {
       await show(tester, catalogOnly: true);
       expect(find.text('Add to queue'), findsOneWidget,
           reason: 'only for games the host has');
-      expect(find.text('Not on this GameNight'), findsNWidgets(2));
+      expect(find.text('Not on this Gamepad Party'), findsNWidgets(2));
 
       await tester.tap(find.text('Add to queue'));
       await tester.pump();

@@ -27,7 +27,7 @@ pub fn register() -> io::Result<()> {
         let exe = std::env::current_exe()?;
         let command = format!("\"{}\" --open-url \"%1\"", exe.display());
         for (key, name, value) in [
-            ("HKCU\\Software\\Classes\\gamenight", None, "URL:GameNight"),
+            ("HKCU\\Software\\Classes\\gamenight", None, "URL:Gamepad Party"),
             (
                 "HKCU\\Software\\Classes\\gamenight",
                 Some("URL Protocol"),
@@ -53,7 +53,7 @@ pub fn register() -> io::Result<()> {
                 .status()?
                 .success()
             {
-                return Err(io::Error::other("Could not register GameNight links"));
+                return Err(io::Error::other("Could not register Gamepad Party links"));
             }
         }
     }

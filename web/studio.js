@@ -762,7 +762,7 @@ let initializing = true;
       };
 
       if (storage.cloud) {
-        document.getElementById('gallery-help').textContent='Your faces sync with your GameNight account. You can also export a backup to keep a separate copy.';
+        document.getElementById('gallery-help').textContent='Your faces sync with your Gamepad Party account. You can also export a backup to keep a separate copy.';
         const initial=storage.initial;
         if(initial.workspace && !storage.pending){
           const saved=validateBackup(initial.workspace);
@@ -778,7 +778,7 @@ let initializing = true;
       await loadProfileData();
       window.updatePlayerNavigation?.(document.getElementById('player-name').value);
       initializing = false;
-      if(storage.cloud)status(storage.pending?'Local changes need attention. Export before refreshing if another device edited your profile.':'Saved to your GameNight account', storage.pending?'#fbbf24':undefined);
+      if(storage.cloud)status(storage.pending?'Local changes need attention. Export before refreshing if another device edited your profile.':'Saved to your Gamepad Party account', storage.pending?'#fbbf24':undefined);
     }
 
     let playlistView = null;
@@ -827,7 +827,7 @@ let initializing = true;
       sessionLoading = true;
       try {
         const response = await fetch('/api/profiles/' + encodeURIComponent(profileId) + '/session', { cache: 'no-store', signal: AbortSignal.timeout(10000) });
-        if (!response.ok) throw new Error('GameNight is unavailable. Your saved character is still on this phone.');
+        if (!response.ok) throw new Error('Gamepad Party is unavailable. Your saved character is still on this phone.');
         const session = await response.json();
         window.dispatchEvent(new CustomEvent("gamenight-local-session",{detail:session}));
         if(session.linked && session.player_id){
@@ -845,7 +845,7 @@ let initializing = true;
         document.getElementById('session-next-game').textContent = session.next || 'No game queued';
       } catch (error) {
         document.getElementById('session-link-status').textContent = error.message;
-        document.getElementById('session-link-help').textContent = 'Reconnect to the same network as GameNight and try again.';
+        document.getElementById('session-link-help').textContent = 'Reconnect to the same network as Gamepad Party and try again.';
         ['session-player-count', 'session-current-game', 'session-next-game'].forEach(id => document.getElementById(id).textContent = '—');
       } finally { sessionLoading = false; }
     }
@@ -1242,7 +1242,7 @@ let initializing = true;
         localStorage.setItem('gamenight_saved_profile', JSON.stringify(prof));
         await storage.save(prof, buildBackup());
         window.dispatchEvent(new Event('gamenight-profile-ready'));
-        if(storage.cloud){status('Saved to your GameNight account');return;}
+        if(storage.cloud){status('Saved to your Gamepad Party account');return;}
 
         // Push straight through to the party. `claim` is whichever player
         // this profile is bound to — the character whose QR was scanned, or
@@ -1309,7 +1309,7 @@ let initializing = true;
       const file = new File([blob], filename, {type:blob.type});
       if (navigator.canShare?.({files:[file]})) {
         try {
-          await navigator.share({files:[file], title:'GameNight backup'});
+          await navigator.share({files:[file], title:'Gamepad Party backup'});
           backupMessage('File shared. Keep the saved copy to restore your data.');
           return;
         } catch (error) {
@@ -1394,7 +1394,7 @@ let initializing = true;
           || value.palette.length > 200 * GRID_SIZE ** 2 || !value.palette.every(color)
           || !Array.isArray(value.artworks) || !value.artworks.length || value.artworks.length > 200
           || typeof value.username !== 'string' || value.username.length > 100 || !color(value.skinColor))
-        throw Error('Please import a current compact GameNight backup.');
+        throw Error('Please import a current compact Gamepad Party backup.');
       const cells = GRID_SIZE ** 2, ids = new Set();
       const artworks = value.artworks.map(art => {
         if (!art || typeof art.id !== 'string' || art.id.length > 200 || ids.has(art.id)

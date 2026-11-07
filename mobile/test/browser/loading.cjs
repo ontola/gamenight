@@ -41,7 +41,7 @@ const output=process.env.GAMENIGHT_TEST_SCREENSHOTS;
   assert.equal(await page.locator('#app-loading').count(),0);
   failed=true;
   await page.reload({waitUntil:'networkidle'});
-  await page.getByText('GameNight could not load. Please try again.').waitFor();
+  await page.getByText('Gamepad Party could not load. Please try again.').waitFor();
   await page.getByRole('button',{name:'Try again'}).waitFor();
   console.log('PASS stable mobile viewport before/after Flutter setup, branded pre-Flutter loader, reduced motion, first-frame removal and recoverable bootstrap failure.');
  }finally{await browser.close();}

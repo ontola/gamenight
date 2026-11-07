@@ -39,7 +39,7 @@ def icon(game):
 
 def main():
  ap=argparse.ArgumentParser(description=__doc__);ap.add_argument('--captures',type=Path);ap.add_argument('--embed',action='store_true')
- ap.add_argument('--sources',type=Path,help='folder with <game>/{cover,icon}-illustrated-source.png masters (GameNight project archive: archive/gamenight/catalog/art); re-exports the illustrated art from them');a=ap.parse_args()
+ ap.add_argument('--sources',type=Path,help='folder with <game>/{cover,icon}-illustrated-source.png masters (Gamepad Party project archive: archive/gamenight/catalog/art); re-exports the illustrated art from them');a=ap.parse_args()
  if not a.captures and not a.embed:ap.error('supply --captures or --embed')
  font=ImageFont.truetype(str(ROOT/'scripts/fonts/FairfaxSM.ttf'),22)
  for game,source in SOURCES.items():
@@ -64,7 +64,7 @@ def main():
    master=a.sources/game/f'{field}-illustrated-source.png' if a.sources else None
    if field != 'screenshot' and master and not master.exists() and illustrated.exists():
     raise SystemExit(f'{game}: --sources has no {master.name}; it is needed to re-export {illustrated.relative_to(ROOT)}. '
-                     'The masters are in the GameNight project archive (archive/gamenight/catalog/art/<game>/). '
+                     'The masters are in the Gamepad Party project archive (archive/gamenight/catalog/art/<game>/). '
                      'Omit --sources to embed the checked-in export.')
    if field != 'screenshot' and illustrated.exists() and not (master and master.exists()):
     asset=illustrated

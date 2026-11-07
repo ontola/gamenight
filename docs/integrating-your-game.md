@@ -1,6 +1,6 @@
-# Integrating your game with GameNight
+# Integrating your game with Gamepad Party
 
-GameNight supplies the party, seats and lifecycle. Your game owns gameplay,
+Gamepad Party supplies the party, seats and lifecycle. Your game owns gameplay,
 rounds and results. Players can stay in a game until they choose another one.
 
 Start from the [shared LÖVE runner](https://github.com/ontola/gamenight-games/blob/main/love-party/README.md) for a Lua game.
@@ -17,7 +17,7 @@ portal's **Help** tab; replies appear there and in your inbox.
 
 We can help with integration, or you can use this guide with your own developers
 or AI tools. For assisted work, agree repository access, code handling and any AI use
-first. Private repositories can stay private. GameNight prepares a pull request;
+first. Private repositories can stay private. Gamepad Party prepares a pull request;
 you review and merge it, then supply the resulting build for testing.
 
 When ready for review, open your game in the portal and use its **Review** tab.
@@ -133,7 +133,7 @@ not proof for another.
 ## Rounds continue inside the session
 
 Your game shows its own scores, winner names and results screen, then starts the
-next round. Pause also freezes the results countdown. Do not wait for GameNight
+next round. Pause also freezes the results countdown. Do not wait for Gamepad Party
 to create a fresh session after every round.
 
 You may send `finished` as a round notification. It keeps the active session,

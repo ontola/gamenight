@@ -82,7 +82,7 @@ func _send(message: Dictionary) -> void:
 
 func _command(message: Dictionary) -> void:
 	if not connected:
-		rejected.emit("Reconnecting to GameNight. Please try again when connected.")
+		rejected.emit("Reconnecting to Gamepad Party. Please try again when connected.")
 		return
 	# Godot parses every JSON number as float. The optimistic queue snapshot
 	# must echo the host's integer cursor and queue length, otherwise serde rejects e.g. 3.0.

@@ -1,6 +1,6 @@
 # Performance
 
-A GameNight PC is often a living-room machine, not a gaming rig, and it runs
+A Gamepad Party PC is often a living-room machine, not a gaming rig, and it runs
 the lobby next to your game. This page collects what our own games learned
 about staying smooth there. Numbers come from those games; they are examples,
 not guarantees.
@@ -92,7 +92,7 @@ bus; the simulation is yours.
 - **Measure on modest hardware.** A laptop with integrated graphics is a fair
   stand-in for a living-room PC. Numbers from a fast desktop say little.
 - The SDKs report frame times, slow frames and the machine's CPU, GPU and
-  memory to GameNight while your game runs. See
+  memory to Gamepad Party while your game runs. See
   [session diagnostics](/docs/protocol#session-diagnostics). A Godot game that
   overrides the SDK's message handling must still let it see Prepare, Start and
   Pause, or these reports stop.

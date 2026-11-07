@@ -47,7 +47,7 @@ def wait_for(predicate, timeout=15):
 
 def worker(folder):
     kernel, user = configure()
-    window = user.CreateWindowExW(0, "STATIC", "GameNight preload fixture", 0x00CF0000,
+    window = user.CreateWindowExW(0, "STATIC", "Gamepad Party preload fixture", 0x00CF0000,
         20, 20, 320, 200, None, None, kernel.GetModuleHandleW(None), None)
     assert window
     user.ShowWindow(window, 5)  # First normal show must obey the inherited SW_HIDE.

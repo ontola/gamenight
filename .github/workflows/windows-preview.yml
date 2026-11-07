@@ -172,7 +172,7 @@ jobs:
           RELEASE_VERSION: ${{ inputs.version }}
           RELEASE_CHANNEL: ${{ inputs.channel }}
         run: |
-          args=(--draft --title "GameNight $RELEASE_VERSION" --target "$GITHUB_SHA" --generate-notes)
+          args=(--draft --title "Gamepad Party $RELEASE_VERSION" --target "$GITHUB_SHA" --generate-notes)
           if [ "$RELEASE_CHANNEL" = preview ]; then args+=(--prerelease); fi
           tar -czf release/game-contract-windows.tar.gz -C evidence .
           gh release create "v$RELEASE_VERSION" release/* games/*.love "${args[@]}"

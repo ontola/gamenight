@@ -25,7 +25,7 @@ namespace OrbRush.Editor
         public static void Linux() => Build(BuildTarget.StandaloneLinux64, "Builds/Linux/OrbRush.x86_64");
 
         /// <summary>The player settings a GameNight game needs.</summary>
-        [MenuItem("GameNight/Apply GameNight player settings")]
+        [MenuItem("GameNight/Apply Gamepad Party player settings")]
         public static void ApplyPlayerSettings()
         {
             PlayerSettings.productName = "Orb Rush";

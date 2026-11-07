@@ -259,7 +259,7 @@ pub(crate) mod tests {
 
     /// The hub's schema drive: anyone may read it.
     pub(crate) async fn schema_drive(hub: &Db, account_drives: &[&str]) -> String {
-        let drive = hub.create_drive("GameNight schemas").await.unwrap();
+        let drive = hub.create_drive("Gamepad Party schemas").await.unwrap();
         let mut resource = hub.get_resource(&drive.as_str().into()).await.unwrap();
         let owner = hub.get_default_agent().unwrap().subject.to_string();
         resource

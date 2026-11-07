@@ -1,6 +1,6 @@
 # Host guide imagery
 
-`host-lobby.png` is an actual GameNight lobby capture from the public macOS
+`host-lobby.png` is an actual Gamepad Party lobby capture from the public macOS
 installer workflow, run 35768101137 (22 September 2026), artifact
 `gamenight-macos-smoke` (10712409675). The base image is an unmodified capture; the guide layers illustrated example
 players over it, clearly captioned as an illustration.

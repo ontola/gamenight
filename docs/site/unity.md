@@ -32,14 +32,14 @@ through the old Input Manager otherwise.
 
 ## Player settings
 
-These are the settings every GameNight game needs. Orb Rush applies them from
+These are the settings every Gamepad Party game needs. Orb Rush applies them from
 its build script:
 
 ::: source csharp examples/unity-demo/Assets/Editor/BuildOrbRush.cs "        public static void ApplyPlayerSettings()" "        static void Build("
 
-Run in Background matters most. GameNight prepares the next game while
+Run in Background matters most. Gamepad Party prepares the next game while
 another one is on screen; a Unity player that stops updating when it loses
-focus never hears Start. The package also sets it at startup when GameNight
+focus never hears Start. The package also sets it at startup when Gamepad Party
 launched the game, but set it in the project too.
 
 ## Connect
@@ -51,14 +51,14 @@ scene. Set your catalog id first:
 
 ::: source csharp examples/unity-demo/Assets/OrbRush/OrbRushView.cs "            // The catalog id." "            var args ="
 
-The same build runs standalone and under GameNight. GameNight launches it with
+The same build runs standalone and under Gamepad Party. Gamepad Party launches it with
 `GAMENIGHT=1` and the address in the environment, and
 `GameNight.Client.LaunchedByHost` is true: skip your menus and wait for
 Prepared. A game you start by hand stays offline, so a test run never joins the
 party on your machine. To connect it to a development host anyway, set
 `GAMENIGHT_ADDR=127.0.0.1:7912` or call `GameNight.Configure(id, connectStandalone: true)`.
 
-Every event fires on the main thread, inside that pump. When GameNight goes
+Every event fires on the main thread, inside that pump. When Gamepad Party goes
 away, a launched game quits.
 
 ## Lifecycle
@@ -89,7 +89,7 @@ keeps its own results screen and starts the next round itself.
 
 Seats are players. A seat's controller token is opaque; it is not a Unity
 joystick index, and the order of pads Unity sees means nothing under
-GameNight. `FrameForSeat(seat)` returns that seat's input from the host. It is
+Gamepad Party. `FrameForSeat(seat)` returns that seat's input from the host. It is
 neutral while the session is not running and when the input is more than
 250 ms old:
 
@@ -103,7 +103,7 @@ true in the one frame a button went down; read it in `Update`, not
 `FixedUpdate`. After Start and Resume, a button still held from the lobby must
 be released first, so the press that started the game does not also fire in it.
 
-Back/Select belongs to GameNight: the host pauses you and shows the lobby.
+Back/Select belongs to Gamepad Party: the host pauses you and shows the lobby.
 Never bind it. F1 does the same from a keyboard; the package handles it.
 
 `ReportActivity(seat)` on a press or a stick past its deadzone keeps the
@@ -116,7 +116,7 @@ Standalone, read your own pads and keyboard. Orb Rush does that in
 
 ## The Start menu
 
-Every GameNight game has the same Start menu: the game's name, Resume, New
+Every Gamepad Party game has the same Start menu: the game's name, Resume, New
 round (which applies the options), then the settings. No button hints. Play
 waits while it is open:
 
@@ -147,7 +147,7 @@ session is the one being played:
 
 ::: source csharp examples/unity-demo/Assets/OrbRush/OrbRushGame.cs "        public static readonly PhoneAction[] Actions =" "        public readonly GameNightClient GameNight;"
 
-`DeclareCommands` accepts requests in plain words from the GameNight app and
+`DeclareCommands` accepts requests in plain words from the Gamepad Party app and
 the session assistant ("8 orbs", "rounds of 90 seconds"). Your game decides
 what the words mean and answers once:
 
@@ -157,7 +157,7 @@ what the words mean and answers once:
 
 Every player arrives with a name, a clothing colour, a skin colour and their
 own pixel-art face. `GameNightFaces.Head(player, size)` paints the head every
-GameNight game draws, as a `Texture2D`, cached per face. Put it on a sprite, a
+Gamepad Party game draws, as a `Texture2D`, cached per face. Put it on a sprite, a
 quad or a `RawImage`; hair may stick out past the circle:
 
 ::: source csharp examples/unity-demo/Assets/OrbRush/OrbRushView.cs "            // The player's own face, from their GameNight profile." "            return body;"
@@ -190,7 +190,7 @@ unlocked, for tonight only:
 ::: source csharp examples/unity-demo/Assets/OrbRush/OrbRushGame.cs "        void EndRound()" "        public List<Runner> Ranking()"
 
 `AddRoomLog(text)` adds a line to the room log players read back in the
-GameNight app, never on the TV. Use it for a round or a winner, not every frame.
+Gamepad Party app, never on the TV. Use it for a round or a winner, not every frame.
 
 ## Phone screens
 
@@ -207,7 +207,7 @@ See [Phone screens](/docs/phone-screens) for the page side.
 
 ## The screen
 
-`GameNightScreen` comes with the package and needs no code. When GameNight
+`GameNightScreen` comes with the package and needs no code. When Gamepad Party
 launched the game it mutes and minimises the window at startup, drops to 10
 frames a second once you report Ready, takes the screen in borderless
 fullscreen with sound on at Start and Resume, and gets out of the way on Pause
@@ -225,7 +225,7 @@ windowed and without a splash screen keeps that short.
 
 The SDK core and Orb Rush's rules are plain C#, kept apart from the Unity
 view. CI builds them into a console game with dotnet and plays every feature
-on this page against a fake GameNight host, then compiles the Unity layer and
+on this page against a fake Gamepad Party host, then compiles the Unity layer and
 the view against Unity's reference assemblies:
 
 ```sh
@@ -236,7 +236,7 @@ cargo run -p gamenight-certify -- unity-demo -- /tmp/orb-rush/orb-rush-headless
 
 Keep your own game split the same way and you can test it like this too. These
 checks do not run a Unity build: window handling, faces on screen and real
-pads need a test on hardware. Build the demo with **GameNight → Build Orb
+pads need a test on hardware. Build the demo with **Gamepad Party → Build Orb
 Rush** in the editor, then run the [integration checks](/docs/testing) on the
 build.
 

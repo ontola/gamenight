@@ -3,7 +3,7 @@
   "id": "blast-party",
   "title": "Blast Party",
   "tagline": "Blast crates, collect powers and be the last player standing.",
-  "developer": "GameNight contributors",
+  "developer": "Gamepad Party contributors",
   "players": {
     "min": 2,
     "max": 4

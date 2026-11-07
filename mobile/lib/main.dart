@@ -379,7 +379,7 @@ class _GameNightAppState extends State<GameNightApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
         navigatorKey: kIsWeb ? null : _navigator,
-        title: 'GameNight',
+        title: 'Gamepad Party',
         debugShowCheckedModeBanner: false,
         theme: gameNightTheme(),
         builder: (context, child) => ListenableBuilder(
@@ -823,7 +823,7 @@ class _BrandButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
         button: true,
-        label: 'About GameNight',
+        label: 'About Gamepad Party',
         excludeSemantics: true,
         child: InkWell(
           key: const ValueKey('about-button'),

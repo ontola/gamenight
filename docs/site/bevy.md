@@ -1,10 +1,10 @@
 # Bevy
 
-`gamenight-bevy` is a Bevy plugin that does the GameNight side of a game for
+`gamenight-bevy` is a Bevy plugin that does the Gamepad Party side of a game for
 you. Add it next to `DefaultPlugins`, read `GameNightEvent` messages and ask
 `GameNight` for each seat's controller. The plugin:
 
-- connects when GameNight launched the game and runs standalone otherwise,
+- connects when Gamepad Party launched the game and runs standalone otherwise,
   with the keyboard and every local gamepad as seats, so your input code is
   the same in both modes;
 - follows Prepare, Start, Pause, Resume and Dispose, and sends Ready two frames
@@ -43,7 +43,7 @@ Replace `YOUR_REVIEWED_COMMIT` with an actual commit hash.
 
 ## Set up the app
 
-Wrap your window in `managed_window`, so a game GameNight launched starts
+Wrap your window in `managed_window`, so a game Gamepad Party launched starts
 hidden and unfocused. A window that flashes up while warming steals the TV
 from the game being played. Run simulation systems only while
 `gameplay_runs`: that is what freezes play, timers and bots on Pause.
@@ -56,7 +56,7 @@ from the game being played. Run simulation systems only while
 
 ## Follow the session
 
-Every message from GameNight arrives as a `GameNightEvent`. On Prepare, build
+Every message from Gamepad Party arrives as a `GameNightEvent`. On Prepare, build
 the level for exactly the seats you were given, then call `ready()`. Opt into
 live roster changes with `participation(true)` first if new players can join
 mid-round, as here. Nothing restarts on `RosterChanged` or `PlayersUpdated`:
@@ -75,7 +75,7 @@ seat has none, when input is more than 250 ms old and while the game is not
 running. `stick` applies a radial deadzone (up is positive y, as in Bevy's
 world), `trigger` a trigger deadzone. `just_pressed` is true once per press,
 and a button still held from the lobby has to be released before it counts.
-Never use Bevy's gamepad order under GameNight: a seat's controller is a host
+Never use Bevy's gamepad order under Gamepad Party: a seat's controller is a host
 token.
 
 ::: source rust sdk/bevy/demo/src/main.rs "fn steer(" "fn bots("
@@ -86,7 +86,7 @@ seconds)` vibrates a pad; standalone it drives the local gamepad.
 ## Declare settings, phone buttons and a phone screen
 
 Declare once at startup; the plugin declares again after each reconnect, and
-GameNight replays the values the party picked. A `player` scope gives every
+Gamepad Party replays the values the party picked. A `player` scope gives every
 player a value of their own, which arrives as `PlayerSettings`.
 
 ::: source rust sdk/bevy/demo/src/main.rs "fn settings() -> Vec<SettingSpec> {" "#[derive(Clone)]"
@@ -99,14 +99,14 @@ Ship the folder with your build. The page loads `/assets/companion.js`; see
 [Phone screens](/docs/phone-screens) and the demo's
 [phone page](../../sdk/bevy/demo/assets/phone/index.html).
 
-Plain-text requests from the GameNight app or the session assistant arrive as
+Plain-text requests from the Gamepad Party app or the session assistant arrive as
 `GameCommand`. Answer every one with `command_result`:
 
 ::: source rust sdk/bevy/demo/src/main.rs "fn command(gn: &mut GameNight" "/// Standalone, the game starts"
 
 ## The Start menu
 
-Start opens your own menu, for everyone; Back belongs to GameNight. The game's
+Start opens your own menu, for everyone; Back belongs to Gamepad Party. The game's
 name heads the menu, then Resume, then New round, then the settings, without
 button hints. The menu changes settings through `set_setting`, so the change
 also shows in the apps and comes back as `SettingChanged` (standalone too).

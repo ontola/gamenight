@@ -164,7 +164,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                       const SizedBox(height: 8),
                       Wrap(spacing: 8, runSpacing: 8, children: [
                         ChoiceChip(
-                            label: const Text('GameNight'),
+                            label: const Text('Gamepad Party'),
                             selected: _game == null,
                             onSelected: _sending || recording
                                 ? null
@@ -193,7 +193,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                       const SizedBox(height: 5),
                       Text(
                           _game == null
-                              ? 'Sent to the GameNight team.'
+                              ? 'Sent to the Gamepad Party team.'
                               : 'Sent to the developer of ${_gameTitle(_game!)}.',
                           style: const TextStyle(
                               color: GnColors.muted, fontSize: 12)),
@@ -299,7 +299,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                          'Only text is sent. No audio is stored by GameNight.',
+                          'Only text is sent. No audio is stored by Gamepad Party.',
                           style: TextStyle(
                               color: GnColors.muted,
                               fontSize: 12,
@@ -364,7 +364,7 @@ class _FeedbackScreenState extends State<FeedbackScreen>
           const SizedBox(height: 12),
           Text(
               _delivered!
-                  ? 'Your feedback helps make the next GameNight better.'
+                  ? 'Your feedback helps make the next Gamepad Party better.'
                   : 'Your feedback is saved on this phone and will be retried when the app can connect.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: GnColors.muted, height: 1.5)),

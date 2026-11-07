@@ -1,12 +1,12 @@
-# GameNight for Godot 4
+# Gamepad Party for Godot 4
 
 Start with the [Godot integration guide](../../docs/site/godot.md), published in
-[GameNight Docs](https://gamenight.ontola.io/docs/godot). It covers installation,
+[Gamepad Party Docs](https://gamenight.ontola.io/docs/godot). It covers installation,
 lifecycle signals, seat-based controller input, faces and release testing.
 
 For the runnable **Living Room lobby**, open this directory's `project.godot`
 and follow [Build a lobby](../../docs/site/lobbies.md), published at
-[GameNight Docs / Lobbies](https://gamenight.ontola.io/docs/lobbies).
+[Gamepad Party Docs / Lobbies](https://gamenight.ontola.io/docs/lobbies).
 It uses the separate `lobby.gd` client and reusable `face.gd` renderer.
 Run it through `python scripts/run-local.py --lobby godot --godot /path/to/godot`.
 

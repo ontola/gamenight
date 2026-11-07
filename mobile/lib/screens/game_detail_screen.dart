@@ -402,13 +402,13 @@ class _GameDetailPageState extends State<_GameDetailPage> {
         : null;
     final note = _Note(game.unreviewed
         ? host == null
-            ? 'Not in the store yet. Join a room to playtest: the GameNight '
+            ? 'Not in the store yet. Join a room to playtest: the Gamepad Party '
                 'gets your preview build while you are there.'
-            : 'Your preview build is not on this GameNight yet. It comes '
+            : 'Your preview build is not on this Gamepad Party yet. It comes '
                 'with you once one is uploaded and ready.'
         : host == null
             ? 'Join a room to put this game in the queue.'
-            : 'This GameNight does not have this game yet.');
+            : 'This Gamepad Party does not have this game yet.');
     // Outside a room, Want to play says what happens next.
     if (host == null && !game.unreviewed && _canWant) {
       return buy ?? const SizedBox.shrink();

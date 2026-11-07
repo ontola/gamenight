@@ -59,7 +59,7 @@ impl DaemonClient {
     pub async fn connect(addr: &str) -> Result<Arc<Self>, String> {
         let (ws, _) = tokio_tungstenite::connect_async(format!("ws://{addr}"))
             .await
-            .map_err(|e| format!("cannot reach the GameNight daemon at {addr}: {e}"))?;
+            .map_err(|e| format!("cannot reach the Gamepad Party daemon at {addr}: {e}"))?;
         let (mut sink, mut stream) = ws.split();
         sink.send(Message::Text(
             ClientMessage::Hello {
@@ -494,7 +494,7 @@ pub async fn handle_message(client: &DaemonClient, msg: &Value) -> Option<Value>
                 "capabilities": { "tools": {} },
                 "serverInfo": {
                     "name": "gamenight",
-                    "title": "GameNight",
+                    "title": "Gamepad Party",
                     "version": env!("CARGO_PKG_VERSION")
                 },
                 "instructions": "You are a member of a couch-multiplayer game night. \

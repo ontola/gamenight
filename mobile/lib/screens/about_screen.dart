@@ -153,7 +153,7 @@ class _Todos extends StatelessWidget {
           title: 'Get the app',
           hint: kIsWeb && ios
               ? 'The iPhone app is in testing. Ask for an invite.'
-              : 'Keep GameNight a tap away on your phone.',
+              : 'Keep Gamepad Party a tap away on your phone.',
           action: kIsWeb && android ? 'Download' : null,
           onTap: () =>
               launchUrl(AppUpdate.apk, mode: LaunchMode.externalApplication),
@@ -189,7 +189,7 @@ class _Todos extends StatelessWidget {
         key: const ValueKey('todo-host'),
         done: state.hostedOwnRoom,
         title: 'Install on your PC and host a session',
-        hint: 'Run GameNight on the TV computer and invite your friends.',
+        hint: 'Run Gamepad Party on the TV computer and invite your friends.',
         action: onHost == null ? null : 'Host',
         onTap: () => onHost?.call(),
       ),

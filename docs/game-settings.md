@@ -1,6 +1,6 @@
 # Game settings
 
-GameNight can display a game's settings in the lobby and phone interface. Games
+Gamepad Party can display a game's settings in the lobby and phone interface. Games
 must declare their options and implement the changes. Having the protocol or SDK
 in a project does not expose its gameplay rules automatically.
 
@@ -45,7 +45,7 @@ The host still owns seats and controller assignments. Settings cannot remap
 controllers, create human players or write arbitrary engine variables.
 
 Run each game's headless settings suite in its own repository. For the complete
-source-to-host path, build the GameNight daemon and run:
+source-to-host path, build the Gamepad Party daemon and run:
 
 ~~~sh
 export GODOT=/path/to/godot
@@ -99,14 +99,14 @@ rounds without returning to the runner. Do not mutate active state just to make
 a slider look responsive.
 
 A declaration makes controls available once the game connects, usually during
-preloading. It is not static catalog metadata. GameNight remembers party choices
+preloading. It is not static catalog metadata. Gamepad Party remembers party choices
 and sends them back when a game declares settings again. It does not yet have a
 separate acknowledgement for "applied in gameplay". A saved value may therefore
 be pending the next round. See the [protocol reference](/docs/protocol).
 
 A game's own menu can change its settings too: send `set_setting` for one of
 your keys (Godot `GameNight.set_setting(key, value)`, Rust
-`GameNight::set_setting`). GameNight validates it, stores it as the party's
+`GameNight::set_setting`). Gamepad Party validates it, stores it as the party's
 choice and echoes `setting_changed`, so the app and the assistant show the
 value players picked in the game.
 
@@ -114,7 +114,7 @@ Mineclonia maps its integer percentages onto the existing world physics factors.
 It applies them on a worker, coalesces repeated edits and retries mailbox
 conflicts. Mod installation waits for an in-flight settings update. These two
 controls do not install arbitrary mods. Edits made directly through the separate
-world bridge are not automatically republished into GameNight's setting values.
+world bridge are not automatically republished into Gamepad Party's setting values.
 
 ## Per-player settings
 
@@ -199,7 +199,7 @@ Keep the timing in the label and description. The assistant must not promise an
 immediate gameplay change when your game waits for a new round or match. Account
 configs store these scalar values, not world saves or arbitrary mod code.
 
-Voice and account features belong to the optional GameNight service. The public
+Voice and account features belong to the optional Gamepad Party service. The public
 game contract remains usable offline, without an AI provider.
 
 ## Verify changes

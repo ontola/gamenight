@@ -1,6 +1,6 @@
 # Five-second gameplay previews
 
-Every playable GameNight store entry needs an engaging five-second gameplay
+Every playable Gamepad Party store entry needs an engaging five-second gameplay
 montage. Its job is to show how much fun the game contains before someone scrolls
 past. Technical validity alone is not acceptance.
 

@@ -16,7 +16,7 @@ final class LinkReceiver: NSObject, NSApplicationDelegate {
         let process = Process()
         process.executableURL = contents.appendingPathComponent("MacOS/GameNight")
         process.arguments = ["--open-url", url.absoluteString]
-        do { try process.run() } catch { NSLog("GameNight could not open: %@", error.localizedDescription) }
+        do { try process.run() } catch { NSLog("Gamepad Party could not open: %@", error.localizedDescription) }
         NSApp.terminate(nil)
     }
 }

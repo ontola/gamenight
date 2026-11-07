@@ -63,12 +63,12 @@ HostLink parseHostLink(String input) {
   try {
     url = Uri.parse(text);
   } on FormatException {
-    throw const LinkError('That is not a GameNight address.');
+    throw const LinkError('That is not a Gamepad Party address.');
   }
   if (!['http', 'https'].contains(url.scheme) ||
       url.host.isEmpty ||
       url.userInfo.isNotEmpty) {
-    throw const LinkError('That is not a GameNight address.');
+    throw const LinkError('That is not a Gamepad Party address.');
   }
   final port = url.hasPort
       ? url.port
@@ -81,14 +81,14 @@ HostLink parseHostLink(String input) {
       RegExp(r'^/(session(/[^/]+)?|studio|mobile|join|app)/?$').hasMatch(path);
   if (!known) {
     throw const LinkError(
-        'This is not a GameNight sign-in QR. Try the code in the lobby.');
+        'This is not a Gamepad Party sign-in QR. Try the code in the lobby.');
   }
   final q = url.queryParameters;
   final Map<String, String> fragment;
   try {
     fragment = Uri.splitQueryString(url.fragment);
   } on FormatException {
-    throw const LinkError('That is not a GameNight address.');
+    throw const LinkError('That is not a Gamepad Party address.');
   }
   final room = (q['room'] ?? q['r'] ?? fragment['room'])?.toUpperCase();
   final pair = q['pair'] ?? fragment['pair'];
