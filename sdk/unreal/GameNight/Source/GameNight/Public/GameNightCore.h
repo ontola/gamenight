@@ -18,12 +18,18 @@
 #include <string>
 #include <vector>
 
+// Unreal defines GAMENIGHT_API (dllexport/dllimport in modular editor builds).
+// Anywhere else it is empty, so the core stays engine-free.
+#ifndef GAMENIGHT_API
+#define GAMENIGHT_API
+#endif
+
 namespace gamenight {
 
 // ---------------------------------------------------------------------------
 // A small JSON value. Objects keep insertion order, numbers are doubles.
 // ---------------------------------------------------------------------------
-class Json {
+class GAMENIGHT_API Json {
 public:
 	enum class Type : uint8_t { Null, Bool, Number, String, Array, Object };
 
@@ -149,9 +155,9 @@ struct Vec2 {
 
 // A stick with a radial deadzone, rescaled so it starts at 0. `side` 0 is the
 // left stick, 1 the right one. Up is negative y.
-Vec2 Stick(const Pad& pad, int side = 0, float deadzone = STICK_DEADZONE);
+GAMENIGHT_API Vec2 Stick(const Pad& pad, int side = 0, float deadzone = STICK_DEADZONE);
 // A trigger from 0 to 1 with a deadzone. `side` 0 is the left trigger.
-float Trigger(const Pad& pad, int side = 0, float deadzone = TRIGGER_DEADZONE);
+GAMENIGHT_API float Trigger(const Pad& pad, int side = 0, float deadzone = TRIGGER_DEADZONE);
 
 // ---------------------------------------------------------------------------
 // Faces (docs/faces.md)
@@ -171,9 +177,9 @@ struct FaceImage {
 
 // Decodes players[].avatar. Invalid or empty payloads give an invalid image:
 // draw the default face then.
-FaceImage DecodeAvatar(const std::string& payload);
+GAMENIGHT_API FaceImage DecodeAvatar(const std::string& payload);
 // "#rrggbb" to bytes. False (and `rgb` untouched) for anything else.
-bool ParseHexColor(const std::string& text, uint8_t rgb[3]);
+GAMENIGHT_API bool ParseHexColor(const std::string& text, uint8_t rgb[3]);
 
 // ---------------------------------------------------------------------------
 // The client
@@ -227,7 +233,7 @@ struct DeviceInfo {
 	uint64_t memory_mib = 0;
 };
 
-class Client {
+class GAMENIGHT_API Client {
 public:
 	explicit Client(Config config);
 
@@ -375,6 +381,6 @@ private:
 	uint64_t perf_sent_us_ = 0;
 };
 
-const char* PhaseName(Phase phase);
+GAMENIGHT_API const char* PhaseName(Phase phase);
 
 }  // namespace gamenight
