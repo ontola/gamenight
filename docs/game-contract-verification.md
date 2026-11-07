@@ -202,7 +202,7 @@ that a person would otherwise do by hand. What worked in our games:
   Gamepad Party that goes away; `host.exit_code()` then checks the game quit
   cleanly. `HostClient` connects to a real Gamepad Party as the overlay does.
 - **Install Godot the same way everywhere.** In GitHub Actions use
-  `ontola/gamenight/.github/actions/setup-godot@main` with your project's
+  `ontola/gamepad-party/.github/actions/setup-godot@main` with your project's
   `version`; it verifies the download's sha256, works on Linux and Windows,
   and with `export-templates` installs the templates an export needs.
 - **Keep sending frames.** Input older than 250 ms counts as released, so a

@@ -17,14 +17,14 @@ a Gamepad Party game or overlay — Godot, Unity, Bevy, a shell script, a browse
 start with <a href="/docs/lifecycle">Integrating your game</a></strong> — it walks the
 lifecycle in build order and links the checks and runnable examples. The
 canonical type definitions live in
-<a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-protocol/src/lib.rs"><code>crates/gamenight-protocol</code></a>.</p>
+<a href="https://github.com/ontola/gamepad-party/blob/main/crates/gamenight-protocol/src/lib.rs"><code>crates/gamenight-protocol</code></a>.</p>
 <p>The same types, as one machine-readable JSON Schema with every message tag,
 field, enum value and protocol constant, are in
-<a href="https://github.com/ontola/gamenight/blob/main/contract/protocol.schema.json"><code>contract/protocol.schema.json</code></a>. The SDK
+<a href="https://github.com/ontola/gamepad-party/blob/main/contract/protocol.schema.json"><code>contract/protocol.schema.json</code></a>. The SDK
 bindings are generated from it by <code>scripts/build-protocol.py</code>: <code>GN_MSG_*</code> in
 <code>sdk/c/gamenight.h</code>, <code>protocol.gd</code> in the Godot addon,
-<a href="https://github.com/ontola/gamenight/blob/main/sdk/js/protocol.mjs"><code>sdk/js/protocol.mjs</code></a>,
-<a href="https://github.com/ontola/gamenight/blob/main/sdk/python/gamenight_protocol.py"><code>sdk/python/gamenight_protocol.py</code></a>,
+<a href="https://github.com/ontola/gamepad-party/blob/main/sdk/js/protocol.mjs"><code>sdk/js/protocol.mjs</code></a>,
+<a href="https://github.com/ontola/gamepad-party/blob/main/sdk/python/gamenight_protocol.py"><code>sdk/python/gamenight_protocol.py</code></a>,
 <code>mobile/lib/protocol.g.dart</code> and <code>Protocol.cs</code> in the Unity package. Use one of them, or the schema, rather than
 retyping tag strings.</p>
 <h2 id="transport">Transport</h2>
@@ -368,7 +368,7 @@ otherwise bounce straight back into the game. Only Start/Resume commands authori
 gameplay. See the <a href="/docs/lifecycle">integration guide</a> for Back release
 handling and borderless windows.</p>
 <p>Ready completes preparation. Release acceptance additionally requires the
-behaviors in <a href="https://github.com/ontola/gamenight/blob/main/contract/requirements.json">the contract</a>, including pause,
+behaviors in <a href="https://github.com/ontola/gamepad-party/blob/main/contract/requirements.json">the contract</a>, including pause,
 resume, input ownership, clean switching and continuous play.</p>
 <p>Session snapshots include <a href="#session-diagnostics">diagnostics</a>. Consumers must
 treat absent diagnostics from older hosts as unavailable, not zero measured
@@ -555,7 +555,7 @@ on focus remains forbidden. On macOS games still report Cmd+Tab with
 <p>The optional <code>onboarding_error</code> string is a host-owned failure of an explicitly
 requested first game. Lobbies should show it visibly without inventing a library
 or queue entry. It disappears when the request succeeds or another game is
-chosen. Games cannot submit this field. See <a href="https://github.com/ontola/gamenight/blob/main/docs/catalog-onboarding.md">catalog onboarding</a>
+chosen. Games cannot submit this field. See <a href="https://github.com/ontola/gamepad-party/blob/main/docs/catalog-onboarding.md">catalog onboarding</a>
 for saved-choice recovery and local game registration.</p>
 <h2 id="room-log">Room log</h2>
 <p>The host keeps a log of the evening for phones to read back: who joined and
@@ -619,7 +619,7 @@ send <code>media_control</code> to pause or skip it.</p>
 <p><code>now_playing</code> is <strong>absent whenever nothing is on</strong>, which is most nights.
 That's the whole rendering rule: a screen draws its music controls only when
 the field is there, because controls for a stereo that isn't playing are
-worse than none. The <a href="https://github.com/ontola/gamenight/blob/main/lobbies/game-room">Game Room lobby</a> shows the track on
+worse than none. The <a href="https://github.com/ontola/gamepad-party/blob/main/lobbies/game-room">Game Room lobby</a> shows the track on
 its jukebox, where players pause or skip it, and has no music controls while the
 field is absent.</p>
 <p>A <code>play_pause</code> flips <code>playing</code> in the very next snapshot rather than waiting
@@ -666,7 +666,7 @@ and a host who'd rather not be asked should be able to say so.</p>
 and <strong>the daemon owns the values</strong>: it validates every write, broadcasts them
 in every snapshot, pushes changes to the game, and keeps them when the game's
 process reconnects. Anything speaking the overlay role can turn a knob: the
-party overlay, or an LLM through <a href="https://github.com/ontola/gamenight/blob/main/docs/llm-control.md"><code>gamenight-mcp</code></a> (&quot;hey
+party overlay, or an LLM through <a href="https://github.com/ontola/gamepad-party/blob/main/docs/llm-control.md"><code>gamenight-mcp</code></a> (&quot;hey
 Gamepad Party, disable items&quot;).</p>
 <p>A game declares its settings once, right after <code>welcome</code> (and again after
 every reconnect — the daemon replays changed values in response):</p>
@@ -805,7 +805,7 @@ appears).</li>
 <li>The daemon loads the shelf from <code>$GAMENIGHT_LIBRARY</code> (a JSON array of these
 objects) and falls back to a built-in demo shelf.</li>
 </ul>
-<p>Separately, on startup the daemon also folds <a href="https://github.com/ontola/gamenight/blob/main/catalog">the catalogue</a>
+<p>Separately, on startup the daemon also folds <a href="https://github.com/ontola/gamepad-party/blob/main/catalog">the catalogue</a>
 into the shelf: free entries with a direct, hash-verified binary for the
 running platform that are already installed (from a previous run) join
 <code>library</code> immediately, with a real <code>launch</code> spec resolved from the
@@ -820,7 +820,7 @@ blocking this start, so it's ready to join the shelf on the <em>next</em> one. S
 already has a <code>launch</code> spec — a catalogue-only game that isn't installed yet
 never reaches that path, so the daemon watches <code>play_next</code> directly instead:
 the moment a <code>play_next</code> names a game with no launch spec, it calls
-<a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-installer/src/lib.rs"><code>PrewarmHandle::prioritize</code></a> to
+<a href="https://github.com/ontola/gamepad-party/blob/main/crates/gamenight-installer/src/lib.rs"><code>PrewarmHandle::prioritize</code></a> to
 bump that game to the front of whatever's left in the queue. An in-flight
 download always finishes first (no HTTP range support to resume a cancelled
 one); reprioritizing only reorders what hasn't started yet.</p>
@@ -1135,7 +1135,7 @@ fallback colours. When a colour becomes available, a player waiting for that
 preference receives it. Games can still use team colours when required by their
 rules. Older profiles without this field retain automatic colour selection.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="c0e380fd3e54360d897f0faf83a7530a59d452c1585618ba96c3851c738cb7a4">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/protocol.md">Edit this page</a><span data-source-fingerprint="44b6b807140a4b54ab3dc51c1fbb9acec1e0a264448675b95aee88b172c41313">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/settings"><small>Previous</small>Game settings</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#transport">Transport</a><a href="#roles">Roles</a><a href="#session-lifecycle">Session lifecycle</a><a href="#party-commands-overlay-daemon">Party commands (overlay → daemon)</a><a href="#party-state-daemon-overlays">Party state (daemon → overlays)</a><a href="#room-log">Room log</a><a href="#phone-buttons">Phone buttons</a><a href="#the-hosts-music">The host&#x27;s music</a><a href="#match-settings">Match settings</a><a href="#phone-screens">Phone screens</a><a href="#plain-text-requests">Plain-text requests</a><a href="#the-night-end-to-end">The night, end to end</a><a href="#rules-the-daemon-enforces">Rules the daemon enforces</a><a href="#errors">Errors</a><a href="#future-kept-off-v1-on-purpose">Future (kept off v1 on purpose)</a><a href="#player-activity-sleep-and-joining-during-play">Player activity, sleep and joining during play</a><a href="#circular-player-faces">Circular player faces</a><a href="#session-diagnostics">Session diagnostics</a><a href="#preferred-player-colours">Preferred player colours</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

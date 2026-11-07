@@ -36,7 +36,7 @@ the public repository:
 ```toml
 [dependencies]
 bevy = "0.20"
-gamenight-bevy = { git = "https://github.com/ontola/gamenight", rev = "YOUR_REVIEWED_COMMIT" }
+gamenight-bevy = { git = "https://github.com/ontola/gamepad-party", rev = "YOUR_REVIEWED_COMMIT" }
 ```
 
 Replace `YOUR_REVIEWED_COMMIT` with an actual commit hash.

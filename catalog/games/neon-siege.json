@@ -28,7 +28,7 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-siege.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/neon-siege.love",
       "sha256": "ca5f8a2687bb4e22c31b37634afb091145be141ebd41efcc9274218431921129",
       "entrypoint": "neon-siege.love",
       "runtime": {
@@ -40,7 +40,7 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/neon-siege.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/neon-siege.love",
       "sha256": "ca5f8a2687bb4e22c31b37634afb091145be141ebd41efcc9274218431921129",
       "entrypoint": "neon-siege.love",
       "runtime": {

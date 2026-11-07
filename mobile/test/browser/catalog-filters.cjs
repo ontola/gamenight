@@ -65,7 +65,7 @@ games[0].tags=['party','action'];games[1].tags=['co-op','party'];games[2].tags=[
   await page.getByRole('button',{name:'Download APK',exact:true}).waitFor();
   await shot('android-install-phone');
   // Test the actual target without downloading a real installer.
-  await context.route('https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk',route=>route.fulfill({contentType:'application/vnd.android.package-archive',headers:{'Content-Disposition':'attachment; filename="gamenight.apk"'},body:'synthetic-download'}));
+  await context.route('https://github.com/ontola/gamepad-party/releases/download/app-latest/gamenight.apk',route=>route.fulfill({contentType:'application/vnd.android.package-archive',headers:{'Content-Disposition':'attachment; filename="gamenight.apk"'},body:'synthetic-download'}));
   const request=context.waitForEvent('request',{predicate:r=>r.url().endsWith('/app-latest/gamenight.apk')});
   await page.getByRole('button',{name:'Download APK',exact:true}).click();await request;
   signedIn=false;

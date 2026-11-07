@@ -41,7 +41,7 @@ your <code>.uproject</code> at the folder that holds it, as the demo does:</p>
 	&quot;AdditionalPluginDirectories&quot;: [ &quot;../../sdk/unreal&quot; ]
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/DashDerby.uproject#L1">Source: examples/unreal-demo/DashDerby.uproject</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/DashDerby.uproject#L1">Source: examples/unreal-demo/DashDerby.uproject</a></p>
 <p>Add <code>&quot;GameNight&quot;</code> to your module's dependencies in its <code>.Build.cs</code>, then set
 your game id under <strong>Project Settings &gt; Plugins &gt; Gamepad Party</strong>. It must match
 your catalog entry; Gamepad Party also passes it in <code>GAMENIGHT_GAME_ID</code>.</p>
@@ -51,7 +51,7 @@ bAutomaticScreen=True
 bPauseWorldWhenNotRunning=True
 WarmMaxFPS=10
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Config/DefaultGame.ini#L7">Source: examples/unreal-demo/Config/DefaultGame.ini</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Config/DefaultGame.ini#L7">Source: examples/unreal-demo/Config/DefaultGame.ini</a></p>
 <p>A game started by hand stays offline, so a test run never joins the party on
 your machine. Turn on <strong>Connect Standalone</strong> (or set <code>GAMENIGHT_ADDR</code>) to
 connect a Play In Editor session to a running Gamepad Party.</p>
@@ -110,7 +110,7 @@ if (GN &amp;&amp; GN-&gt;IsLaunchedByGameNight())
 	return;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L132">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L132">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>On prepare, it seats everyone in couch order (left to right as they sit),
 opts into live joins and reports ready:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::HandlePrepared(const FString&amp; SessionId)
@@ -127,7 +127,7 @@ opts into live joins and reports ready:</p>
 	GN-&gt;NotifyReady();
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L255">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L255">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-cpp">void ADashDerbyGameMode::SeatFromSession()
 {
 	UGameNightSubsystem* GN = GameNight();
@@ -157,7 +157,7 @@ opts into live joins and reports ready:</p>
 		AddRunner(MoveTemp(Bot));
 	}
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L298">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L298">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>Seats with an AI occupant get a bot. Empty seats are skipped. The number of
 people is <code>LocalSeatCount()</code>, never the number of pads you can see.</p>
 <h2 id="read-input-per-seat">Read input per seat</h2>
@@ -181,7 +181,7 @@ must be released first, so one press never does two things.</p>
 	if (Pad.Buttons != 0 || !Move.IsNearlyZero(0.3)) GN-&gt;ReportActivity(Runner.Seat);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L644">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L644">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p><code>ReportActivity</code> tells Gamepad Party someone is really playing, so the party does
 not mark them asleep. <code>Rumble(Seat, Weak, Strong, Seconds)</code> vibrates that
 seat's controller. Back is never bound: it returns to the party.</p>
@@ -199,7 +199,7 @@ for (const FOrbRunner&amp; Runner : Mode-&gt;Runners)
 	GN-&gt;DrawFace(Canvas, Runner.Player, FVector2D(Screen.X, Screen.Y), 30.0f * Unit, Facing);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp#L47">Source: examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp#L47">Source: examples/unreal-demo/Source/DashDerby/DashDerbyHUD.cpp</a></p>
 <p><code>GetFaceTexture(Player)</code> gives the face alone as a nearest-filtered texture,
 for a material or a widget. Profile changes arrive in <code>OnPlayersUpdated</code>
 while the match runs: update in place and never restart.</p>
@@ -217,7 +217,7 @@ while the match runs: update in place and never restart.</p>
 	Trace(TEXT(&quot;players updated&quot;));
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L371">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L371">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>With <code>NotifyParticipation(true)</code>, players who join or leave mid-round arrive
 in <code>OnRosterChanged</code>. Dash Derby keeps everyone still seated, with their score,
 and adds the newcomers at once.</p>
@@ -252,7 +252,7 @@ Json ActionsSpec()
 	                                  .set(&quot;confirm&quot;, true));
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L56">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L56">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>Every Gamepad Party Start menu has the same layout: the game's name, <strong>Resume</strong>,
 <strong>New round</strong>, then the settings, with no button hints. Dash Derby's menu sends
 each change back with <code>SetSettingJson</code>, so the phones show the same value:</p>
@@ -262,7 +262,7 @@ each change back with <code>SetSettingJson</code>, so the phones show the same v
 	if (GN &amp;&amp; GN-&gt;IsLaunchedByGameNight()) GN-&gt;SetSettingJson(Key, Value);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L738">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L738">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <h2 id="rounds-results-and-saves">Rounds, results and saves</h2>
 <p>A round ends with <code>NotifyFinished()</code>; the session goes on. <code>AddRoomLog</code> writes
 one short line to the room log in the app. Each player's own progress is saved
@@ -307,7 +307,7 @@ void ADashDerbyGameMode::SaveProgress()
 	}
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L581">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L581">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>The C++ API takes <code>gamenight::Json</code> values (<code>GN-&gt;Core()</code> is the protocol
 client underneath). Blueprints use the <code>...Json</code> functions, which take and
 return JSON text.</p>
@@ -323,7 +323,7 @@ from a real folder, so stage it as loose files:</p>
 +DirectoriesToAlwaysCook=(Path=&quot;/Engine/BasicShapes&quot;)
 +MapsToCook=(FilePath=&quot;/Engine/Maps/Entry&quot;)
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Config/DefaultGame.ini#L13">Source: examples/unreal-demo/Config/DefaultGame.ini</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Config/DefaultGame.ini#L13">Source: examples/unreal-demo/Config/DefaultGame.ini</a></p>
 <p>The game decides and the phone draws: Dash Derby sends each player their whole
 view, again whenever their phone connects, and checks every tap against the
 rules.</p>
@@ -369,7 +369,7 @@ void ADashDerbyGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
 	GN-&gt;SendCompanionMessage(View, Runner.Player.Id);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L420">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp#L420">Source: examples/unreal-demo/Source/DashDerby/DashDerbyGameMode.cpp</a></p>
 <p>The page itself is plain HTML with the host's <code>/assets/companion.js</code>; see
 <a href="/docs/phone-screens">Phone screens</a> for the limits of hosted rooms.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-html">&lt;script src=&quot;/assets/companion.js&quot;&gt;&lt;/script&gt;
@@ -393,7 +393,7 @@ void ADashDerbyGameMode::SendPhoneView(const FOrbRunner&amp; Runner)
   });
 &lt;/script&gt;
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unreal-demo/Content/Phone/index.html#L44">Source: examples/unreal-demo/Content/Phone/index.html</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unreal-demo/Content/Phone/index.html#L44">Source: examples/unreal-demo/Content/Phone/index.html</a></p>
 <h2 id="build-and-package">Build and package</h2>
 <p>Open <code>examples/unreal-demo/DashDerby.uproject</code> with Unreal Engine 5.3 or later
 and let it build the modules, or build from the command line:</p>
@@ -427,7 +427,7 @@ Gamepad Party, then follow the <a href="/docs/testing">test guide</a>, before re
 them for a release.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/unreal.md">Edit this page</a><span data-source-fingerprint="701ee28734ca5ada71da7789b41b3b0ac7285e522da3d1b06bd894f767f008ed">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/unreal.md">Edit this page</a><span data-source-fingerprint="701ee28734ca5ada71da7789b41b3b0ac7285e522da3d1b06bd894f767f008ed">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/unity"><small>Previous</small>Unity</a><a href="/docs/lobbies"><small>Next</small>Build a lobby</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-plugin">Add the plugin</a><a href="#how-it-fits-together">How it fits together</a><a href="#bind-the-lifecycle">Bind the lifecycle</a><a href="#read-input-per-seat">Read input per seat</a><a href="#players-colours-and-faces">Players, colours and faces</a><a href="#settings-and-the-start-menu">Settings and the Start menu</a><a href="#rounds-results-and-saves">Rounds, results and saves</a><a href="#phone-screens-and-phone-buttons">Phone screens and phone buttons</a><a href="#build-and-package">Build and package</a><a href="#what-is-tested">What is tested</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

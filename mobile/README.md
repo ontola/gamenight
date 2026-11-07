@@ -134,7 +134,7 @@ Catalog game pages support sideways swipes without an extra counter bar.
 CI signs every build from `main` with the Gamepad Party key and publishes it as
 the `app-latest` release, so this link always has the newest app:
 
-<https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk>
+<https://github.com/ontola/gamepad-party/releases/download/app-latest/gamenight.apk>
 
 The app updates itself from there. CI builds with the workflow's run number
 as versionCode and as `GAMENIGHT_BUILD`, and publishes a `version.json` with

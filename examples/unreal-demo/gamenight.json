@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json",
+  "$schema": "https://raw.githubusercontent.com/ontola/gamepad-party/main/catalog/schema.json",
   "id": "unreal-demo",
   "title": "Dash Derby",
   "tagline": "Race your friends for orbs and dash them out of the way. The Gamepad Party demo for Unreal Engine.",
@@ -20,6 +20,6 @@
     "protocol": 1
   },
   "links": {
-    "source": "https://github.com/ontola/gamenight/tree/main/examples/unreal-demo"
+    "source": "https://github.com/ontola/gamepad-party/tree/main/examples/unreal-demo"
   }
 }

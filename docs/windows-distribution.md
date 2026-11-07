@@ -102,7 +102,7 @@ Setup for Ontola (one time, in the Azure portal):
    wait for approval. Microsoft checks the company details against public records.
 3. Create a Public Trust certificate profile on that validated identity.
 4. Create an app registration with a federated credential for GitHub Actions,
-   entity `Branch`, repository `ontola/gamenight`, branch `main`.
+   entity `Branch`, repository `ontola/gamepad-party`, branch `main`.
 5. Give that app the role *Artifact Signing Certificate Profile Signer* (formerly *Trusted
    Signing Certificate Profile Signer*) on the
    certificate profile.

@@ -5,7 +5,7 @@
 // headings, hr, paragraphs, lists (ul/ol/checklists), tables, fenced code,
 // blockquotes, and inline code/bold/italic/links.
 // ---------------------------------------------------------------------------
-const REPO = "https://github.com/ontola/gamenight/blob/main/";
+const REPO = "https://github.com/ontola/gamepad-party/blob/main/";
 
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

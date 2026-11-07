@@ -3,7 +3,7 @@
 # GameNight repository's Godot download:
 #
 #   - id: godot
-#     uses: ontola/gamenight/.github/actions/setup-godot@main
+#     uses: ontola/gamepad-party/.github/actions/setup-godot@main
 #     with:
 #       version: 4.5.2
 #       export-templates: windows_release_x86_64.exe windows_release_x86_64_console.exe

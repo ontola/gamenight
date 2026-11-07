@@ -6,10 +6,10 @@
   "unity": "2021.3",
   "author": {
     "name": "GameNight contributors",
-    "url": "https://github.com/ontola/gamenight"
+    "url": "https://github.com/ontola/gamepad-party"
   },
   "license": "MIT",
-  "documentationUrl": "https://github.com/ontola/gamenight/blob/main/docs/site/unity.md",
+  "documentationUrl": "https://github.com/ontola/gamepad-party/blob/main/docs/site/unity.md",
   "keywords": ["gamenight", "couch", "local multiplayer", "party"],
   "samples": []
 }

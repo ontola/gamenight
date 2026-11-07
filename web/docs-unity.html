@@ -15,17 +15,17 @@ connection, the session lifecycle, every player's controller by seat, names,
 colours and faces, match settings, phone buttons, plain-text requests, phone
 screens, saved progress, the room log, rumble and the game window. Your game
 connects these to its own simulation and rendering.</p>
-<p>Orb Rush in <a href="https://github.com/ontola/gamenight/tree/main/examples/unity-demo"><code>examples/unity-demo</code></a>
+<p>Orb Rush in <a href="https://github.com/ontola/gamepad-party/tree/main/examples/unity-demo"><code>examples/unity-demo</code></a>
 is the reference game: a small 3D couch game that uses every feature on this
 page. The code below is read from it, so it is the code that runs. Copy the
 project to start your own game.</p>
 <h2 id="install">Install</h2>
 <p>In Unity 2021.3 or later, open <strong>Window → Package Manager → + → Add package
 from git URL</strong> and enter:</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-text">https://github.com/ontola/gamenight.git?path=/sdk/unity
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-text">https://github.com/ontola/gamepad-party.git?path=/sdk/unity
 </code></pre></div>
 <p>Or add it to <code>Packages/manifest.json</code>, pinned to a commit or tag:</p>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">&quot;com.ontola.gamenight&quot;: &quot;https://github.com/ontola/gamenight.git?path=/sdk/unity#main&quot;
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-json">&quot;com.ontola.gamenight&quot;: &quot;https://github.com/ontola/gamepad-party.git?path=/sdk/unity#main&quot;
 </code></pre></div>
 <p>The package is plain C# with no other dependencies. It reads keyboard and pad
 input through the Input System when that package is installed and active, and
@@ -52,7 +52,7 @@ its build script:</p>
     PlayerSettings.SplashScreen.show = false;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/Editor/BuildOrbRush.cs#L29">Source: examples/unity-demo/Assets/Editor/BuildOrbRush.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/Editor/BuildOrbRush.cs#L29">Source: examples/unity-demo/Assets/Editor/BuildOrbRush.cs</a></p>
 <p>Run in Background matters most. Gamepad Party prepares the next game while
 another one is on screen; a Unity player that stops updating when it loses
 focus never hears Start. The package also sets it at startup when Gamepad Party
@@ -66,7 +66,7 @@ scene. Set your catalog id first:</p>
 GameNight.Configure(&quot;unity-demo&quot;);
 var gn = GameNight.Client;
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushView.cs#L49">Source: examples/unity-demo/Assets/OrbRush/OrbRushView.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushView.cs#L49">Source: examples/unity-demo/Assets/OrbRush/OrbRushView.cs</a></p>
 <p>The same build runs standalone and under Gamepad Party. Gamepad Party launches it with
 <code>GAMENIGHT=1</code> and the address in the environment, and
 <code>GameNight.Client.LaunchedByHost</code> is true: skip your menus and wait for
@@ -103,7 +103,7 @@ screen and plain-text requests after every reconnect, so declare them in
         Trace(&quot;disposed&quot;);
     };
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L118">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L118">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p>Prepared loads the level while hidden and silent, then reports Ready. Start
 begins play at once. Pause must freeze gameplay, timers and sound; Resume
 continues the same match. Dispose clears the session, and a new Prepared may
@@ -126,7 +126,7 @@ follow later in the night, in the same process:</p>
     GameNight.NotifyReady(session);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L172">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L172">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p>Call <code>NotifyReady</code> only when the first frame can be drawn. <code>NotifyProgress</code>
 is optional: send it when loading takes more than a moment, so the lobby can
 show a real bar. <code>NotifyParticipation</code> from Prepared opts into live roster
@@ -166,7 +166,7 @@ neutral while the session is not running and when the input is more than
     return length &gt; 1f ? (mx / length, my / length) : (mx, my);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L503">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L503">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p><code>Pad</code> names every button and axis (<code>Pad.A</code> to <code>Pad.Right</code>). <code>Pad.Stick</code> and
 <code>Pad.Trigger</code> apply the deadzones our games settled on (0.15 and 0.06). On the
 wire, up on a stick is negative y; <code>GameNight.Stick(seat)</code> gives a <code>Vector2</code>
@@ -223,7 +223,7 @@ waits while it is open:</p>
     return true;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L550">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L550">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p>A value changed in the menu goes through <code>SetSetting</code>, so the phones and the
 assistant show the same value.</p>
 <h2 id="settings">Settings</h2>
@@ -239,7 +239,7 @@ value, such as a character; it is saved with their profile between nights:</p>
         .Describe(&quot;Each player picks their own shape; it is saved with their profile.&quot;),
 };
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L63">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L63">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p>Values arrive through <code>SettingChanged</code>, and per-player values through
 <code>PlayerSettingsChanged</code> and <code>PlayerSetting(playerId, key)</code>. Apply a value live
 when that is safe, or at the next round, and say which in the label:</p>
@@ -259,7 +259,7 @@ when that is safe, or at the next round, and say which in the label:</p>
     Trace($&quot;setting {key} = {Json.Write(value)}&quot;);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L244">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L244">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <h2 id="phone-buttons-and-requests-in-words">Phone buttons and requests in words</h2>
 <p>Phone buttons sit next to your settings on every player's phone, for things
 that happen once. Presses arrive through <code>ActionTriggered</code>, only while your
@@ -270,7 +270,7 @@ session is the one being played:</p>
     new PhoneAction(&quot;shuffle&quot;, &quot;Shuffle the orbs&quot;),
 };
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L72">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L72">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p><code>DeclareCommands</code> accepts requests in plain words from the Gamepad Party app and
 the session assistant (&quot;8 orbs&quot;, &quot;rounds of 90 seconds&quot;). Your game decides
 what the words mean and answers once:</p>
@@ -298,7 +298,7 @@ what the words mean and answers once:</p>
     Trace(&quot;command &quot; + command.Text);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L261">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L261">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <h2 id="names-colours-and-faces">Names, colours and faces</h2>
 <p>Every player arrives with a name, a clothing colour, a skin colour and their
 own pixel-art face. <code>GameNightFaces.Head(player, size)</code> paints the head every
@@ -312,7 +312,7 @@ if (body.FaceTexture != head)
     body.Face.sprite = Sprite.Create(head, new Rect(0, 0, head.width, head.height), new Vector2(0.5f, 0.5f), 40f);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushView.cs#L141">Source: examples/unity-demo/Assets/OrbRush/OrbRushView.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushView.cs#L141">Source: examples/unity-demo/Assets/OrbRush/OrbRushView.cs</a></p>
 <p><code>PlayersUpdated</code> fires when someone picks up a profile in the lobby mid-match:
 the same players in the same seats, with a new name, colour or face. Update in
 place and keep playing; never restart over it.</p>
@@ -330,7 +330,7 @@ lobby. <code>Couch.Order(seats, players)</code> sorts seats that way:</p>
     return result;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L490">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L490">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <h2 id="players-joining-and-leaving">Players joining and leaving</h2>
 <p>After <code>NotifyParticipation</code>, <code>RosterChanged</code> brings the new seats and players
 when someone joins or leaves during your session. Keep everyone else's score:</p>
@@ -356,7 +356,7 @@ when someone joins or leaves during your session. Keep everyone else's score:</p
     if (MenuOwner &gt;= Runners.Count) MenuOwner = -1;
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L221">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L221">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <h2 id="saved-progress">Saved progress</h2>
 <p><code>SavePlayerData(playerId, data)</code> stores any JSON value up to 64 KB with a
 player's profile: unlocks, stats, a best score. It arrives back through
@@ -383,7 +383,7 @@ unlocked, for tonight only:</p>
     if (!string.IsNullOrEmpty(Session)) GameNight.NotifyFinished(Session);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L462">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L462">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p><code>AddRoomLog(text)</code> adds a line to the room log players read back in the
 Gamepad Party app, never on the TV. Use it for a round or a winner, not every frame.</p>
 <h2 id="phone-screens">Phone screens</h2>
@@ -391,7 +391,7 @@ Gamepad Party app, never on the TV. Use it for a round or a winner, not every fr
 under <code>Assets/StreamingAssets</code>, which stays a real folder in a desktop build,
 and declare it from <code>Connected</code> with <code>GameNight.DeclarePhoneScreen(&quot;phone&quot;)</code>.
 The package checks the folder fits a hosted room. Orb Rush's page is
-<a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/StreamingAssets/phone/index.html"><code>StreamingAssets/phone/index.html</code></a>:
+<a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/StreamingAssets/phone/index.html"><code>StreamingAssets/phone/index.html</code></a>:
 your score and a boost button. Messages from a phone are untrusted input:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-csharp">void OnPhoneMessage(string playerId, object data)
 {
@@ -414,7 +414,7 @@ void SendPhone(string playerId)
     }, playerId);
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L287">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/OrbRush/OrbRushGame.cs#L287">Source: examples/unity-demo/Assets/OrbRush/OrbRushGame.cs</a></p>
 <p>See <a href="/docs/phone-screens">Phone screens</a> for the page side.</p>
 <h2 id="the-screen">The screen</h2>
 <p><code>GameNightScreen</code> comes with the package and needs no code. When Gamepad Party
@@ -447,7 +447,7 @@ build.</p>
 a package installed from git needs a <code>.meta</code> file next to every file, and CI
 checks they are there.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/unity.md">Edit this page</a><span data-source-fingerprint="3717b211d47d02ed2beb543b6fd28996acc3aff0982ea4731db254f6f8a5d3ff">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/unity.md">Edit this page</a><span data-source-fingerprint="5fcac915f5ea122e21f96185a891cc139f5122d5f1c6b37b7cb30f957c20229a">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/godot"><small>Previous</small>Godot 4</a><a href="/docs/unreal"><small>Next</small>Unreal Engine</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#install">Install</a><a href="#player-settings">Player settings</a><a href="#connect">Connect</a><a href="#lifecycle">Lifecycle</a><a href="#controllers">Controllers</a><a href="#the-start-menu">The Start menu</a><a href="#settings">Settings</a><a href="#phone-buttons-and-requests-in-words">Phone buttons and requests in words</a><a href="#names-colours-and-faces">Names, colours and faces</a><a href="#players-joining-and-leaving">Players joining and leaving</a><a href="#saved-progress">Saved progress</a><a href="#phone-screens">Phone screens</a><a href="#the-screen">The screen</a><a href="#test-without-unity">Test without Unity</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

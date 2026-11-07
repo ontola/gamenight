@@ -25,7 +25,7 @@ pub fn protocol_schema() -> Value {
     defs.sort_keys();
     json!({
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "$id": "https://github.com/ontola/gamenight/blob/main/contract/protocol.schema.json",
+        "$id": "https://github.com/ontola/gamepad-party/blob/main/contract/protocol.schema.json",
         "title": "GameNight wire protocol",
         "description": "One JSON object per WebSocket text frame, tagged by \"type\". Generated from crates/gamenight-protocol; do not edit.",
         "anyOf": [client, server],

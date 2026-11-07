@@ -1,6 +1,6 @@
 # Gamepad Party for Unity
 
-The Unity package for [Gamepad Party](https://github.com/ontola/gamenight): the
+The Unity package for [Gamepad Party](https://github.com/ontola/gamepad-party): the
 party lifecycle, every player's controller by seat, names, colours and faces,
 match settings, phone buttons, requests in plain words, phone screens, saved
 progress, the room log, rumble and the game window.
@@ -8,7 +8,7 @@ progress, the room log, rumble and the game window.
 Install it from **Window → Package Manager → + → Add package from git URL**:
 
 ```text
-https://github.com/ontola/gamenight.git?path=/sdk/unity
+https://github.com/ontola/gamepad-party.git?path=/sdk/unity
 ```
 
 The guide is [docs/site/unity.md](../../docs/site/unity.md), published at

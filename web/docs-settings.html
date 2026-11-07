@@ -187,7 +187,7 @@ player changes one. In Godot: the <code>player_settings_changed</code> signal an
 <li>Change one from the game's own menu with <code>set_player_setting {player_id, key, value}</code> (Godot <code>GameNight.set_player_setting</code>, Rust <code>set_player_setting</code>).
 Phones send the same message for their own player.</li>
 <li>A player with a profile keeps their values between nights: the host saves them
-in its <a href="https://github.com/ontola/gamenight/blob/main/docs/player-store.md">player store</a>. A guest's values last for the night;
+in its <a href="https://github.com/ontola/gamepad-party/blob/main/docs/player-store.md">player store</a>. A guest's values last for the night;
 when the guest signs in, they move to their profile.</li>
 <li>Party writes (<code>set_setting</code>, <code>control_settings</code>) cannot change a per-player
 key, and <code>GameSettings.values</code> only holds party values. <code>GameSettings.players</code>
@@ -260,7 +260,7 @@ before claiming a downloaded build or a physical controller session is verified.
 <p>Build new <code>.love</code> packages with <code>scripts/package-love-party.py</code>. Publishing those
 packages and updating catalog URLs/checksums is a separate release step.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="e699866c19320058866b0e7d84f5fbdb002fcccc3ee3c92967539b7b11512d01">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/game-settings.md">Edit this page</a><span data-source-fingerprint="e699866c19320058866b0e7d84f5fbdb002fcccc3ee3c92967539b7b11512d01">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/store-clip"><small>Previous</small>Store clip</a><a href="/docs/protocol"><small>Next</small>Protocol reference</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#available-controls">Available controls</a><a href="#godot-game-controls">Godot game controls</a><a href="#declare-and-apply">Declare and apply</a><a href="#per-player-settings">Per-player settings</a><a href="#saved-progress">Saved progress</a><a href="#phone-and-lobby-assistant">Phone and lobby assistant</a><a href="#verify-changes">Verify changes</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -6,7 +6,7 @@ colours and faces, match settings, phone buttons, plain-text requests, phone
 screens, saved progress, the room log, rumble and the game window. Your game
 connects these to its own simulation and rendering.
 
-Orb Rush in [`examples/unity-demo`](https://github.com/ontola/gamenight/tree/main/examples/unity-demo)
+Orb Rush in [`examples/unity-demo`](https://github.com/ontola/gamepad-party/tree/main/examples/unity-demo)
 is the reference game: a small 3D couch game that uses every feature on this
 page. The code below is read from it, so it is the code that runs. Copy the
 project to start your own game.
@@ -17,13 +17,13 @@ In Unity 2021.3 or later, open **Window → Package Manager → + → Add packag
 from git URL** and enter:
 
 ```text
-https://github.com/ontola/gamenight.git?path=/sdk/unity
+https://github.com/ontola/gamepad-party.git?path=/sdk/unity
 ```
 
 Or add it to `Packages/manifest.json`, pinned to a commit or tag:
 
 ```json
-"com.ontola.gamenight": "https://github.com/ontola/gamenight.git?path=/sdk/unity#main"
+"com.ontola.gamenight": "https://github.com/ontola/gamepad-party.git?path=/sdk/unity#main"
 ```
 
 The package is plain C# with no other dependencies. It reads keyboard and pad
@@ -198,7 +198,7 @@ A phone screen is a small web page every player gets on their phone. Keep it
 under `Assets/StreamingAssets`, which stays a real folder in a desktop build,
 and declare it from `Connected` with `GameNight.DeclarePhoneScreen("phone")`.
 The package checks the folder fits a hosted room. Orb Rush's page is
-[`StreamingAssets/phone/index.html`](https://github.com/ontola/gamenight/blob/main/examples/unity-demo/Assets/StreamingAssets/phone/index.html):
+[`StreamingAssets/phone/index.html`](https://github.com/ontola/gamepad-party/blob/main/examples/unity-demo/Assets/StreamingAssets/phone/index.html):
 your score and a boost button. Messages from a phone are untrusted input:
 
 ::: source csharp examples/unity-demo/Assets/OrbRush/OrbRushGame.cs "        void OnPhoneMessage(" "        // ---- standalone"

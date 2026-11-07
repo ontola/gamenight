@@ -15,7 +15,7 @@
 <h2 id="add-the-sdk">Add the SDK</h2>
 <p>For a project in this workspace, use the workspace dependency. For a separate project, pin a reviewed public repository commit:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-toml">[dependencies]
-gamenight-sdk = { git = &quot;https://github.com/ontola/gamenight&quot;, rev = &quot;YOUR_REVIEWED_COMMIT&quot; }
+gamenight-sdk = { git = &quot;https://github.com/ontola/gamepad-party&quot;, rev = &quot;YOUR_REVIEWED_COMMIT&quot; }
 tokio = { version = &quot;1&quot;, features = [&quot;rt-multi-thread&quot;, &quot;macros&quot;] }
 </code></pre></div>
 <p>Replace <code>YOUR_REVIEWED_COMMIT</code> with an actual commit hash. Do not treat the placeholder as a published release.</p>
@@ -75,7 +75,7 @@ async fn main() -&gt; Result&lt;(), SdkError&gt; {
     Ok(())
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/crates/gamenight-sdk/examples/docs_lifecycle.rs#L1">Source: crates/gamenight-sdk/examples/docs_lifecycle.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/crates/gamenight-sdk/examples/docs_lifecycle.rs#L1">Source: crates/gamenight-sdk/examples/docs_lifecycle.rs</a></p>
 <p>Run it from the public repository with <code>cargo run -p gamenight-sdk --example docs_lifecycle</code>. Without a host launch it exits through the standalone branch. In a game, that branch starts your normal menu.</p>
 <h2 id="connect-to-your-game-loop">Connect to your game loop</h2>
 <p>Run the network task separately and pass events into your engine through a channel. Apply Prepare and PartyUpdated to the roster. Store ControllerFrame data with a receipt time, then have your input system look up each seat’s exact controller token.</p>
@@ -91,7 +91,7 @@ cargo test -p gamenight-sdk
 <h2 id="optional-performance-diagnostics">Optional performance diagnostics</h2>
 <p>Call <code>GameNight::performance(session, sample)</code> with a <code>gamenight_protocol::PerformanceSample</code> built from your own active frame measurements. The Rust SDK does not assume an engine update loop or sample automatically. See the <a href="/docs/protocol#session-diagnostics">protocol reference</a> for counters, limits and missing-data semantics. These diagnostics contain no accounts, behavioral history or recommendation logic.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/rust.md">Edit this page</a><span data-source-fingerprint="fdc138f1f6483bae9f17da3756af797b60b076a68f8e792fd794dd672c1acedb">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/rust.md">Edit this page</a><span data-source-fingerprint="d7c2448000b7232a4b3a30a980f591c9c7394fdbd0e0a630cfc6e123d5ecccee">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/bevy"><small>Previous</small>Bevy</a><a href="/docs/godot"><small>Next</small>Godot 4</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-sdk">Add the SDK</a><a href="#receive-lifecycle-events">Receive lifecycle events</a><a href="#connect-to-your-game-loop">Connect to your game loop</a><a href="#controllers-and-faces">Controllers and faces</a><a href="#validate-the-result">Validate the result</a><a href="#optional-performance-diagnostics">Optional performance diagnostics</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

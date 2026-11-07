@@ -14,7 +14,7 @@
 rounds and results. Players can stay in a game until they choose another one.</p>
 <p>Start from the <a href="https://github.com/ontola/gamenight-games/blob/main/love-party/README.md">shared LÖVE runner</a> for a Lua game.
 The <a href="/docs/protocol">wire reference</a> defines messages; the
-<a href="https://github.com/ontola/gamenight/blob/main/contract/requirements.json">release requirements</a> define what must work.
+<a href="https://github.com/ontola/gamepad-party/blob/main/contract/requirements.json">release requirements</a> define what must work.
 A successful handshake alone is not a complete integration.</p>
 <h2 id="submit-a-game">Submit a game</h2>
 <p>Start in the <a href="https://gamenight.ontola.io/developers">developer portal</a>. Sign in
@@ -163,7 +163,7 @@ gameplay screenshot for the TV. They are distinct assets. Colour is an optional
 accent, not a replacement for artwork. Missing artwork should retain a readable
 title fallback.</p>
 <p>Shelf-relative PNG paths are resolved by the host and sent as data URIs. For
-catalog publication, follow the <a href="https://github.com/ontola/gamenight/blob/main/catalog/README.md">catalog guide</a> and the
+catalog publication, follow the <a href="https://github.com/ontola/gamepad-party/blob/main/catalog/README.md">catalog guide</a> and the
 current manifest validation. Do not put launch paths or credentials in profile
 messages.</p>
 <h2 id="verify-before-shipping">Verify before shipping</h2>
@@ -171,13 +171,13 @@ messages.</p>
 The versioned requirements distinguish essential play behavior, personalisation
 and optional party extras. The catalog score uses matching platform/build evidence;
 source declarations alone do not earn a pass.</p>
-<p>Also follow the <a href="https://github.com/ontola/gamenight/blob/main/docs/desktop-integration-checklist.md">desktop checklist</a> with real
+<p>Also follow the <a href="https://github.com/ontola/gamepad-party/blob/main/docs/desktop-integration-checklist.md">desktop checklist</a> with real
 controllers. Test two different profiles, reversed connection order, unplugging
 a pad, nonzero stick input while the lobby is unfocused, live artwork updates,
 repeated Back/Resume and several game switches.
 Synthetic input checks cannot prove physical controller ownership on your machine.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="5f676a5d140df02b513ebb7d3cea6a1fb0b9c203992e04d4f24fcbf291fcdaa1">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/integrating-your-game.md">Edit this page</a><span data-source-fingerprint="5f676a5d140df02b513ebb7d3cea6a1fb0b9c203992e04d4f24fcbf291fcdaa1">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/engines"><small>Previous</small>Engine support</a><a href="/docs/love"><small>Next</small>LÖVE / Lua</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#submit-a-game">Submit a game</a><a href="#connect">Connect</a><a href="#prepare-before-taking-the-screen">Prepare before taking the screen</a><a href="#controllers-belong-to-players">Controllers belong to players</a><a href="#back-focus-and-fullscreen">Back, focus and fullscreen</a><a href="#rounds-continue-inside-the-session">Rounds continue inside the session</a><a href="#live-players-and-settings">Live players and settings</a><a href="#player-faces-and-colours">Player faces and colours</a><a href="#artwork-for-the-catalog-and-lobby">Artwork for the catalog and lobby</a><a href="#verify-before-shipping">Verify before shipping</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

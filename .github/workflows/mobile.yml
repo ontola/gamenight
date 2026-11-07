@@ -107,7 +107,7 @@ jobs:
           name: gamenight-android
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
       # One stable download link for the signed APK:
-      # https://github.com/ontola/gamenight/releases/download/app-latest/gamenight.apk
+      # https://github.com/ontola/gamepad-party/releases/download/app-latest/gamenight.apk
       # Only a build signed with the fixed key is published, never a debug one.
       - name: Publish the APK as the app-latest release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && env.GAMENIGHT_KEYSTORE_FILE != ''
@@ -302,7 +302,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         working-directory: .
         run: |
-          printf '{"repository":"https://github.com/ontola/gamenight","revision":"%s"}\n' "$GITHUB_SHA" > mobile/build/web/build-info.json
+          printf '{"repository":"https://github.com/ontola/gamepad-party","revision":"%s"}\n' "$GITHUB_SHA" > mobile/build/web/build-info.json
           tar -czf gamenight-web.tar.gz -C mobile/build/web .
           sha=$(sha256sum gamenight-web.tar.gz | cut -d' ' -f1)
           printf '{"commit":"%s","run_id":%s,"sha256":"%s"}\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$sha" > web.json

@@ -10,7 +10,7 @@ For a project in this workspace, use the workspace dependency. For a separate pr
 
 ```toml
 [dependencies]
-gamenight-sdk = { git = "https://github.com/ontola/gamenight", rev = "YOUR_REVIEWED_COMMIT" }
+gamenight-sdk = { git = "https://github.com/ontola/gamepad-party", rev = "YOUR_REVIEWED_COMMIT" }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 ```
 

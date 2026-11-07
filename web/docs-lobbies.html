@@ -15,7 +15,7 @@ The runtime owns players, controller bindings and game sessions. The lobby
 chooses how to present them. The Godot Living Room is a runnable example with
 names, custom faces, guest joining, game selection, queueing and resume.</p>
 <h2 id="run-the-godot-example">Run the Godot example</h2>
-<p>Install Godot 4.5 or newer and the <a href="https://github.com/ontola/gamenight/blob/main/docs/development.md">development dependencies</a>.
+<p>Install Godot 4.5 or newer and the <a href="https://github.com/ontola/gamepad-party/blob/main/docs/development.md">development dependencies</a>.
 From the repository root:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">python scripts/run-local.py --lobby godot --godot /path/to/godot --shelf /path/to/games.json
 </code></pre></div>
@@ -103,7 +103,7 @@ The lobby does not receive disposable game sessions.</p>
 <p>This is an additive extension of protocol v1. Older daemons do not support the
 lobby role; deploy the updated daemon and lobby together. A launch token binds
 the connection to the selected process; it does not sandbox native code.
-Existing overlay connections retain their <a href="https://github.com/ontola/gamenight/blob/main/SECURITY.md">trusted local scope</a>.</p>
+Existing overlay connections retain their <a href="https://github.com/ontola/gamepad-party/blob/main/SECURITY.md">trusted local scope</a>.</p>
 <h2 id="state-and-commands">State and commands</h2>
 <p>The lobby receives <code>party_state</code>, <code>lobby_focus</code>, <code>controller_frame</code> and <code>error</code>.
 It may issue the existing <a href="/docs/protocol#party-commands-overlay-daemon">party commands</a>,
@@ -384,7 +384,7 @@ nonzero exit is “Game exited unexpectedly”. These states describe evidence, 
 user intent. Reconnecting games clear their issue and must prepare again before
 being shown as ready.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="a57b3a30048292eb0ea83aaf41ef1ae0af50c7d06182178af6556ea1c8500130">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/lobbies.md">Edit this page</a><span data-source-fingerprint="a57b3a30048292eb0ea83aaf41ef1ae0af50c7d06182178af6556ea1c8500130">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/unreal"><small>Previous</small>Unreal Engine</a><a href="/docs/c"><small>Next</small>C / C++</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#run-the-godot-example">Run the Godot example</a><a href="#talk-to-the-assistant">Talk to the assistant</a><a href="#queue-behaviour">Queue behaviour</a><a href="#register-a-replacement-lobby">Register a replacement lobby</a><a href="#state-and-commands">State and commands</a><a href="#minimal-godot-client">Minimal Godot client</a><a href="#input-and-screen-ownership">Input and screen ownership</a><a href="#faces-and-names">Faces and names</a><a href="#verification-and-current-limits">Verification and current limits</a><a href="#phone-joining-and-profile-pickup">Phone joining and profile pickup</a><a href="#game-settings-and-artwork">Game settings and artwork</a><a href="#choose-a-lobby-in-the-installed-app">Choose a lobby in the installed app</a><a href="#automated-coverage">Automated coverage</a><a href="#closed-games-and-failed-launches">Closed games and failed launches</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -3,7 +3,7 @@ name = "gamenight-bevy"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/ontola/gamenight"
+repository = "https://github.com/ontola/gamepad-party"
 description = "Bevy plugin for GameNight: lifecycle, per-seat controllers, window and audio ownership, settings, phone screens and faces."
 
 [workspace]

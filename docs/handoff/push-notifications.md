@@ -58,7 +58,7 @@ Joep is ingelogd op zijn telefoon en is de main player op de GameNight-PC. Hij p
 
 ## Wat er al is (niet aanpassen tenzij het faalt)
 
-- **App opent in de room** (`ontola/gamenight` commit 5db33aa, map `mobile/`). `AppState.findHostedRoom()` in `mobile/lib/app_state.dart` vraagt `GET /v1/rooms/status` op bij het starten (`loadAccount`), bij terugkomen naar de voorgrond (`didChangeAppLifecycleState` in `mobile/lib/main.dart`) en elke 10 seconden zolang de app open is. Is het account gekoppeld (`status: connected`) of wacht het bij de deur (`status: waiting`), dan gaat de app de room in. Een tik op de melding opent de app, en dan regelt deze code het inloggen al. De melding hoeft dus alleen de app te openen.
+- **App opent in de room** (`ontola/gamepad-party` commit 5db33aa, map `mobile/`). `AppState.findHostedRoom()` in `mobile/lib/app_state.dart` vraagt `GET /v1/rooms/status` op bij het starten (`loadAccount`), bij terugkomen naar de voorgrond (`didChangeAppLifecycleState` in `mobile/lib/main.dart`) en elke 10 seconden zolang de app open is. Is het account gekoppeld (`status: connected`) of wacht het bij de deur (`status: waiting`), dan gaat de app de room in. Een tik op de melding opent de app, en dan regelt deze code het inloggen al. De melding hoeft dus alleen de app te openen.
 - **Waar de koppeling ontstaat** (privérepo `ontola/gamenight-internal`, crate `crates/gamenight-cloud`):
   - `pickup()` in `src/relay.rs`, rond de regel `room.bindings.insert(input.seat.index, pending.account);`. Dit is het oppakken aan de deur: de GameNight-PC stuurt `POST /v1/lobbies/pickup`. **Hier moet de melding verstuurd worden.**
   - De andere twee plekken waar `bindings.insert` staat (pairing claim in `relay.rs`, en `bind()` in `src/room_guests.rs`) komen van de telefoon zelf. Daar is de app al open, dus geen melding.
@@ -85,15 +85,15 @@ Gebruik Firebase Cloud Messaging (FCM) voor beide platforms. Upload de APNs-sleu
 
 ### 2. Secrets zetten (nooit committen of in chat plakken)
 
-- In `ontola/gamenight` (Actions-secrets), base64 zodat CI ze terug kan schrijven:
+- In `ontola/gamepad-party` (Actions-secrets), base64 zodat CI ze terug kan schrijven:
   ```sh
-  gh secret set GOOGLE_SERVICES_JSON -R ontola/gamenight --body "$(base64 -w0 google-services.json)"
-  gh secret set GOOGLE_SERVICE_INFO_PLIST -R ontola/gamenight --body "$(base64 -w0 GoogleService-Info.plist)"
+  gh secret set GOOGLE_SERVICES_JSON -R ontola/gamepad-party --body "$(base64 -w0 google-services.json)"
+  gh secret set GOOGLE_SERVICE_INFO_PLIST -R ontola/gamepad-party --body "$(base64 -w0 GoogleService-Info.plist)"
   ```
 - Op de productieserver (`gamenight-web`), in `/opt/gamenight-cloud/.env`:
   `GAMENIGHT_FCM_SERVICE_ACCOUNT=/opt/gamenight-cloud/fcm-service-account.json`, en zet dat JSON-bestand daar neer met `chmod 600`. Herstart de cloudservice zoals `deploy/cloud/HOSTED.md` beschrijft.
 
-### 3. App (`ontola/gamenight`, map `mobile/`)
+### 3. App (`ontola/gamepad-party`, map `mobile/`)
 
 1. Voeg `firebase_core` en `firebase_messaging` toe aan `mobile/pubspec.yaml`. Flutter-versie in CI: 3.47.6.
 2. Android: Google Services-plugin in de Gradle-bestanden; `mobile/android/app/google-services.json` wordt in CI uit `GOOGLE_SERVICES_JSON` geschreven en staat in `.gitignore`. Vraag op Android 13+ `POST_NOTIFICATIONS` toestemming.
@@ -116,7 +116,7 @@ Gebruik Firebase Cloud Messaging (FCM) voor beide platforms. Upload de APNs-sleu
 ## Werkafspraken in dit project
 
 - Direct pushen naar `main`, geen PR's (beide repo's).
-- In `ontola/gamenight` moet de check `python3 scripts/build-docs.py --check` groen blijven (eerst `python3 scripts/fetch-game-sources.py`). Pas zo nodig `docs/player-memory.md` aan.
+- In `ontola/gamepad-party` moet de check `python3 scripts/build-docs.py --check` groen blijven (eerst `python3 scripts/fetch-game-sources.py`). Pas zo nodig `docs/player-memory.md` aan.
 - Niet terugdraaien: de main player wordt nooit automatisch op een controller gezet. Hij wacht bij de deur en wordt daar opgepakt (zie `docs/player-memory.md`). De melding komt pas ná dat oppakken.
 
 ## Bekende risico's

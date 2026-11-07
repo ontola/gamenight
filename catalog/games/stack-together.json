@@ -30,7 +30,7 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/stack-together.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/stack-together.love",
       "sha256": "584f4ab627ea0db0199cfa8b0426acdfc3618be15bae9c7bb4127865c468cde5",
       "entrypoint": "stack-together.love",
       "runtime": {
@@ -42,7 +42,7 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/stack-together.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/stack-together.love",
       "sha256": "584f4ab627ea0db0199cfa8b0426acdfc3618be15bae9c7bb4127865c468cde5",
       "entrypoint": "stack-together.love",
       "runtime": {

@@ -6,7 +6,7 @@ Use the [developer portal](/developers) to add your game, upload builds, manage 
 
 Keep two things in your repository and let Gamepad Party production hold the rest:
 
-- `gamenight.json` holds the facts about the game: id, title, tagline, developer, players, round length, tags, emoji, colour, requirements and links. Start it with `"$schema": "https://raw.githubusercontent.com/ontola/gamenight/main/catalog/schema.json"` so editors check it.
+- `gamenight.json` holds the facts about the game: id, title, tagline, developer, players, round length, tags, emoji, colour, requirements and links. Start it with `"$schema": "https://raw.githubusercontent.com/ontola/gamepad-party/main/catalog/schema.json"` so editors check it.
 - `assets/gamenight/` holds the store media sources: `preview.mp4`, `preview.jpg`, `cover.png`, `icon.png`, `gameplay.png` and an optional `screenshots/` folder.
 
 Builds, the store page, ownership and visibility live in production. `gamenight-publish.py push` (or the GitHub Action) sends builds and `gamenight-publish.py store` sends `gamenight.json` and the media. Do not put store text or media anywhere else. Hosts pick up a stable release from the hosted catalog; a new game needs no entry in the Gamepad Party repository.
@@ -43,7 +43,7 @@ Add this step after packaging and testing:
 ```yaml
 - name: Upload GameNight preview
   id: gamenight
-  uses: ontola/gamenight@main
+  uses: ontola/gamepad-party@main
   with:
     token: ${{ secrets.GAMENIGHT_API_TOKEN }}
     game: my-game
@@ -73,7 +73,7 @@ permissions:
 jobs:
   upload:
     if: vars.GAMENIGHT_PUBLISH_ENABLED == 'true'
-    uses: ontola/gamenight/.github/workflows/publish-game.yml@main
+    uses: ontola/gamepad-party/.github/workflows/publish-game.yml@main
     secrets:
       GAMENIGHT_API_TOKEN: ${{ secrets.GAMENIGHT_API_TOKEN }}
     with:
@@ -93,7 +93,7 @@ The shared first-party pack uses a `gamenight-<game-id>` GitHub environment per 
 - **Every preview needs a new version.** A version identifies immutable bytes,
   so a rebuilt commit cannot reuse `${{ github.sha }}`. Add the run:
   `ci-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}`.
-- **Pin what you run with your key.** Pin `ontola/gamenight` actions and
+- **Pin what you run with your key.** Pin `ontola/gamepad-party` actions and
   reusable workflows to a reviewed commit, and check out a pinned copy of
   `scripts/gamenight-publish.py` for the store step. Keep both on the same
   commit, and update them together.

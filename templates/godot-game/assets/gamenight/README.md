@@ -12,4 +12,4 @@
 | `screenshots/*.png` | extra gallery images, in name order |
 
 Make the clip with `tools/capture_preview.sh` and `tools/encode_preview.py`.
-Read the [gameplay preview guide](https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md) first.
+Read the [gameplay preview guide](https://github.com/ontola/gamepad-party/blob/main/docs/gameplay-previews.md) first.

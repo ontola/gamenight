@@ -33,7 +33,7 @@ and window size;</li>
 <li>sends F1 to the party (physical Back is the host's own) and exits when the
 host goes away.</li>
 </ul>
-<p>The demo game in <a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs"><code>sdk/bevy/demo</code></a>, Star
+<p>The demo game in <a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs"><code>sdk/bevy/demo</code></a>, Star
 Catch, uses every feature on this page. Each excerpt below is read from it.
 CI runs it through the <a href="/docs/testing">conformance harness</a> against a real
 host on every push.</p>
@@ -42,7 +42,7 @@ host on every push.</p>
 the public repository:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-toml">[dependencies]
 bevy = &quot;0.20&quot;
-gamenight-bevy = { git = &quot;https://github.com/ontola/gamenight&quot;, rev = &quot;YOUR_REVIEWED_COMMIT&quot; }
+gamenight-bevy = { git = &quot;https://github.com/ontola/gamepad-party&quot;, rev = &quot;YOUR_REVIEWED_COMMIT&quot; }
 </code></pre></div>
 <p>Replace <code>YOUR_REVIEWED_COMMIT</code> with an actual commit hash.</p>
 <h2 id="set-up-the-app">Set up the app</h2>
@@ -90,7 +90,7 @@ from the game being played. Run simulation systems only while
         .run();
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L38">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L38">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p><code>GameNightPlugin::new</code> turns the window, audio and throttling on. Set
 <code>manage_window</code>, <code>fullscreen</code>, <code>manage_audio</code>, <code>throttle_when_hidden</code> or
 <code>report_activity</code> to false to handle one of them yourself.</p>
@@ -260,7 +260,7 @@ painted onto the same pawn.</p>
     }
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L449">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L449">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p>Prepare can follow a Dispose in the same frame (a replay, a skip). Despawn
 with <code>try_despawn</code> and skip entities you already removed in the same batch.</p>
 <h2 id="read-each-seats-controller">Read each seat's controller</h2>
@@ -308,7 +308,7 @@ token.</p>
     }
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L885">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L885">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p>AI seats get bots, empty seats get nothing. <code>rumble(seat, weak, strong, seconds)</code> vibrates a pad; standalone it drives the local gamepad.</p>
 <h2 id="declare-settings-phone-buttons-and-a-phone-screen">Declare settings, phone buttons and a phone screen</h2>
 <p>Declare once at startup; the plugin declares again after each reconnect, and
@@ -357,7 +357,7 @@ player a value of their own, which arrives as <code>PlayerSettings</code>.</p>
     ]
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L108">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L108">Source: sdk/bevy/demo/src/main.rs</a></p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-rust">/// Declare once; the plugin declares again after a reconnect.
 fn declare(mut gn: ResMut&lt;GameNight&gt;) {
     gn.declare_settings(settings());
@@ -378,12 +378,12 @@ fn declare(mut gn: ResMut&lt;GameNight&gt;) {
     );
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L427">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L427">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p><code>declare_companion_folder</code> looks for a relative folder next to the executable,
 under <code>BEVY_ASSET_ROOT</code> or <code>CARGO_MANIFEST_DIR</code>, then the working directory.
 Ship the folder with your build. The page loads <code>/assets/companion.js</code>; see
 <a href="/docs/phone-screens">Phone screens</a> and the demo's
-<a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/assets/phone/index.html">phone page</a>.</p>
+<a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/assets/phone/index.html">phone page</a>.</p>
 <p>Plain-text requests from the Gamepad Party app or the session assistant arrive as
 <code>GameCommand</code>. Answer every one with <code>command_result</code>:</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-rust">fn command(gn: &amp;mut GameNight, text: &amp;str) -&gt; (bool, String) {
@@ -422,7 +422,7 @@ Ship the folder with your build. The page loads <code>/assets/companion.js</code
     )
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L609">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L609">Source: sdk/bevy/demo/src/main.rs</a></p>
 <h2 id="the-start-menu">The Start menu</h2>
 <p>Start opens your own menu, for everyone; Back belongs to Gamepad Party. The game's
 name heads the menu, then Resume, then New round, then the settings, without
@@ -489,7 +489,7 @@ fn menu_input(
     }
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L1141">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L1141">Source: sdk/bevy/demo/src/main.rs</a></p>
 <h2 id="rounds-keep-going">Rounds keep going</h2>
 <p>At the end of a round, show the result briefly, put the winner in the room log,
 save each player's progress and call <code>finished()</code>. Then start the next round
@@ -539,7 +539,7 @@ yourself: <code>finished()</code> does not end the session. Players leave with B
     gn.finished();
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L1094">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L1094">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p><code>save_player_data</code> keeps up to 64 KB of JSON with a player's profile between
 nights; <code>player_data</code> reads it back. Guests keep it for the night only.</p>
 <h2 id="faces-colours-and-couch-order">Faces, colours and couch order</h2>
@@ -612,7 +612,7 @@ fn dress(
     });
 }
 </code></pre></div>
-<p><a href="https://github.com/ontola/gamenight/blob/main/sdk/bevy/demo/src/main.rs#L759">Source: sdk/bevy/demo/src/main.rs</a></p>
+<p><a href="https://github.com/ontola/gamepad-party/blob/main/sdk/bevy/demo/src/main.rs#L759">Source: sdk/bevy/demo/src/main.rs</a></p>
 <p>Lay anything that runs left to right out with <code>couch_order(seats, players)</code>:
 the order in which players sit, which they choose in the lobby. Call it again
 when players update, because people move mid-match.</p>
@@ -641,7 +641,7 @@ plugin hides the window rather than minimising it; Alt-Tab back to a paused
 game goes through the lobby. See <a href="/docs/engines">Engine support</a> for how this
 compares with the other engines.</p>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/bevy.md">Edit this page</a><span data-source-fingerprint="4dd9e2fd055506a9a9d141aab83d24e79ecf74bfc9592e6635c729d308a35b11">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/bevy.md">Edit this page</a><span data-source-fingerprint="471c925a74d5776f9695b34a35a78cbe1a3cd237a942c529a7bbd7b72c703b49">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs/love"><small>Previous</small>LÖVE / Lua</a><a href="/docs/rust"><small>Next</small>Rust</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#add-the-plugin">Add the plugin</a><a href="#set-up-the-app">Set up the app</a><a href="#follow-the-session">Follow the session</a><a href="#read-each-seats-controller">Read each seat&#x27;s controller</a><a href="#declare-settings-phone-buttons-and-a-phone-screen">Declare settings, phone buttons and a phone screen</a><a href="#the-start-menu">The Start menu</a><a href="#rounds-keep-going">Rounds keep going</a><a href="#faces-colours-and-couch-order">Faces, colours and couch order</a><a href="#host-music">Host music</a><a href="#run-and-test">Run and test</a><a href="#what-is-not-covered-yet">What is not covered yet</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

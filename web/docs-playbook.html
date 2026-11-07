@@ -14,7 +14,7 @@
 for AI coding agents as much as for people: every step can run headless, from
 the command line, without someone watching the screen.</p>
 <h2 id="start-from-the-template">Start from the template</h2>
-<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">git clone https://github.com/ontola/gamenight
+<div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">git clone https://github.com/ontola/gamepad-party
 python3 gamenight/scripts/new-godot-game.py my-game my-game &quot;My Game&quot;
 cd my-game &amp;&amp; git init &amp;&amp; git add -A &amp;&amp; git commit -m &quot;Start My Game&quot;
 </code></pre></div>
@@ -167,7 +167,7 @@ Gamepad Party launched the game, never joystick indices.</li>
 <a href="/docs/faces">Faces &amp; colours</a> and <a href="/docs/settings">Game settings</a>.</p>
 <h2 id="the-store-clip">The store clip</h2>
 <p>The store needs a five-second clip of real gameplay. Read the
-<a href="https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md">gameplay preview guide</a>:
+<a href="https://github.com/ontola/gamepad-party/blob/main/docs/gameplay-previews.md">gameplay preview guide</a>:
 quick, varied, readable cuts.</p>
 <div class="docs-code"><button type="button" class="docs-copy" aria-label="Copy code example">Copy</button><pre><code class="language-sh">GODOT=godot tools/capture_preview.sh /tmp/takes
 python3 tools/encode_preview.py /tmp/takes assets/gamenight
@@ -192,7 +192,7 @@ exports Windows, publishes the GitHub release and fills the store page.</li>
 <p>It reads <code>gamenight.json</code> and uploads what is in <code>assets/gamenight/</code>. See
 <a href="/docs/publishing">Publish a game</a> for builds, channels and review.</p>
 <p>Everything players see lives in Gamepad Party production, filled from your
-repository by these commands. Do not add the game to <code>ontola/gamenight</code>'s
+repository by these commands. Do not add the game to <code>ontola/gamepad-party</code>'s
 <code>catalog/games</code> or to any store file in another repository: installed hosts
 get stable releases from the hosted catalog. Store visibility (listed or
 hidden) is a Gamepad Party staff setting.</p>
@@ -205,7 +205,7 @@ only, and let the publish commands carry them to production.</li>
 dictionaries are the usual cause. Give them a type (<code>var c: Vector3 = ...</code>).</li>
 <li>Agents often cannot push git tags. Release with the workflow input instead.</li>
 <li>Never run a downloaded script with your publish key in CI. Check out a
-pinned copy of <code>ontola/gamenight</code> and run its <code>scripts/gamenight-publish.py</code>.</li>
+pinned copy of <code>ontola/gamepad-party</code> and run its <code>scripts/gamenight-publish.py</code>.</li>
 <li>The first frames of a <code>--write-movie</code> take can show the engine warming up.
 Start cuts at frame 20 or later.</li>
 <li>A big level needs the camera close enough to read on a phone; check the clip
@@ -226,7 +226,7 @@ such as one with the CI run id.</li>
 first seconds of play don't stutter.</li>
 </ul>
 
-<footer class="docs-source"><a href="https://github.com/ontola/gamenight/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="fec0643e6176b7ab5046ffd2c4ca6304bc5fba2b0b8246c11f4ad35976e47af7">Built from repository sources</span></footer>
+<footer class="docs-source"><a href="https://github.com/ontola/gamepad-party/blob/main/docs/site/playbook.md">Edit this page</a><span data-source-fingerprint="5aaf1b1df5559e29550a627ae2223b96e252095ffdd5ef92913323e984b9deb6">Built from repository sources</span></footer>
 <nav class="docs-pager" aria-label="Adjacent documentation pages"><a href="/docs"><small>Previous</small>Get started</a><a href="/docs/engines"><small>Next</small>Engine support</a></nav></article>
 <aside class="docs-toc" aria-label="On this page"><strong>On this page</strong><a href="#start-from-the-template">Start from the template</a><a href="#the-loop">The loop</a><a href="#make-it-deterministic-from-day-one">Make it deterministic from day one</a><a href="#see-the-game-without-a-person">See the game without a person</a><a href="#make-3d-models">Make 3D models</a><a href="#design-for-the-couch">Design for the couch</a><a href="#the-store-clip">The store clip</a><a href="#release-and-store-page">Release and store page</a><a href="#pitfalls-we-hit">Pitfalls we hit</a></aside>
 <p class="docs-copy-status" role="status" aria-live="polite"></p></main></body></html>

@@ -2,7 +2,7 @@
 
 The website serves `/download/GameNight.dmg` as a static file. Publishing a Windows release does not update that file. The server deployment and download replacement procedure are documented in the internal repository at `deploy/cloud/HOSTED.md`.
 
-Download the [Mac preview](https://gamenight.ontola.io/download/GameNight.dmg) and drag `GameNight.app` into Applications, replacing the old copy. The September 22 release is [0.1.4 Preview](https://github.com/ontola/gamenight/releases/tag/macos-v0.1.4-preview).
+Download the [Mac preview](https://gamenight.ontola.io/download/GameNight.dmg) and drag `GameNight.app` into Applications, replacing the old copy. The September 22 release is [0.1.4 Preview](https://github.com/ontola/gamepad-party/releases/tag/macos-v0.1.4-preview).
 
 ## Build
 

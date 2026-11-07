@@ -2,7 +2,7 @@
 
 ## Doel
 
-De Gamepad Party player-app (Flutter, `ontola/gamenight`, map `mobile/`) moet bij elke push naar `main` automatisch als iOS-build in TestFlight verschijnen. De CI-kant is al klaar; wat ontbreekt is de eenmalige setup in het Apple-account en drie GitHub-secrets.
+De Gamepad Party player-app (Flutter, `ontola/gamepad-party`, map `mobile/`) moet bij elke push naar `main` automatisch als iOS-build in TestFlight verschijnen. De CI-kant is al klaar; wat ontbreekt is de eenmalige setup in het Apple-account en drie GitHub-secrets.
 
 ## Wat er al is (niet aanpassen tenzij het faalt)
 
@@ -18,18 +18,18 @@ De Gamepad Party player-app (Flutter, `ontola/gamenight`, map `mobile/`) moet bi
 1. **Bundle ID registreren** (als die nog niet bestaat): developer.apple.com → Certificates, Identifiers & Profiles → Identifiers → + → App IDs → App → description `GameNight`, explicit bundle ID `io.ontola.gamenight`. Geen extra capabilities nodig.
 2. **App-record aanmaken** in App Store Connect → Apps → + → New App: platform iOS, naam `GameNight` (of een vrije variant als die bezet is), primaire taal Engels, bundle ID `io.ontola.gamenight`, SKU `gamenight`, volledige toegang. De API kan dit record niet zelf aanmaken, dus dit moet handmatig.
 3. **API-sleutel maken**: App Store Connect → Users and Access → Integrations → App Store Connect API → Team Keys → + . Naam `GameNight CI`, rol **Admin** (nodig om certificaten en profielen aan te maken). Download het `.p8`-bestand (kan maar één keer). Noteer de **Key ID** en de **Issuer ID** (staat boven de lijst).
-4. **GitHub-secrets zetten** in `ontola/gamenight` (Settings → Secrets and variables → Actions → New repository secret), of met de CLI:
+4. **GitHub-secrets zetten** in `ontola/gamepad-party` (Settings → Secrets and variables → Actions → New repository secret), of met de CLI:
    - `APP_STORE_CONNECT_KEY_ID` = de Key ID
    - `APP_STORE_CONNECT_ISSUER_ID` = de Issuer ID
    - `APP_STORE_CONNECT_PRIVATE_KEY` = de volledige inhoud van het `.p8`-bestand, inclusief de `-----BEGIN PRIVATE KEY-----`- en `END`-regels
 
    ```sh
-   gh secret set APP_STORE_CONNECT_KEY_ID -R ontola/gamenight --body "<KEY_ID>"
-   gh secret set APP_STORE_CONNECT_ISSUER_ID -R ontola/gamenight --body "<ISSUER_ID>"
-   gh secret set APP_STORE_CONNECT_PRIVATE_KEY -R ontola/gamenight < AuthKey_<KEY_ID>.p8
+   gh secret set APP_STORE_CONNECT_KEY_ID -R ontola/gamepad-party --body "<KEY_ID>"
+   gh secret set APP_STORE_CONNECT_ISSUER_ID -R ontola/gamepad-party --body "<ISSUER_ID>"
+   gh secret set APP_STORE_CONNECT_PRIVATE_KEY -R ontola/gamepad-party < AuthKey_<KEY_ID>.p8
    ```
    Zet de `.p8` daarna nergens anders neer (niet committen, niet in chat plakken).
-5. **Build starten**: Actions → "Mobile app" → Run workflow op `main` (of `gh workflow run mobile.yml -R ontola/gamenight --ref main`). Kijk naar de job `ios`.
+5. **Build starten**: Actions → "Mobile app" → Run workflow op `main` (of `gh workflow run mobile.yml -R ontola/gamepad-party --ref main`). Kijk naar de job `ios`.
 6. **Interne testgroep**: App Store Connect → de app → TestFlight → Internal Testing → + → groep `GameNight`, zet "Enable automatic distribution" aan en voeg Joep (joep@ontola.io) toe. Na verwerking (meestal 5 tot 30 minuten) staat de build in de TestFlight-app op de iPhone.
 
 ## Bekende risico's en wat te doen

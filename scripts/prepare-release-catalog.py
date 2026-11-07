@@ -23,7 +23,7 @@ def prepare(catalog, pack, version):
             if name not in artifacts:
                 raise ValueError(f'Missing release artifact: {name}')
             used.add(name)
-            download['url'] = f'https://github.com/ontola/gamenight/releases/download/v{version}/{name}'
+            download['url'] = f'https://github.com/ontola/gamepad-party/releases/download/v{version}/{name}'
             download['sha256'] = hashlib.sha256(artifacts[name].read_bytes()).hexdigest()
         updates.append((path, entry))
     if used != set(artifacts):

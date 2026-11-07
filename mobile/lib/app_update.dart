@@ -18,7 +18,7 @@ const appBuild = int.fromEnvironment('GAMENIGHT_BUILD');
 class AppUpdate {
   static const package = 'io.ontola.gamenight';
   static final _release = Uri.parse(
-      'https://github.com/ontola/gamenight/releases/download/app-latest/');
+      'https://github.com/ontola/gamepad-party/releases/download/app-latest/');
   static final feed = _release.resolve('version.json');
   static final apk = _release.resolve('gamenight.apk');
 

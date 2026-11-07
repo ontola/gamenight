@@ -7,7 +7,7 @@ the command line, without someone watching the screen.
 ## Start from the template
 
 ```sh
-git clone https://github.com/ontola/gamenight
+git clone https://github.com/ontola/gamepad-party
 python3 gamenight/scripts/new-godot-game.py my-game my-game "My Game"
 cd my-game && git init && git add -A && git commit -m "Start My Game"
 ```
@@ -153,7 +153,7 @@ More detail: [Game lifecycle](/docs/lifecycle), [Controllers & players](/docs/co
 ## The store clip
 
 The store needs a five-second clip of real gameplay. Read the
-[gameplay preview guide](https://github.com/ontola/gamenight/blob/main/docs/gameplay-previews.md):
+[gameplay preview guide](https://github.com/ontola/gamepad-party/blob/main/docs/gameplay-previews.md):
 quick, varied, readable cuts.
 
 ```sh
@@ -186,7 +186,7 @@ It reads `gamenight.json` and uploads what is in `assets/gamenight/`. See
 [Publish a game](/docs/publishing) for builds, channels and review.
 
 Everything players see lives in Gamepad Party production, filled from your
-repository by these commands. Do not add the game to `ontola/gamenight`'s
+repository by these commands. Do not add the game to `ontola/gamepad-party`'s
 `catalog/games` or to any store file in another repository: installed hosts
 get stable releases from the hosted catalog. Store visibility (listed or
 hidden) is a Gamepad Party staff setting.
@@ -200,7 +200,7 @@ hidden) is a Gamepad Party staff setting.
   dictionaries are the usual cause. Give them a type (`var c: Vector3 = ...`).
 - Agents often cannot push git tags. Release with the workflow input instead.
 - Never run a downloaded script with your publish key in CI. Check out a
-  pinned copy of `ontola/gamenight` and run its `scripts/gamenight-publish.py`.
+  pinned copy of `ontola/gamepad-party` and run its `scripts/gamenight-publish.py`.
 - The first frames of a `--write-movie` take can show the engine warming up.
   Start cuts at frame 20 or later.
 - A big level needs the camera close enough to read on a phone; check the clip

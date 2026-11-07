@@ -20,11 +20,11 @@ and let the game's CI fail when it falls behind:
 ```yaml
 jobs:
   gamenight-sdk:
-    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+    uses: ontola/gamepad-party/.github/workflows/godot-sdk-check.yml@main
 ```
 
 Games that publish to the catalog can call
-`ontola/gamenight/.github/workflows/publish-game.yml@main` from a `workflow_run`
+`ontola/gamepad-party/.github/workflows/publish-game.yml@main` from a `workflow_run`
 workflow instead of copying the upload steps; the file shows an example.
 
 Managed games read `GameNight.frame_for_seat(index)` rather than native joystick

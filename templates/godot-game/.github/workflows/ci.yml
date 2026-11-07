@@ -18,7 +18,7 @@ env:
   TEMPLATES_SHA512: 1643140ac56ba8e6d18be34eb27788ec6a216e4a3f45dbcc3e01caf2b28ae9c8229832061e30200e296a1be46cec61e2b54c6d9df190b921ea1d0ad5f3f25ed1
 jobs:
   gamenight-sdk:
-    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+    uses: ontola/gamepad-party/.github/workflows/godot-sdk-check.yml@main
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -94,7 +94,7 @@ jobs:
       - uses: actions/checkout@v4
         if: env.GAMENIGHT_API_TOKEN != ''
         with:
-          repository: ontola/gamenight
+          repository: ontola/gamepad-party
           path: .gamenight
           sparse-checkout: scripts/gamenight-publish.py
           sparse-checkout-cone-mode: false

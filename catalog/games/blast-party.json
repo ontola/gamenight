@@ -28,7 +28,7 @@
   },
   "downloads": {
     "windows": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/blast-party.love",
       "sha256": "09a038d077b028aaf873ef8effd68adc4e9caddd44efcf8d7140d035c88facaa",
       "entrypoint": "blast-party.love",
       "runtime": {
@@ -40,7 +40,7 @@
       }
     },
     "mac": {
-      "url": "https://github.com/ontola/gamenight/releases/download/v0.1.0-preview.4/blast-party.love",
+      "url": "https://github.com/ontola/gamepad-party/releases/download/v0.1.0-preview.4/blast-party.love",
       "sha256": "09a038d077b028aaf873ef8effd68adc4e9caddd44efcf8d7140d035c88facaa",
       "entrypoint": "blast-party.love",
       "runtime": {

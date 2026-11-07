@@ -5,7 +5,7 @@
 // catalogue guide uses — plus a link resolver that knows some of its links
 // point at directories (crates, games/), not files.
 // ---------------------------------------------------------------------------
-const REPO = "https://github.com/ontola/gamenight";
+const REPO = "https://github.com/ontola/gamepad-party";
 // A sentinel char for protecting code spans, built at runtime rather than
 // written as a literal escape — keeps this file itself plain text.
 const NUL = String.fromCharCode(0);

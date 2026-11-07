@@ -13,7 +13,7 @@ Godot has no package manager, so every game keeps its own copy of the addon, and
 ```yaml
 jobs:
   gamenight-sdk:
-    uses: ontola/gamenight/.github/workflows/godot-sdk-check.yml@main
+    uses: ontola/gamepad-party/.github/workflows/godot-sdk-check.yml@main
     with:
       path: .  # the folder that holds project.godot
 ```

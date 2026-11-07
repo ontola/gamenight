@@ -18,7 +18,7 @@ from markdown_it import MarkdownIt
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGES = json.loads((ROOT / "docs/site/pages.json").read_text())
-REPO = "https://github.com/ontola/gamenight/blob/main/"
+REPO = "https://github.com/ontola/gamepad-party/blob/main/"
 
 
 # Shown on every docs page, so makers can always reach the portal.
