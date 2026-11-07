@@ -24,14 +24,27 @@ class Account {
 
   /// May use the AI Assistant; it is invite-only for now.
   final bool assistant;
+
+  /// `preferences` as the cloud stores them (version, personalization,
+  /// weights); sent back whole when one field changes.
+  final Map<String, dynamic> preferences;
   const Account(
-      {required this.id, this.displayName, this.email, this.assistant = false});
+      {required this.id,
+      this.displayName,
+      this.email,
+      this.assistant = false,
+      this.preferences = const {}});
+
+  /// Personal recommendations: play history is used to suggest games.
+  /// On unless the player turned it off.
+  bool get recommendations => preferences['personalization'] != false;
 
   static Account fromJson(Map<String, dynamic> j) => Account(
       id: j['id'] as String,
       displayName: (j['profile'] as Map?)?['display_name'] as String?,
       email: j['email'] as String?,
-      assistant: j['assistant'] == true);
+      assistant: j['assistant'] == true,
+      preferences: Map<String, dynamic>.from(j['preferences'] as Map? ?? {}));
 }
 
 /// `GET /v1/me/studio`: the saved player and every face, in the studio's
@@ -523,6 +536,16 @@ class CloudApi {
     }) as Map;
     return data['email'] as String;
   }
+
+  /// Turns personal recommendations on or off. Off also forgets the play
+  /// history behind them.
+  Future<void> setRecommendations(Map<String, dynamic> preferences, bool on) =>
+      _send('PUT', '/v1/me/preferences', body: {
+        'version': 1,
+        'weights': List.filled(8, 0.0),
+        ...preferences,
+        'personalization': on,
+      });
 
   /// Deletes the account and everything saved to it.
   Future<void> deleteAccount() => _send('DELETE', '/v1/me', errors: const {

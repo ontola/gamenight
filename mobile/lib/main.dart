@@ -279,6 +279,7 @@ class _GameNightAppState extends State<GameNightApp> {
                     'Privacy policy',
                     Icons.privacy_tip_outlined
                   ),
+                  ('/docs/terms', 'Terms of service', Icons.gavel_outlined),
                   ('/host', 'Host a room', Icons.tv),
                 ])
                   ListTile(
@@ -365,6 +366,7 @@ class _GameNightAppState extends State<GameNightApp> {
               ('/developers', 'Developer portal', Icons.code),
               ('/docs', 'Documentation', Icons.menu_book_outlined),
               ('/docs/privacy', 'Privacy policy', Icons.privacy_tip_outlined),
+              ('/docs/terms', 'Terms of service', Icons.gavel_outlined),
               ('/host', 'Host a room', Icons.tv),
             ])
               _SidebarItem(

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../theme.dart';
 import '../layout.dart';
+import '../navigation/open_website.dart';
 
 /// Sign in with a GameNight account: GameNight emails an 8-digit code.
 /// Pops with true once signed in.
@@ -112,7 +113,19 @@ class _SignInScreenState extends State<SignInScreen> {
             decoration: const InputDecoration(labelText: 'Email'),
             onSubmitted: (_) => _send(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
+          Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: [
+            const Hint('By signing in you accept the'),
+            TextButton(
+                onPressed: () => openWebsite(widget.state.cloud, '/docs/terms'),
+                child: const Text('terms')),
+            const Hint('and'),
+            TextButton(
+                onPressed: () =>
+                    openWebsite(widget.state.cloud, '/docs/privacy'),
+                child: const Text('privacy policy')),
+          ]),
+          const SizedBox(height: 8),
           if (!_sent)
             FilledButton(
               onPressed: _busy ? null : _send,

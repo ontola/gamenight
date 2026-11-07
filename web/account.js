@@ -10,7 +10,7 @@ window.initAccountSettings = (account, request) => {
     preference.disabled = true;
     try {
       account.preferences = await request('/v1/me/preferences', 'PUT', {...account.preferences, personalization: enabled});
-      window.showToast(enabled ? 'Game preferences enabled.' : 'Game preferences cleared.');
+      window.showToast(enabled ? 'Personal recommendations are on.' : 'Personal recommendations are off and your play history is forgotten.');
     } catch (error) { preference.checked = !enabled; window.showToast(error.message); }
     finally { preference.disabled = false; }
   });

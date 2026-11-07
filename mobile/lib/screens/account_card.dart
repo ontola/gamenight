@@ -39,13 +39,31 @@ class _AccountCardState extends State<AccountCard> {
     if (mounted && email != null) toast(context, 'You now sign in with $email');
   }
 
+  Future<void> _setRecommendations(bool on) async {
+    setState(() => _busy = true);
+    try {
+      await state.setRecommendations(on);
+      if (mounted) {
+        toast(
+            context,
+            on
+                ? 'Personal recommendations are on.'
+                : 'Personal recommendations are off and your play history is forgotten.');
+      }
+    } catch (e) {
+      if (mounted) toast(context, e is ApiError ? e.message : e.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _delete() async {
     final sure = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
               title: const Text('Delete your account?'),
               content: const Text(
-                  'Your saved player, faces, likes, play history and purchases are removed from Gamepad Party for good. The player on this device stays.'),
+                  'Your saved player, faces, likes, play history and purchases are removed from Gamepad Party for good. The player on this device stays. Records of purchases are kept for 7 years, as tax law requires.'),
               actions: [
                 TextButton(
                     onPressed: () => Navigator.pop(context, false),
@@ -95,7 +113,16 @@ class _AccountCardState extends State<AccountCard> {
         ]),
         const SizedBox(height: 8),
         const Hint('Your name and faces are saved to your account.'),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
+        SwitchListTile(
+            key: const ValueKey('recommendations'),
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Personal recommendations'),
+            subtitle: const Text(
+                'Use what you play to suggest games for your group. Turning this off forgets your play history.'),
+            value: account?.recommendations ?? true,
+            onChanged: _busy || account == null ? null : _setRecommendations),
+        const SizedBox(height: 8),
         Wrap(spacing: 8, runSpacing: 8, children: [
           OutlinedButton.icon(
               onPressed: _busy ? null : _signOut,

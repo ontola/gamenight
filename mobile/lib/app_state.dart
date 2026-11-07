@@ -930,6 +930,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setRecommendations(bool on) async {
+    await cloud.setRecommendations(account?.preferences ?? const {}, on);
+    account = await cloud.me();
+    notifyListeners();
+  }
+
   Future<String> requestEmailChange(String email) =>
       cloud.requestEmailChange(email);
 
