@@ -186,6 +186,8 @@ window server refuses to minimise it.
   (`gamenight-certify unreal-core`).
 - `GameNightProtocol.h` is generated from the protocol schema, so message tags
   cannot drift (`scripts/build-protocol.py --check`).
+- The plugin and the demo were built (game and editor targets) and packaged
+  by hand with Unreal Engine 5.8 on Windows, without errors or warnings.
 - Not yet in CI: compiling the Unreal module and the demo, and the window,
   audio and pause behaviour on real hardware. Build the demo and run it under
   Gamepad Party, then follow the [test guide](/docs/testing), before relying on
