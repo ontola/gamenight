@@ -193,6 +193,7 @@ pub struct WsTransport {
 
 impl WsTransport {
     pub async fn connect(url: &str) -> Result<Self> {
+        crate::install_tls_provider();
         let (socket, _) = tokio::time::timeout(IDLE, tokio_tungstenite::connect_async(url))
             .await
             .map_err(|_| "the hub did not answer")??;
@@ -241,6 +242,27 @@ pub(crate) mod tests {
     use super::*;
     use atomic_lib::sync::transport::ChannelTransport;
     use atomic_lib::{urls, Storelike, Value};
+
+    /// A `wss://` hub needs a TLS client. With both rustls backends in the
+    /// build (atomic_lib brings aws-lc-rs, the rest ring), rustls cannot pick
+    /// one by itself and panicked here, taking the store worker with it.
+    #[tokio::test]
+    async fn a_tls_hub_that_does_not_answer_is_an_error_not_a_panic() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            // Accept and hang up: the TLS handshake fails, as it should.
+            while let Ok((socket, _)) = listener.accept().await {
+                drop(socket);
+            }
+        });
+        let url = format!("wss://localhost:{}/atomic/ws", addr.port());
+        let result = tokio::spawn(async move { WsTransport::connect(&url).await.is_err() }).await;
+        assert!(
+            matches!(result, Ok(true)),
+            "connecting must fail cleanly: {result:?}"
+        );
+    }
 
     /// A hub as small as it gets: one connection, the engine answering.
     pub(crate) fn serve(hub: Db) -> ChannelTransport {

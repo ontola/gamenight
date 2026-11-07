@@ -12,6 +12,7 @@ serde_json = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true, features = ["fs"] }
 tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
+rustls = { workspace = true }
 futures-util = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }

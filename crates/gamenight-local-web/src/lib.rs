@@ -28,6 +28,18 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+/// Pick rustls' crypto backend for this process, once. Every `wss://`
+/// connection goes through rustls' process default, and with both ring and
+/// aws-lc-rs in the build there is none until someone installs one: without
+/// this, the first TLS connection panics.
+pub fn install_tls_provider() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // Err means another one is installed already, which is just as good.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Profile {
     pub id: String,

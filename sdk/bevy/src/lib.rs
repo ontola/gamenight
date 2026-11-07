@@ -794,9 +794,17 @@ fn resolve_folder(folder: &Path) -> Option<PathBuf> {
 
 impl Plugin for GameNightPlugin {
     fn build(&self, app: &mut App) {
-        let gn = GameNight::new(self.game_id.clone());
+        // A launch names the id the host knows this game by (a local
+        // registration can call it something else than the code does);
+        // registering under another id leaves the host waiting for it.
+        let game_id = gamenight_sdk::GameNight::launched_by_daemon()
+            .then(|| std::env::var("GAMENIGHT_GAME_ID").ok())
+            .flatten()
+            .filter(|id| !id.is_empty())
+            .unwrap_or_else(|| self.game_id.clone());
+        let gn = GameNight::new(game_id.clone());
         let link = if gn.connect {
-            Some(spawn_network(self.game_id.clone(), gn.launched_by_daemon))
+            Some(spawn_network(game_id, gn.launched_by_daemon))
         } else {
             None
         };

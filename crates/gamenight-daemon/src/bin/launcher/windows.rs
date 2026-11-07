@@ -117,8 +117,11 @@ impl Updates {
     pub fn start(data: &Path) -> Self {
         // No token in the client. The installed manifest chooses stable or preview;
         // including GitHub prereleases cannot switch a stable install's channel.
-        let source =
-            velopack::sources::GithubSource::new("https://github.com/ontola/gamepad-party", None, true);
+        let source = velopack::sources::GithubSource::new(
+            "https://github.com/ontola/gamepad-party",
+            None,
+            true,
+        );
         Self::with_source(data, source)
     }
     pub fn with_source(

@@ -128,6 +128,7 @@ pub(super) async fn run(bridge: Bridge, state: SharedState) {
             continue;
         };
         request.headers_mut().insert("authorization", auth);
+        crate::install_tls_provider();
         let Ok(Ok((mut socket, _))) = tokio::time::timeout(
             Duration::from_secs(10),
             tokio_tungstenite::connect_async(request),

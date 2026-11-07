@@ -35,9 +35,18 @@ uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "io-util", "signal"] }
 tokio-tungstenite = "0.24"
+# One TLS backend for the whole host: atomic_lib brings aws-lc-rs, the rest
+# ring, and with both compiled in rustls picks neither by itself.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 futures-util = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Line tables in the release build: on Windows they go into the .pdb next
+# to the exe, which the release keeps, so a crash dump from a player's PC
+# shows where it happened. The exe itself stays the same size.
+[profile.release]
+debug = "line-tables-only"
 
 # Fast native packaging smoke builds; production installers use release.
 [profile.ci]

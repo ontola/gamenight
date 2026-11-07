@@ -42,6 +42,36 @@ fn atomic(e: atomic_lib::errors::AtomicError) -> Error {
     e.to_string().into()
 }
 
+/// Pick rustls' crypto backend for this process, once. Every `wss://`
+/// connection goes through rustls' process default, and with both ring and
+/// aws-lc-rs in the build there is none until someone installs one: without
+/// this, the first TLS connection panics.
+pub fn install_tls_provider() {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        // Err means another one is installed already, which is just as good.
+        let _ = rustls::crypto::ring::default_provider().install_default();
+    });
+}
+
+/// Run one step of the store worker, and keep the worker when it panics: a
+/// bug in one save or sync must not stop every later save of the night.
+async fn survive<T>(step: impl std::future::Future<Output = T>) -> Option<T> {
+    use futures_util::FutureExt;
+    match std::panic::AssertUnwindSafe(step).catch_unwind().await {
+        Ok(value) => Some(value),
+        Err(panic) => {
+            let message = panic
+                .downcast_ref::<&str>()
+                .map(|s| s.to_string())
+                .or_else(|| panic.downcast_ref::<String>().cloned())
+                .unwrap_or_default();
+            tracing::error!(%message, "the player store recovered from a panic");
+            None
+        }
+    }
+}
+
 /// Everything saved, as the night loads it.
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Saved {
@@ -959,22 +989,22 @@ impl StoreHandle {
                 tokio::select! {
                     request = rx.recv() => {
                         let Some(request) = request else { break };
-                        if let Err(error) = worker.handle(request).await {
+                        if let Some(Err(error)) = survive(worker.handle(request)).await {
                             warn!(%error, "could not save to the player store");
                         }
                     }
                     _ = project_tick.tick(), if worker.projects.is_some() => {
-                        worker.save_projects().await;
-                        worker.save_shelf().await;
+                        survive(worker.save_projects()).await;
+                        survive(worker.save_shelf()).await;
                     }
                     _ = tokio::time::sleep_until(soon) => {
                         if tokio::time::Instant::now() >= next_round {
                             worker.dirty.clear();
-                            worker.sync_owners(None).await;
+                            survive(worker.sync_owners(None)).await;
                             next_round = tokio::time::Instant::now() + SYNC_EVERY;
                         } else {
                             let owners = std::mem::take(&mut worker.dirty);
-                            worker.sync_owners(Some(owners)).await;
+                            survive(worker.sync_owners(Some(owners))).await;
                         }
                         due = None;
                     }

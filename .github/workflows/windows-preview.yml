@@ -135,6 +135,14 @@ jobs:
           path: |
             ${{ runner.temp }}/native-downloads/results.json
             ${{ runner.temp }}/native-downloads/installer.log
+      # Symbols for the exes in this build: a crash dump from a host
+      # (%LOCALAPPDATA%\CrashDumps) is only readable with these.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gamenight-windows-symbols
+          path: target/release/*.pdb
+          if-no-files-found: warn
+          retention-days: 90
       - uses: actions/upload-artifact@v4
         with:
           name: gamenight-windows-installer

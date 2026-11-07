@@ -18,6 +18,8 @@ fn main() -> std::io::Result<()> {
 
 #[tokio::main]
 async fn run() -> std::io::Result<()> {
+    gamenight_store::install_tls_provider();
+    gamenight_local_web::install_tls_provider();
     // The desktop launcher attaches us to its Windows job before allowing any
     // descendants to spawn. EOF means the launcher failed before ownership was set.
     if std::env::var_os("GAMENIGHT_STARTUP_GATE").is_some() {

@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing_subscriber::fmt().init();
+    gamenight_local_web::install_tls_provider();
     let daemon_addr =
         std::env::var("GAMENIGHT_ADDR").unwrap_or_else(|_| gamenight_protocol::DEFAULT_ADDR.into());
     let addr = std::env::var("GAMENIGHT_WEB_ADDR")

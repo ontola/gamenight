@@ -253,7 +253,9 @@ impl Bridge {
 
     /// The model's next step for a live-control request (see `live`).
     async fn live_step(&self, body: serde_json::Value) -> Result<serde_json::Value, String> {
-        let token = self.session_token().ok_or("Not connected to Gamepad Party")?;
+        let token = self
+            .session_token()
+            .ok_or("Not connected to Gamepad Party")?;
         let response = self
             .http
             .post(format!("{}/v1/lobbies/assistant", self.origin))
